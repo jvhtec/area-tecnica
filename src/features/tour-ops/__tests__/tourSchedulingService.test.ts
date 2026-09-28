@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeComparison } from "@/features/tour-ops/tourSchedulingNormalizers";
+import {
+  buildHojaStaffLookup,
+  normalizeComparison,
+  normalizeRoomAssignment,
+} from "@/features/tour-ops/tourSchedulingNormalizers";
+import { buildHojaRoomAssignmentRows } from "@/features/tour-ops/tourSchedulingMutations";
 import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingService";
 
 const rawTour: Record<string, unknown> = {
@@ -73,7 +78,17 @@ const rawPayload: Record<string, unknown> = {
       tour_date_id: null,
       job_id: "job-1",
       venue_name: "Barcelona Arena",
-      program_schedule_json: [{ label: "Dia 1", rows: [{ time: "10:00", item: "Load in", dept: "sound" }] }],
+      program_schedule_json: [{
+        label: "Dia 1",
+        rows: [{
+          id: "program-row-1",
+          time: "10:00",
+          item: "Load in",
+          dept: "sound",
+          notify: true,
+          departments: ["sound", "production"],
+        }],
+      }],
       weather_data: [{ condition: "sun" }],
       hotel_info: { hotel_name: "Legacy Hoja Hotel", address: "Legacy address", check_in: "2026-06-01", check_out: "2026-06-02" },
     },
@@ -123,6 +138,80 @@ describe("tour ops normalization", () => {
     expect(normalizeComparison("  BCN Airport  ")).toBe("bcn airport");
   });
 
+  it("prefers canonical Hoja staff UUIDs when normalizing room occupants", () => {
+    const staffLookup = buildHojaStaffLookup([
+      {
+        id: "staff-row-1",
+        hoja_de_ruta_id: "hdr-1",
+        technician_id: "tech-1",
+        name: "Ada",
+        surname1: "Lovelace",
+      },
+    ]).get("hdr-1");
+
+    expect(normalizeRoomAssignment({
+      id: "room-1",
+      room_type: "single",
+      staff_member1_hoja_staff_id: "staff-row-1",
+      staff_member1_id: "legacy-index-that-must-not-win",
+    }, staffLookup)).toEqual(expect.objectContaining({
+      staffMember1Id: "tech-1",
+      rawStaffMember1Id: "staff-row-1",
+      staffMember1Name: "Ada Lovelace",
+    }));
+  });
+
+  it("writes Tour Ops room occupants through the canonical Hoja staff FK columns", () => {
+    expect(buildHojaRoomAssignmentRows(
+      "hotel-1",
+      [{
+        roomType: "double",
+        roomNumber: "204",
+        staffMember1Id: "tech-1",
+        staffMember2Id: "tech-2",
+      }],
+      new Map([
+        ["tech-1", "hoja-staff-1"],
+        ["tech-2", "hoja-staff-2"],
+      ]),
+    )).toEqual([
+      expect.objectContaining({
+        accommodation_id: "hotel-1",
+        room_type: "double",
+        room_number: "204",
+        staff_member1_hoja_staff_id: "hoja-staff-1",
+        staff_member2_hoja_staff_id: "hoja-staff-2",
+        staff_member1_id: null,
+        staff_member2_id: null,
+        sort_order: 0,
+      }),
+    ]);
+  });
+
+  it("keeps current free-text room occupants when no Hoja staff row matches", () => {
+    expect(buildHojaRoomAssignmentRows(
+      "hotel-1",
+      [{
+        roomType: "single",
+        roomNumber: "205",
+        staffMember1Id: "Invitado externo",
+        staffMember1Name: "Invitado externo",
+      }],
+      new Map(),
+    )).toEqual([
+      expect.objectContaining({
+        accommodation_id: "hotel-1",
+        room_type: "single",
+        room_number: "205",
+        staff_member1_hoja_staff_id: null,
+        staff_member2_hoja_staff_id: null,
+        staff_member1_id: "Invitado externo",
+        staff_member2_id: null,
+        sort_order: 0,
+      }),
+    ]);
+  });
+
   it("merges tour dates, jobs, aggregate hoja data, and legacy tour travel", () => {
     const model = normalizeTourOpsModel(rawPayload, "management");
 
@@ -131,6 +220,11 @@ describe("tour ops normalization", () => {
     expect(model.dates).toHaveLength(2);
     expect(model.dates[0].jobId).toBe("job-1");
     expect(model.dates[0].program[0].rows[0].item).toBe("Load in");
+    expect(model.dates[0].program[0].rows[0]).toMatchObject({
+      id: "program-row-1",
+      notify: true,
+      departments: ["sound", "production"],
+    });
     expect(model.dates[0].crew.map((member) => member.name)).toContain("Ada Lovelace");
     expect(model.dates[0].crew.filter((member) => member.name === "Ada Lovelace")).toHaveLength(1);
     expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(
@@ -196,6 +290,53 @@ describe("tour ops normalization", () => {
     expect(model.accommodations.filter((hotel) => hotel.hotelName === "Hoja Hotel")).toEqual([
       expect.objectContaining({ id: "ops-hotel-1", source: "normalized", syncStatus: "synced" }),
     ]);
+  });
+
+  it("uses stable source links to collapse synced rows even after their display fields diverge", () => {
+    const model = normalizeTourOpsModel(
+      {
+        ...rawPayload,
+        tour: { ...rawTour, travel_plan: [] },
+        travel_segments: [{
+          id: "ops-travel-linked",
+          tour_id: "tour-1",
+          to_tour_date_id: "date-1",
+          transportation_type: "van",
+          departure_time: "08:30",
+          arrival_time: "09:30",
+          source_hoja_travel_arrangement_id: "hdr-travel-1",
+        }],
+        hoja_travel_arrangements: [{
+          ...((rawPayload.hoja_travel_arrangements as Record<string, unknown>[])[0]),
+          source_tour_travel_segment_id: "ops-travel-linked",
+          departure_time: "08:00",
+          arrival_time: "09:00",
+        }],
+        accommodations: [{
+          id: "ops-hotel-linked",
+          tour_id: "tour-1",
+          tour_date_id: "date-1",
+          hotel_name: "Renamed Hotel",
+          check_in_date: "2026-06-01",
+          check_out_date: "2026-06-02",
+          source_hoja_accommodation_id: "hdr-hotel-1",
+        }],
+        hoja_accommodations: [{
+          ...((rawPayload.hoja_accommodations as Record<string, unknown>[])[0]),
+          source_tour_accommodation_id: "ops-hotel-linked",
+        }],
+      },
+      "management",
+    );
+
+    expect(model.travelSegments.filter((segment) => segment.id === "hdr-travel-1")).toEqual([]);
+    expect(model.travelSegments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "ops-travel-linked", source: "normalized", syncStatus: "synced" }),
+    ]));
+    expect(model.accommodations.filter((hotel) => hotel.id === "hdr-hotel-1")).toEqual([]);
+    expect(model.accommodations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "ops-hotel-linked", source: "normalized", syncStatus: "synced" }),
+    ]));
   });
 
   it("filters private data for technician and guest projections", () => {

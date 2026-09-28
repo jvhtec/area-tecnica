@@ -33,7 +33,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   }
 
   const handleToggleVisibility = async (doc: JobDocument) => {
-    if (doc.read_only) {
+    if (doc.read_only || doc.document_kind === 'hoja_de_ruta') {
       return;
     }
     try {
@@ -66,7 +66,8 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       <div className="space-y-2">
         {documents.map((doc) => {
           const isTemplate = doc.template_type === 'soundvision';
-          const isReadOnly = Boolean(doc.read_only);
+          const isPublishedHoja = doc.document_kind === 'hoja_de_ruta';
+          const isReadOnly = Boolean(doc.read_only) || isPublishedHoja;
           return (
             <div
               key={doc.id}
@@ -92,7 +93,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                     Subido el {formatDocumentUploadDate(doc.uploaded_at)}
                   </span>
                   {isReadOnly && (
-                    <span className="italic">Solo lectura</span>
+                    <span className="italic">{isPublishedHoja ? 'Hoja publicada' : 'Solo lectura'}</span>
                   )}
                 </div>
               </div>

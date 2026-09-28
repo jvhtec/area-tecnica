@@ -11,8 +11,15 @@ describe("Hoja status workflow", () => {
     expect(shouldStopTransitionAfterSave("approved", "final", false)).toBe(false);
   });
 
-  it("does not block normal draft and review transitions", () => {
+  it("stops non-admin self-approval after saving review changes", () => {
+    expect(shouldStopTransitionAfterSave("review", "approved", true)).toBe(true);
+  });
+
+  it("keeps the admin self-approval exemption after saving review changes", () => {
+    expect(shouldStopTransitionAfterSave("review", "approved", true, true)).toBe(false);
+  });
+
+  it("does not block the normal draft to review transition", () => {
     expect(shouldStopTransitionAfterSave("draft", "review", true)).toBe(false);
-    expect(shouldStopTransitionAfterSave("review", "approved", true)).toBe(false);
   });
 });

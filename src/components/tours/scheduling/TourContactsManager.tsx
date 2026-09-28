@@ -28,7 +28,9 @@ import {
 
 interface TourContactsManagerProps {
   tourId: string;
-  tourData: any;
+  tourData: { tour_contacts?: TourContact[] | null } | null;
+  tourUpdatedAt: string;
+  hojaVersions: Record<string, number>;
   canEdit: boolean;
   onSave: () => void;
 }
@@ -43,125 +45,56 @@ interface TourContact {
   notes: string;
 }
 
-type DataLayerRowsResult<T> = {
-  data: T[] | null;
-  error: { message?: string } | null;
+type ContactSyncResult = {
+  syncedRows: number;
+  changedHojas: number;
+  approvalInvalidated: number;
+  skippedFinal: number;
 };
 
-type DataLayerWriteResult = {
-  error: { message?: string } | null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-type SelectRowsQuery<T> = {
-  select(columns: string): {
-    eq(column: string, value: string): Promise<DataLayerRowsResult<T>>;
-    in(column: string, values: string[]): Promise<DataLayerRowsResult<T>>;
-  };
-};
-
-type InsertRowsQuery = {
-  insert(rows: unknown[]): Promise<DataLayerWriteResult>;
-};
-
-type UpdateRowsQuery = {
-  update(values: unknown): {
-    eq(column: string, value: string): Promise<DataLayerWriteResult>;
-  };
-};
-
-type IdRow = { id: string | null };
-type HojaContactRow = {
-  hoja_de_ruta_id: string | null;
-  name: string | null;
-  role: string | null;
-  phone: string | null;
-};
-
-const dataLayerTable = <TQuery,>(table: string): TQuery =>
-  dataLayerClient.from(table as never) as unknown as TQuery;
-
-const contactKey = (contact: Pick<TourContact, "name" | "role" | "phone">) =>
-  [contact.name, contact.role, contact.phone]
-    .map((value) => (value || "").trim().toLowerCase())
-    .join("|");
-
-const syncTourContactsToHojas = async (tourId: string, contacts: TourContact[]) => {
-  const tourContacts = contacts.filter((contact) => contact.name?.trim()).map((contact) => ({
-    name: contact.name.trim(),
-    role: contact.role || null,
-    phone: contact.phone || null,
-  }));
-  if (tourContacts.length === 0) return 0;
-
-  const { data: tourDates, error: datesError } = await dataLayerTable<SelectRowsQuery<IdRow>>("tour_dates")
-    .select("id")
-    .eq("tour_id", tourId);
-  if (datesError) throw datesError;
-
-  const dateIds = (tourDates || [])
-    .map((date) => date.id)
-    .filter((id): id is string => Boolean(id));
-
-  const [hojasByTourResult, hojasByDateResult] = await Promise.all([
-    dataLayerTable<SelectRowsQuery<IdRow>>("hoja_de_ruta").select("id").eq("tour_id", tourId),
-    dateIds.length
-      ? dataLayerTable<SelectRowsQuery<IdRow>>("hoja_de_ruta").select("id").in("tour_date_id", dateIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  if (hojasByTourResult.error) throw hojasByTourResult.error;
-  if (hojasByDateResult.error) throw hojasByDateResult.error;
-
-  const hojaIds = Array.from(new Set([
-    ...(hojasByTourResult.data || []).map((hoja) => hoja.id),
-    ...(hojasByDateResult.data || []).map((hoja) => hoja.id),
-  ].filter((id): id is string => Boolean(id))));
-
-  if (hojaIds.length === 0) return 0;
-
-  const { data: existingContacts, error: contactsError } = await dataLayerTable<SelectRowsQuery<HojaContactRow>>("hoja_de_ruta_contacts")
-    .select("hoja_de_ruta_id, name, role, phone")
-    .in("hoja_de_ruta_id", hojaIds);
-  if (contactsError) throw contactsError;
-
-  const existingByHoja = new Map<string, Set<string>>();
-  (existingContacts || []).forEach((contact) => {
-    const hojaId = contact.hoja_de_ruta_id;
-    if (!hojaId) return;
-    if (!existingByHoja.has(hojaId)) existingByHoja.set(hojaId, new Set());
-    existingByHoja.get(hojaId)?.add(contactKey({
-      name: contact.name || "",
-      role: contact.role || "",
-      phone: contact.phone || "",
+const syncTourContactsToHojas = async (
+  tourId: string,
+  tourUpdatedAt: string,
+  contacts: TourContact[],
+  hojaVersions: Record<string, number>,
+): Promise<ContactSyncResult> => {
+  const tourContacts = contacts
+    .filter((contact) => contact.name?.trim())
+    .map((contact) => ({
+      id: contact.id,
+      name: contact.name.trim(),
+      role: contact.role || null,
+      phone: contact.phone || null,
+      email: contact.email || null,
+      isPrimary: Boolean(contact.isPrimary),
+      notes: contact.notes || null,
     }));
+
+  const { data, error } = await dataLayerClient.rpc("save_tour_contacts_and_sync_hojas", {
+    p_tour_id: tourId,
+    p_expected_tour_updated_at: tourUpdatedAt,
+    p_contacts: tourContacts,
+    p_expected_hoja_versions: hojaVersions,
   });
+  if (error) throw error;
 
-  const rows = hojaIds.flatMap((hojaId) => {
-    const existing = existingByHoja.get(hojaId) ?? new Set<string>();
-    return tourContacts
-      .filter((contact) => !existing.has(contactKey({
-        name: contact.name,
-        role: contact.role || "",
-        phone: contact.phone || "",
-      })))
-      .map((contact) => ({
-        hoja_de_ruta_id: hojaId,
-        name: contact.name,
-        role: contact.role,
-        phone: contact.phone,
-      }));
-  });
-
-  if (rows.length === 0) return 0;
-
-  const { error: insertError } = await dataLayerTable<InsertRowsQuery>("hoja_de_ruta_contacts").insert(rows);
-  if (insertError) throw insertError;
-  return rows.length;
+  const result = isRecord(data) ? data : {};
+  return {
+    syncedRows: Number(result.synced_rows || 0),
+    changedHojas: Number(result.changed_hojas || 0),
+    approvalInvalidated: Number(result.approval_invalidated || 0),
+    skippedFinal: Number(result.skipped_final || 0),
+  };
 };
 
 export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
   tourId,
   tourData,
+  tourUpdatedAt,
+  hojaVersions,
   canEdit,
   onSave,
 }) => {
@@ -303,19 +236,17 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
 
     setIsSaving(true);
     try {
-      const { error } = await dataLayerTable<UpdateRowsQuery>("tours")
-        .update({ tour_contacts: contacts })
-        .eq("id", tourId);
-
-      if (error) throw error;
-
-      const syncedRows = await syncTourContactsToHojas(tourId, contacts);
+      const result = await syncTourContactsToHojas(tourId, tourUpdatedAt, contacts, hojaVersions);
 
       toast({
         title: "Guardado",
-        description: syncedRows
-          ? `Contactos guardados y sincronizados en ${syncedRows} hoja(s).`
-          : "Contactos guardados. Las hojas ya estaban sincronizadas.",
+        description: result.approvalInvalidated > 0
+          ? `Contactos guardados. ${result.approvalInvalidated} Hoja(s) vuelven a revisión y deben aprobarse de nuevo.`
+          : result.changedHojas > 0
+            ? `Contactos guardados y sincronizados en ${result.changedHojas} Hoja(s).`
+            : result.skippedFinal > 0
+              ? `Contactos guardados. ${result.skippedFinal} Hoja(s) finalizadas se mantienen intactas.`
+              : "Contactos guardados. Las hojas ya estaban sincronizadas.",
       });
 
       onSave();

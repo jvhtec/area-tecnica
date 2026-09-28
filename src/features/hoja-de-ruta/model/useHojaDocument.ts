@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useJobSelection } from "@/hooks/useJobSelection";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import type {
   Accommodation,
   EventData,
@@ -48,6 +49,7 @@ export const useHojaDocument = (
   }: UseHojaDocumentOptions,
 ) => {
   const { toast } = useToast();
+  const { userRole } = useOptimizedAuth();
   const {
     eventData,
     setEventData,
@@ -211,13 +213,24 @@ export const useHojaDocument = (
     }
 
     let expectedStatusVersion = documentVersionRef.current;
-    const stopAfterSave = shouldStopTransitionAfterSave(documentStatus, nextStatus, isDirty);
+    const stopAfterSave = shouldStopTransitionAfterSave(
+      documentStatus,
+      nextStatus,
+      isDirty,
+      userRole === "admin",
+    );
     if (isDirty || !hojaDeRuta?.id) {
       try {
         const saved = await handleSaveAll();
         if (!saved) return;
         expectedStatusVersion = saved.document_version;
         if (stopAfterSave) {
+          if (documentStatus === "review" && nextStatus === "approved") {
+            toast({
+              title: "Cambios guardados",
+              description: "Otra persona debe aprobar los cambios que acabas de guardar.",
+            });
+          }
           return;
         }
       } catch {
@@ -268,6 +281,7 @@ export const useHojaDocument = (
     selectedJobId,
     setStatus,
     toast,
+    userRole,
     validation,
   ]);
 

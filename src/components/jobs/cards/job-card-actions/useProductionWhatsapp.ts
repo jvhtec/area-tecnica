@@ -150,7 +150,7 @@ export const useProductionWhatsapp = ({
         "get_published_hoja_documents_for_production",
         {
           p_job_id: job.id,
-          p_tour_date_id: job.tour_date_id ?? null,
+          p_tour_date_id: job.tour_date_id ?? undefined,
         },
       );
 

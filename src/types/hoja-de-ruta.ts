@@ -65,8 +65,12 @@ export interface RoomAssignment {
   /** Always set: `addRoom` seeds 'single' and the loader maps a NOT NULL column. */
   room_type: string;
   room_number?: string;
+  /** Canonical hoja_de_ruta_staff row id when the occupant is staff. */
   staff_member1_id?: string;
   staff_member2_id?: string;
+  /** Current free-text occupant used for guests/drivers/external crew. */
+  staff_member1_free_text?: string;
+  staff_member2_free_text?: string;
   hotel_name?: string;
   address?: string;
 }

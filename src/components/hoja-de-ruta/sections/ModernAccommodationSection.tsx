@@ -256,14 +256,22 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                             <div className="space-y-2">
                               <Label className="text-sm font-medium">Personal 1</Label>
                               <Select
-                                value={room.staff_member1_id || '__none__'}
-                                onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_id', value === '__none__' ? '' : value)}
+                                value={room.staff_member1_id || (room.staff_member1_free_text ? '__external__' : '__none__')}
+                                onValueChange={(value) => {
+                                  onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_free_text', '');
+                                  onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_id', value === '__none__' ? '' : value);
+                                }}
                               >
                                 <SelectTrigger className="border-2 focus:border-pink-300">
                                   <SelectValue placeholder="Seleccionar personal" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="__none__">Sin asignar</SelectItem>
+                                  {room.staff_member1_free_text && (
+                                    <SelectItem value="__external__" disabled>
+                                      Externo: {room.staff_member1_free_text}
+                                    </SelectItem>
+                                  )}
                                   {eventData.staff.map((staff, staffIndex) => (
                                     <SelectItem key={staffIndex} value={staffOptionValue(staff, staffIndex)}>
                                       {staff.name} {staff.surname1}
@@ -277,14 +285,22 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium">Personal 2</Label>
                                 <Select
-                                  value={room.staff_member2_id || '__none__'}
-                                  onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_id', value === '__none__' ? '' : value)}
+                                  value={room.staff_member2_id || (room.staff_member2_free_text ? '__external__' : '__none__')}
+                                  onValueChange={(value) => {
+                                    onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_free_text', '');
+                                    onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_id', value === '__none__' ? '' : value);
+                                  }}
                                 >
                                   <SelectTrigger className="border-2 focus:border-pink-300">
                                     <SelectValue placeholder="Seleccionar personal" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__none__">Sin asignar</SelectItem>
+                                    {room.staff_member2_free_text && (
+                                      <SelectItem value="__external__" disabled>
+                                        Externo: {room.staff_member2_free_text}
+                                      </SelectItem>
+                                    )}
                                     {eventData.staff.map((staff, staffIndex) => (
                                       <SelectItem key={staffIndex} value={staffOptionValue(staff, staffIndex)}>
                                         {staff.name} {staff.surname1}

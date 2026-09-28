@@ -10,11 +10,11 @@ import type {
   TourOpsProgramDay,
   TourOpsProjection,
   TourOpsRoomAssignment,
-  TourOpsSyncStatus,
   TourOpsTimelineEvent,
   TourOpsTravelSegment
 } from "@/features/tour-ops/types";
 import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
+import { ACTIVE_DEPARTMENTS, type ActiveDepartment } from "@/types/department";
 
 export type UnknownRecord = Record<string, unknown>;
 
@@ -24,6 +24,7 @@ export const TOUR_SELECT = `
   description,
   color,
   status,
+  updated_at,
   start_date,
   end_date,
   default_timezone,
@@ -96,6 +97,11 @@ export const normalizeTourOpsLocation = (value: unknown): TourOpsLocation | null
   };
 };
 
+const normalizeProgramDepartments = (value: unknown): ActiveDepartment[] => {
+  const allowed = new Set<string>(ACTIVE_DEPARTMENTS);
+  return asArray<string>(value).filter((department): department is ActiveDepartment => allowed.has(department));
+};
+
 export const normalizeProgramDays = (value: unknown): TourOpsProgramDay[] =>
   asArray(value)
     .filter(isRecord)
@@ -105,10 +111,13 @@ export const normalizeProgramDays = (value: unknown): TourOpsProgramDay[] =>
       rows: asArray(day.rows)
         .filter(isRecord)
         .map((row) => ({
+          id: textOrNull(row.id) ?? crypto.randomUUID(),
           time: textOrNull(row.time),
           item: textOrNull(row.item),
           dept: textOrNull(row.dept ?? row.department),
           notes: textOrNull(row.notes),
+          notify: Boolean(row.notify),
+          departments: normalizeProgramDepartments(row.departments),
         }))
         .filter((row) => row.time || row.item || row.dept || row.notes),
     }))
@@ -273,6 +282,9 @@ export const normalizeTravelSegment = (
     crewManifest: asArray(row.crew_manifest ?? row.crewManifest),
     luggageTruck: Boolean(row.luggage_truck),
     status: textOrNull(row.status),
+    updatedAt: textOrNull(row.updated_at),
+    linkedHojaRowId: textOrNull(row.source_hoja_travel_arrangement_id),
+    linkedTourRowId: textOrNull(row.source_tour_travel_segment_id),
     source,
     syncStatus: source === "legacy" ? "legacy" : source === "hoja" ? "imported" : "needs_sync",
     hojaDeRutaId: textOrNull(row.hoja_de_ruta_id) ?? textOrNull(vehicleDetails?.hojaDeRutaId),
@@ -319,8 +331,20 @@ export const normalizeRoomAssignment = (
   row: UnknownRecord,
   staffLookup?: Map<string, HojaStaffReference>,
 ): TourOpsRoomAssignment => {
-  const rawStaffMember1Id = textOrNull(row.staff_member1_id ?? row.staffMember1Id ?? row.rawStaffMember1Id);
-  const rawStaffMember2Id = textOrNull(row.staff_member2_id ?? row.staffMember2Id ?? row.rawStaffMember2Id);
+  const rawStaffMember1Id = textOrNull(
+    row.staff_member1_hoja_staff_id ??
+    row.staffMember1HojaStaffId ??
+    row.staff_member1_id ??
+    row.staffMember1Id ??
+    row.rawStaffMember1Id
+  );
+  const rawStaffMember2Id = textOrNull(
+    row.staff_member2_hoja_staff_id ??
+    row.staffMember2HojaStaffId ??
+    row.staff_member2_id ??
+    row.staffMember2Id ??
+    row.rawStaffMember2Id
+  );
   const staff1 = rawStaffMember1Id ? staffLookup?.get(rawStaffMember1Id) : null;
   const staff2 = rawStaffMember2Id ? staffLookup?.get(rawStaffMember2Id) : null;
 
@@ -380,6 +404,9 @@ export const normalizeAccommodation = (
     roomAllocation,
     roomsBooked: toNumber(row.rooms_booked) ?? (roomAllocation.length || null),
     notes: textOrNull(row.notes),
+    updatedAt: textOrNull(row.updated_at),
+    linkedHojaRowId: textOrNull(row.source_hoja_accommodation_id),
+    linkedTourRowId: textOrNull(row.source_tour_accommodation_id),
     source: row.source === "hoja" ? "hoja" : "normalized",
     syncStatus: row.source === "hoja" ? "imported" : "needs_sync",
   };
@@ -659,122 +686,7 @@ export const shouldIncludeSection = (allowed: TourOpsAllowedSections, section: k
 
 export const normalizeComparison = (value: unknown) => textOrNull(value)?.trim().toLowerCase() ?? "";
 
-export const mergeTravelSegments = (segments: TourOpsTravelSegment[]) => {
-  const byKey = new Map<string, TourOpsTravelSegment>();
-  const sourceRank: Record<TourOpsTravelSegment["source"], number> = { normalized: 3, hoja: 2, legacy: 1 };
-
-  segments.forEach((segment) => {
-    const key = [
-      segment.fromTourDateId,
-      segment.toTourDateId,
-      normalizeComparison(segment.fromLabel),
-      normalizeComparison(segment.toLabel),
-      normalizeComparison(segment.transportationType),
-      normalizeComparison(segment.departureTime),
-      normalizeComparison(segment.arrivalTime),
-    ].join("|");
-    const existing = byKey.get(key);
-    if (!existing || sourceRank[segment.source] > sourceRank[existing.source]) {
-      byKey.set(key, segment);
-    }
-  });
-
-  return Array.from(byKey.values());
-};
-
-export const mergeAccommodations = (accommodations: TourOpsAccommodation[]) => {
-  const byKey = new Map<string, TourOpsAccommodation>();
-  const sourceRank: Record<TourOpsAccommodation["source"], number> = { normalized: 2, hoja: 1 };
-
-  accommodations.forEach((accommodation) => {
-    const key = [
-      accommodation.tourDateId,
-      normalizeComparison(accommodation.hotelName),
-      normalizeComparison(accommodation.checkInDate),
-      normalizeComparison(accommodation.checkOutDate),
-    ].join("|");
-    const existing = byKey.get(key);
-    if (!existing || sourceRank[accommodation.source] > sourceRank[existing.source]) {
-      byKey.set(key, accommodation);
-    }
-  });
-
-  return Array.from(byKey.values());
-};
-
 export const hasHomeBase = (settings: Record<string, unknown>) => {
   const homeBase = isRecord(settings.homeBase) ? settings.homeBase : null;
   return Boolean(homeBase && toNumber(homeBase.latitude) != null && toNumber(homeBase.longitude) != null);
-};
-
-export const travelSyncKey = (segment: TourOpsTravelSegment) => [
-  segment.fromTourDateId,
-  segment.toTourDateId,
-  normalizeComparison(segment.transportationType),
-  normalizeComparison(segment.departureTime),
-  normalizeComparison(segment.arrivalTime),
-].join("|");
-
-export const accommodationSyncKey = (accommodation: TourOpsAccommodation) => [
-  accommodation.tourDateId,
-  normalizeComparison(accommodation.hotelName),
-  normalizeComparison(accommodation.checkInDate),
-  normalizeComparison(accommodation.checkOutDate),
-].join("|");
-
-export const annotateTravelSyncStatus = (
-  segments: TourOpsTravelSegment[],
-  allCandidates: TourOpsTravelSegment[],
-  hojaByDate: Map<string, UnknownRecord>,
-): TourOpsTravelSegment[] => {
-  const hojaKeys = new Set(
-    allCandidates
-      .filter((segment) => segment.source === "hoja")
-      .map(travelSyncKey),
-  );
-
-  return segments.map((segment) => {
-    if (segment.source === "legacy") return { ...segment, syncStatus: "legacy" as const };
-    if (segment.source === "hoja") return { ...segment, syncStatus: "imported" as const };
-
-    const linkedDateIds = [segment.fromTourDateId, segment.toTourDateId].filter(Boolean) as string[];
-    const hasHojaTarget = linkedDateIds.some((id) => hojaByDate.has(id));
-    const syncStatus: TourOpsSyncStatus = hojaKeys.has(travelSyncKey(segment))
-      ? "synced"
-      : hasHojaTarget
-        ? "needs_sync"
-        : "no_hoja";
-
-    return {
-      ...segment,
-      syncStatus,
-    };
-  });
-};
-
-export const annotateAccommodationSyncStatus = (
-  accommodations: TourOpsAccommodation[],
-  allCandidates: TourOpsAccommodation[],
-  hojaByDate: Map<string, UnknownRecord>,
-): TourOpsAccommodation[] => {
-  const hojaKeys = new Set(
-    allCandidates
-      .filter((hotel) => hotel.source === "hoja")
-      .map(accommodationSyncKey),
-  );
-
-  return accommodations.map((hotel) => {
-    if (hotel.source === "hoja") return { ...hotel, syncStatus: "imported" as const };
-    const hasHojaTarget = Boolean(hotel.tourDateId && hojaByDate.has(hotel.tourDateId));
-    const syncStatus: TourOpsSyncStatus = hojaKeys.has(accommodationSyncKey(hotel))
-      ? "synced"
-      : hasHojaTarget
-        ? "needs_sync"
-        : "no_hoja";
-
-    return {
-      ...hotel,
-      syncStatus,
-    };
-  });
 };

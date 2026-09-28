@@ -218,6 +218,14 @@ export function mapHojaAggregateToDocument(
         typeof room.staff_member2_hoja_staff_id === "string"
           ? room.staff_member2_hoja_staff_id
           : "",
+      staff_member1_free_text:
+        typeof room.staff_member1_id === "string" && !/^\d+$/.test(room.staff_member1_id.trim())
+          ? room.staff_member1_id.trim()
+          : "",
+      staff_member2_free_text:
+        typeof room.staff_member2_id === "string" && !/^\d+$/.test(room.staff_member2_id.trim())
+          ? room.staff_member2_id.trim()
+          : "",
     })),
   }));
 
@@ -302,6 +310,8 @@ export function buildHojaSavePayload(input: HojaDocumentSaveInput): Record<strin
         room_number: room.room_number || "",
         staff_member1_hoja_staff_id: room.staff_member1_id || null,
         staff_member2_hoja_staff_id: room.staff_member2_id || null,
+        staff_member1_free_text: room.staff_member1_free_text || null,
+        staff_member2_free_text: room.staff_member2_free_text || null,
         sort_order: roomOrder,
       })),
     })),

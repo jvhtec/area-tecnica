@@ -69,7 +69,7 @@ const jsonArrayOrEmpty = <T,>(value: Json | null | undefined): T[] => (
   Array.isArray(value) ? value as unknown as T[] : []
 );
 
-const toJson = (value: unknown): Json => value as Json;
+const toJson = (value: unknown): NonNullable<Json> => value as NonNullable<Json>;
 
 const mapGearSetupRow = (row: FestivalGearSetupRow): FestivalGearSetup => ({
   id: row.id,

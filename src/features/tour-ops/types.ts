@@ -1,3 +1,5 @@
+import type { ActiveDepartment } from "@/types/department";
+
 export type TourOpsProjection = "management" | "technician" | "guest";
 export type TourOpsSyncStatus = "synced" | "needs_sync" | "no_hoja" | "imported" | "legacy";
 
@@ -31,7 +33,7 @@ export interface TourOpsLocation {
 }
 
 export interface TourOpsContact {
-  id?: string;
+  id: string;
   name: string;
   role?: string | null;
   phone?: string | null;
@@ -42,10 +44,13 @@ export interface TourOpsContact {
 }
 
 export interface TourOpsProgramRow {
+  id: string;
   time: string | null;
   item: string | null;
   dept: string | null;
   notes: string | null;
+  notify: boolean;
+  departments: ActiveDepartment[];
 }
 
 export interface TourOpsProgramDay {
@@ -103,6 +108,9 @@ export interface TourOpsTravelSegment {
   crewManifest: unknown[];
   luggageTruck: boolean;
   status: string | null;
+  updatedAt?: string | null;
+  linkedHojaRowId?: string | null;
+  linkedTourRowId?: string | null;
   source: "normalized" | "legacy" | "hoja";
   syncStatus: TourOpsSyncStatus;
   hojaDeRutaId?: string | null;
@@ -136,6 +144,9 @@ export interface TourOpsAccommodation {
   roomAllocation: TourOpsRoomAssignment[];
   roomsBooked: number | null;
   notes: string | null;
+  updatedAt?: string | null;
+  linkedHojaRowId?: string | null;
+  linkedTourRowId?: string | null;
   source: "normalized" | "hoja";
   syncStatus: TourOpsSyncStatus;
 }
@@ -169,6 +180,8 @@ export interface TourOpsDate {
   isTourPackOnly: boolean;
   location: TourOpsLocation | null;
   hojaDeRutaId: string | null;
+  hojaDocumentVersion: number | null;
+  hojaStatus: "draft" | "review" | "approved" | "final" | null;
   jobId: string | null;
   jobTitle: string | null;
   jobStatus: string | null;
@@ -200,6 +213,7 @@ export interface TourOpsModel {
     description: string | null;
     color: string | null;
     status: string | null;
+    updatedAt: string;
     startDate: string | null;
     endDate: string | null;
     defaultTimezone: string | null;

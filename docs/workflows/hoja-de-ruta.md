@@ -26,6 +26,7 @@ Hoja de Ruta is modeled as one versioned document. The React feature owns a cano
 | **Database hardening** | `supabase/migrations/20260926103000_hoja_de_ruta_hardening.sql` |
 | **Roadmap completion migration** | `supabase/migrations/20260926144902_complete_hoja_roadmap.sql` |
 | **Integrity migration** | `supabase/migrations/20260927150000_hoja_de_ruta_integrity.sql` |
+| **Integration-boundary migration** | `supabase/migrations/20260927193000_hoja_integration_boundary.sql` |
 | **Database tests** | `supabase/tests/database/hoja_de_ruta_hardening.sql`, `hoja_de_ruta_integrity.sql` |
 
 ## Document Boundary
@@ -68,11 +69,12 @@ The section registry is the source of truth for tabs, completion checks, export 
 - `status`, `approved_*`, `review_requested_by`, `document_version` and `published_document_id` only change through the workflow RPCs; a direct update is rejected with `42501`.
 - A stale `expected_version` is rejected with SQLSTATE `40001`. The conflict banner offers either a confirmed reload or a deliberate retry against the latest version; the retry never bypasses optimistic concurrency.
 - Status transitions are forward only: `draft -> review -> approved -> final`. The person who sent a document to review cannot approve it (admins exempt).
-- Any content change to an `approved` document (aggregate save or direct write) sends it back to `review`, clears the approval and records the editor as the new review requester; that editor cannot approve their own changes (admins exempt). The reset is logged.
+- Any content change to an `approved` document (aggregate save or direct write) sends it back to `review`, clears the approval and records the editor as the new review requester. While a document is already in `review`, every further content edit transfers `review_requested_by` to the latest editor. The person who last changed the reviewed content cannot approve those changes themselves (admins exempt). Approval resets are logged.
 - A final document is immutable for every writer, enforced by the table triggers rather than only the RPCs. Crew removal leaves a final document's staff list as issued. Referential actions (a deleted PDF or user, a deleted tour date) and the service role are not blocked.
 - `reopen_hoja_de_ruta` is the only way back: admin/management, required reason, logged as `hoja.status.reopened`.
 - PDF download and preview are local export actions. They do not publish a file.
 - Publication is a separate explicit action and is accepted only for `approved` or `final` documents.
+- A canonical published Hoja PDF is an issued artifact: publication marks it read-only and generic document CRUD cannot hide, mutate, or delete it. Replacement stays inside `publish_hoja_de_ruta_document`.
 
 ## Authorization
 
@@ -81,6 +83,7 @@ The section registry is the source of truth for tabs, completion checks, export 
 - The restricted projection omits staff rows and sensitive identity data. Room assignments retain only the operationally necessary occupant name.
 - Unassigned technicians cannot read the document.
 - Anonymous callers cannot execute the aggregate, status, or publication RPCs.
+- The private `job-documents` bucket follows the same job boundary. Assigned technicians can read visible documents and approved/final Hoja images for their jobs; incident-report uploads are the only technician write exception.
 
 Keep authorization in the RPCs and database policies. Do not replace aggregate reads with direct client table queries, which can change the projection and expose child-table details.
 
@@ -107,6 +110,9 @@ The general PDF and XLS exports exclude DNI, and the Hoja keeps its DNI copies o
 ## Integration Points
 
 - **Jobs**: initialization can populate dates, location, assignments, power, and producer contacts.
+- **Tour Ops**: Programa, travel, accommodation/rooming, and tour contacts use version-aware transactional bridge RPCs. Travel/accommodation pairs use stable reciprocal source IDs; cross-date moves validate every affected Hoja snapshot before mutating either side. Hoja transport remains logistics-owned and is edited in place rather than mirrored into a second Tour Ops identity.
+- **Tour Ops vs a final Hoja**: like tour contacts, normalized travel and hotel saves/deletes still succeed on a date whose Hoja is `final`; the final Hoja is left untouched (no copy, no version bump) and the RPC returns `hoja_final_skipped` so the Hub tells the user to reopen it. Editing or deleting a Hoja-sourced row itself is still rejected. Legacy `hotel-info:` hotels are migrated by saving them, which creates the normalized hotel and its linked Hoja row.
+- **Programa reminders**: Tour Ops preserves row `id`, `notify`, and department scope so scheduled-push dedupe stays stable across edits.
 - **Mapbox**: venue autocomplete, geocoding, maps, and coordinates.
 - **Google Places**: restaurant search and details through the cached Edge Function.
 - **Wikimedia**: venue/accommodation image suggestions through the cached Edge Function.

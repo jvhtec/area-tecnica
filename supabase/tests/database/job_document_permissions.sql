@@ -28,13 +28,11 @@ SELECT ok(
       AND policyname = 'p_storage_job_documents_authorized_select'
       AND cmd = 'SELECT'
       AND qual ILIKE '%job-documents%'
-      AND qual ILIKE '%admin%'
-      AND qual ILIKE '%management%'
-      AND qual ILIKE '%logistics%'
-      AND qual ILIKE '%house_tech%'
-      AND qual ILIKE '%jobs%'
-  ),
-  'house techs may view job document storage objects'
+      AND qual ILIKE '%can_read_job_document_storage%'
+  )
+  AND pg_get_functiondef('public.can_read_job_document_storage(text)'::regprocedure)
+      ILIKE '%house_tech%',
+  'house techs may view job document storage objects through the scoped authorization helper'
 );
 
 SELECT ok(
@@ -46,13 +44,9 @@ SELECT ok(
       AND policyname = 'p_storage_job_documents_authorized_insert'
       AND cmd = 'INSERT'
       AND with_check ILIKE '%job-documents%'
-      AND with_check ILIKE '%admin%'
-      AND with_check ILIKE '%management%'
-      AND with_check ILIKE '%logistics%'
-      AND with_check ILIKE '%house_tech%'
-      AND with_check ILIKE '%jobs%'
+      AND with_check ILIKE '%can_write_job_document_storage%'
   ),
-  'house techs may upload job document storage objects'
+  'house techs may upload job document storage objects through the scoped authorization helper'
 );
 
 SELECT ok(
@@ -65,10 +59,12 @@ SELECT ok(
       AND cmd = 'UPDATE'
       AND qual ILIKE '%job-documents%'
       AND qual ILIKE '%house_tech%'
+      AND qual ILIKE '%can_write_job_document_storage%'
       AND with_check ILIKE '%job-documents%'
       AND with_check ILIKE '%house_tech%'
+      AND with_check ILIKE '%can_write_job_document_storage%'
   ),
-  'house techs may update job document storage objects'
+  'house techs may update job document storage objects through the scoped authorization helper'
 );
 
 SELECT ok(
@@ -80,13 +76,11 @@ SELECT ok(
       AND policyname = 'p_storage_job_documents_authorized_delete'
       AND cmd = 'DELETE'
       AND qual ILIKE '%job-documents%'
-      AND qual ILIKE '%admin%'
-      AND qual ILIKE '%management%'
-      AND qual ILIKE '%logistics%'
-      AND qual ILIKE '%house_tech%'
-      AND qual ILIKE '%jobs%'
-  ),
-  'house techs may remove job document storage objects'
+      AND qual ILIKE '%can_delete_job_document_storage%'
+  )
+  AND pg_get_functiondef('public.can_delete_job_document_storage(text)'::regprocedure)
+      ILIKE '%house_tech%',
+  'house techs may remove job document storage objects through the scoped authorization helper'
 );
 
 SELECT * FROM finish();

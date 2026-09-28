@@ -32,6 +32,37 @@ const toJson = (value: unknown): Json => {
   return null;
 };
 
+// PostgreSQL function arguments accept NULL unless a function is STRICT, but
+// generated Supabase RPC Args do not encode argument nullability unless a
+// parameter has a default. Keep that mismatch at this boundary rather than
+// widening the generated database declarations by hand.
+const nullableRpcString = (value: string | null | undefined): string =>
+  value as string;
+
+export type TourOpsHojaMutationResult = {
+  id?: string | null;
+  opsId?: string | null;
+  hojaRowId?: string | null;
+  hojaDocumentVersion?: number | null;
+  hojaStatus?: string | null;
+  approvalInvalidated: boolean;
+  /** The linked Hoja is final, so only the Tour Ops row changed. */
+  hojaFinalSkipped: boolean;
+};
+
+const parseHojaMutationResult = (value: unknown): TourOpsHojaMutationResult => {
+  const row = isRecord(value) ? value : {};
+  return {
+    id: textOrNull(row.id),
+    opsId: textOrNull(row.ops_id),
+    hojaRowId: textOrNull(row.hoja_row_id),
+    hojaDocumentVersion: typeof row.hoja_document_version === "number" ? row.hoja_document_version : null,
+    hojaStatus: textOrNull(row.hoja_status ?? row.status),
+    approvalInvalidated: Boolean(row.approval_invalidated),
+    hojaFinalSkipped: Boolean(row.hoja_final_skipped),
+  };
+};
+
 export async function saveTimelineEvent(input: Partial<TourOpsTimelineEvent> & { tourId: string; date: string; title: string }) {
   const payload = {
     tour_id: input.tourId,
@@ -61,15 +92,18 @@ export async function saveTimelineEvent(input: Partial<TourOpsTimelineEvent> & {
   return data.id as string;
 }
 
-export async function saveProgramSchedule(input: { hojaDeRutaId: string; program: TourOpsProgramDay[] }) {
-  const { error } = await client
-    .from("hoja_de_ruta")
-    .update({
-      program_schedule_json: toJson(input.program),
-      last_modified: new Date().toISOString(),
-    })
-    .eq("id", input.hojaDeRutaId);
+export async function saveProgramSchedule(input: {
+  hojaDeRutaId: string;
+  expectedHojaVersion: number;
+  program: TourOpsProgramDay[];
+}) {
+  const { data, error } = await client.rpc("save_tour_ops_hoja_program", {
+    p_hoja_id: input.hojaDeRutaId,
+    p_expected_version: input.expectedHojaVersion,
+    p_program: toJson(input.program),
+  });
   if (error) throw error;
+  return parseHojaMutationResult(data);
 }
 
 export async function deleteTimelineEvent(id: string) {
@@ -93,19 +127,6 @@ export const normalizeHojaTransportationType = (value: string | null | undefined
   return "van";
 };
 
-export const getHojaForTourDate = async (
-  tourDateId: string | null | undefined,
-): Promise<{ id: string; tourDateId: string | null } | null> => {
-  if (!tourDateId) return null;
-  const { data, error } = await client
-    .from("hoja_de_ruta")
-    .select("id, tour_date_id")
-    .eq("tour_date_id", tourDateId)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? { id: data.id, tourDateId: data.tour_date_id } : null;
-};
-
 export const hojaTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment>) => ({
   transportation_type: normalizeHojaTransportationType(input.transportationType),
   pickup_address: input.fromLabel && input.fromLabel !== "Origen" ? input.fromLabel : null,
@@ -117,6 +138,16 @@ export const hojaTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment
   driver_phone: textOrNull((input.vehicleDetails as UnknownRecord | null)?.driverPhone),
   plate_number: textOrNull((input.vehicleDetails as UnknownRecord | null)?.plateNumber),
   notes: input.routeNotes || null,
+});
+
+export const hojaTransportPayloadFromSegment = (input: Partial<TourOpsTravelSegment>) => ({
+  transport_type: input.transportationType || "furgoneta",
+  date_time: input.departureTime || null,
+  return_date_time: input.arrivalTime || null,
+  company: input.carrierName || null,
+  driver_name: textOrNull((input.vehicleDetails as UnknownRecord | null)?.driverName),
+  driver_phone: textOrNull((input.vehicleDetails as UnknownRecord | null)?.driverPhone),
+  license_plate: textOrNull((input.vehicleDetails as UnknownRecord | null)?.plateNumber),
 });
 
 export const opsTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment> & { tourId: string }) => ({
@@ -146,127 +177,50 @@ export const opsTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment>
   status: input.status || "planned",
 });
 
-export const upsertOpsTravelFromHoja = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
-  if (!input.id) return false;
-  const payload = opsTravelPayloadFromSegment(input);
-  const { data: existing, error: existingError } = await client
-    .from("tour_travel_segments")
-    .select("id")
-    .eq("tour_id", input.tourId)
-    .contains("vehicle_details", { hojaSourceId: input.id })
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existing?.id) {
-    const { error } = await client.from("tour_travel_segments").update(payload).eq("id", existing.id);
-    if (error) throw error;
-    return true;
+export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & {
+  tourId: string;
+  expectedHojaVersions?: Record<string, number>;
+}) {
+  if (input.source === "legacy") {
+    throw new Error("Migra primero el viaje legacy antes de editarlo");
   }
 
-  const { error } = await client.from("tour_travel_segments").insert(payload);
+  const source = input.source === "hoja" ? "hoja" : "normalized";
+  const opsPayload = opsTravelPayloadFromSegment(input);
+  const hojaPayload = input.sourceTable === "hoja_de_ruta_transport"
+    ? hojaTransportPayloadFromSegment(input)
+    : hojaTravelPayloadFromSegment(input);
+
+  const { data, error } = await client.rpc("save_tour_ops_travel", {
+    p_tour_id: input.tourId,
+    p_source: source,
+    p_segment_id: nullableRpcString(source === "normalized" ? input.id || null : null),
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
+    p_hoja_row_id: nullableRpcString(source === "hoja" ? input.id || null : null),
+    p_hoja_source_table: input.sourceTable || "hoja_de_ruta_travel_arrangements",
+    p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
+    p_expected_ops_updated_at: nullableRpcString(
+      source === "normalized" ? input.updatedAt || null : null,
+    ),
+    p_ops_payload: toJson(opsPayload),
+    p_hoja_payload: toJson(hojaPayload),
+  });
   if (error) throw error;
-  return true;
-};
-
-export const hojaTravelRowMatchesPayload = (row: UnknownRecord, payload: UnknownRecord) =>
-  normalizeComparison(row.transportation_type) === normalizeComparison(payload.transportation_type) &&
-  normalizeComparison(row.pickup_address) === normalizeComparison(payload.pickup_address) &&
-  normalizeComparison(row.departure_time) === normalizeComparison(payload.departure_time) &&
-  normalizeComparison(row.arrival_time) === normalizeComparison(payload.arrival_time) &&
-  normalizeComparison(row.flight_train_number) === normalizeComparison(payload.flight_train_number) &&
-  normalizeComparison(row.notes) === normalizeComparison(payload.notes);
-
-export const syncSegmentToHoja = async (input: Partial<TourOpsTravelSegment>) => {
-  const targetDateId = input.toTourDateId || input.fromTourDateId;
-  const hoja = await getHojaForTourDate(targetDateId);
-  if (!hoja?.id) return false;
-
-  const payload = {
-    hoja_de_ruta_id: hoja.id,
-    ...hojaTravelPayloadFromSegment(input),
-  };
-
-  const linkedHojaSourceId = textOrNull((input.vehicleDetails as UnknownRecord | null)?.hojaSourceId);
-  if (linkedHojaSourceId) {
-    const { data: existingLinked, error: existingLinkedError } = await client
-      .from("hoja_de_ruta_travel_arrangements")
-      .select("id, transportation_type, pickup_address, departure_time, arrival_time, flight_train_number, notes")
-      .eq("id", linkedHojaSourceId)
-      .maybeSingle();
-    if (existingLinkedError) throw existingLinkedError;
-    if (existingLinked && hojaTravelRowMatchesPayload(existingLinked, payload)) return false;
-
-    const { error } = await client
-      .from("hoja_de_ruta_travel_arrangements")
-      .update(payload)
-      .eq("id", linkedHojaSourceId);
-    if (error) throw error;
-    return true;
-  }
-
-  const { data: existing, error: existingError } = await client
-    .from("hoja_de_ruta_travel_arrangements")
-    .select("id, transportation_type, pickup_address, departure_time, arrival_time, flight_train_number, notes")
-    .eq("hoja_de_ruta_id", hoja.id);
-  if (existingError) throw existingError;
-
-  const alreadyExists = asArray<UnknownRecord>(existing).some((row) => hojaTravelRowMatchesPayload(row, payload));
-  if (alreadyExists) return false;
-
-  const { error } = await client.from("hoja_de_ruta_travel_arrangements").insert(payload);
-  if (error) throw error;
-  return true;
-};
-
-export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & { tourId: string }) {
-  if (input.source === "hoja" && input.id) {
-    const payload = hojaTravelPayloadFromSegment(input);
-    const table = input.sourceTable === "hoja_de_ruta_transport"
-      ? "hoja_de_ruta_transport"
-      : "hoja_de_ruta_travel_arrangements";
-
-    await upsertOpsTravelFromHoja(input);
-
-    if (table === "hoja_de_ruta_transport") {
-      const { error } = await client
-        .from("hoja_de_ruta_transport")
-        .update({
-          transport_type: input.transportationType || "furgoneta",
-          date_time: input.departureTime || null,
-          return_date_time: input.arrivalTime || null,
-          company: input.carrierName || null,
-          driver_name: textOrNull((input.vehicleDetails as UnknownRecord | null)?.driverName),
-          driver_phone: textOrNull((input.vehicleDetails as UnknownRecord | null)?.driverPhone),
-          license_plate: textOrNull((input.vehicleDetails as UnknownRecord | null)?.plateNumber),
-        })
-        .eq("id", input.id);
-      if (error) throw error;
-      return input.id;
-    }
-
-    const { error } = await client.from("hoja_de_ruta_travel_arrangements").update(payload).eq("id", input.id);
-    if (error) throw error;
-    return input.id;
-  }
-
-  const payload = opsTravelPayloadFromSegment(input);
-
-  if (input.id && input.source !== "legacy") {
-    const { error } = await client.from("tour_travel_segments").update(payload).eq("id", input.id);
-    if (error) throw error;
-    await syncSegmentToHoja(input);
-    return input.id;
-  }
-
-  const { data, error } = await client.from("tour_travel_segments").insert(payload).select("id").single();
-  if (error) throw error;
-  await syncSegmentToHoja({ ...input, id: data.id as string, source: "normalized" });
-  return data.id as string;
+  return parseHojaMutationResult(data);
 }
 
-export async function deleteTravelSegment(id: string) {
-  const { error } = await client.from("tour_travel_segments").delete().eq("id", id);
+export async function deleteTravelSegment(input: {
+  id: string;
+  expectedHojaVersions?: Record<string, number>;
+  updatedAt?: string | null;
+}) {
+  const { data, error } = await client.rpc("delete_tour_ops_travel", {
+    p_segment_id: input.id,
+    p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
+    p_expected_ops_updated_at: nullableRpcString(input.updatedAt || null),
+  });
   if (error) throw error;
+  return parseHojaMutationResult(data);
 }
 
 export const opsAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommodation> & { tourId: string }) => ({
@@ -298,134 +252,79 @@ export const hojaAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommod
 export const hojaStaffStorageLookup = async (hojaId: string) => {
   const { data, error } = await client
     .from("hoja_de_ruta_staff")
-    .select("id, name, surname1, surname2, position")
+    .select("id, technician_id, name, surname1, surname2, position")
     .eq("hoja_de_ruta_id", hojaId);
   if (error) throw error;
 
   const byValue = new Map<string, string>();
-  asArray<UnknownRecord>(data).forEach((member, index) => {
-    const indexValue = String(index);
+  asArray<UnknownRecord>(data).forEach((member) => {
+    const canonicalId = textOrNull(member.id);
+    if (!canonicalId) return;
     [textOrNull(member.id), textOrNull(member.technician_id)]
       .filter(Boolean)
-      .forEach((key) => byValue.set(key as string, indexValue));
+      .forEach((key) => byValue.set(key as string, canonicalId));
     const name = displayName(member.name, member.surname1, member.surname2);
-    if (name) byValue.set(name, indexValue);
+    if (name) byValue.set(name, canonicalId);
   });
   return byValue;
 };
 
-export const replaceHojaRoomAssignments = async (
+export const buildHojaRoomAssignmentRows = (
   accommodationId: string,
-  hojaId: string | null | undefined,
   rooms: TourOpsRoomAssignment[] | undefined | null,
+  staffValueLookup: Map<string, string>,
 ) => {
-  const serializedRooms = serializeRoomAllocation(rooms);
-  const { error: deleteError } = await client
-    .from("hoja_de_ruta_room_assignments")
-    .delete()
-    .eq("accommodation_id", accommodationId);
-  if (deleteError) throw deleteError;
-  if (serializedRooms.length === 0) return;
-
-  const staffValueLookup = hojaId ? await hojaStaffStorageLookup(hojaId) : new Map<string, string>();
-  const staffValue = (value: unknown, rawValue: unknown) => {
+  const resolveStaffId = (value: unknown, rawValue: unknown, name: unknown) => {
     const normalizedValue = textOrNull(value);
     const raw = textOrNull(rawValue);
+    const normalizedName = textOrNull(name);
     if (normalizedValue && staffValueLookup.has(normalizedValue)) return staffValueLookup.get(normalizedValue);
     if (raw && staffValueLookup.has(raw)) return staffValueLookup.get(raw);
-    return normalizedValue ?? raw;
+    if (normalizedName && staffValueLookup.has(normalizedName)) return staffValueLookup.get(normalizedName);
+    return null;
   };
 
-  const rows = asArray<TourOpsRoomAssignment>(rooms)
-    .filter((room) => room.roomType || room.roomNumber || room.staffMember1Id || room.staffMember2Id)
-    .map((room) => ({
-      accommodation_id: accommodationId,
-      room_type: room.roomType || "single",
-      room_number: room.roomNumber || "",
-      staff_member1_id: staffValue(room.staffMember1Id, room.rawStaffMember1Id) ?? null,
-      staff_member2_id: staffValue(room.staffMember2Id, room.rawStaffMember2Id) ?? null,
-    }));
-  if (rows.length === 0) return;
-
-  const { error } = await client.from("hoja_de_ruta_room_assignments").insert(rows);
-  if (error) throw error;
+  return asArray<TourOpsRoomAssignment>(rooms)
+    .filter((room) =>
+      room.roomType ||
+      room.roomNumber ||
+      room.staffMember1Id ||
+      room.staffMember2Id ||
+      room.staffMember1Name ||
+      room.staffMember2Name
+    )
+    .map((room, sortOrder) => {
+      const staff1Id = resolveStaffId(room.staffMember1Id, room.rawStaffMember1Id, room.staffMember1Name);
+      const staff2Id = resolveStaffId(room.staffMember2Id, room.rawStaffMember2Id, room.staffMember2Name);
+      return {
+        id: room.id || crypto.randomUUID(),
+        accommodation_id: accommodationId,
+        room_type: room.roomType || "single",
+        room_number: room.roomNumber || "",
+        staff_member1_hoja_staff_id: staff1Id,
+        staff_member2_hoja_staff_id: staff2Id,
+        // These text columns are no longer identity fields. They only retain a
+        // current free-text occupant when no canonical Hoja staff row exists.
+        staff_member1_id: staff1Id
+          ? null
+          : textOrNull(room.staffMember1Name) ?? textOrNull(room.staffMember1Id) ?? textOrNull(room.rawStaffMember1Id),
+        staff_member2_id: staff2Id
+          ? null
+          : textOrNull(room.staffMember2Name) ?? textOrNull(room.staffMember2Id) ?? textOrNull(room.rawStaffMember2Id),
+        sort_order: sortOrder,
+      };
+    });
 };
 
-export const findSimilarOpsAccommodation = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
-  if (!input.tourDateId || !input.hotelName) return null;
-  const { data, error } = await client
-    .from("tour_accommodations")
-    .select("id")
-    .eq("tour_id", input.tourId)
-    .eq("tour_date_id", input.tourDateId)
-    .ilike("hotel_name", input.hotelName)
-    .limit(1);
-  if (error) throw error;
-  return data?.[0] ?? null;
-};
-
-export const upsertOpsAccommodationFromHoja = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
-  // `tour_accommodations.check_in_date`/`check_out_date` are NOT NULL, so rebuild the
-  // payload from the narrowed locals rather than relying on property narrowing.
-  const { check_in_date, check_out_date, ...restPayload } = opsAccommodationPayloadFromHotel(input);
-  if (!check_in_date || !check_out_date) return false;
-  const payload = { ...restPayload, check_in_date, check_out_date };
-
-  const existing = await findSimilarOpsAccommodation(input);
-  if (existing?.id) {
-    const { error } = await client.from("tour_accommodations").update(payload).eq("id", existing.id);
-    if (error) throw error;
-    return true;
-  }
-
-  const { error } = await client.from("tour_accommodations").insert(payload);
-  if (error) throw error;
-  return true;
-};
-
-export const syncAccommodationToHoja = async (input: Partial<TourOpsAccommodation>) => {
-  const hoja = await getHojaForTourDate(input.tourDateId);
-  if (!hoja?.id) return false;
-
-  const payload = {
-    hoja_de_ruta_id: hoja.id,
-    ...hojaAccommodationPayloadFromHotel(input),
-  };
-
-  const { data: existing, error: existingError } = await client
-    .from("hoja_de_ruta_accommodations")
-    .select("id, hotel_name")
-    .eq("hoja_de_ruta_id", hoja.id)
-    .ilike("hotel_name", payload.hotel_name)
-    .limit(1);
-  if (existingError) throw existingError;
-
-  const existingRow = existing?.[0];
-  if (existingRow?.id) {
-    const { error } = await client.from("hoja_de_ruta_accommodations").update(payload).eq("id", existingRow.id);
-    if (error) throw error;
-    await replaceHojaRoomAssignments(existingRow.id, hoja.id, input.roomAllocation);
-    return true;
-  }
-
-  const { data, error } = await client.from("hoja_de_ruta_accommodations").insert(payload).select("id").single();
-  if (error) throw error;
-  await replaceHojaRoomAssignments(data.id as string, hoja.id, input.roomAllocation);
-  return true;
-};
-
-export async function saveAccommodation(input: Partial<TourOpsAccommodation> & { tourId: string }) {
-  const isLegacyHotelInfo = Boolean(input.id?.startsWith("hotel-info:"));
-
-  if (input.source === "hoja" && input.id && !isLegacyHotelInfo) {
-    await upsertOpsAccommodationFromHoja(input);
-    const { error } = await client
-      .from("hoja_de_ruta_accommodations")
-      .update(hojaAccommodationPayloadFromHotel(input))
-      .eq("id", input.id);
-    if (error) throw error;
-    await replaceHojaRoomAssignments(input.id, input.hojaDeRutaId, input.roomAllocation);
-    return input.id;
+export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
+  tourId: string;
+  expectedHojaVersions?: Record<string, number>;
+}) {
+  // A legacy `hotel-info:` entry only lives in the Hoja's hotel_info JSON and has
+  // no row of its own. Saving it creates the normalized hotel (and its linked
+  // Hoja row), which is how legacy hotels get migrated.
+  if (input.id?.startsWith("hotel-info:")) {
+    input = { ...input, id: undefined, source: "normalized", updatedAt: null };
   }
 
   // See above: rebuild from narrowed locals so the NOT NULL columns type as `string`.
@@ -435,23 +334,51 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
   }
   const payload = { ...restPayload, check_in_date, check_out_date };
 
-  if (input.id && !isLegacyHotelInfo) {
-    const { error } = await client.from("tour_accommodations").update(payload).eq("id", input.id);
-    if (error) throw error;
-    await syncAccommodationToHoja(input);
-    return input.id;
-  }
+  const source = input.source === "hoja" ? "hoja" : "normalized";
+  const rooms = input.hojaDeRutaId
+    ? buildHojaRoomAssignmentRows(
+        input.id || crypto.randomUUID(),
+        input.roomAllocation,
+        await hojaStaffStorageLookup(input.hojaDeRutaId),
+      )
+    : [];
 
-  const { data, error } = await client.from("tour_accommodations").insert(payload).select("id").single();
+  const { data, error } = await client.rpc("save_tour_ops_accommodation", {
+    p_tour_id: input.tourId,
+    p_source: source,
+    p_accommodation_id: nullableRpcString(source === "normalized" ? input.id || null : null),
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
+    p_hoja_row_id: nullableRpcString(source === "hoja" ? input.id || null : null),
+    p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
+    p_expected_ops_updated_at: nullableRpcString(
+      source === "normalized" ? input.updatedAt || null : null,
+    ),
+    p_ops_payload: toJson(payload),
+    p_hoja_payload: toJson(hojaAccommodationPayloadFromHotel(input)),
+    p_rooms: toJson(rooms),
+  });
   if (error) throw error;
-  await syncAccommodationToHoja({ ...input, id: data.id as string, source: "normalized" });
-  return data.id as string;
+  return parseHojaMutationResult(data);
 }
 
-export async function deleteAccommodation(input: { id: string; source?: TourOpsAccommodation["source"] }) {
-  const table = input.source === "hoja" ? "hoja_de_ruta_accommodations" : "tour_accommodations";
-  const { error } = await client.from(table).delete().eq("id", input.id);
+export async function deleteAccommodation(input: {
+  id: string;
+  source?: TourOpsAccommodation["source"];
+  hojaDeRutaId?: string | null;
+  expectedHojaVersions?: Record<string, number>;
+  updatedAt?: string | null;
+}) {
+  const { data, error } = await client.rpc("delete_tour_ops_accommodation", {
+    p_source: input.source === "hoja" ? "hoja" : "normalized",
+    p_accommodation_id: input.id,
+    p_hoja_id: nullableRpcString(input.hojaDeRutaId || null),
+    p_expected_hoja_versions: toJson(input.expectedHojaVersions || {}),
+    p_expected_ops_updated_at: nullableRpcString(
+      input.source === "hoja" ? null : input.updatedAt || null,
+    ),
+  });
   if (error) throw error;
+  return parseHojaMutationResult(data);
 }
 
 export async function migrateLegacyTravelPlan(model: TourOpsModel) {
@@ -490,155 +417,4 @@ export async function migrateLegacyTravelPlan(model: TourOpsModel) {
   if (error) throw error;
 
   return rows.length;
-}
-
-export const similarTravelExists = (segment: TourOpsTravelSegment, candidates: TourOpsTravelSegment[], source: TourOpsTravelSegment["source"]) =>
-  candidates.some((candidate) =>
-    candidate.source === source &&
-    candidate.fromTourDateId === segment.fromTourDateId &&
-    candidate.toTourDateId === segment.toTourDateId &&
-    normalizeComparison(candidate.transportationType) === normalizeComparison(segment.transportationType) &&
-    normalizeComparison(candidate.departureTime) === normalizeComparison(segment.departureTime) &&
-    normalizeComparison(candidate.arrivalTime) === normalizeComparison(segment.arrivalTime)
-  );
-
-export const similarAccommodationExists = (
-  accommodation: TourOpsAccommodation,
-  candidates: TourOpsAccommodation[],
-  source: TourOpsAccommodation["source"],
-) =>
-  candidates.some((candidate) =>
-    candidate.source === source &&
-    candidate.tourDateId === accommodation.tourDateId &&
-    normalizeComparison(candidate.hotelName) === normalizeComparison(accommodation.hotelName) &&
-    normalizeComparison(candidate.checkInDate) === normalizeComparison(accommodation.checkInDate) &&
-    normalizeComparison(candidate.checkOutDate) === normalizeComparison(accommodation.checkOutDate)
-  );
-
-export async function syncHojaRutaOpsData(model: TourOpsModel) {
-  const dateById = new Map(model.dates.map((date) => [date.id, date]));
-  let insertedTravelSegments = 0;
-  let insertedHojaTravelRows = 0;
-  let insertedAccommodations = 0;
-  let insertedHojaAccommodations = 0;
-
-  const hojaTravelToNormalize = model.travelSegments.filter((segment) =>
-    segment.source === "hoja" && !similarTravelExists(segment, model.travelSegments, "normalized")
-  );
-  if (hojaTravelToNormalize.length > 0) {
-    const rows = hojaTravelToNormalize.map((segment) => {
-      const fromDate = segment.fromTourDateId ? dateById.get(segment.fromTourDateId) : null;
-      const toDate = segment.toTourDateId ? dateById.get(segment.toTourDateId) : null;
-      const departureAnchorDate = fromDate?.date ?? toDate?.date ?? model.tour.startDate;
-      const arrivalAnchorDate = toDate?.date ?? fromDate?.date ?? model.tour.startDate;
-
-      return {
-        tour_id: model.tour.id,
-        from_tour_date_id: segment.fromTourDateId,
-        to_tour_date_id: segment.toTourDateId,
-        from_location_id: segment.fromLocationId,
-        to_location_id: segment.toLocationId,
-        transportation_type: segment.transportationType,
-        departure_time: normalizeDbTimestamp(departureAnchorDate, segment.departureTime),
-        arrival_time: normalizeDbTimestamp(arrivalAnchorDate, segment.arrivalTime),
-        carrier_name: segment.carrierName,
-        vehicle_details: toJson({
-          ...(isRecord(segment.vehicleDetails) ? segment.vehicleDetails : {}),
-          hojaSourceId: segment.id,
-          hojaSourceTable: segment.sourceTable,
-          hojaDeRutaId: segment.hojaDeRutaId,
-        }),
-        distance_km: segment.distanceKm,
-        estimated_duration_minutes: segment.estimatedDurationMinutes,
-        route_notes: segment.routeNotes,
-        stops: toJson(segment.stops),
-        crew_manifest: toJson(segment.crewManifest),
-        luggage_truck: segment.luggageTruck,
-        status: segment.status ?? "planned",
-      };
-    });
-    const { error } = await client.from("tour_travel_segments").insert(rows);
-    if (error) throw error;
-    insertedTravelSegments = rows.length;
-  }
-
-  const normalizedTravelToHoja = model.travelSegments.filter((segment) =>
-    segment.source === "normalized" && !similarTravelExists(segment, model.travelSegments, "hoja")
-  );
-  for (const segment of normalizedTravelToHoja) {
-    if (await syncSegmentToHoja(segment)) {
-      insertedHojaTravelRows += 1;
-    }
-  }
-
-  const hojaHotelsToNormalize = model.accommodations.filter((hotel) =>
-    hotel.source === "hoja" && !similarAccommodationExists(hotel, model.accommodations, "normalized")
-  );
-  if (hojaHotelsToNormalize.length > 0) {
-    const rows = hojaHotelsToNormalize.map((hotel) => {
-      const date = hotel.tourDateId ? dateById.get(hotel.tourDateId) : null;
-      const checkIn = hotel.checkInDate ?? date?.date ?? model.tour.startDate;
-      const checkOut = hotel.checkOutDate ?? checkIn;
-      return {
-        tour_id: model.tour.id,
-        tour_date_id: hotel.tourDateId,
-        hotel_name: hotel.hotelName,
-        hotel_address: hotel.hotelAddress,
-        latitude: hotel.latitude,
-        longitude: hotel.longitude,
-        check_in_date: checkIn,
-        check_out_date: checkOut,
-        room_allocation: toJson(serializeRoomAllocation(hotel.roomAllocation)),
-        rooms_booked: hotel.roomsBooked ?? hotel.roomAllocation.length,
-        notes: hotel.notes,
-        status: "planned",
-      };
-    }).flatMap((row) =>
-      row.check_in_date && row.check_out_date
-        ? [{ ...row, check_in_date: row.check_in_date, check_out_date: row.check_out_date }]
-        : []
-    );
-    if (rows.length > 0) {
-      const { error } = await client.from("tour_accommodations").insert(rows);
-      if (error) throw error;
-      insertedAccommodations = rows.length;
-    }
-  }
-
-  const normalizedHotelsToHoja = model.accommodations.filter((hotel) =>
-    hotel.source === "normalized" && hotel.tourDateId && !similarAccommodationExists(hotel, model.accommodations, "hoja")
-  );
-  for (const hotel of normalizedHotelsToHoja) {
-    const hoja = await getHojaForTourDate(hotel.tourDateId);
-    if (!hoja?.id) continue;
-    const { data: existing, error: existingError } = await client
-      .from("hoja_de_ruta_accommodations")
-      .select("id, hotel_name, check_in, check_out")
-      .eq("hoja_de_ruta_id", hoja.id);
-    if (existingError) throw existingError;
-    const exists = asArray<UnknownRecord>(existing).some((row) =>
-      normalizeComparison(row.hotel_name) === normalizeComparison(hotel.hotelName) &&
-      normalizeComparison(row.check_in) === normalizeComparison(hotel.checkInDate) &&
-      normalizeComparison(row.check_out) === normalizeComparison(hotel.checkOutDate)
-    );
-    if (exists) continue;
-    const { error } = await client.from("hoja_de_ruta_accommodations").insert({
-      hoja_de_ruta_id: hoja.id,
-      hotel_name: hotel.hotelName,
-      address: hotel.hotelAddress,
-      check_in: hotel.checkInDate,
-      check_out: hotel.checkOutDate,
-      latitude: hotel.latitude,
-      longitude: hotel.longitude,
-    });
-    if (error) throw error;
-    insertedHojaAccommodations += 1;
-  }
-
-  return {
-    insertedTravelSegments,
-    insertedHojaTravelRows,
-    insertedAccommodations,
-    insertedHojaAccommodations,
-  };
 }

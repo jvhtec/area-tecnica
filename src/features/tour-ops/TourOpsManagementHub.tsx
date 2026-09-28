@@ -121,6 +121,15 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     [model?.tour.contacts],
   );
 
+  const hojaVersions = useMemo(
+    () => Object.fromEntries(
+      (model?.dates ?? [])
+        .filter((date) => date.hojaDeRutaId && date.hojaDocumentVersion != null)
+        .map((date) => [date.hojaDeRutaId as string, date.hojaDocumentVersion as number]),
+    ),
+    [model?.dates],
+  );
+
   const homeBaseConfigured = useMemo(
     () => Boolean(model && hasTourHomeBase(model.tour.settings)),
     [model],
@@ -140,35 +149,105 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   };
 
   const saveProgram = async (program: TourOpsProgramDay[]) => {
-    if (!selectedDate?.hojaDeRutaId) {
+    if (!selectedDate?.hojaDeRutaId || selectedDate.hojaDocumentVersion == null) {
       toast.error("Selecciona una fecha con Hoja de Ruta");
       return;
     }
-    await mutations.saveProgram.mutateAsync({ hojaDeRutaId: selectedDate.hojaDeRutaId, program });
+    const result = await mutations.saveProgram.mutateAsync({
+      hojaDeRutaId: selectedDate.hojaDeRutaId,
+      expectedHojaVersion: selectedDate.hojaDocumentVersion,
+      program,
+    });
+    if (result.approvalInvalidated) {
+      toast.warning("Programa guardado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    }
   };
 
+  const finalHojaNote = "La Hoja de Ruta está finalizada y no se ha modificado; reábrela para reflejar el cambio.";
+
   const saveTravel = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
-    await mutations.saveTravel.mutateAsync(input);
-    toast.success("Viaje guardado");
+    const targetDateId = input.toTourDateId || input.fromTourDateId;
+    const targetDate = targetDateId ? model.dates.find((date) => date.id === targetDateId) : null;
+    const hojaDeRutaId = input.source === "hoja"
+      ? input.hojaDeRutaId || null
+      : targetDate?.hojaDeRutaId || null;
+    const result = await mutations.saveTravel.mutateAsync({
+      ...input,
+      hojaDeRutaId,
+      expectedHojaVersions: hojaVersions,
+    });
+    if (result.approvalInvalidated) {
+      toast.warning("Viaje guardado. La Hoja vuelve a revisión y deja de ser visible en vivo hasta reaprobarla.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Viaje guardado. ${finalHojaNote}`);
+    } else {
+      toast.success("Viaje guardado");
+    }
   };
 
   const saveHotel = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
-    await mutations.saveHotel.mutateAsync(input);
-    toast.success("Hotel guardado");
+    const targetDate = input.tourDateId ? model.dates.find((date) => date.id === input.tourDateId) : null;
+    const hojaDeRutaId = input.source === "hoja"
+      ? input.hojaDeRutaId || null
+      : targetDate?.hojaDeRutaId || null;
+    const result = await mutations.saveHotel.mutateAsync({
+      ...input,
+      hojaDeRutaId,
+      expectedHojaVersions: hojaVersions,
+    });
+    if (result.approvalInvalidated) {
+      toast.warning("Hotel y rooming guardados. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Hotel guardado. ${finalHojaNote}`);
+    } else {
+      toast.success("Hotel guardado");
+    }
   };
 
-  const syncHojaOps = async () => {
-    const result = await mutations.syncHojaOps.mutateAsync(model);
-    const total =
-      result.insertedTravelSegments +
-      result.insertedHojaTravelRows +
-      result.insertedAccommodations +
-      result.insertedHojaAccommodations;
-    toast.success(
-      total
-        ? `Sincronizacion completada: ${total} cambios.`
-        : "Hoja de ruta y operaciones ya estaban sincronizadas.",
-    );
+  const removeTravel = async (segment: TourOpsTravelSegment) => {
+    let result;
+    try {
+      result = await mutations.removeTravel.mutateAsync({
+        id: segment.id,
+        expectedHojaVersions: hojaVersions,
+        updatedAt: segment.updatedAt,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el viaje");
+      return;
+    }
+    if (result.approvalInvalidated) {
+      toast.warning("Viaje eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Viaje eliminado. ${finalHojaNote}`);
+    } else {
+      toast.success("Viaje eliminado");
+    }
+  };
+
+  const removeHotel = async (hotel: TourOpsAccommodation) => {
+    const targetDate = hotel.tourDateId ? model.dates.find((date) => date.id === hotel.tourDateId) : null;
+    const hojaDeRutaId = hotel.hojaDeRutaId || targetDate?.hojaDeRutaId || null;
+    let result;
+    try {
+      result = await mutations.removeHotel.mutateAsync({
+        id: hotel.id,
+        source: hotel.source,
+        hojaDeRutaId,
+        expectedHojaVersions: hojaVersions,
+        updatedAt: hotel.updatedAt,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el hotel");
+      return;
+    }
+    if (result.approvalInvalidated) {
+      toast.warning("Hotel eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Hotel eliminado. ${finalHojaNote}`);
+    } else {
+      toast.success("Hotel eliminado");
+    }
   };
 
   const copyProgram = (program: HojaProgramDay[]) => {
@@ -383,10 +462,6 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={syncHojaOps} disabled={mutations.syncHojaOps.isPending}>
-                  {mutations.syncHojaOps.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Route className="h-4 w-4 mr-2" />}
-                  Sincronizar hoja
-                </Button>
                 {model.tour.hasLegacyTravelPlan && (
                   <Button variant="outline" onClick={() => mutations.migrateTravel.mutate(model)}>
                     Migrar legacy
@@ -426,7 +501,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => { setEditingSegment(segment); setTravelDialogOpen(true); }}>Editar</Button>
                       {segment.source === "normalized" && (
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => mutations.removeTravel.mutate(segment.id)}>
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { void removeTravel(segment); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
@@ -487,7 +562,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => { setEditingHotel(hotel); setHotelDialogOpen(true); }}>Editar</Button>
                         {!hotel.id.startsWith("hotel-info:") && (
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => mutations.removeHotel.mutate({ id: hotel.id, source: hotel.source })}>
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { void removeHotel(hotel); }}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
@@ -552,6 +627,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
           <TourContactsManager
             tourId={model.tour.id}
             tourData={contactsTourData}
+            tourUpdatedAt={model.tour.updatedAt}
+            hojaVersions={hojaVersions}
             canEdit
             onSave={() => void refetch()}
           />

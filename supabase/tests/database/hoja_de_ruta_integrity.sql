@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(63);
+SELECT plan(122);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -48,6 +48,12 @@ SELECT ok(
   'child writes lock the parent row before checking whether it is final'
 );
 
+SELECT ok(
+  pg_get_functiondef('public._hoja_lock_external_edits(uuid[],jsonb,boolean)'::regprocedure)
+    ~* 'order by h\.id\s+for update',
+  'multi-Hoja external edits lock parent rows in deterministic UUID order'
+);
+
 -- ---------------------------------------------------------------------------
 -- Fixtures
 -- ---------------------------------------------------------------------------
@@ -65,7 +71,10 @@ VALUES
   ('assignment.removed', 'Assignment removed', 'management', 'info', false),
   ('document.uploaded', 'Document uploaded', 'management', 'info', false),
   ('document.deleted', 'Document deleted', 'management', 'info', false),
-  ('hoja.updated', 'Hoja updated', 'management', 'info', false)
+  ('hoja.updated', 'Hoja updated', 'management', 'info', false),
+  ('tourdate.created', 'Tour date created', 'management', 'info', false),
+  ('tourdate.updated', 'Tour date updated', 'management', 'info', false),
+  ('tourdate.deleted', 'Tour date deleted', 'management', 'info', false)
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO auth.users (
@@ -112,6 +121,28 @@ VALUES
   ('dc200000-0000-0000-0000-000000000001'::uuid, 'Integridad uno', '2032-03-01 09:00:00+01', '2032-03-01 23:00:00+01', 'single'),
   ('dc200000-0000-0000-0000-000000000002'::uuid, 'Integridad dry-hire', '2032-03-02 09:00:00+01', '2032-03-02 23:00:00+01', 'dryhire'),
   ('dc200000-0000-0000-0000-000000000003'::uuid, 'Integridad pasado', '2020-03-01 09:00:00+01', '2020-03-01 23:00:00+01', 'single');
+
+INSERT INTO public.tours (id, name, created_by)
+VALUES (
+  'dc900000-0000-0000-0000-000000000001'::uuid,
+  'Gira integridad Hoja',
+  'dc100000-0000-0000-0000-000000000001'::uuid
+);
+
+INSERT INTO public.tour_dates (id, tour_id, date, start_date, end_date)
+VALUES (
+  'dc910000-0000-0000-0000-000000000001'::uuid,
+  'dc900000-0000-0000-0000-000000000001'::uuid,
+  '2032-03-01'::date,
+  '2032-03-01'::date,
+  '2032-03-01'::date
+);
+
+UPDATE public.jobs
+SET tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid,
+    tour_date_id = 'dc910000-0000-0000-0000-000000000001'::uuid,
+    job_type = 'tourdate'
+WHERE id = 'dc200000-0000-0000-0000-000000000001'::uuid;
 
 INSERT INTO public.job_assignments (job_id, technician_id, status, sound_role)
 VALUES (
@@ -403,13 +434,161 @@ SELECT set_config(
 SET ROLE authenticated;
 
 SELECT lives_ok(
+  $$ INSERT INTO public.hoja_de_ruta_contacts (hoja_de_ruta_id, name, role, sort_order)
+     SELECT id, 'Editado durante review', 'Promotor', 0
+     FROM public.hoja_de_ruta
+     WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid $$,
+  'a second manager can edit content while the Hoja is already in review'
+);
+
+SELECT has_function(
+  'public', 'save_tour_ops_hoja_program',
+  ARRAY['uuid', 'integer', 'jsonb'],
+  'Tour Ops Programa uses a version-aware Hoja RPC'
+);
+
+SELECT has_function(
+  'public', 'save_tour_ops_travel',
+  ARRAY['uuid', 'text', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'timestamp with time zone', 'jsonb', 'jsonb'],
+  'Tour Ops travel has one transactional bridge RPC'
+);
+
+SELECT has_function(
+  'public', 'save_tour_ops_accommodation',
+  ARRAY['uuid', 'text', 'uuid', 'uuid', 'uuid', 'jsonb', 'timestamp with time zone', 'jsonb', 'jsonb', 'jsonb'],
+  'Tour Ops accommodation and rooming have one transactional bridge RPC'
+);
+
+SELECT has_function(
+  'public', 'save_tour_contacts_and_sync_hojas',
+  ARRAY['uuid', 'timestamp with time zone', 'jsonb', 'jsonb'],
+  'tour contacts sync through one optimistic transaction'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'authenticated',
+    'public._hoja_assert_tour_membership(uuid, uuid)',
+    'EXECUTE'
+  ),
+  'the Tour Ops tour-membership guard is not a PostgREST entry point'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000099'::uuid,
+       'normalized',
+       NULL::uuid,
+       (SELECT id FROM public.hoja_de_ruta
+        WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       NULL::uuid,
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       NULL::timestamptz,
+       '{"transportation_type":"bus"}'::jsonb,
+       '{"transportation_type":"van"}'::jsonb
+     ) $$,
+  '22023',
+  'La Hoja de Ruta no pertenece a esta gira',
+  'Tour Ops cannot attach a Hoja from another tour'
+);
+
+SELECT set_eq(
+  $$ SELECT table_name || '.' || column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND (table_name, column_name) IN (
+         ('hoja_de_ruta_travel_arrangements', 'source_tour_travel_segment_id'),
+         ('tour_travel_segments', 'source_hoja_travel_arrangement_id'),
+         ('hoja_de_ruta_accommodations', 'source_tour_accommodation_id'),
+         ('tour_accommodations', 'source_hoja_accommodation_id'),
+         ('hoja_de_ruta_contacts', 'source_tour_contact_id')
+       ) $$,
+  ARRAY[
+    'hoja_de_ruta_travel_arrangements.source_tour_travel_segment_id',
+    'tour_travel_segments.source_hoja_travel_arrangement_id',
+    'hoja_de_ruta_accommodations.source_tour_accommodation_id',
+    'tour_accommodations.source_hoja_accommodation_id',
+    'hoja_de_ruta_contacts.source_tour_contact_id'
+  ],
+  'Tour Ops and Hoja rows have stable cross-system identities'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+   FROM pg_policies
+   WHERE schemaname = 'storage'
+     AND tablename = 'objects'
+     AND policyname IN (
+       'Authenticated users can view job documents',
+       'Users can view job documents',
+       'Users can upload job documents',
+       'Users can update job documents',
+       'Users can delete job documents'
+     )),
+  0,
+  'broad authenticated job-documents storage policies are removed'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+   FROM pg_policies
+   WHERE schemaname = 'storage'
+     AND tablename = 'objects'
+     AND policyname LIKE 'p_storage_job_documents_authorized_%'),
+  4,
+  'job-documents storage has one scoped policy per CRUD class'
+);
+
+SELECT has_trigger(
+  'public', 'job_documents', 'trg_protect_published_hoja_document',
+  'published Hoja metadata is protected from generic document CRUD'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000002'::uuid,
+  'editing content during review transfers review ownership to that editor'
+);
+
+SELECT throws_ok(
   $$ SELECT * FROM public.set_hoja_de_ruta_status(
        'dc200000-0000-0000-0000-000000000001'::uuid,
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'a second manager approves'
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'an editor cannot approve content they changed while it was already in review'
 );
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  'the original manager can approve after the second manager edits the review'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
 
 INSERT INTO public.hoja_de_ruta_contacts (hoja_de_ruta_id, name, role, sort_order)
 SELECT id, 'Contacto directo', 'Promotor', 0
@@ -493,6 +672,66 @@ SELECT throws_ok(
   'the aggregate editor cannot approve their own changes'
 );
 
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ SELECT * FROM public.save_hoja_de_ruta(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       (SELECT payload FROM hoja_integrity_payloads WHERE name = 'base'),
+       ARRAY[]::uuid[]
+     ) $$,
+  'a different manager can save aggregate edits while the Hoja is already in review'
+);
+
+SELECT is(
+  (SELECT review_requested_by FROM public.hoja_de_ruta
+   WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'dc100000-0000-0000-0000-000000000002'::uuid,
+  'aggregate edits during review transfer review ownership to the latest editor'
+);
+
+SELECT throws_ok(
+  $$ SELECT * FROM public.set_hoja_de_ruta_status(
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'approved',
+       (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+     ) $$,
+  '42501',
+  'Otra persona debe aprobar la Hoja de Ruta que enviaste a revisión',
+  'the latest aggregate editor cannot approve their own review changes'
+);
+
+INSERT INTO public.hoja_de_ruta_accommodations (
+  id, hoja_de_ruta_id, hotel_name, address, sort_order
+)
+SELECT
+  'dc700000-0000-0000-0000-000000000001'::uuid,
+  id,
+  'Hotel Integridad',
+  'Calle Integridad 1',
+  0
+FROM public.hoja_de_ruta
+WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+
+INSERT INTO public.hoja_de_ruta_room_assignments (
+  id, accommodation_id, room_type, room_number, staff_member1_id, sort_order
+) VALUES (
+  'dc710000-0000-0000-0000-000000000001'::uuid,
+  'dc700000-0000-0000-0000-000000000001'::uuid,
+  'single',
+  '205',
+  'Invitado externo',
+  0
+);
+
 SELECT ok(
   EXISTS (
     SELECT 1 FROM public.activity_log
@@ -523,10 +762,10 @@ SELECT is(
 );
 
 RESET ROLE;
-SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000002', false);
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
 SELECT set_config(
   'request.jwt.claims',
-  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000002"}',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
   false
 );
 SET ROLE authenticated;
@@ -537,7 +776,7 @@ SELECT lives_ok(
        'approved',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
      ) $$,
-  'a different manager approves the aggregate edit'
+  'a different manager approves the latest aggregate review edit'
 );
 
 INSERT INTO public.job_documents (
@@ -570,6 +809,41 @@ SELECT ok(
   'publication makes the uploaded PDF visible to crew in the same transaction'
 );
 
+SELECT ok(
+  (SELECT read_only FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid),
+  'publication marks the canonical Hoja PDF read-only'
+);
+
+INSERT INTO public.job_documents (
+  id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+  original_type, visible_to_tech
+) VALUES (
+  'dc800000-0000-0000-0000-000000000003'::uuid,
+  'dc200000-0000-0000-0000-000000000001'::uuid,
+  'Documento oculto.pdf',
+  'private/dc200000-0000-0000-0000-000000000001/hidden.pdf',
+  'application/pdf',
+  1,
+  'dc100000-0000-0000-0000-000000000001'::uuid,
+  'pdf',
+  false
+);
+
+SELECT throws_ok(
+  $$ UPDATE public.job_documents
+     SET job_id = 'dc200000-0000-0000-0000-000000000002'::uuid
+     WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid $$,
+  '42501',
+  'La Hoja de Ruta publicada solo se reemplaza desde su flujo de publicación',
+  'generic document updates cannot reassign the canonical published PDF to another job'
+);
+
+SELECT is(
+  (SELECT job_id FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid),
+  'dc200000-0000-0000-0000-000000000001'::uuid,
+  'the canonical published PDF keeps the Hoja job identity'
+);
+
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000003', false);
 SELECT set_config(
@@ -579,10 +853,68 @@ SELECT set_config(
 );
 SET ROLE authenticated;
 
+SELECT lives_ok(
+  $$ SELECT count(*) FROM storage.objects WHERE bucket_id = 'job-documents' $$,
+  'authenticated users can evaluate the job-documents Storage SELECT policy without private-helper permission errors'
+);
+
 SELECT is(
   public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid) #>> '{main,event_name}',
   'Integridad',
   'the assigned technician reads the approved Hoja'
+);
+
+SELECT ok(
+  public.can_read_job_document_storage(
+    'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf'
+  ),
+  'an assigned technician can read the visible published Hoja object'
+);
+
+SELECT ok(
+  public.can_write_job_document_storage(
+    'incident-reports/dc200000-0000-0000-0000-000000000001/incidente.pdf'
+  ),
+  'an assigned technician can upload an incident report for their job'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'private/dc200000-0000-0000-0000-000000000001/hidden.pdf'
+  ),
+  'an assigned technician cannot read a hidden generic job document'
+);
+
+SELECT lives_ok(
+  $$ INSERT INTO public.job_documents (
+       id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+       original_type, visible_to_tech
+     ) VALUES (
+       'dc800000-0000-0000-0000-000000000004'::uuid,
+       'dc200000-0000-0000-0000-000000000001'::uuid,
+       'Spoof same-job metadata.pdf',
+       'private/dc200000-0000-0000-0000-000000000001/hidden.pdf',
+       'application/pdf',
+       1,
+       'dc100000-0000-0000-0000-000000000003'::uuid,
+       'pdf',
+       true
+     ) $$,
+  'an assigned technician can still exercise the broad metadata insert policy'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'private/dc200000-0000-0000-0000-000000000001/hidden.pdf'
+  ),
+  'technician-created visible metadata cannot promote a hidden object in the same job'
+);
+
+SELECT is(
+  public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid)
+    #>> '{accommodations,0,rooms,0,staff_member1_name}',
+  'Invitado externo',
+  'crew projection preserves a current free-text room occupant when no canonical staff row exists'
 );
 
 RESET ROLE;
@@ -594,15 +926,32 @@ SELECT set_config(
 );
 SET ROLE authenticated;
 
-UPDATE public.hoja_de_ruta
-SET program_schedule_json = '[{"date":"2032-03-01","rows":[]}]'::jsonb
-WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid;
+SELECT is(
+  (public.save_tour_ops_hoja_program(
+    (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+    (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+    '[{"date":"2032-03-01","rows":[{"id":"program-test","time":"10:00","item":"Load in","notify":true,"departments":["sound"]}]}]'::jsonb
+  ) ->> 'approval_invalidated')::boolean,
+  true,
+  'Tour Ops Programa invalidates an approved Hoja through the same workflow boundary'
+);
 
 SELECT is(
   (SELECT status FROM public.hoja_de_ruta
    WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
   'review',
   'editing a published approved Hoja sends the live aggregate back to review'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.save_tour_ops_hoja_program(
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       (SELECT document_version - 1 FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       '[]'::jsonb
+     ) $$,
+  '40001',
+  'La Hoja de Ruta ha cambiado desde la última carga',
+  'Tour Ops Programa rejects a stale Hoja version before writing'
 );
 
 SELECT ok(
@@ -654,6 +1003,20 @@ SELECT set_config(
 );
 SET ROLE authenticated;
 
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf'
+  ),
+  'an unassigned technician cannot read another job published Hoja object'
+);
+
+SELECT ok(
+  NOT public.can_write_job_document_storage(
+    'incident-reports/dc200000-0000-0000-0000-000000000001/incidente.pdf'
+  ),
+  'an unassigned technician cannot upload an incident report for another job'
+);
+
 SELECT throws_ok(
   $$ SELECT public.get_hoja_de_ruta('dc200000-0000-0000-0000-000000000001'::uuid) $$,
   '42501',
@@ -682,6 +1045,57 @@ SELECT throws_ok(
   'permission denied',
   'the publication wrapper authorizes before revealing the document version'
 );
+
+RESET ROLE;
+INSERT INTO public.job_assignments (job_id, technician_id, status, sound_role)
+VALUES (
+  'dc200000-0000-0000-0000-000000000002'::uuid,
+  'dc100000-0000-0000-0000-000000000004'::uuid,
+  'confirmed',
+  'SND-PA'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000004', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000004"}',
+  false
+);
+SET ROLE authenticated;
+
+SELECT lives_ok(
+  $$ INSERT INTO public.job_documents (
+       id, job_id, file_name, file_path, file_type, file_size, uploaded_by,
+       original_type, visible_to_tech
+     ) VALUES (
+       'dc800000-0000-0000-0000-000000000002'::uuid,
+       'dc200000-0000-0000-0000-000000000002'::uuid,
+       'Spoof metadata.pdf',
+       'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf',
+       'application/pdf',
+       1,
+       'dc100000-0000-0000-0000-000000000004'::uuid,
+       'pdf',
+       true
+     ) $$,
+  'an authenticated technician can create duplicate metadata for a known path'
+);
+
+SELECT ok(
+  NOT public.can_read_job_document_storage(
+    'hojas-de-ruta/dc200000-0000-0000-0000-000000000001/integridad.pdf'
+  ),
+  'duplicate metadata cannot redefine storage ownership away from the job UUID embedded in the path'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub', 'dc100000-0000-0000-0000-000000000001', false);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"role":"authenticated","sub":"dc100000-0000-0000-0000-000000000001"}',
+  false
+);
+SET ROLE authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Final lock on every writer
@@ -745,9 +1159,140 @@ SELECT is(
   'the final Hoja keeps its issued staff list'
 );
 
+-- Tour Ops keeps working on dates whose Hoja is final: the normalized row is
+-- saved or deleted, and the issued Hoja is left exactly as it was.
+SELECT set_config(
+  'hoja_test.final_version',
+  (SELECT document_version::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  false
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       null,
+       '{"transportation_type":"bus","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01"}'::jsonb,
+       '{"transportation_type":"van","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01"}'::jsonb
+     ) $$,
+  'Tour Ops can save normalized travel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  1,
+  'the normalized travel row is stored'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+     FROM public.hoja_de_ruta_travel_arrangements hta
+     JOIN public.tour_travel_segments t ON t.id = hta.source_tour_travel_segment_id
+    WHERE t.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no travel row is copied into the final Hoja'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'hoja',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       gen_random_uuid(),
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       null,
+       '{}'::jsonb,
+       '{}'::jsonb
+     ) $$,
+  '22023',
+  'La Hoja de Ruta está finalizada y no admite edición',
+  'editing a Hoja travel row from Tour Ops still respects the final lock'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_travel(
+       (SELECT id FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       '{}'::jsonb,
+       null
+     ) $$,
+  'Tour Ops can delete normalized travel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'the normalized travel row is deleted'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_accommodation(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       '{}'::jsonb,
+       null,
+       '{"hotel_name":"Hotel final","check_in_date":"2032-03-01","check_out_date":"2032-03-02","room_allocation":[],"status":"planned"}'::jsonb,
+       '{"hotel_name":"Hotel final","check_in":"2032-03-01T15:00:00+01","check_out":"2032-03-02T10:00:00+01"}'::jsonb,
+       '[{"room_type":"single","room_number":"1","staff_member1_id":"Invitado","sort_order":0}]'::jsonb
+     ) $$,
+  'Tour Ops can save a normalized hotel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+     FROM public.hoja_de_ruta_accommodations ha
+     JOIN public.tour_accommodations a ON a.id = ha.source_tour_accommodation_id
+    WHERE a.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no hotel or rooming is copied into the final Hoja'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_accommodation(
+       'normalized',
+       (SELECT id FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       null,
+       '{}'::jsonb,
+       null
+     ) $$,
+  'Tour Ops can delete a normalized hotel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'the normalized hotel is deleted'
+);
+
+SELECT is(
+  (SELECT status || ':' || document_version::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'final:' || current_setting('hoja_test.final_version'),
+  'Tour Ops writes leave the final Hoja status and version untouched'
+);
+
+SELECT throws_ok(
+  $$ DELETE FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid $$,
+  '42501',
+  'La Hoja de Ruta publicada solo se reemplaza desde su flujo de publicación',
+  'generic document CRUD cannot delete the canonical published Hoja PDF'
+);
+
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', false);
+SET ROLE service_role;
+
 SELECT lives_ok(
   $$ DELETE FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid $$,
-  'deleting the published PDF of a final Hoja is not blocked by the lock'
+  'service-role referential cleanup can still remove the published artifact'
 );
 
 SELECT is(
@@ -755,6 +1300,8 @@ SELECT is(
   NULL::uuid,
   'the referential action clears the published pointer'
 );
+
+RESET ROLE;
 
 -- ---------------------------------------------------------------------------
 -- Reopen
@@ -840,6 +1387,174 @@ SELECT lives_ok(
 );
 
 -- ---------------------------------------------------------------------------
+-- Tour Ops <-> Hoja transactional bridge contracts
+-- ---------------------------------------------------------------------------
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       'hoja_de_ruta_travel_arrangements',
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+       ),
+       null,
+       '{"transportation_type":"bus","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01","route_notes":"Contrato"}'::jsonb,
+       '{"transportation_type":"van","pickup_address":"Base","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01","notes":"Contrato"}'::jsonb
+     ) $$,
+  'Tour Ops creates normalized travel and its Hoja row atomically'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::text || ':' ||
+           (SELECT count(*)::text
+              FROM public.hoja_de_ruta_travel_arrangements hta
+              WHERE hta.source_tour_travel_segment_id = t.id)
+    FROM public.tour_travel_segments t
+    WHERE t.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid
+    GROUP BY t.id
+  ),
+  '1:1',
+  'the travel bridge creates exactly one normalized row and one linked Hoja row'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.tour_travel_segments t
+    JOIN public.hoja_de_ruta_travel_arrangements hta
+      ON hta.id = t.source_hoja_travel_arrangement_id
+     AND hta.source_tour_travel_segment_id = t.id
+    WHERE t.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid
+  ),
+  'travel source identity is reciprocal instead of content-based'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       (SELECT id FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       'hoja_de_ruta_travel_arrangements',
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+       ),
+       (SELECT updated_at FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       '{"transportation_type":"bus","departure_time":"2032-03-01T08:30:00+01","arrival_time":"2032-03-01T09:30:00+01","route_notes":"Editado"}'::jsonb,
+       '{"transportation_type":"van","pickup_address":"Base 2","departure_time":"2032-03-01T08:30:00+01","arrival_time":"2032-03-01T09:30:00+01","notes":"Editado"}'::jsonb
+     ) $$,
+  'editing linked travel updates the stable pair'
+);
+
+SELECT is(
+  (
+    SELECT (SELECT count(*) FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid)::text
+      || ':' ||
+      (SELECT count(*)
+         FROM public.hoja_de_ruta_travel_arrangements hta
+         JOIN public.tour_travel_segments t ON t.id = hta.source_tour_travel_segment_id
+        WHERE t.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid)::text
+  ),
+  '1:1',
+  'editing travel does not manufacture a second copy'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_travel(
+       (SELECT id FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+       ),
+       (SELECT updated_at FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1)
+     ) $$,
+  'deleting normalized travel removes the linked Hoja copy in the same transaction'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no Tour Ops ghost travel row remains after deletion'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_accommodation(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+       ),
+       null,
+       '{"hotel_name":"Hotel contrato","check_in_date":"2032-03-01","check_out_date":"2032-03-02","room_allocation":[],"rooms_booked":1,"status":"planned"}'::jsonb,
+       '{"hotel_name":"Hotel contrato","address":"Calle contrato 1","check_in":"2032-03-01T15:00:00+01","check_out":"2032-03-02T10:00:00+01"}'::jsonb,
+       '[{"id":"dc720000-0000-0000-0000-000000000001","room_type":"single","room_number":"301","staff_member1_id":"Invitado contractual","sort_order":0}]'::jsonb
+     ) $$,
+  'Tour Ops saves hotel and rooming as one Hoja-aware transaction'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::text || ':' ||
+           coalesce((
+             SELECT r.staff_member1_id
+             FROM public.hoja_de_ruta_room_assignments r
+             JOIN public.hoja_de_ruta_accommodations ha ON ha.id = r.accommodation_id
+             WHERE ha.source_tour_accommodation_id = a.id
+             LIMIT 1
+           ), '')
+    FROM public.tour_accommodations a
+    WHERE a.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid
+    GROUP BY a.id
+  ),
+  '1:Invitado contractual',
+  'room replacement keeps a current free-text occupant inside the same transaction'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.tour_accommodations a
+    JOIN public.hoja_de_ruta_accommodations ha
+      ON ha.id = a.source_hoja_accommodation_id
+     AND ha.source_tour_accommodation_id = a.id
+    WHERE a.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid
+  ),
+  'accommodation source identity is reciprocal'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_accommodation(
+       'normalized',
+       (SELECT id FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       null,
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid)
+       ),
+       (SELECT updated_at FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1)
+     ) $$,
+  'deleting a normalized hotel removes its Hoja hotel and rooming atomically'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no normalized accommodation ghost remains after deletion'
+);
+
+-- ---------------------------------------------------------------------------
 -- DNI retention
 -- ---------------------------------------------------------------------------
 
@@ -851,6 +1566,44 @@ SELECT lives_ok(
        ARRAY[]::uuid[]
      ) $$,
   'a Hoja for a past job can be saved'
+);
+
+RESET ROLE;
+
+SELECT throws_ok(
+  $$ SELECT public._hoja_lock_external_edits(
+       ARRAY[
+         (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
+       ],
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid),
+         (SELECT document_version - 1 FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
+       ),
+       false
+     ) $$,
+  '40001',
+  'La Hoja de Ruta ha cambiado desde la última carga',
+  'a multi-Hoja external mutation rejects the whole operation when either snapshot is stale'
+);
+
+SELECT lives_ok(
+  $$ SELECT public._hoja_lock_external_edits(
+       ARRAY[
+         (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
+       ],
+       jsonb_build_object(
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+         (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid),
+         (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
+       ),
+       false
+     ) $$,
+  'the same multi-Hoja mutation accepts a complete current version map'
 );
 
 RESET ROLE;
@@ -904,5 +1657,7 @@ WHERE id IN (
   'dc200000-0000-0000-0000-000000000002'::uuid,
   'dc200000-0000-0000-0000-000000000003'::uuid
 );
+DELETE FROM public.tour_dates WHERE id = 'dc910000-0000-0000-0000-000000000001'::uuid;
+DELETE FROM public.tours WHERE id = 'dc900000-0000-0000-0000-000000000001'::uuid;
 
 SELECT * FROM finish();

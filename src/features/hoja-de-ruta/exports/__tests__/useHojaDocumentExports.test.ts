@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getHojaPublishBlockReason } from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
+import {
+  getHojaPublishBlockReason,
+  shouldStopPublicationAfterSave,
+} from "@/features/hoja-de-ruta/exports/useHojaDocumentExports";
 
 describe("getHojaPublishBlockReason", () => {
   it("blocks publication when the editor knows its version is stale", () => {
@@ -13,5 +16,11 @@ describe("getHojaPublishBlockReason", () => {
     expect(getHojaPublishBlockReason(false, "review")).toBe("status");
     expect(getHojaPublishBlockReason(false, "approved")).toBeNull();
     expect(getHojaPublishBlockReason(false, "final")).toBeNull();
+  });
+
+  it("stops publication after saving dirty approved content because the save reopens review", () => {
+    expect(shouldStopPublicationAfterSave("approved", true)).toBe(true);
+    expect(shouldStopPublicationAfterSave("approved", false)).toBe(false);
+    expect(shouldStopPublicationAfterSave("final", true)).toBe(false);
   });
 });
