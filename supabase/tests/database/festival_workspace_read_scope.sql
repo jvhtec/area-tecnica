@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(44);
+SELECT plan(55);
 
 -- ---------------------------------------------------------------------------
 -- Structural assertions
@@ -107,6 +107,61 @@ SELECT ok(
   'department matching normalizes case and production spellings'
 );
 
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname IN (
+        'riders_bucket_read_all',
+        'Enable upload access for authenticated users',
+        'Enable delete access for authenticated users',
+        'Authenticated users can upload festival logos',
+        'Users can update own festival logos',
+        'Users can delete own festival logos'
+      )
+  ),
+  'unscoped legacy rider and logo storage policies are absent'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND cmd IN ('SELECT', 'ALL')
+      AND roles && ARRAY['anon', 'public']::name[]
+      AND coalesce(qual, '') ILIKE '%festival_artist_files%'
+  ),
+  'no anonymous or PUBLIC read policy exists on the rider bucket'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'Anyone can view festival logos'
+      AND cmd = 'SELECT'
+      AND roles @> ARRAY['anon', 'authenticated']::name[]
+      AND qual ILIKE '%festival-logos%'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'p_storage_festival_logos_authorized_delete'
+      AND cmd = 'DELETE'
+      AND qual ILIKE '%house_tech%'
+      AND qual NOT ILIKE '%''technician''%'
+  ),
+  'logos stay publicly readable and are deletable only by office roles and house techs'
+);
+
 -- ---------------------------------------------------------------------------
 -- Fixtures (as the table owner; RLS does not apply)
 -- ---------------------------------------------------------------------------
@@ -205,6 +260,15 @@ INSERT INTO public.festival_artist_form_submissions (id, form_id, artist_id, for
 VALUES ('fa800000-0000-0000-0000-000000000001'::uuid, 'fa700000-0000-0000-0000-000000000001'::uuid,
         'fa600000-0000-0000-0000-000000000001'::uuid, '{}'::jsonb);
 
+INSERT INTO public.festival_artist_files (id, artist_id, file_name, file_path, file_type, file_size)
+VALUES ('fa620000-0000-0000-0000-000000000001'::uuid, 'fa600000-0000-0000-0000-000000000001'::uuid,
+        'rider.pdf', 'fa600000-0000-0000-0000-000000000001/rider.pdf', 'application/pdf', 10);
+
+INSERT INTO storage.objects (bucket_id, name)
+VALUES
+  ('festival_artist_files', 'fa600000-0000-0000-0000-000000000001/rider.pdf'),
+  ('festival_artist_files', 'fa600000-0000-0000-0000-000000000001/stage-plots/plot.webp');
+
 INSERT INTO public.festival_gear_setups (id, job_id, max_stages)
 VALUES ('fa900000-0000-0000-0000-000000000001'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid, 1);
 
@@ -234,9 +298,14 @@ SELECT
   (SELECT count(*) FROM public.festival_stage_gear_setups WHERE gear_setup_id = 'fa900000-0000-0000-0000-000000000001'::uuid)::integer AS stage_gear,
   (SELECT count(*) FROM public.festival_settings WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid)::integer AS settings,
   (SELECT count(*) FROM public.festival_logos WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid)::integer AS logos,
-  (SELECT count(*) FROM public.festival_stages WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid)::integer AS stages;
+  (SELECT count(*) FROM public.festival_stages WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid)::integer AS stages,
+  (SELECT count(*) FROM public.festival_artists WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid)::integer AS artists,
+  (SELECT count(*) FROM public.festival_artist_files WHERE artist_id = 'fa600000-0000-0000-0000-000000000001'::uuid)::integer AS artist_files,
+  (SELECT count(*) FROM storage.objects
+     WHERE bucket_id = 'festival_artist_files'
+       AND name LIKE 'fa600000-0000-0000-0000-000000000001/%')::integer AS rider_objects;
 
-GRANT SELECT ON public.__fest_scope_counts TO authenticated;
+GRANT SELECT ON public.__fest_scope_counts TO anon, authenticated;
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
@@ -257,6 +326,10 @@ SELECT is((SELECT submissions FROM public.__fest_scope_counts), 1, 'sound tech k
 SELECT ok(
   (SELECT gear = 1 AND stage_gear = 1 AND settings = 1 AND logos = 1 AND stages = 1 FROM public.__fest_scope_counts),
   'sound tech reads job-level festival data for their job'
+);
+SELECT ok(
+  (SELECT artists = 1 AND artist_files = 1 AND rider_objects = 2 FROM public.__fest_scope_counts),
+  'sound tech reads artists, rider metadata, rider files and stage plots for their job'
 );
 
 -- ---------------------------------------------------------------------------
@@ -299,6 +372,10 @@ SELECT ok(
   'shift-only tech reads job-level festival data for that job'
 );
 SELECT is((SELECT forms FROM public.__fest_scope_counts), 0, 'shift-only tech cannot read public form tokens');
+SELECT ok(
+  (SELECT artists = 1 AND artist_files = 1 AND rider_objects = 2 FROM public.__fest_scope_counts),
+  'shift-only tech reads the artists and riders of the job they work on'
+);
 
 -- ---------------------------------------------------------------------------
 -- Unassigned technician
@@ -314,6 +391,9 @@ SELECT is((SELECT stage_gear FROM public.__fest_scope_counts), 0, 'unassigned te
 SELECT is((SELECT settings FROM public.__fest_scope_counts), 0, 'unassigned tech sees no festival settings');
 SELECT is((SELECT logos FROM public.__fest_scope_counts), 0, 'unassigned tech sees no festival logo');
 SELECT is((SELECT stages FROM public.__fest_scope_counts), 0, 'unassigned tech sees no festival stages');
+SELECT is((SELECT artists FROM public.__fest_scope_counts), 0, 'unassigned tech sees no artists');
+SELECT is((SELECT artist_files FROM public.__fest_scope_counts), 0, 'unassigned tech sees no rider metadata');
+SELECT is((SELECT rider_objects FROM public.__fest_scope_counts), 0, 'unassigned tech cannot read rider files or stage plots');
 
 -- ---------------------------------------------------------------------------
 -- Technician who declined the job
@@ -322,6 +402,10 @@ SELECT set_config('request.jwt.claim.sub', 'fa100000-0000-0000-0000-000000000005
 
 SELECT is((SELECT shifts FROM public.__fest_scope_counts), 0, 'declined tech sees no shifts');
 SELECT is((SELECT gear FROM public.__fest_scope_counts), 0, 'declined tech sees no job-level festival data');
+SELECT ok(
+  (SELECT artists = 0 AND artist_files = 0 AND rider_objects = 0 FROM public.__fest_scope_counts),
+  'declined tech sees no artists or riders'
+);
 
 -- ---------------------------------------------------------------------------
 -- House tech (unassigned) keeps operational read, without form tokens
@@ -335,6 +419,10 @@ SELECT is((SELECT submissions FROM public.__fest_scope_counts), 1, 'house tech r
 SELECT ok(
   (SELECT gear = 1 AND stage_gear = 1 AND settings = 1 AND logos = 1 AND stages = 1 FROM public.__fest_scope_counts),
   'house tech reads job-level festival data'
+);
+SELECT ok(
+  (SELECT artists = 1 AND artist_files = 1 AND rider_objects = 2 FROM public.__fest_scope_counts),
+  'house tech reads artists and riders without an assignment'
 );
 
 -- ---------------------------------------------------------------------------
@@ -362,6 +450,14 @@ SELECT ok(
   'a session with no user cannot read festival job data'
 );
 
+RESET ROLE;
+SET LOCAL ROLE anon;
+SELECT set_config('request.jwt.claim.role', 'anon', true);
+SELECT is(
+  (SELECT count(*)::integer FROM storage.objects WHERE bucket_id = 'festival_artist_files'),
+  0,
+  'the anon key cannot read any rider file'
+);
 RESET ROLE;
 
 SELECT * FROM finish();

@@ -33,11 +33,13 @@ SELECT ok(
       AND policyname = 'p_festival_artists_public_select_598f77'
       AND cmd = 'SELECT'
       AND roles = ARRAY['authenticated']::name[]
-      AND qual ILIKE '%job_assignments%'
-      AND qual ILIKE '%festival_artists.job_id%'
-      AND qual ILIKE '%auth.uid()%'
+      AND qual ILIKE '%can_read_festival_job(job_id)%'
       AND qual NOT ILIKE '%OR true%'
-  ),
+  )
+  -- The job correlation now lives in the helper (20260928130000); it must still
+  -- compare the assignment to the caller and to the row's job, not to itself.
+  AND pg_get_functiondef(to_regprocedure('public.can_read_festival_job(uuid)')) ILIKE '%ja.job_id = p_job_id%'
+  AND pg_get_functiondef(to_regprocedure('public.can_read_festival_job(uuid)')) ILIKE '%auth.uid()%',
   'festival artist reads are scoped to authenticated roles and assigned technicians'
 );
 

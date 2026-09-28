@@ -128,13 +128,23 @@ Each item is sized to be one PR. Phases can overlap. Phase 0 blocks nothing else
 
 ### Phase 0: containment (this week)
 
-**Status (2026-09-28): 0.1–0.3 done** in `20260928120000_scope_festival_workspace_reads.sql` + `supabase/tests/database/festival_workspace_read_scope.sql`. Form-link actions are hidden in the UI for roles that can no longer read tokens (`canManageArtistFormLinks`). Production policies matched the migration chain for all nine tables before the change (one SELECT policy each), so DB-06 drift does not affect this migration.
+**Status (2026-09-28): 0.1–0.4 done.**
+
+- `20260928120000_scope_festival_workspace_reads.sql` scopes the nine workspace tables (0.1, 0.2). Form-link actions are hidden in the UI for roles that can no longer read tokens (`canManageArtistFormLinks`). Production matched the migration chain for these tables (one SELECT policy each).
+- `20260928130000_align_festival_artist_and_storage_reads.sql` (0.4):
+  - `festival_artists` and `festival_artist_files` now use the same `can_read_festival_job` rule, so declined technicians lose access and shift-only crew gain it.
+  - It closes **FEST-SEC-03**, found while doing this. Production had seven storage policies that no migration defines (DB-06 drift). Among them, `riders_bucket_read_all` let **anyone with the anon key read all 586 rider files**, and four others let any signed-in user upload or delete any rider file or logo. These policies are dropped.
+  - The public form now opens and downloads its riders through the token-validated `sign` action of `upload-public-artist-rider`.
+  - Logos stay publicly readable on purpose (the anonymous form and PDFs render them), and the policy is now defined in a migration.
+  - Logo uploads accept every job type. Before, single jobs only worked through the dropped drift policies.
+- `supabase/tests/database/festival_workspace_read_scope.sql` pins the behaviour per role, including the storage objects and the anon key.
 
 | # | Item | Findings | Exit criteria |
 | --- | --- | --- | --- |
 | 0.1 | Close form-token exposure: role-limit `festival_artist_forms` and `festival_artist_form_submissions` `SELECT`, and give technicians a token-free status view if needed. | FEST-SEC-01 | pgTAP: an unassigned technician gets 0 rows, and no non-manager path returns `token`. Production policy diff recorded in the PR. |
 | 0.2 | Job-correlate `SELECT` on shifts, shift assignments, gear setups, stage gear setups, settings, logos and stages. Shifts and shift assignments are also scoped to the technician's department on that job. | FEST-SEC-02 | pgTAP per table, including a sound tech on the job who sees sound and department-less shifts but not lights shifts, and still sees any shift they are personally assigned to. The technician super app, the offline snapshot and `push/festivalFeed` still work for an assigned tech (manual smoke plus existing tests). |
 | 0.3 | Tracking entry in `docs/CODEBASE_AUDIT_2026-09-04.md`'s register (as a SEC-12 follow-up). | — | Register updated. |
+| 0.4 | Align `festival_artists` / `festival_artist_files` and the rider/logo storage buckets with the same read rule, and remove the drifted storage policies. | FEST-SEC-03 | pgTAP covers artists, rider metadata, rider objects, stage plots and anon storage reads. The public form reads riders through signed URLs. |
 
 ### Phase 1: correctness (1–2 weeks)
 

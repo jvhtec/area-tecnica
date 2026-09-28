@@ -154,3 +154,26 @@ export async function uploadPublicArtistRiderFiles(token: string, selectedFiles:
 
   return parseUploadedRiderFiles(completeResponse);
 }
+
+/**
+ * The rider bucket has no anonymous read access, so the public form asks the
+ * token-validated Edge Function for a short-lived URL to one of its own files.
+ */
+export async function getPublicArtistRiderSignedUrl(
+  token: string,
+  fileId: string,
+  options: { download?: boolean } = {},
+): Promise<string> {
+  const { data, error } = await dataLayerClient.functions.invoke("upload-public-artist-rider", {
+    body: { action: "sign", token, file_id: fileId, download: options.download === true },
+  });
+
+  if (error) throw error;
+
+  const response = data as { ok?: boolean; error?: string; signed_url?: unknown } | null;
+  if (!response?.ok || typeof response.signed_url !== "string" || !response.signed_url) {
+    throw new Error(response?.error || "signed_read_failed");
+  }
+
+  return response.signed_url;
+}

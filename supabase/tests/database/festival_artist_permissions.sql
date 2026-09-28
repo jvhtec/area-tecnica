@@ -96,9 +96,7 @@ SELECT ok(
       AND qual ILIKE '%management%'
       AND qual ILIKE '%logistics%'
       AND qual ILIKE '%house_tech%'
-      AND qual ILIKE '%job_assignments%'
-      AND qual ILIKE '%auth.uid%'
-      AND qual ILIKE '%''technician''%'
+      AND qual ILIKE '%can_read_festival_job%'
       AND qual NOT ILIKE '%OR true%'
   ),
   'festival artist file metadata reads are scoped to elevated roles or assigned technicians'
@@ -197,9 +195,7 @@ SELECT ok(
       AND qual ILIKE '%management%'
       AND qual ILIKE '%logistics%'
       AND qual ILIKE '%house_tech%'
-      AND qual ILIKE '%job_assignments%'
-      AND qual ILIKE '%auth.uid%'
-      AND qual ILIKE '%''technician''%'
+      AND qual ILIKE '%can_read_festival_job%'
       AND qual ILIKE '%festival_artists%'
   ),
   'house techs and assigned technicians may view festival artist file storage objects'
@@ -300,10 +296,10 @@ SELECT ok(
       AND with_check ILIKE '%management%'
       AND with_check ILIKE '%logistics%'
       AND with_check ILIKE '%house_tech%'
-      AND with_check ILIKE '%festival%'
-      AND with_check ILIKE '%ciclo%'
+      AND with_check ILIKE '%jobs%'
+      AND with_check NOT ILIKE '%ciclo%'
   ),
-  'house techs may upload festival logo storage objects'
+  'house techs may upload festival logo storage objects for any job type'
 );
 
 SELECT ok(
