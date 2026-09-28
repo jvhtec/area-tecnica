@@ -23,7 +23,7 @@ import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/ut
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs } from "@/utils/permissions";
+import { canCreateFestivalArtistExtras, canDeleteFestivalArtists, canEditJobs, canManageArtistFormLinks } from "@/utils/permissions";
 import { queryKeys } from "@/lib/react-query";
 import { fetchWithOfflineFallback, getOfflineFestivalContext } from "@/lib/offline";
 import { useFestivalArtistJobDetails } from "@/hooks/festival/useFestivalArtistJobDetails";
@@ -40,7 +40,11 @@ const FestivalArtistManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { userRole } = useOptimizedAuth();
-  const artistActionPermissions = { canDelete: canDeleteFestivalArtists(userRole), canCreateExtras: canCreateFestivalArtistExtras(userRole) };
+  const artistActionPermissions = {
+    canDelete: canDeleteFestivalArtists(userRole),
+    canCreateExtras: canCreateFestivalArtistExtras(userRole),
+    canManageFormLinks: canManageArtistFormLinks(userRole),
+  };
   const routeDate = searchParams.get("date") || "";
   const routeStage = searchParams.get("stage") || "all";
   const normalizedRouteStage = routeStage && routeStage !== "all" ? routeStage : "all";

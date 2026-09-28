@@ -192,6 +192,7 @@ interface MobileArtistCardProps {
   riderFiles?: MobileArtistRiderFile[];
   canDelete: boolean;
   canCreateExtras: boolean;
+  canManageFormLinks?: boolean;
 }
 
 export const MobileArtistCard = ({
@@ -219,6 +220,7 @@ export const MobileArtistCard = ({
   riderFiles = [],
   canDelete,
   canCreateExtras,
+  canManageFormLinks = false,
 }: MobileArtistCardProps) => {
   const handleCreateFlexExtras = () => {
     if (!canCreateExtras || !artist.date) return;
@@ -405,9 +407,18 @@ export const MobileArtistCard = ({
       {/* Action Bar */}
       {mode === 'edit' && (
         <div className="flex items-center justify-between gap-1 px-3 py-2 border-t bg-muted/30">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onGenerateLink(artist)}>
-            <Link className="h-4 w-4" />
-          </Button>
+          {canManageFormLinks && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onGenerateLink(artist)}
+              aria-label="Generar enlace de formulario"
+              title="Generar enlace de formulario"
+            >
+              <Link className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onManageFiles(artist)}>
             <FileText className="h-4 w-4" />
           </Button>

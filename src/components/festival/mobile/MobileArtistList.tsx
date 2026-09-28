@@ -43,6 +43,7 @@ interface MobileArtistListProps {
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
   canDelete: boolean;
   canCreateExtras: boolean;
+  canManageFormLinks?: boolean;
 }
 
 export const MobileArtistList = ({
@@ -72,6 +73,7 @@ export const MobileArtistList = ({
   onDownloadRiderFile,
   canDelete,
   canCreateExtras,
+  canManageFormLinks = false,
 }: MobileArtistListProps) => {
   const [editingCategory, setEditingCategory] = useState<{
     artistId: string;
@@ -171,6 +173,7 @@ export const MobileArtistList = ({
             riderFiles={riderFilesByArtistId[artist.id] || []}
             canDelete={canDelete}
             canCreateExtras={canCreateExtras}
+            canManageFormLinks={canManageFormLinks}
           />
         </div>
       ))}

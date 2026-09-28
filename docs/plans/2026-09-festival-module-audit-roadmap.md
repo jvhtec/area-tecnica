@@ -128,6 +128,8 @@ Each item is sized to be one PR. Phases can overlap. Phase 0 blocks nothing else
 
 ### Phase 0: containment (this week)
 
+**Status (2026-09-28): 0.1–0.3 done** in `20260928120000_scope_festival_workspace_reads.sql` + `supabase/tests/database/festival_workspace_read_scope.sql`. Form-link actions are hidden in the UI for roles that can no longer read tokens (`canManageArtistFormLinks`). Production policies matched the migration chain for all nine tables before the change (one SELECT policy each), so DB-06 drift does not affect this migration.
+
 | # | Item | Findings | Exit criteria |
 | --- | --- | --- | --- |
 | 0.1 | Close form-token exposure: role-limit `festival_artist_forms` and `festival_artist_form_submissions` `SELECT`, and give technicians a token-free status view if needed. | FEST-SEC-01 | pgTAP: an unassigned technician gets 0 rows, and no non-manager path returns `token`. Production policy diff recorded in the PR. |

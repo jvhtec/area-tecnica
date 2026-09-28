@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, ExternalLink, ImageOff, ImagePlus, Loader2 } from "lucide-react";
+import { ArrowUpDown, ImageOff, ImagePlus, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -35,6 +35,7 @@ import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 import { ArtistActionButtons } from "./ArtistActionButtons";
+import { ArtistTableHeader } from "./ArtistTableHeader";
 import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 import { formatDifferentScheduleDate, getEffectiveSoundcheckDate } from "@/utils/artistScheduleDates";
@@ -57,7 +58,8 @@ export const ArtistTable = ({
   crossDateSearch = false,
   onArtistStagePlotUpdated,
   canDelete,
-  canCreateExtras
+  canCreateExtras,
+  canManageFormLinks = false
 }: ArtistTableProps) => {
   const [sortBy, setSortBy] = useState<ArtistSortField>('chronological');
   const confirm = useConfirm();
@@ -303,19 +305,11 @@ export const ArtistTable = ({
     <>
       <TooltipProvider>
         <div className="w-full space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between py-4 px-2">
-            <h2 className="text-xl md:text-2xl font-semibold leading-none tracking-tight">
-              Cronograma de artistas ({sortedFilteredArtists.length} artistas)
-            </h2>
-            <Button variant="outline" size="sm" onClick={handleViewLinks} className="hidden md:flex">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Ver todos los enlaces
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleViewLinks} className="md:hidden">
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
+          <ArtistTableHeader
+            artistCount={sortedFilteredArtists.length}
+            canManageFormLinks={canManageFormLinks}
+            onViewLinks={handleViewLinks}
+          />
 
           {hasArtistSubmittedData && (
             <div className="px-2">
@@ -636,6 +630,7 @@ export const ArtistTable = ({
                           deletingArtistId={deletingArtistId}
                           canDelete={canDelete}
                           canCreateExtras={canCreateExtras}
+                          canManageFormLinks={canManageFormLinks}
                           isCreatingExtrasFor={isCreatingExtrasFor}
                           onGenerateLink={handleGenerateLink}
                           onManageFiles={handleManageFiles}
@@ -680,6 +675,7 @@ export const ArtistTable = ({
               isCreatingExtrasFor={isCreatingExtrasFor}
               canDelete={canDelete}
               canCreateExtras={canCreateExtras}
+              canManageFormLinks={canManageFormLinks}
             />
           </div>
 
