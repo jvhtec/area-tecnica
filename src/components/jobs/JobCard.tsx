@@ -48,6 +48,9 @@ export const JobCard = ({
   const canEditJobs = isManagementRole(userRole);
   const isFestivalLike = isFestivalLikeJobType(job.job_type);
   const workspaceProfile = getJobWorkspaceProfile(job.job_type);
+  const workspaceActionLabel = userRole === "technician"
+    ? workspaceProfile.viewActionLabel
+    : workspaceProfile.actionLabel;
 
   return (
     <Card 
@@ -87,10 +90,7 @@ export const JobCard = ({
                 onClick={handleFestivalManage}
                 className="h-8 md:h-9 text-xs md:text-sm"
               >
-                <span className="hidden sm:inline">
-                  {userRole === "technician" ? workspaceProfile.viewActionLabel : workspaceProfile.actionLabel}
-                </span>
-                <span className="sm:hidden">{userRole === "technician" ? "Ver" : "Gestionar"}</span>
+                <span>{workspaceActionLabel}</span>
               </Button>
             )}
             {canEditJobs && !hideFestivalControls && (
