@@ -123,9 +123,13 @@ revoke all on function public._hoja_lock_external_edit(uuid, integer)
 -- Lock every Hoja touched by one external mutation in deterministic UUID order.
 -- Callers pass the versions from the Tour Ops snapshot for *all* affected Hojas,
 -- including the old source Hoja when an item is moved to another date.
+-- With p_skip_final, a final Hoja is locked and reported as 'final' instead of
+-- rejecting the whole mutation: the caller saves its own Tour Ops row and must
+-- leave that Hoja untouched (same contract as save_tour_contacts_and_sync_hojas).
 create or replace function public._hoja_lock_external_edits(
   p_hoja_ids uuid[],
-  p_expected_versions jsonb
+  p_expected_versions jsonb,
+  p_skip_final boolean
 )
 returns jsonb
 language plpgsql
@@ -158,14 +162,17 @@ begin
     if not public.can_manage_hoja(v_row.job_id) then
       raise exception 'permission denied' using errcode = '42501';
     end if;
-    if v_row.status = 'final' then
+    if v_row.status = 'final' and not coalesce(p_skip_final, false) then
       raise exception 'La Hoja de Ruta está finalizada y no admite edición'
         using errcode = '22023';
     end if;
 
     v_expected_text := coalesce(p_expected_versions, '{}'::jsonb) ->> v_row.id::text;
-    if v_expected_text is null
-       or v_row.document_version <> v_expected_text::integer then
+    -- A skipped final Hoja is not written, so its snapshot version is moot.
+    if v_row.status <> 'final' and (
+         v_expected_text is null
+         or v_row.document_version <> v_expected_text::integer
+       ) then
       raise exception 'La Hoja de Ruta ha cambiado desde la última carga'
         using errcode = '40001';
     end if;
@@ -182,7 +189,7 @@ begin
 end;
 $$;
 
-revoke all on function public._hoja_lock_external_edits(uuid[], jsonb)
+revoke all on function public._hoja_lock_external_edits(uuid[], jsonb, boolean)
   from public, anon, authenticated;
 
 -- Tour Ops bridge RPCs must never attach a Hoja from another tour. The
@@ -301,6 +308,8 @@ declare
   v_previous_hoja_row_id uuid;
   v_previous_hoja_id uuid;
   v_previous_hoja_status text;
+  v_target_final boolean := false;
+  v_previous_final boolean := false;
   v_locked_statuses jsonb := '{}'::jsonb;
   v_result jsonb;
 begin
@@ -342,9 +351,12 @@ begin
     end if;
   end if;
 
+  -- A normalized Tour Ops row is saved even when its Hoja is final; the final
+  -- Hoja is locked but left untouched. Editing a Hoja row itself still fails.
   v_locked_statuses := public._hoja_lock_external_edits(
     array[p_hoja_id, v_previous_hoja_id],
-    p_expected_hoja_versions
+    p_expected_hoja_versions,
+    p_source = 'normalized'
   );
   if p_hoja_id is not null then
     v_target_previous_status := v_locked_statuses ->> p_hoja_id::text;
@@ -352,6 +364,8 @@ begin
   if v_previous_hoja_id is not null then
     v_previous_hoja_status := v_locked_statuses ->> v_previous_hoja_id::text;
   end if;
+  v_target_final := coalesce(v_target_previous_status = 'final', false);
+  v_previous_final := coalesce(v_previous_hoja_status = 'final', false);
 
   perform set_config('app.hoja_trusted_write', 'on', true);
 
@@ -393,14 +407,33 @@ begin
     end if;
 
     if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id then
-      delete from public.hoja_de_ruta_travel_arrangements
-      where id = v_previous_hoja_row_id
-        and hoja_de_ruta_id = v_previous_hoja_id
-        and source_tour_travel_segment_id = v_segment_id;
+      if v_previous_final then
+        -- Keep the issued row on the final Hoja; only release its source link.
+        update public.hoja_de_ruta_travel_arrangements
+        set source_tour_travel_segment_id = null
+        where id = v_previous_hoja_row_id
+          and hoja_de_ruta_id = v_previous_hoja_id
+          and source_tour_travel_segment_id = v_segment_id;
+      else
+        delete from public.hoja_de_ruta_travel_arrangements
+        where id = v_previous_hoja_row_id
+          and hoja_de_ruta_id = v_previous_hoja_id
+          and source_tour_travel_segment_id = v_segment_id;
+      end if;
       v_hoja_row_id := null;
     end if;
 
-    if p_hoja_id is not null then
+    if p_hoja_id is not null and v_target_final then
+      -- The target Hoja is final: keep an existing link to its issued row, but
+      -- never create or rewrite Hoja content.
+      if v_previous_hoja_id is distinct from p_hoja_id then
+        update public.tour_travel_segments
+        set source_hoja_travel_arrangement_id = null
+        where id = v_segment_id;
+      else
+        v_hoja_row_id := v_previous_hoja_row_id;
+      end if;
+    elsif p_hoja_id is not null then
       select t.id into v_hoja_row_id
       from public.hoja_de_ruta_travel_arrangements t
       where t.hoja_de_ruta_id = p_hoja_id
@@ -564,10 +597,11 @@ begin
 
   perform set_config('app.hoja_trusted_write', 'off', true);
 
-  if p_hoja_id is not null then
+  if p_hoja_id is not null and not v_target_final then
     perform public._hoja_touch(p_hoja_id);
   end if;
-  if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id then
+  if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id
+     and not v_previous_final then
     perform public._hoja_touch(v_previous_hoja_id);
   end if;
 
@@ -579,7 +613,10 @@ begin
     'hoja_status', h.status,
     'approval_invalidated',
       (v_target_previous_status = 'approved')
-      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_hoja_status = 'approved')
+      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_hoja_status = 'approved'),
+    'hoja_final_skipped',
+      v_target_final
+      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_final)
   ) into v_result
   from (select 1) seed
   left join public.hoja_de_ruta h on h.id = p_hoja_id;
@@ -608,6 +645,7 @@ declare
   v_updated_at timestamptz;
   v_hoja_row_id uuid;
   v_hoja_id uuid;
+  v_hoja_final boolean := false;
   v_locked_statuses jsonb := '{}'::jsonb;
 begin
   if coalesce(public.get_current_user_role(), '') not in ('admin', 'management', 'logistics')
@@ -630,16 +668,20 @@ begin
       using errcode = '40001';
   end if;
 
+  -- Deleting the Tour Ops row is allowed when its Hoja is final; the issued
+  -- Hoja row stays and only loses its source link (ON DELETE SET NULL).
   v_locked_statuses := public._hoja_lock_external_edits(
     array[v_hoja_id],
-    p_expected_hoja_versions
+    p_expected_hoja_versions,
+    true
   );
   if v_hoja_id is not null then
     v_target_previous_status := v_locked_statuses ->> v_hoja_id::text;
   end if;
+  v_hoja_final := coalesce(v_target_previous_status = 'final', false);
 
   perform set_config('app.hoja_trusted_write', 'on', true);
-  if v_hoja_id is not null then
+  if v_hoja_id is not null and not v_hoja_final then
     delete from public.hoja_de_ruta_travel_arrangements
     where hoja_de_ruta_id = v_hoja_id
       and (source_tour_travel_segment_id = p_segment_id or id = v_hoja_row_id);
@@ -647,7 +689,7 @@ begin
   delete from public.tour_travel_segments where id = p_segment_id;
   perform set_config('app.hoja_trusted_write', 'off', true);
 
-  if v_hoja_id is not null then
+  if v_hoja_id is not null and not v_hoja_final then
     perform public._hoja_touch(v_hoja_id);
   end if;
 
@@ -655,7 +697,8 @@ begin
     'deleted', true,
     'hoja_document_version', (select document_version from public.hoja_de_ruta where id = v_hoja_id),
     'hoja_status', (select status from public.hoja_de_ruta where id = v_hoja_id),
-    'approval_invalidated', v_target_previous_status = 'approved'
+    'approval_invalidated', v_target_previous_status = 'approved',
+    'hoja_final_skipped', v_hoja_final
   );
 end;
 $$;
@@ -699,6 +742,8 @@ declare
   v_room jsonb;
   v_staff1 uuid;
   v_staff2 uuid;
+  v_target_final boolean := false;
+  v_previous_final boolean := false;
   v_locked_statuses jsonb := '{}'::jsonb;
   v_result jsonb;
 begin
@@ -736,9 +781,12 @@ begin
     end if;
   end if;
 
+  -- A normalized Tour Ops row is saved even when its Hoja is final; the final
+  -- Hoja is locked but left untouched. Editing a Hoja row itself still fails.
   v_locked_statuses := public._hoja_lock_external_edits(
     array[p_hoja_id, v_previous_hoja_id],
-    p_expected_hoja_versions
+    p_expected_hoja_versions,
+    p_source = 'normalized'
   );
   if p_hoja_id is not null then
     v_target_previous_status := v_locked_statuses ->> p_hoja_id::text;
@@ -746,6 +794,8 @@ begin
   if v_previous_hoja_id is not null then
     v_previous_hoja_status := v_locked_statuses ->> v_previous_hoja_id::text;
   end if;
+  v_target_final := coalesce(v_target_previous_status = 'final', false);
+  v_previous_final := coalesce(v_previous_hoja_status = 'final', false);
 
   perform set_config('app.hoja_trusted_write', 'on', true);
 
@@ -781,14 +831,34 @@ begin
     end if;
 
     if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id then
-      delete from public.hoja_de_ruta_accommodations
-      where id = v_previous_hoja_row_id
-        and hoja_de_ruta_id = v_previous_hoja_id
-        and source_tour_accommodation_id = v_ops_id;
+      if v_previous_final then
+        -- Keep the issued hotel on the final Hoja; only release its source link.
+        update public.hoja_de_ruta_accommodations
+        set source_tour_accommodation_id = null
+        where id = v_previous_hoja_row_id
+          and hoja_de_ruta_id = v_previous_hoja_id
+          and source_tour_accommodation_id = v_ops_id;
+      else
+        delete from public.hoja_de_ruta_accommodations
+        where id = v_previous_hoja_row_id
+          and hoja_de_ruta_id = v_previous_hoja_id
+          and source_tour_accommodation_id = v_ops_id;
+      end if;
       v_hoja_id := null;
     end if;
 
-    if p_hoja_id is not null then
+    if p_hoja_id is not null and v_target_final then
+      -- The target Hoja is final: keep an existing link to its issued hotel,
+      -- but never create or rewrite Hoja content (hotel or rooming).
+      if v_previous_hoja_id is distinct from p_hoja_id then
+        update public.tour_accommodations
+        set source_hoja_accommodation_id = null
+        where id = v_ops_id;
+        v_hoja_id := null;
+      else
+        v_hoja_id := v_previous_hoja_row_id;
+      end if;
+    elsif p_hoja_id is not null then
       select a.id into v_hoja_id
       from public.hoja_de_ruta_accommodations a
       where a.hoja_de_ruta_id = p_hoja_id
@@ -895,7 +965,7 @@ begin
     where id = v_hoja_id;
   end if;
 
-  if p_hoja_id is not null and v_hoja_id is not null then
+  if p_hoja_id is not null and v_hoja_id is not null and not v_target_final then
     delete from public.hoja_de_ruta_room_assignments
     where accommodation_id = v_hoja_id;
 
@@ -936,10 +1006,11 @@ begin
   end if;
 
   perform set_config('app.hoja_trusted_write', 'off', true);
-  if p_hoja_id is not null then
+  if p_hoja_id is not null and not v_target_final then
     perform public._hoja_touch(p_hoja_id);
   end if;
-  if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id then
+  if v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id
+     and not v_previous_final then
     perform public._hoja_touch(v_previous_hoja_id);
   end if;
 
@@ -951,7 +1022,10 @@ begin
     'hoja_status', h.status,
     'approval_invalidated',
       (v_target_previous_status = 'approved')
-      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_hoja_status = 'approved')
+      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_hoja_status = 'approved'),
+    'hoja_final_skipped',
+      v_target_final
+      or (v_previous_hoja_id is not null and v_previous_hoja_id is distinct from p_hoja_id and v_previous_final)
   ) into v_result
   from (select 1) seed
   left join public.hoja_de_ruta h on h.id = p_hoja_id;
@@ -983,6 +1057,7 @@ declare
   v_hoja_row_id uuid;
   v_actual_hoja_id uuid;
   v_updated_at timestamptz;
+  v_hoja_final boolean := false;
   v_locked_statuses jsonb := '{}'::jsonb;
 begin
   if coalesce(public.get_current_user_role(), '') not in ('admin', 'management', 'logistics')
@@ -1021,16 +1096,21 @@ begin
       using errcode = '40001';
   end if;
 
+  -- A normalized hotel can be deleted while its Hoja is final: the issued Hoja
+  -- hotel stays and only loses its source link (ON DELETE SET NULL). Deleting
+  -- a Hoja-sourced hotel removes Hoja content and still fails on a final Hoja.
   v_locked_statuses := public._hoja_lock_external_edits(
     array[v_actual_hoja_id],
-    p_expected_hoja_versions
+    p_expected_hoja_versions,
+    p_source is distinct from 'hoja'
   );
   if v_actual_hoja_id is not null then
     v_target_previous_status := v_locked_statuses ->> v_actual_hoja_id::text;
   end if;
+  v_hoja_final := coalesce(v_target_previous_status = 'final', false);
 
   perform set_config('app.hoja_trusted_write', 'on', true);
-  if v_actual_hoja_id is not null then
+  if v_actual_hoja_id is not null and not v_hoja_final then
     delete from public.hoja_de_ruta_accommodations
     where hoja_de_ruta_id = v_actual_hoja_id
       and (
@@ -1043,7 +1123,7 @@ begin
   end if;
   perform set_config('app.hoja_trusted_write', 'off', true);
 
-  if v_actual_hoja_id is not null then
+  if v_actual_hoja_id is not null and not v_hoja_final then
     perform public._hoja_touch(v_actual_hoja_id);
   end if;
 
@@ -1051,7 +1131,8 @@ begin
     'deleted', true,
     'hoja_document_version', (select document_version from public.hoja_de_ruta where id = v_actual_hoja_id),
     'hoja_status', (select status from public.hoja_de_ruta where id = v_actual_hoja_id),
-    'approval_invalidated', v_target_previous_status = 'approved'
+    'approval_invalidated', v_target_previous_status = 'approved',
+    'hoja_final_skipped', v_hoja_final
   );
 end;
 $$;

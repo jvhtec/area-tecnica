@@ -111,6 +111,7 @@ The general PDF and XLS exports exclude DNI, and the Hoja keeps its DNI copies o
 
 - **Jobs**: initialization can populate dates, location, assignments, power, and producer contacts.
 - **Tour Ops**: Programa, travel, accommodation/rooming, and tour contacts use version-aware transactional bridge RPCs. Travel/accommodation pairs use stable reciprocal source IDs; cross-date moves validate every affected Hoja snapshot before mutating either side. Hoja transport remains logistics-owned and is edited in place rather than mirrored into a second Tour Ops identity.
+- **Tour Ops vs a final Hoja**: like tour contacts, normalized travel and hotel saves/deletes still succeed on a date whose Hoja is `final`; the final Hoja is left untouched (no copy, no version bump) and the RPC returns `hoja_final_skipped` so the Hub tells the user to reopen it. Editing or deleting a Hoja-sourced row itself is still rejected. Legacy `hotel-info:` hotels are migrated by saving them, which creates the normalized hotel and its linked Hoja row.
 - **Programa reminders**: Tour Ops preserves row `id`, `notify`, and department scope so scheduled-push dedupe stays stable across edits.
 - **Mapbox**: venue autocomplete, geocoding, maps, and coordinates.
 - **Google Places**: restaurant search and details through the cached Edge Function.

@@ -12447,7 +12447,11 @@ export type Database = {
         }[]
       }
       _hoja_lock_external_edits: {
-        Args: { p_expected_versions: Json; p_hoja_ids: string[] }
+        Args: {
+          p_expected_versions: Json
+          p_hoja_ids: string[]
+          p_skip_final: boolean
+        }
         Returns: Json
       }
       _hoja_log_status_change: {

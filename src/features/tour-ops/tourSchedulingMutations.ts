@@ -46,6 +46,8 @@ export type TourOpsHojaMutationResult = {
   hojaDocumentVersion?: number | null;
   hojaStatus?: string | null;
   approvalInvalidated: boolean;
+  /** The linked Hoja is final, so only the Tour Ops row changed. */
+  hojaFinalSkipped: boolean;
 };
 
 const parseHojaMutationResult = (value: unknown): TourOpsHojaMutationResult => {
@@ -57,6 +59,7 @@ const parseHojaMutationResult = (value: unknown): TourOpsHojaMutationResult => {
     hojaDocumentVersion: typeof row.hoja_document_version === "number" ? row.hoja_document_version : null,
     hojaStatus: textOrNull(row.hoja_status ?? row.status),
     approvalInvalidated: Boolean(row.approval_invalidated),
+    hojaFinalSkipped: Boolean(row.hoja_final_skipped),
   };
 };
 
@@ -317,8 +320,12 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
   tourId: string;
   expectedHojaVersions?: Record<string, number>;
 }) {
-  const isLegacyHotelInfo = Boolean(input.id?.startsWith("hotel-info:"));
-  if (isLegacyHotelInfo) throw new Error("Migra primero el alojamiento legacy antes de editarlo");
+  // A legacy `hotel-info:` entry only lives in the Hoja's hotel_info JSON and has
+  // no row of its own. Saving it creates the normalized hotel (and its linked
+  // Hoja row), which is how legacy hotels get migrated.
+  if (input.id?.startsWith("hotel-info:")) {
+    input = { ...input, id: undefined, source: "normalized", updatedAt: null };
+  }
 
   // See above: rebuild from narrowed locals so the NOT NULL columns type as `string`.
   const { check_in_date, check_out_date, ...restPayload } = opsAccommodationPayloadFromHotel(input);

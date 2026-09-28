@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(111);
+SELECT plan(122);
 
 -- ---------------------------------------------------------------------------
 -- Surface
@@ -49,7 +49,7 @@ SELECT ok(
 );
 
 SELECT ok(
-  pg_get_functiondef('public._hoja_lock_external_edits(uuid[],jsonb)'::regprocedure)
+  pg_get_functiondef('public._hoja_lock_external_edits(uuid[],jsonb,boolean)'::regprocedure)
     ~* 'order by h\.id\s+for update',
   'multi-Hoja external edits lock parent rows in deterministic UUID order'
 );
@@ -1159,6 +1159,126 @@ SELECT is(
   'the final Hoja keeps its issued staff list'
 );
 
+-- Tour Ops keeps working on dates whose Hoja is final: the normalized row is
+-- saved or deleted, and the issued Hoja is left exactly as it was.
+SELECT set_config(
+  'hoja_test.final_version',
+  (SELECT document_version::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  false
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       null,
+       '{"transportation_type":"bus","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01"}'::jsonb,
+       '{"transportation_type":"van","departure_time":"2032-03-01T08:00:00+01","arrival_time":"2032-03-01T09:00:00+01"}'::jsonb
+     ) $$,
+  'Tour Ops can save normalized travel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  1,
+  'the normalized travel row is stored'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+     FROM public.hoja_de_ruta_travel_arrangements hta
+     JOIN public.tour_travel_segments t ON t.id = hta.source_tour_travel_segment_id
+    WHERE t.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no travel row is copied into the final Hoja'
+);
+
+SELECT throws_ok(
+  $$ SELECT public.save_tour_ops_travel(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'hoja',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       gen_random_uuid(),
+       'hoja_de_ruta_travel_arrangements',
+       '{}'::jsonb,
+       null,
+       '{}'::jsonb,
+       '{}'::jsonb
+     ) $$,
+  '22023',
+  'La Hoja de Ruta está finalizada y no admite edición',
+  'editing a Hoja travel row from Tour Ops still respects the final lock'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_travel(
+       (SELECT id FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       '{}'::jsonb,
+       null
+     ) $$,
+  'Tour Ops can delete normalized travel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_travel_segments WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'the normalized travel row is deleted'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.save_tour_ops_accommodation(
+       'dc900000-0000-0000-0000-000000000001'::uuid,
+       'normalized',
+       null,
+       (SELECT id FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+       null,
+       '{}'::jsonb,
+       null,
+       '{"hotel_name":"Hotel final","check_in_date":"2032-03-01","check_out_date":"2032-03-02","room_allocation":[],"status":"planned"}'::jsonb,
+       '{"hotel_name":"Hotel final","check_in":"2032-03-01T15:00:00+01","check_out":"2032-03-02T10:00:00+01"}'::jsonb,
+       '[{"room_type":"single","room_number":"1","staff_member1_id":"Invitado","sort_order":0}]'::jsonb
+     ) $$,
+  'Tour Ops can save a normalized hotel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer
+     FROM public.hoja_de_ruta_accommodations ha
+     JOIN public.tour_accommodations a ON a.id = ha.source_tour_accommodation_id
+    WHERE a.tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'no hotel or rooming is copied into the final Hoja'
+);
+
+SELECT lives_ok(
+  $$ SELECT public.delete_tour_ops_accommodation(
+       'normalized',
+       (SELECT id FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid LIMIT 1),
+       null,
+       '{}'::jsonb,
+       null
+     ) $$,
+  'Tour Ops can delete a normalized hotel on a date whose Hoja is final'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.tour_accommodations WHERE tour_id = 'dc900000-0000-0000-0000-000000000001'::uuid),
+  0,
+  'the normalized hotel is deleted'
+);
+
+SELECT is(
+  (SELECT status || ':' || document_version::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
+  'final:' || current_setting('hoja_test.final_version'),
+  'Tour Ops writes leave the final Hoja status and version untouched'
+);
+
 SELECT throws_ok(
   $$ DELETE FROM public.job_documents WHERE id = 'dc800000-0000-0000-0000-000000000001'::uuid $$,
   '42501',
@@ -1461,7 +1581,8 @@ SELECT throws_ok(
          (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
          (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid),
          (SELECT document_version - 1 FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
-       )
+       ),
+       false
      ) $$,
   '40001',
   'La Hoja de Ruta ha cambiado desde la última carga',
@@ -1479,7 +1600,8 @@ SELECT lives_ok(
          (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
          (SELECT id::text FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid),
          (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000003'::uuid)
-       )
+       ),
+       false
      ) $$,
   'the same multi-Hoja mutation accepts a complete current version map'
 );

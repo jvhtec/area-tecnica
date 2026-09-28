@@ -163,6 +163,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     }
   };
 
+  const finalHojaNote = "La Hoja de Ruta está finalizada y no se ha modificado; reábrela para reflejar el cambio.";
+
   const saveTravel = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
     const targetDateId = input.toTourDateId || input.fromTourDateId;
     const targetDate = targetDateId ? model.dates.find((date) => date.id === targetDateId) : null;
@@ -176,6 +178,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     });
     if (result.approvalInvalidated) {
       toast.warning("Viaje guardado. La Hoja vuelve a revisión y deja de ser visible en vivo hasta reaprobarla.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Viaje guardado. ${finalHojaNote}`);
     } else {
       toast.success("Viaje guardado");
     }
@@ -193,6 +197,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     });
     if (result.approvalInvalidated) {
       toast.warning("Hotel y rooming guardados. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Hotel guardado. ${finalHojaNote}`);
     } else {
       toast.success("Hotel guardado");
     }
@@ -212,6 +218,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     }
     if (result.approvalInvalidated) {
       toast.warning("Viaje eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Viaje eliminado. ${finalHojaNote}`);
     } else {
       toast.success("Viaje eliminado");
     }
@@ -235,6 +243,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     }
     if (result.approvalInvalidated) {
       toast.warning("Hotel eliminado. La Hoja vuelve a revisión y debe aprobarse de nuevo.");
+    } else if (result.hojaFinalSkipped) {
+      toast.warning(`Hotel eliminado. ${finalHojaNote}`);
     } else {
       toast.success("Hotel eliminado");
     }
