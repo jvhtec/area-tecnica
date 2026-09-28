@@ -7,7 +7,8 @@ import {
   type JobDateTypeRow,
 } from "@/features/festival-management/selectors";
 import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
-import { fetchWithOfflineFallback, getFestivalSnapshot } from "@/lib/offline";
+import { fetchWithOfflineFallback, getFestivalSnapshot, getOfflineFestivalContext } from "@/lib/offline";
+import type { Tables } from "@/integrations/supabase/types";
 import {
   normalizeVenueCoordinates,
   resolveHojaVenue,
@@ -40,6 +41,58 @@ type HojaVenueRow = {
 };
 
 const RIDER_LIBRARY_FILE_LIMIT = 1000;
+
+export const DEFAULT_FESTIVAL_DAY_START_TIME = "07:00";
+
+export type FestivalSettings = Tables<"festival_settings">;
+
+type FestivalSettingsEnvelope = {
+  settings: FestivalSettings | null;
+};
+
+export const fetchFestivalSettings = async (jobId: string): Promise<FestivalSettings | null> => {
+  const result = await fetchWithOfflineFallback<FestivalSettingsEnvelope>({
+    jobId,
+    online: async () => {
+      const { data, error } = await supabase
+        .from("festival_settings")
+        .select("*")
+        .eq("job_id", jobId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return { settings: data };
+    },
+    offline: async () => {
+      const context = await getOfflineFestivalContext(jobId);
+      if (!context) return null;
+      return { settings: context.festivalSettings as FestivalSettings | null };
+    },
+  });
+
+  return result.data.settings;
+};
+
+export const fetchFestivalDateTypes = async (jobId: string): Promise<Record<string, string>> => {
+  const result = await fetchWithOfflineFallback<Record<string, string>>({
+    jobId,
+    online: async () => {
+      const { data, error } = await supabase
+        .from("job_date_types")
+        .select("date, type")
+        .eq("job_id", jobId);
+
+      if (error) throw error;
+
+      return Object.fromEntries(
+        data.map((item) => [`${jobId}-${item.date}`, item.type]),
+      );
+    },
+    offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
+  });
+
+  return result.data;
+};
 
 export const resolveFestivalVenueData = (
   hojaData: HojaVenueRow | null | undefined,
@@ -111,17 +164,14 @@ const fetchJobDates = async (jobId: string, job: FestivalJob) => {
   console.warn("Invalid dates in job data, checking for date types");
   const { data: dateTypes, error } = await supabase.from("job_date_types").select("*").eq("job_id", jobId);
 
-  if (error) {
-    console.error("Error fetching date types:", error);
-    return [new Date()];
-  }
+  if (error) throw error;
 
   if (dateTypes && dateTypes.length > 0) {
     return buildJobDates(job, dateTypes);
   }
 
   console.warn("No valid dates found for this job");
-  return [new Date()];
+  return [];
 };
 
 const buildOfflineJobDetails = async (jobId: string): Promise<FestivalJobDetailsData | null> => {
