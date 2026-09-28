@@ -29,7 +29,7 @@ type Tables = Record<string, Row[]>;
 function mockClient(overrides: Partial<Tables> = {}, errorTable?: string) {
   const tables: Tables = {
     transport_requests: [{ ...request }], jobs: [{ ...job }], transport_request_items: items,
-    profiles: [{ ...requester }, { id: "log-1", email: "log@example.com", department: "logistics", role: "technician" }],
+    profiles: [{ ...requester }, { id: "log-1", email: "log@example.com", department: "logistics", role: "management" }],
     ...overrides,
   };
   const from = vi.fn((table: string) => {
@@ -99,6 +99,19 @@ describe("sendTransportRequestEmail", () => {
     expect(from.mock.calls.map(([table]) => table)).not.toContain("notification_preferences");
   });
 
+  it("emails only manager-level logistics profiles", async () => {
+    const { client } = mockClient({ profiles: [requester,
+      { id: "manager", email: "manager@example.com", department: "logistics", role: "management" },
+      { id: "technician", email: "technician@example.com", department: "logistics", role: "technician" },
+      { id: "logistics-role", email: "logistics@example.com", department: "logistics", role: "logistics" },
+      { id: "admin", email: "admin@example.com", department: "logistics", role: "admin" },
+    ] });
+
+    expect(await sendTransportRequestEmail(client, creatorId, requestId))
+      .toMatchObject({ status: "sent", sent: 1 });
+    expect([...payloadsByRecipient().keys()]).toEqual(["manager@example.com"]);
+  });
+
   it.each([undefined, "", "bogus", { id: requestId }])("rejects malformed ID %s before querying", async (id) => {
     const { client, from } = mockClient();
     expect(await sendTransportRequestEmail(client, creatorId, id as string)).toMatchObject({ reason: "invalid_request_id" });
@@ -119,7 +132,7 @@ describe("sendTransportRequestEmail", () => {
   });
 
   it("permits an admin owner and trusted service, retaining the real requester identity", async () => {
-    const { client } = mockClient({ profiles: [{ ...requester, role: "admin" }, { email: "log@example.com", department: "logistics" }] });
+    const { client } = mockClient({ profiles: [{ ...requester, role: "admin" }, { email: "log@example.com", department: "logistics", role: "management" }] });
     expect(await sendTransportRequestEmail(client, creatorId, requestId)).toMatchObject({ sent: 1 });
     expect(await sendTransportRequestEmail(client, serviceId, requestId)).toMatchObject({ sent: 1 });
     expect(payload(1).htmlContent).toContain("ana@example.com");
@@ -156,7 +169,7 @@ describe("sendTransportRequestEmail", () => {
   it("ignores production/non-logistics admins and skips invalid or absent emails", async () => {
     const { client } = mockClient({ profiles: [requester,
       { email: "production@example.com", department: "production", role: "admin" },
-      ...[null, "", "broken", "a@@example.com", "a@bad..com", "Name <a@example.com>", "a\nb@example.com"].map((email) => ({ email, department: "logistics" })),
+      ...[null, "", "broken", "a@@example.com", "a@bad..com", "Name <a@example.com>", "a\nb@example.com"].map((email) => ({ email, department: "logistics", role: "management" })),
     ] });
     expect(await sendTransportRequestEmail(client, creatorId, requestId)).toMatchObject({ reason: "no_recipients" });
     expect(sendBrevoEmail).not.toHaveBeenCalled();
@@ -169,7 +182,7 @@ describe("sendTransportRequestEmail", () => {
   });
 
   it("deduplicates normalized logistics recipients, isolates messages and uses stable per-recipient UUID keys", async () => {
-    const { client } = mockClient({ profiles: [requester, ...[" LOG@example.com ", "log@example.com", "other@example.com"].map((email) => ({ email, department: "logistics" }))] });
+    const { client } = mockClient({ profiles: [requester, ...[" LOG@example.com ", "log@example.com", "other@example.com"].map((email) => ({ email, department: "logistics", role: "management" }))] });
     expect(await sendTransportRequestEmail(client, creatorId, requestId)).toMatchObject({ sent: 2 });
     const sent = payloadsByRecipient();
     // Three logistics rows collapse to two recipients: the padded/uppercase
@@ -189,7 +202,7 @@ describe("sendTransportRequestEmail", () => {
   });
 
   it("bounds concurrency to four and isolates individual provider failures", async () => {
-    const { client } = mockClient({ profiles: [requester, ...Array.from({ length: 9 }, (_, index) => ({ email: `log${index}@example.com`, department: "logistics" }))] });
+    const { client } = mockClient({ profiles: [requester, ...Array.from({ length: 9 }, (_, index) => ({ email: `log${index}@example.com`, department: "logistics", role: "management" }))] });
     let active = 0; let peak = 0;
     vi.mocked(sendBrevoEmail).mockImplementation(async () => {
       active++; peak = Math.max(peak, active);
@@ -212,14 +225,14 @@ describe("sendTransportRequestEmail", () => {
   });
 
   it("paginates recipients before sending", async () => {
-    const { client, from } = mockClient({ profiles: [requester, ...Array.from({ length: 501 }, (_, index) => ({ email: "log@example.com", department: "logistics", id: `log-${index}` }))] });
+    const { client, from } = mockClient({ profiles: [requester, ...Array.from({ length: 501 }, (_, index) => ({ email: "log@example.com", department: "logistics", role: "management", id: `log-${index}` }))] });
     expect(await sendTransportRequestEmail(client, serviceId, requestId)).toMatchObject({ sent: 1 });
     const pages = from.mock.results.filter(({ value }) => value.range.mock.calls.length).map(({ value }) => value.range.mock.calls[0]);
     expect(pages).toEqual([[0, 499], [500, 999]]);
   });
 
   it("skips every send if recipient pagination fails after an earlier successful page", async () => {
-    const { client, from } = mockClient({ profiles: [requester, ...Array.from({ length: 500 }, () => ({ email: "log@example.com", department: "logistics" }))] });
+    const { client, from } = mockClient({ profiles: [requester, ...Array.from({ length: 500 }, () => ({ email: "log@example.com", department: "logistics", role: "management" }))] });
     const implementation = from.getMockImplementation()!;
     from.mockImplementation((table) => {
       const query = implementation(table);
@@ -235,7 +248,7 @@ describe("sendTransportRequestEmail", () => {
   });
 
   it("reports partial delivery while continuing after a provider failure", async () => {
-    const { client } = mockClient({ profiles: [requester, ...["log@example.com", "other@example.com"].map((email) => ({ email, department: "logistics" }))] });
+    const { client } = mockClient({ profiles: [requester, ...["log@example.com", "other@example.com"].map((email) => ({ email, department: "logistics", role: "management" }))] });
     vi.mocked(sendBrevoEmail).mockRejectedValueOnce(new Error("timeout"));
     expect(await sendTransportRequestEmail(client, serviceId, requestId)).toEqual({ status: "partial", sent: 1, failed: 1, skipped: 0 });
   });
