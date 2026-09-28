@@ -89,6 +89,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - `SECURITY_AUDIT_LOGGING.md`
 
 ## Plans / Roadmaps
+- **[2026-09 Festival Module Audit and Roadmap](plans/2026-09-festival-module-audit-roadmap.md)** — the festival/production workspace as reused by `festival`, `ciclo`, `single` and `evento` jobs: findings register (including unscoped festival RLS and public-form token exposure), phased cleanup plan, and enhancement proposals.
 - **[2026-07 Deep Codebase Audit and Remediation Roadmap](plans/2026-07-codebase-audit-roadmap.md)** — supporting security, database, quality, reliability, performance, operations, and technical-debt plan; reconcile work against the current actionable findings register above.
 - **[Codebase Maintenance Roadmap](plans/codebase-maintenance-roadmap.md)** - phased technical-debt, refactor, type-safety, performance, and ops cleanup backlog
   - Phase 0 is complete as of 2026-05-16: `npm run typecheck` is available, rigging pass/fail is disabled for unverified truss constants, and Flex lights/video business-role gaps return diagnostics.
