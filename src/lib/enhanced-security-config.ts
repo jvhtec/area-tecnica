@@ -4,6 +4,8 @@
  * Builds upon the base security config with additional protections
  */
 
+import { DOCUMENT_UPLOAD_EXTENSIONS, DOCUMENT_UPLOAD_MIME_TYPES, splitDocumentFileName } from '@/constants/documentUploadTypes';
+
 import { VALIDATION_PATTERNS, sanitizeInput, validateFolderName } from './security-config';
 
 // Enhanced rate limiting with progressive penalties
@@ -71,53 +73,8 @@ const SENSITIVE_PATTERNS = [
   /api.?key/i,
 ];
 
-const DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS = new Set([
-  'pdf',
-  'doc',
-  'docx',
-  'jpg',
-  'jpeg',
-  'png',
-  'gif',
-  'webp',
-  'txt',
-  'xmlp',
-  'xmlc',
-  'xmls',
-  'nwm',
-  'dwg',
-  'dfx',
-  'dxf',
-  'mvr',
-]);
-
-const DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'text/plain',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/xml',
-  'text/xml',
-  'application/octet-stream',
-  'application/acad',
-  'application/x-acad',
-  'application/autocad_dwg',
-  'application/dwg',
-  'application/x-dwg',
-  'image/vnd.dwg',
-  'application/dxf',
-  'application/x-dxf',
-  'application/vnd.dxf',
-  'image/vnd.dxf',
-  'drawing/x-dxf',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/x-mvr',
-]);
+const DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS = new Set(DOCUMENT_UPLOAD_EXTENSIONS);
+const DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES = new Set(DOCUMENT_UPLOAD_MIME_TYPES);
 
 /**
  * Enhanced input sanitization with XSS protection
@@ -224,13 +181,13 @@ export function validateFileUpload(file: File): {
     errors.push('El nombre del archivo contiene caracteres no permitidos');
   }
   
-  // Check for double extensions (e.g., file.txt.exe)
-  const nameParts = file.name.split('.');
-  if (nameParts.length > 2) {
+  // Check for double extensions (e.g., file.txt.exe). Known compound
+  // extensions such as grandMA2's `show.gz` count as a single extension.
+  const { stem, extension } = splitDocumentFileName(file.name);
+  if (stem.includes('.')) {
     errors.push('El nombre del archivo no puede contener múltiples extensiones');
   }
 
-  const extension = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
   if (!extension || !DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS.has(extension)) {
     errors.push('Tipo de archivo no permitido');
   }

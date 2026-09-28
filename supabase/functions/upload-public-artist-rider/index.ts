@@ -8,7 +8,7 @@ import {
   requireEnvValues,
 } from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES } from "./fileRules.ts";
+import { ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, getFileExtension } from "./fileRules.ts";
 import { signOwnRiderFile } from "./signRiderRead.ts";
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -72,12 +72,6 @@ const sanitizeFileName = (value: string) => {
     .slice(0, 160);
 
   return cleaned || "rider";
-};
-
-const getFileExtension = (fileName: string) => {
-  const parts = fileName.split(".");
-  if (parts.length < 2) return "";
-  return parts[parts.length - 1].toLowerCase();
 };
 
 const extractFiles = (formData: FormData) => {
