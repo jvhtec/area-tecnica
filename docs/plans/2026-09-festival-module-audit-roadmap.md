@@ -182,6 +182,17 @@ The "Planificación" tab (`src/components/festival/scheduling/`, about 2,100 LOC
 
 ### Delivery plan
 
+**Status (2026-09-28): SCH-A done** on the Phase 0 branch (PR #963).
+
+- **Shared model:** `scheduling/shiftModel.ts` holds departments, overnight-aware sorting and duration, the next-day marker, the form schema and the crew-candidate rules, all unit-tested. `ShiftFormFields.tsx` is shared by the create and edit dialogs.
+- **Fixes:** SCH-01, 02, 04, 05, 06, 07, 08, and the SCH-13 labels and locale.
+- **Two bugs found while fixing:**
+  - The realtime subscription for crew changes invalidated a cache key no query used, so crew changes made elsewhere never showed up live. It now targets the shifts query.
+  - Logistics shifts couldn't get anyone assigned, because that department has no role catalogue and the role was mandatory. They now take a free-text role.
+- **Also:** phones open the list view by default; external names are suggested from earlier shifts of the job; the PDF branding loads only on export.
+- **Still open for SCH-C:** SCH-03, the rest of SCH-11 (the date-navigation empty state overflows on phones), and SCH-12.
+
+
 | Step | Scope | Size | Depends on | Done when |
 | --- | --- | --- | --- | --- |
 | **SCH-A. Quick fixes** (one PR) | SCH-01 (keep the role, control the Select, bulk add stays for step B); SCH-02 (dialog reads the live shift from the query by id); SCH-04 (stage names from `buildFestivalStageOptions`, production department, Spanish labels); SCH-05 (candidates by job role, plus shift crew, plus production); SCH-06 (`get_profile_directory`); SCH-07 (sort from festival day start, duration and "+1 día" marker, reject `end == start`); SCH-08 (`useConfirm` everywhere, single delete); SCH-13 labels and locale | S–M | Phase 0 merged | Component tests for each fix; overnight sorting has a unit test; e2e adds "create shift, add two people without re-picking the role" |

@@ -1,53 +1,108 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useState, useEffect } from "react";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
-import { Department } from "@/types/department";
-import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
-
+import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
-import { unwrapPostgrestRelation } from "@/utils/postgrestRelation";
-import type { Database } from "@/integrations/supabase/types";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import type { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { labelForCode } from "@/utils/roles";
+
+import {
+  buildShiftCrewCandidates,
+  crewDisplayName,
+  defaultShiftRole,
+  shiftDepartmentLabel,
+  shiftRoleOptions,
+  type CrewDirectoryEntry,
+  type JobCrewAssignment,
+} from "./shiftModel";
+
 interface ManageAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pass the live shift from the shifts query so the crew list updates after each change. */
   shift: ShiftWithAssignments;
   onAssignmentsUpdated: () => void;
   isViewOnly?: boolean;
 }
 
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
-type Technician = Pick<ProfileRow, "id" | "first_name" | "last_name" | "department" | "role">;
+type JobCrewData = {
+  jobAssignments: JobCrewAssignment[];
+  shiftCrewIds: string[];
+  directory: CrewDirectoryEntry[];
+  externalNames: string[];
+};
 
-// Define the structure for the job_assignments response from Supabase
-interface JobAssignmentResponse {
-  technician_id: string;
-  profiles: Technician | Technician[] | null;
-}
+const EMPTY_CREW: JobCrewData = { jobAssignments: [], shiftCrewIds: [], directory: [], externalNames: [] };
 
-export const ManageAssignmentsDialog = ({ 
-  open, 
-  onOpenChange, 
-  shift, 
+const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
+  const [assignmentsResult, shiftCrewResult] = await Promise.all([
+    dataLayerClient
+      .from("job_assignments")
+      .select("technician_id, status, sound_role, lights_role, video_role, production_role")
+      .eq("job_id", jobId),
+    dataLayerClient
+      .from("festival_shift_assignments")
+      .select("technician_id, external_technician_name, festival_shifts!inner(job_id)")
+      .eq("festival_shifts.job_id", jobId),
+  ]);
+
+  if (assignmentsResult.error) throw assignmentsResult.error;
+  if (shiftCrewResult.error) throw shiftCrewResult.error;
+
+  const jobAssignments: JobCrewAssignment[] = assignmentsResult.data ?? [];
+  const shiftRows = shiftCrewResult.data ?? [];
+  const shiftCrewIds = shiftRows.map((row) => row.technician_id).filter((id): id is string => Boolean(id));
+  const externalNames = Array.from(
+    new Set(
+      shiftRows
+        .map((row) => row.external_technician_name?.trim())
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ).sort((a, b) => a.localeCompare(b, "es"));
+
+  const ids = Array.from(new Set([...jobAssignments.map((row) => row.technician_id), ...shiftCrewIds]));
+  if (ids.length === 0) return { ...EMPTY_CREW, externalNames };
+
+  // Display names come from the safe directory: direct `profiles` reads are
+  // row-scoped and hide crew the viewer does not share an assignment with.
+  const { data: directory, error: directoryError } = await dataLayerClient.rpc("get_profile_directory", {
+    p_profile_ids: ids,
+  });
+  if (directoryError) throw directoryError;
+
+  return { jobAssignments, shiftCrewIds, directory: directory ?? [], externalNames };
+};
+
+export const ManageAssignmentsDialog = ({
+  open,
+  onOpenChange,
+  shift,
   onAssignmentsUpdated,
-  isViewOnly = false
+  isViewOnly = false,
 }: ManageAssignmentsDialogProps) => {
   const [technicianId, setTechnicianId] = useState("");
   const [externalTechnicianName, setExternalTechnicianName] = useState("");
@@ -56,112 +111,70 @@ export const ManageAssignmentsDialog = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Set a default role when dialog opens based on department
-  useEffect(() => {
-    if (open && shift.department) {
-      const opts = roleOptionsForDiscipline(String(shift.department));
-      if (opts.length > 0) {
-        setRole(opts[0].code);
-      }
-    }
-  }, [open, shift.department]);
+  const roleOptions = shiftRoleOptions(shift.department);
+  const hasRoleCatalogue = roleOptions.length > 0;
 
-  const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
-    queryKey: queryKeys.scope("job-technicians", shift.job_id, shift.department),
-    queryFn: async () => {
-      // `festival_shifts.job_id` is nullable. A shift with no job has no crew to draw from,
-      // and `.eq("job_id", null)` is not an IS NULL filter in PostgREST — it would send
-      // `job_id=eq.null` and match nothing useful.
-      if (!shift.job_id) return [];
-
-      const departmentFilter = shift.department || "sound";
-      
-      // First, get assigned technicians for this job and department
-      const { data, error } = await dataLayerClient.from("job_assignments")
-        .select(`
-          technician_id,
-          profiles (
-            id, 
-            first_name, 
-            last_name, 
-            email, 
-            department, 
-            role
-          )
-        `)
-        .eq("job_id", shift.job_id);
-
-      if (error) {
-        console.error("Error fetching job assignments:", error);
-        throw error;
-      }
-
-      // Filter by department and map to get just the profiles
-      const assignments = (data ?? []) as JobAssignmentResponse[];
-      const filteredTechnicians = assignments
-        .map((assignment) => unwrapPostgrestRelation(assignment.profiles))
-        .filter((profile): profile is Technician => profile?.department === departmentFilter);
-
-      console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
-      return filteredTechnicians;
-    },
+  const { data: crew = EMPTY_CREW, isLoading: isLoadingCrew } = useQuery({
+    queryKey: queryKeys.scope("festival_shift_crew", shift.job_id ?? "none"),
+    queryFn: () => (shift.job_id ? fetchJobCrew(shift.job_id) : Promise.resolve(EMPTY_CREW)),
+    enabled: open && !isViewOnly && Boolean(shift.job_id),
   });
 
-  // Function to get department-specific role options
-  const getRoleOptions = (department: Department): string[] => {
-    const opts = roleOptionsForDiscipline(String(department));
-    return opts.map(o => o.code);
+  const candidates = useMemo(
+    () =>
+      buildShiftCrewCandidates({
+        jobAssignments: crew.jobAssignments,
+        shiftCrewIds: crew.shiftCrewIds,
+        directory: crew.directory,
+        shiftDepartment: shift.department,
+        excludeIds: shift.assignments
+          .map((assignment) => assignment.technician_id)
+          .filter((id): id is string => Boolean(id)),
+      }),
+    [crew, shift.assignments, shift.department],
+  );
+  const departmentCandidates = candidates.filter((candidate) => candidate.inShiftDepartment);
+  const otherCandidates = candidates.filter((candidate) => !candidate.inShiftDepartment);
+
+  // Default role when the dialog opens; afterwards the chosen role is kept
+  // between additions so several people can be added in a row.
+  useEffect(() => {
+    if (open) setRole((current) => defaultShiftRole(undefined, shift.department, current));
+  }, [open, shift.department]);
+
+  const handleTechnicianChange = (value: string) => {
+    setTechnicianId(value);
+    const candidate = candidates.find((item) => item.id === value);
+    setRole((current) => defaultShiftRole(candidate, shift.department, current));
   };
 
-  // Function to sort technicians - house techs first
-  const getSortedTechnicians = () => {
-    if (!technicians) return [];
-    
-    return [...technicians].sort((a, b) => {
-      // Sort house_tech before technician
-      if (a.role === 'house_tech' && b.role !== 'house_tech') return -1;
-      if (a.role !== 'house_tech' && b.role === 'house_tech') return 1;
-      
-      // Then sort by name
-      return formatTechnicianName(a).localeCompare(formatTechnicianName(b), "es");
-    });
-  };
-
-  // Format technician display name
-  const formatTechnicianName = (technician: Technician) => {
-    const isHouseTech = technician.role === 'house_tech';
-    const name = [technician.first_name, technician.last_name].filter(Boolean).join(" ") || technician.id;
-    return `${name}${isHouseTech ? ' (House Tech)' : ''}`;
-  };
+  const invalidateShifts = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festival_shifts") }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festival_shift_crew") }),
+    ]);
 
   const addAssignmentMutation = useMutation({
-    mutationFn: async (assignment: { shift_id: string; technician_id?: string; external_technician_name?: string; role: string }) => {
-      if (!shift?.id) {
-        throw new Error("Shift ID is required");
-      }
-
-      const { data, error } = await dataLayerClient.from("festival_shift_assignments")
-        .insert([assignment]);
-
-      if (error) {
-        console.error("Error adding assignment:", error);
-        throw error;
-      }
-      return data;
+    mutationFn: async (assignment: {
+      shift_id: string;
+      technician_id?: string;
+      external_technician_name?: string;
+      role: string;
+    }) => {
+      const { error } = await dataLayerClient.from("festival_shift_assignments").insert([assignment]);
+      if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festivalShifts") });
+    onSuccess: async () => {
+      await invalidateShifts();
       onAssignmentsUpdated();
-      toast({
-        title: "Éxito",
-        description: "Técnico asignado exitosamente",
-      });
+      setTechnicianId("");
+      setExternalTechnicianName("");
+      toast({ title: "Personal asignado", description: "Se ha añadido al turno." });
     },
     onError: (error: unknown) => {
-      console.error("Error adding assignment:", error);
       toast({
         title: "Error",
-        description: "No se pudo asignar el técnico",
+        description: getErrorMessage(error, "No se pudo asignar el técnico"),
         variant: "destructive",
       });
     },
@@ -169,94 +182,67 @@ export const ManageAssignmentsDialog = ({
 
   const removeAssignmentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const { data, error } = await dataLayerClient.from("festival_shift_assignments")
-        .delete()
-        .eq("id", assignmentId);
-
-      if (error) {
-        console.error("Error removing assignment:", error);
-        throw error;
-      }
-      return data;
+      const { error } = await dataLayerClient.from("festival_shift_assignments").delete().eq("id", assignmentId);
+      if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festivalShifts") });
+    onSuccess: async () => {
+      await invalidateShifts();
       onAssignmentsUpdated();
-      toast({
-        title: "Éxito",
-        description: "Técnico desasignado exitosamente",
-      });
+      toast({ title: "Personal retirado", description: "Se ha quitado del turno." });
     },
     onError: (error: unknown) => {
-      console.error("Error removing assignment:", error);
       toast({
         title: "Error",
-        description: "No se pudo desasignar el técnico",
+        description: getErrorMessage(error, "No se pudo quitar el técnico"),
         variant: "destructive",
       });
     },
   });
 
-  const handleAddAssignment = async () => {
-    if ((!technicianId && !externalTechnicianName) || !role) {
+  const trimmedExternalName = externalTechnicianName.trim();
+  const trimmedRole = role.trim();
+  const canAdd = Boolean(trimmedRole) && (isExternalTechnician ? Boolean(trimmedExternalName) : Boolean(technicianId));
+
+  const handleAddAssignment = () => {
+    if (!canAdd) {
       toast({
-        title: "Error",
-        description: "Por favor completa todos los campos requeridos",
+        title: "Faltan datos",
+        description: isExternalTechnician
+          ? "Indica el nombre del técnico externo y su función."
+          : "Elige un técnico y su función.",
         variant: "destructive",
       });
       return;
     }
 
-    try {
-      const assignment = {
-        shift_id: shift.id,
-        role: role,
-        ...(isExternalTechnician 
-          ? { external_technician_name: externalTechnicianName }
-          : { technician_id: technicianId }
-        )
-      };
-
-      await addAssignmentMutation.mutateAsync(assignment);
-      
-      // Reset form
-      setTechnicianId("");
-      setExternalTechnicianName("");
-      setRole("");
-    } catch (error) {
-      console.error("Error adding assignment:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo asignar el técnico",
-        variant: "destructive",
-      });
-    }
+    addAssignmentMutation.mutate({
+      shift_id: shift.id,
+      role: trimmedRole,
+      ...(isExternalTechnician
+        ? { external_technician_name: trimmedExternalName }
+        : { technician_id: technicianId }),
+    });
   };
 
-  const handleRemoveAssignment = async (assignmentId: string) => {
-    try {
-      await removeAssignmentMutation.mutateAsync(assignmentId);
-    } catch (error) {
-      console.error("Error removing assignment:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo desasignar el técnico",
-        variant: "destructive",
-      });
-    }
-  };
-  
+  const renderCandidate = (candidate: (typeof candidates)[number]) => (
+    <SelectItem key={candidate.id} value={candidate.id}>
+      {candidate.name}
+      {candidate.isHouseTech ? " · Plantilla" : ""}
+      {candidate.jobRole ? ` · ${labelForCode(candidate.jobRole)}` : ""}
+    </SelectItem>
+  );
+
+  const departmentLabel = shiftDepartmentLabel(shift.department);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">
-            {isViewOnly ? "Ver Personal para" : "Gestionar Personal para"} {shift.name}
+            {isViewOnly ? "Personal de" : "Gestionar personal de"} {shift.name}
           </DialogTitle>
           <DialogDescription className="text-sm">
-            {isViewOnly
-              ? "Ver personal asignado a este turno"
-              : "Añadir o eliminar personal de este turno"}
+            {isViewOnly ? "Personal asignado a este turno." : "Añade o quita personal de este turno."}
           </DialogDescription>
         </DialogHeader>
 
@@ -266,82 +252,116 @@ export const ManageAssignmentsDialog = ({
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Switch
+                    id="external-technician"
                     checked={isExternalTechnician}
                     onCheckedChange={setIsExternalTechnician}
                   />
-                  <Label>Técnico Externo</Label>
+                  <Label htmlFor="external-technician">Técnico externo</Label>
                 </div>
 
                 {isExternalTechnician ? (
                   <div className="grid gap-2">
-                    <Label htmlFor="externalTechnician">Nombre del Técnico Externo</Label>
+                    <Label htmlFor="externalTechnician">Nombre del técnico externo</Label>
                     <Input
                       id="externalTechnician"
+                      list="festival-external-crew"
                       value={externalTechnicianName}
-                      onChange={(e) => setExternalTechnicianName(e.target.value)}
-                      placeholder="Ingresar nombre del técnico"
+                      onChange={(event) => setExternalTechnicianName(event.target.value)}
+                      placeholder="Nombre y apellidos"
                     />
+                    <datalist id="festival-external-crew">
+                      {crew.externalNames.map((name) => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
                   </div>
                 ) : (
                   <div className="grid gap-2">
                     <Label htmlFor="technician">Técnico</Label>
-                    <Select onValueChange={setTechnicianId}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar un técnico" />
+                    <Select value={technicianId} onValueChange={handleTechnicianChange}>
+                      <SelectTrigger id="technician" className="w-full">
+                        <SelectValue
+                          placeholder={isLoadingCrew ? "Cargando personal…" : "Seleccionar un técnico"}
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {getSortedTechnicians().map((technician) => (
-                          <SelectItem key={technician.id} value={technician.id}>
-                            {formatTechnicianName(technician)}
-                          </SelectItem>
-                        ))}
+                        {candidates.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No queda personal del trabajo por asignar.
+                          </div>
+                        ) : shift.department && departmentCandidates.length > 0 && otherCandidates.length > 0 ? (
+                          <>
+                            <SelectGroup>
+                              <SelectLabel>{departmentLabel} en este trabajo</SelectLabel>
+                              {departmentCandidates.map(renderCandidate)}
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Resto del equipo</SelectLabel>
+                              {otherCandidates.map(renderCandidate)}
+                            </SelectGroup>
+                          </>
+                        ) : (
+                          candidates.map(renderCandidate)
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
 
                 <div className="grid gap-2">
-                  <Label htmlFor="role">Rol</Label>
-                  <Select
-                    value={role}
-                    onValueChange={setRole}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar un rol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getRoleOptions(shift.department as Department || "sound").map((code) => (
-                        <SelectItem key={code} value={code}>
-                          {labelForCode(code)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="role">Función</Label>
+                  {hasRoleCatalogue ? (
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger id="role" className="w-full">
+                        <SelectValue placeholder="Seleccionar una función" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roleOptions.map((option) => (
+                          <SelectItem key={option.code} value={option.code}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="role"
+                      value={role}
+                      onChange={(event) => setRole(event.target.value)}
+                      placeholder="Carga y descarga, runner, …"
+                    />
+                  )}
                 </div>
-                <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
-                  {addAssignmentMutation.isPending ? "Asignando..." : "Asignar Técnico"}
+
+                <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending || !canAdd}>
+                  {addAssignmentMutation.isPending ? "Asignando…" : "Asignar al turno"}
                 </Button>
               </div>
             )}
 
             <div className="space-y-4">
-              <h3 className="text-sm font-medium">Personal Asignado</h3>
+              <h3 className="text-sm font-medium">Personal asignado ({shift.assignments.length})</h3>
               {shift.assignments.length > 0 ? (
                 <div className="space-y-2">
-                  {shift.assignments.map(assignment => (
-                    <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
-                      <div>
-                        {assignment.external_technician_name || 
-                          `${assignment.profiles?.first_name} ${assignment.profiles?.last_name}`} 
-                        - {labelForCode(assignment.role) || assignment.role}
+                  {shift.assignments.map((assignment) => (
+                    <div key={assignment.id} className="flex items-center justify-between gap-2 p-2 bg-accent/20 rounded-md">
+                      <div className="min-w-0 text-sm">
+                        <span className="font-medium">
+                          {assignment.external_technician_name || crewDisplayName(assignment.profiles)}
+                        </span>
+                        {assignment.external_technician_name ? (
+                          <span className="text-muted-foreground"> · Externo</span>
+                        ) : null}
+                        <span className="text-muted-foreground"> · {labelForCode(assignment.role) || assignment.role}</span>
                       </div>
                       {!isViewOnly && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveAssignment(assignment.id)}
+                          onClick={() => removeAssignmentMutation.mutate(assignment.id)}
+                          disabled={removeAssignmentMutation.isPending}
                         >
-                          Eliminar
+                          Quitar
                         </Button>
                       )}
                     </div>

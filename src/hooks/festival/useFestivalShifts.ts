@@ -18,7 +18,7 @@ type ShiftProfile = {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
+  nickname: string | null;
   department: string | null;
   role: string | null;
 };
@@ -28,9 +28,11 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
 
-  // Set up real-time subscriptions for both tables
-  useTableSubscription('festival_shifts', queryKeys.scope('festival_shifts', jobId, selectedDate));
-  useTableSubscription('festival_shift_assignments', queryKeys.scope('festival_shift_assignments', jobId, selectedDate));
+  // Both tables feed the same query: a crew change elsewhere must refresh the
+  // shifts list, so the assignments subscription targets the shifts key too.
+  const shiftsQueryKey = queryKeys.scope('festival_shifts', jobId, selectedDate);
+  useTableSubscription('festival_shifts', shiftsQueryKey);
+  useTableSubscription('festival_shift_assignments', shiftsQueryKey);
 
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {
@@ -75,18 +77,19 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
 
       console.log("Assignments data retrieved:", assignmentsData);
 
-      // 4. For assignments with technicians, fetch their profiles
+      // 4. For assignments with technicians, fetch their display names. The
+      // directory RPC works for every viewer; reading `profiles` directly is
+      // row-scoped (SEC-13) and returns nothing for crew the viewer does not
+      // share a job assignment with.
       const technicianIds = assignmentsData
-        .filter(assignment => assignment.technician_id)
-        .map(assignment => assignment.technician_id);
+        .map(assignment => assignment.technician_id)
+        .filter((id): id is string => Boolean(id));
 
       let profilesData: Record<string, ShiftProfile> = {};
 
       if (technicianIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, email, department, role")
-          .in("id", technicianIds);
+          .rpc("get_profile_directory", { p_profile_ids: technicianIds });
 
         if (profilesError) {
           console.error("Error fetching profiles:", profilesError);
@@ -94,10 +97,8 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         }
 
         // Create a map of profiles by ID for easier lookup
-        profilesData = profiles.reduce<Record<string, ShiftProfile>>((acc, profile) => ({
-          ...acc,
-          [profile.id]: profile
-        }), {});
+        const directoryRows: ShiftProfile[] = profiles ?? [];
+        profilesData = Object.fromEntries(directoryRows.map((profile) => [profile.id, profile]));
       }
 
       // 5. Map shifts with their assignments and profile data
@@ -132,7 +133,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   }, [selectedDate, jobId, toast]);
 
   const { data: shifts = [], isLoading: queryLoading, refetch } = useQuery({
-    queryKey: queryKeys.scope('festival_shifts', jobId, selectedDate),
+    queryKey: shiftsQueryKey,
     queryFn: fetchShifts,
     enabled: !!jobId && !!selectedDate,
     staleTime: 1000 * 60 * 2,

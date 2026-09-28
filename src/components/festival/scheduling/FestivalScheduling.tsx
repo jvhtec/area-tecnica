@@ -18,9 +18,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { useIsMobile } from "@/hooks/use-mobile";
+import type { FestivalStageOption } from "@/features/festival-management/types";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
+  /** The festival's stages (names from `festival_stages`, count from the gear setup). */
+  stageOptions?: readonly FestivalStageOption[];
   isViewOnly?: boolean;
   onCreateWhatsappGroup?: () => void;
   onOpenRiderLibrary?: (selectedDate?: string) => void;
@@ -29,13 +33,17 @@ interface FestivalSchedulingProps {
 export const FestivalScheduling = ({
   jobId,
   jobDates,
+  stageOptions,
   isViewOnly = false,
   onCreateWhatsappGroup,
   onOpenRiderLibrary,
 }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "table">("table");
+  // The six-column table is cramped on a phone; start phones on the list view.
+  const isMobile = useIsMobile();
+  const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
+  const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
@@ -142,28 +150,17 @@ export const FestivalScheduling = ({
     setIsCreateShiftOpen(false);
   };
 
+  // The copy dialog awaits every write before calling back, so refetch directly.
   const handleShiftsCopied = async () => {
-    console.log("Shifts copied - refreshing data with delay to ensure database consistency");
-    
-    // Add a small delay to ensure database operations are complete
-    setTimeout(async () => {
-      await refetch();
-      toast({
-        title: "Datos actualizados",
-        description: "Los turnos y asignaciones han sido actualizados",
-      });
-    }, 500);
+    await refetch();
   };
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
       setIsRefreshing(true);
       
-      // Delete shift assignments first to avoid foreign key constraints
-      await dataLayerClient.from("festival_shift_assignments")
-        .delete()
-        .eq("shift_id", shiftId);
-
+      // festival_shift_assignments.shift_id cascades on delete, so one
+      // statement removes the shift and its crew together.
       const { error } = await dataLayerClient.from("festival_shifts")
         .delete()
         .eq("id", shiftId);
@@ -174,8 +171,8 @@ export const FestivalScheduling = ({
 
       await refetch();
       toast({
-        title: "Éxito",
-        description: "Turno eliminado exitosamente",
+        title: "Turno eliminado",
+        description: "Se ha quitado el turno y su personal.",
       });
     } catch (error) {
       console.error("Error deleting shift:", error);
@@ -321,6 +318,8 @@ export const FestivalScheduling = ({
             ) : viewMode === "table" ? (
               <ShiftsTable 
                 shifts={shifts} 
+                stageOptions={stageOptions}
+                dayStartTime={dayStartTime}
                 onDeleteShift={handleDeleteShift}
                 onShiftUpdated={refetch}
                 date={selectedDate}
@@ -332,6 +331,8 @@ export const FestivalScheduling = ({
             ) : (
               <ShiftsList 
                 shifts={shifts} 
+                stageOptions={stageOptions}
+                dayStartTime={dayStartTime}
                 onDeleteShift={handleDeleteShift} 
                 onShiftUpdated={refetch}
                 jobId={jobId}
@@ -352,6 +353,7 @@ export const FestivalScheduling = ({
           jobId={jobId}
           onShiftCreated={handleShiftCreated}
           date={selectedDate}
+          stageOptions={stageOptions}
         />
       )}
     </Card>

@@ -21,14 +21,14 @@ export interface ShiftAssignment {
   external_technician_name?: string;
   role: string;
   created_at?: string;
+  /** Display fields from `get_profile_directory` (no contact details). */
   profiles?: {
     id: string;
-    first_name: string;
+    first_name: string | null;
     nickname?: string | null;
-    last_name: string;
-    email: string;
-    department: string;
-    role: string;
+    last_name: string | null;
+    department: string | null;
+    role: string | null;
   } | null;
 }
 

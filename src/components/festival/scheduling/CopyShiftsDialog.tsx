@@ -3,10 +3,16 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { getErrorMessage } from '@/utils/errorMessage';
+
+// Shift dates are calendar days ("yyyy-MM-dd"); parse them as local dates.
+const formatShiftDate = (value: Date | string) =>
+  format(typeof value === "string" ? parseISO(value) : value, "d MMM yyyy", { locale: es });
+
 interface CopyShiftsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -124,7 +130,7 @@ export const CopyShiftsDialog = ({
       }
 
       console.log("Copy operation completed successfully");
-      toast.success(`Se copiaron exitosamente ${shifts.length} turnos con todas las asignaciones a ${format(new Date(targetDate), 'MMM d, yyyy')}`);
+      toast.success(`Se copiaron exitosamente ${shifts.length} turnos con todas las asignaciones a ${formatShiftDate(targetDate)}`);
 
       // Call the callback to refresh data
       onShiftsCopied();
@@ -147,7 +153,7 @@ export const CopyShiftsDialog = ({
         <div className="space-y-4 mt-4">
           <div>
             <p className="text-sm text-muted-foreground mb-2">
-              Fecha de origen: {format(new Date(sourceDate), 'MMM d, yyyy')}
+              Fecha de origen: {formatShiftDate(sourceDate)}
             </p>
             <p className="text-xs text-muted-foreground mb-4">
               Esto copiará todos los turnos y sus técnicos asignados a la fecha destino.
@@ -165,7 +171,7 @@ export const CopyShiftsDialog = ({
                   if (formattedDate === sourceDate) return null;
                   return (
                     <SelectItem key={formattedDate} value={formattedDate}>
-                      {format(date, 'MMM d, yyyy')}
+                      {formatShiftDate(date)}
                     </SelectItem>
                   );
                 })}
