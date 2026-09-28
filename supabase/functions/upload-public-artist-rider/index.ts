@@ -8,6 +8,8 @@ import {
   requireEnvValues,
 } from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
+import { ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, getFileExtension } from "./fileRules.ts";
+import { signOwnRiderFile } from "./signRiderRead.ts";
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 10;
@@ -17,50 +19,6 @@ const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const INGRESS_RATE_LIMIT_MAX_REQUESTS = 30;
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const TOKEN_RATE_LIMIT_MAX_REQUESTS = 50;
-const ALLOWED_EXTENSIONS = new Set([
-  "pdf",
-  "doc",
-  "docx",
-  "txt",
-  "png",
-  "jpg",
-  "jpeg",
-  "webp",
-  "xmlp",
-  "xmlc",
-  "xmls",
-  "nwm",
-  "dwg",
-  "dfx",
-  "dxf",
-  "mvr",
-]);
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "application/xml",
-  "text/xml",
-  "application/octet-stream",
-  "application/acad",
-  "application/x-acad",
-  "application/autocad_dwg",
-  "application/dwg",
-  "application/x-dwg",
-  "image/vnd.dwg",
-  "application/dxf",
-  "application/x-dxf",
-  "application/vnd.dxf",
-  "image/vnd.dxf",
-  "drawing/x-dxf",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/x-mvr",
-]);
 
 type UploadFormRow = {
   id: string;
@@ -114,12 +72,6 @@ const sanitizeFileName = (value: string) => {
     .slice(0, 160);
 
   return cleaned || "rider";
-};
-
-const getFileExtension = (fileName: string) => {
-  const parts = fileName.split(".");
-  if (parts.length < 2) return "";
-  return parts[parts.length - 1].toLowerCase();
 };
 
 const extractFiles = (formData: FormData) => {
@@ -649,6 +601,13 @@ serve(createHttpHandler(async (req) => {
               : getFileValidationStatus(errorCode);
           return jsonResponse({ ok: false, error: errorCode }, { status });
         }
+      }
+
+      // Private rider bucket: the public form reads its own riders via signed URLs.
+      if (action === "sign") {
+        const contextOrResponse = await loadUploadContext(req, supabaseAdmin, token, rateLimitSalt);
+        if (contextOrResponse instanceof Response) return contextOrResponse;
+        return signOwnRiderFile(supabaseAdmin, contextOrResponse.formRow.artist_id, body);
       }
 
       return jsonResponse({ ok: false, error: "invalid_action" }, { status: 400 });

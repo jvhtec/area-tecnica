@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { uploadPublicArtistRiderFiles } from "@/utils/publicArtistRiderUpload";
+import { getPublicArtistRiderSignedUrl, uploadPublicArtistRiderFiles } from "@/utils/publicArtistRiderUpload";
 import type { RiderFileRecord } from "@/components/festival/artistRequirementsFormModel";
 
 type Options = {
@@ -45,15 +45,9 @@ export const usePublicArtistRiderFiles = ({ token, publicArtistId, formLanguage,
   const openRiderFile = useCallback(
     async (file: RiderFileRecord) => {
       try {
-        const { data, error } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .createSignedUrl(file.file_path, 60 * 60);
-
-        if (error || !data?.signedUrl) {
-          throw error ?? new Error("Could not create signed URL");
-        }
-
-        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        if (!token) throw new Error("missing_token");
+        const signedUrl = await getPublicArtistRiderSignedUrl(token, file.id);
+        window.open(signedUrl, "_blank", "noopener,noreferrer");
       } catch (error) {
         console.error("Error opening rider file:", error);
         toast({
@@ -63,19 +57,17 @@ export const usePublicArtistRiderFiles = ({ token, publicArtistId, formLanguage,
         });
       }
     },
-    [toast, tx]
+    [toast, token, tx]
   );
 
   const downloadRiderFile = useCallback(
     async (file: RiderFileRecord) => {
       try {
-        const { data, error } = await dataLayerClient.storage
-          .from("festival_artist_files")
-          .download(file.file_path);
-
-        if (error || !data) {
-          throw error ?? new Error("Could not download file");
-        }
+        if (!token) throw new Error("missing_token");
+        const signedUrl = await getPublicArtistRiderSignedUrl(token, file.id, { download: true });
+        const response = await fetch(signedUrl);
+        if (!response.ok) throw new Error(`download_failed_${response.status}`);
+        const data = await response.blob();
 
         const url = window.URL.createObjectURL(data);
         const anchor = window.document.createElement("a");
@@ -94,7 +86,7 @@ export const usePublicArtistRiderFiles = ({ token, publicArtistId, formLanguage,
         });
       }
     },
-    [toast, tx]
+    [toast, token, tx]
   );
 
   const handleRiderUpload = useCallback(

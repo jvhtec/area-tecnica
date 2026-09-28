@@ -171,6 +171,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
             <FestivalScheduling
               jobId={jobId}
               jobDates={jobDates}
+              stageOptions={festivalStageOptions}
               isViewOnly={isPlanningViewOnly}
               onCreateWhatsappGroup={isManagementUser ? () => setIsWhatsappDialogOpen(true) : undefined}
               onOpenRiderLibrary={canImportRiders ? handleOpenRiderLibrary : undefined}

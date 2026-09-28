@@ -28,6 +28,7 @@ interface ArtistActionButtonsProps<TArtist extends ArtistActionArtist> {
   deletingArtistId: string | null;
   canDelete: boolean;
   canCreateExtras: boolean;
+  canManageFormLinks?: boolean;
   isCreatingExtrasFor: (id: string) => boolean;
   onGenerateLink: (artist: TArtist) => void;
   onManageFiles: (artist: TArtist) => void;
@@ -48,6 +49,7 @@ export function ArtistActionButtons<TArtist extends ArtistActionArtist>({
   deletingArtistId,
   canDelete,
   canCreateExtras,
+  canManageFormLinks = false,
   isCreatingExtrasFor,
   onGenerateLink,
   onManageFiles,
@@ -82,10 +84,12 @@ export function ArtistActionButtons<TArtist extends ArtistActionArtist>({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onGenerateLink(artist)}>
-            <Link className="h-4 w-4 mr-2" />
-            Generar enlace de formulario
-          </DropdownMenuItem>
+          {canManageFormLinks && (
+            <DropdownMenuItem onClick={() => onGenerateLink(artist)}>
+              <Link className="h-4 w-4 mr-2" />
+              Generar enlace de formulario
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => onManageFiles(artist)}>
             <FileText className="h-4 w-4 mr-2" />
             Gestionar archivos/riders

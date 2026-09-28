@@ -22,10 +22,11 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'festival_stages'
       AND cmd = 'SELECT'
-      AND qual ILIKE '%house_tech%'
-      AND qual ILIKE '%technician%'
-  ),
-  'house techs and technicians can read festival stage names'
+      AND qual ILIKE '%can_read_festival_job%'
+  )
+  AND pg_get_functiondef(to_regprocedure('public.can_read_festival_job(uuid)')) ILIKE '%house_tech%'
+  AND pg_get_functiondef(to_regprocedure('public.can_read_festival_job(uuid)')) ILIKE '%''technician''%',
+  'house techs and assigned technicians can read festival stage names (job-scoped since 20260928120000)'
 );
 
 SELECT ok(
@@ -75,8 +76,9 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'festival_gear_setups'
       AND cmd = 'SELECT'
-      AND qual ILIKE '%house_tech%'
-  ),
+      AND qual ILIKE '%can_read_festival_job%'
+  )
+  AND pg_get_functiondef(to_regprocedure('public.can_read_festival_job(uuid)')) ILIKE '%house_tech%',
   'festival_gear_setups already grants house_tech read access (the fallback max_stages source)'
 );
 

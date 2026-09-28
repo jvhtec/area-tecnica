@@ -11,6 +11,8 @@ The festival system includes:
 - Staffing schedule (shifts, assignments, stage/day-level planning).
 - Flex integration (pullsheet push, folder/document integration, navigation/opening, and extras quote creation for mismatch remediation).
 
+> **Current audit:** see [`docs/plans/2026-09-festival-module-audit-roadmap.md`](../../plans/2026-09-festival-module-audit-roadmap.md) for open findings and the cleanup/enhancement roadmap. The same workspace also serves `single`, `evento` and `ciclo` jobs.
+
 ## Reading order (recommended)
 
 1. [Artist data model & workflows](./artist-tables.md)

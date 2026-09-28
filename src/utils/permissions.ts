@@ -157,6 +157,11 @@ export const canDeleteFestivalArtists = (role: UserRole): boolean => isManagemen
 
 export const canCreateFestivalArtistExtras = (role: UserRole): boolean => isManagementRole(role);
 
+// Public artist form links carry a bearer token; only the roles that may create
+// them can read them (see 20260928120000_scope_festival_workspace_reads.sql).
+export const canManageArtistFormLinks = (role: UserRole): boolean =>
+  PROJECT_MANAGEMENT_ALLOWED_ROLES.includes(role as AppUserRole);
+
 // House techs may upload documents to a job but get no other festival quick actions.
 export const canUploadFestivalDocuments = (role: UserRole): boolean =>
   canUploadDocuments(role) || isHouseTechRole(role);

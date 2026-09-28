@@ -1,89 +1,67 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
-import { SubmitButton } from "@/components/ui/submit-button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { buildFallbackStageOptions } from "@/features/festival-management/selectors";
+import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
-import { ShiftWithAssignments } from "@/types/festival-scheduling";
-import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { getErrorMessage } from "@/utils/errorMessage";
+
+import { ShiftFormFields } from "./ShiftFormFields";
+import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
+import { SHIFT_FORM_NONE, shiftFormDefaults, shiftFormSchema, shiftFormToRow, type ShiftFormValues } from "./shiftModel";
 
 interface EditShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shift: ShiftWithAssignments;
   onShiftUpdated: () => void;
+  stageOptions?: readonly FestivalStageOption[];
 }
 
-const formSchema = z.object({
-  name: z.string().min(1, "El nombre del turno es requerido"),
-  start_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Se requiere formato de hora válido (HH:MM)"),
-  end_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Se requiere formato de hora válido (HH:MM)"),
-  stage: z.string().optional(),
-  department: z.string().optional(),
-  notes: z.string().optional(),
-});
+const DEFAULT_STAGE_OPTIONS = buildFallbackStageOptions(1);
 
-type FormValues = z.infer<typeof formSchema>;
-
-export const EditShiftDialog = ({ 
-  open, 
-  onOpenChange, 
+export const EditShiftDialog = ({
+  open,
+  onOpenChange,
   shift,
-  onShiftUpdated 
+  onShiftUpdated,
+  stageOptions = DEFAULT_STAGE_OPTIONS,
 }: EditShiftDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: shift.name,
-      start_time: shift.start_time,
-      end_time: shift.end_time,
-      stage: shift.stage?.toString() || "",
-      department: shift.department || "",
-      notes: shift.notes || "",
-    },
+
+  const form = useForm<ShiftFormValues>({
+    resolver: zodResolver(shiftFormSchema),
+    defaultValues: shiftFormDefaults(shift),
   });
 
   const handleApplyCalculatedTimes = (startTime: string, endTime: string) => {
-    form.setValue("start_time", startTime);
-    form.setValue("end_time", endTime);
+    form.setValue("start_time", startTime, { shouldValidate: true });
+    form.setValue("end_time", endTime, { shouldValidate: true });
   };
 
-  const handleSubmit = async (values: FormValues) => {
+  const handleSubmit = async (values: ShiftFormValues) => {
     setIsSubmitting(true);
     try {
-      const { error } = await dataLayerClient.from("festival_shifts")
-        .update({
-          name: values.name,
-          start_time: values.start_time,
-          end_time: values.end_time,
-          stage: values.stage && values.stage !== "none" ? parseInt(values.stage) : null,
-          department: values.department && values.department !== "none" ? values.department : null,
-          notes: values.notes || null,
-        })
+      const { error } = await dataLayerClient
+        .from("festival_shifts")
+        .update(shiftFormToRow(values))
         .eq("id", shift.id);
 
       if (error) throw error;
-      
+
       onShiftUpdated();
       onOpenChange(false);
-      toast({
-        title: "Éxito",
-        description: "Turno actualizado exitosamente",
-      });
+      toast({ title: "Turno actualizado", description: `${values.name.trim()} se ha guardado.` });
     } catch (error) {
-      console.error("Error updating shift:", error);
       toast({
         title: "Error",
         description: getErrorMessage(error, "No se pudo actualizar el turno"),
@@ -94,27 +72,20 @@ export const EditShiftDialog = ({
     }
   };
 
-  // Hoisted so the value is narrowed once instead of re-read inside `parseInt`.
   const watchedStage = form.watch("stage");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Editar Turno</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Editar turno</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Turno</Label>
-            <Input
-              id="name"
-              placeholder="Turno Mañana, Soundcheck, etc."
-              {...form.register("name")}
-            />
+            <Label htmlFor="name">Nombre del turno</Label>
+            <Input id="name" placeholder="Mañana, Montaje, Noche…" {...form.register("name")} />
             {form.formState.errors.name && (
-              <p className="text-destructive text-sm">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>
             )}
           </div>
 
@@ -123,100 +94,19 @@ export const EditShiftDialog = ({
             <ShiftTimeCalculator
               jobId={shift.job_id}
               date={shift.date}
-              stage={watchedStage ? parseInt(watchedStage) : undefined}
+              stage={watchedStage && watchedStage !== SHIFT_FORM_NONE ? Number.parseInt(watchedStage, 10) : undefined}
               onApplyTimes={handleApplyCalculatedTimes}
             />
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_time">Hora de Inicio</Label>
-              <Input
-                id="start_time"
-                type="time"
-                {...form.register("start_time")}
-              />
-              {form.formState.errors.start_time && (
-                <p className="text-destructive text-sm">
-                  {form.formState.errors.start_time.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end_time">Hora de Fin</Label>
-              <Input
-                id="end_time"
-                type="time"
-                {...form.register("end_time")}
-              />
-              {form.formState.errors.end_time && (
-                <p className="text-destructive text-sm">
-                  {form.formState.errors.end_time.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stage">Stage (opcional)</Label>
-              <Select
-                defaultValue={form.getValues("stage") || "none"}
-                onValueChange={(value) => form.setValue("stage", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar stage" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin stage</SelectItem>
-                  <SelectItem value="1">Stage 1</SelectItem>
-                  <SelectItem value="2">Stage 2</SelectItem>
-                  <SelectItem value="3">Stage 3</SelectItem>
-                  <SelectItem value="4">Stage 4</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="department">Departamento (opcional)</Label>
-              <Select
-                defaultValue={form.getValues("department") || "none"}
-                onValueChange={(value) => form.setValue("department", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar departamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin departamento</SelectItem>
-                  <SelectItem value="sound">Sonido</SelectItem>
-                  <SelectItem value="lights">Luces</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="logistics">Logística</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="Cualquier información adicional sobre este turno"
-              {...form.register("notes")}
-            />
-          </div>
+          <ShiftFormFields form={form} stageOptions={stageOptions} />
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <SubmitButton type="submit" loading={isSubmitting} loadingText="Actualizando...">
-              Actualizar Turno
+            <SubmitButton type="submit" loading={isSubmitting} loadingText="Guardando…">
+              Guardar cambios
             </SubmitButton>
           </div>
         </form>

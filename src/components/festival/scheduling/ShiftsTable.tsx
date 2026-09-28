@@ -1,24 +1,33 @@
-import { format } from "date-fns";
-import { useState, useEffect } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useState } from "react";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { Copy, Edit, FileDown, Trash2, Users } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, FileDown, Edit, Users, Copy } from "lucide-react";
-import { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
-import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import type { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
+import { labelForCode } from "@/utils/roles";
+import { exportShiftsTablePDF, type ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
+
+import { CopyShiftsDialog } from "./CopyShiftsDialog";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
-import { CopyShiftsDialog } from "./CopyShiftsDialog";
-import { labelForCode } from '@/utils/roles';
-import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
+import {
+  crewDisplayName,
+  formatShiftDuration,
+  formatShiftTime,
+  shiftDepartmentLabel,
+  shiftDurationMinutes,
+  shiftNextDayNote,
+  shiftStageLabel,
+  sortShiftsForFestivalDay,
+} from "./shiftModel";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -29,168 +38,93 @@ interface ShiftsTableProps {
   isViewOnly?: boolean;
   jobDates?: Date[];
   onShiftsCopied?: () => void;
+  stageOptions?: readonly FestivalStageOption[];
+  dayStartTime?: string;
 }
 
-export const ShiftsTable = ({ 
-  shifts, 
+const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
+
+/** Job title and logo for the PDF, loaded only when the user exports. */
+const loadPdfBranding = async (jobId: string): Promise<{ jobTitle: string; logoUrl?: string }> => {
+  const [{ data: job }, { data: logo }] = await Promise.all([
+    dataLayerClient.from("jobs").select("title").eq("id", jobId).maybeSingle(),
+    dataLayerClient.from("festival_logos").select("file_path").eq("job_id", jobId).maybeSingle(),
+  ]);
+  const jobTitle = job?.title ?? "";
+  const logoPath = logo?.file_path;
+  if (!logoPath) return { jobTitle };
+  if (logoPath.startsWith("http")) return { jobTitle, logoUrl: logoPath };
+
+  let bucket = "festival-logos";
+  let path = logoPath;
+  if (logoPath.includes("/")) {
+    [bucket] = logoPath.split("/", 1);
+    path = logoPath.substring(bucket.length + 1);
+  }
+  const { data: signed } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
+  if (signed?.signedUrl) return { jobTitle, logoUrl: signed.signedUrl };
+  const { data: publicUrl } = dataLayerClient.storage.from(bucket).getPublicUrl(path);
+  return { jobTitle, logoUrl: publicUrl?.publicUrl };
+};
+
+export const ShiftsTable = ({
+  shifts,
   onDeleteShift,
   onShiftUpdated,
-  date, 
-  jobId, 
+  date,
+  jobId,
   isViewOnly = false,
   jobDates = [],
-  onShiftsCopied
+  onShiftsCopied,
+  stageOptions = EMPTY_STAGE_OPTIONS,
+  dayStartTime = "07:00",
 }: ShiftsTableProps) => {
   const { toast } = useToast();
-  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
-  const [jobTitle, setJobTitle] = useState<string>("");
-  const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
-  const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
+  const confirm = useConfirm();
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [managingShiftId, setManagingShiftId] = useState<string | null>(null);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
-  
-  useEffect(() => {
-    const fetchJobAndLogo = async () => {
-      if (!jobId) return;
-      
-      try {
-        const { data: jobData, error: jobError } = await dataLayerClient.from("jobs")
-          .select("title")
-          .eq("id", jobId)
-          .single();
-          
-        if (jobError) {
-          console.error("Error fetching job title:", jobError);
-        } else if (jobData) {
-          setJobTitle(jobData.title);
-        }
-        
-        const { data, error } = await dataLayerClient.from("festival_logos")
-          .select("file_path")
-          .eq("job_id", jobId)
-          .maybeSingle();
-          
-        if (error) {
-          console.error("Error fetching festival logo:", error);
-          return;
-        }
-        
-        if (data?.file_path) {
-          const logoPath = data.file_path;
-          console.log("Retrieved logo path:", logoPath);
-          
-          if (logoPath.startsWith('http')) {
-            setLogoUrl(logoPath);
-          } 
-          else {
-            try {
-              let bucket = 'festival-logos';
-              let path = logoPath;
-              
-              if (logoPath.includes('/')) {
-                const parts = logoPath.split('/', 1);
-                bucket = parts[0];
-                path = logoPath.substring(bucket.length + 1);
-              }
-              
-              console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
-              const { data: signedUrlData } = await dataLayerClient.storage
-                .from(bucket)
-                .createSignedUrl(path, 60 * 60);
+  const [isExporting, setIsExporting] = useState(false);
 
-              if (signedUrlData?.signedUrl) {
-                console.log("Generated signed URL:", signedUrlData.signedUrl);
-                setLogoUrl(signedUrlData.signedUrl);
-                return;
-              }
+  const sortedShifts = sortShiftsForFestivalDay(shifts, dayStartTime);
+  // Dialogs read the shift from the live list so their contents follow refetches.
+  const editingShift = shifts.find((shift) => shift.id === editingShiftId) ?? null;
+  const managingShift = shifts.find((shift) => shift.id === managingShiftId) ?? null;
 
-              const { data: publicUrlData } = dataLayerClient.storage
-                .from(bucket)
-                .getPublicUrl(path);
-                
-              if (publicUrlData?.publicUrl) {
-                console.log("Generated public URL:", publicUrlData.publicUrl);
-                setLogoUrl(publicUrlData.publicUrl);
-              }
-            } catch (storageErr) {
-              console.error("Error getting public URL:", storageErr);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error in fetch:", err);
-      }
-    };
-    
-    fetchJobAndLogo();
-  }, [jobId]);
-  
-  const sortedShifts = [...shifts].sort((a, b) => 
-    a.start_time.localeCompare(b.start_time)
-  );
+  const formattedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? format(parseISO(date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
+    : date;
 
-  const formatTimeRange = (start: string, end: string) => {
-    return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+  const handleDeleteClick = async (shift: ShiftWithAssignments) => {
+    const confirmed = await confirm({
+      title: "Eliminar turno",
+      description: `¿Seguro que quieres eliminar «${shift.name}»? También se quitará el personal asignado.`,
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (confirmed) onDeleteShift(shift.id);
   };
-
-  const handleDeleteClick = (e: React.MouseEvent, shiftId: string) => {
-    e.stopPropagation();
-    if (confirm("¿Estás seguro de que deseas eliminar este turno?")) {
-      onDeleteShift(shiftId);
-    }
-  };
-
-  const handleEditClick = (e: React.MouseEvent, shift: ShiftWithAssignments) => {
-    e.stopPropagation();
-    setEditingShift(shift);
-  };
-
-  const handleManageClick = (e: React.MouseEvent, shift: ShiftWithAssignments) => {
-    e.stopPropagation();
-    setManagingShift(shift);
-  };
-
-  const formattedDate = new Date(date).toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long', 
-    day: 'numeric'
-  });
 
   const handleExportPDF = async () => {
+    setIsExporting(true);
     try {
-      console.log("Exporting PDF with jobId:", jobId, "and jobTitle:", jobTitle);
-      console.log("Using logo URL:", logoUrl);
-      
-      const pdfData: ShiftsTablePdfData = {
-        jobTitle,
-        date,
-        jobId,
-        shifts: sortedShifts,
-        logoUrl
-      };
-
+      const { jobTitle, logoUrl } = await loadPdfBranding(jobId);
+      const pdfData: ShiftsTablePdfData = { jobTitle, date, jobId, shifts: sortedShifts, logoUrl };
       const blob = await exportShiftsTablePDF(pdfData);
-      
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = buildReadableFilename([jobTitle || "Festival", formatDateForFilename(date), "Turnos"]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = buildReadableFilename([jobTitle || "Festival", formatDateForFilename(date), "Turnos"]);
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-
-      toast({
-        title: "Éxito",
-        description: "PDF generado exitosamente",
-      });
+      toast({ title: "PDF generado", description: "Se ha descargado la programación del día." });
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo generar el PDF",
-        variant: "destructive",
-      });
+      console.error("Error generating shifts PDF:", error);
+      toast({ title: "Error", description: "No se pudo generar el PDF", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -198,126 +132,141 @@ export const ShiftsTable = ({
     <div className="print:p-8">
       <div className="flex justify-between items-center mb-4">
         <div className="print:block hidden">
-          <h2 className="text-xl font-bold text-center">{jobTitle}</h2>
           <p className="text-center text-muted-foreground">{formattedDate}</p>
         </div>
         <div className="flex gap-2 ml-auto mb-2 print:hidden">
           {!isViewOnly && sortedShifts.length > 0 && jobDates.length > 1 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCopyDialogOpen(true)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setIsCopyDialogOpen(true)}>
               <Copy className="h-4 w-4 mr-2" />
-              Copiar Turnos
+              Copiar turnos
             </Button>
           )}
-          <Button
-            variant="outline"
-            onClick={handleExportPDF}
-          >
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isExporting}>
             <FileDown className="h-4 w-4 mr-2" />
-            Exportar a PDF
+            {isExporting ? "Generando…" : "Exportar a PDF"}
           </Button>
         </div>
       </div>
-      
-      <Table className="border-collapse border border-border print:border-black">
-        <TableHeader>
-          <TableRow className="bg-muted print:bg-gray-200">
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Turno</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Horario</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Stage</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Departamento</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium">Técnicos</TableHead>
-            <TableHead className="border border-border print:border-black print:text-black font-medium print:hidden">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sortedShifts.map((shift) => (
-            <TableRow key={shift.id} className="hover:bg-accent/5">
-              <TableCell className="border border-border print:border-black font-medium print:text-black">
-                {shift.name}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {formatTimeRange(shift.start_time, shift.end_time)}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.stage ? `Stage ${shift.stage}` : '-'}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.department || '-'}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.assignments.length > 0 ? (
-                  <ul className="list-disc list-inside">
-                    {shift.assignments.map((assignment) => (
-                      <li key={assignment.id} className="text-sm">
-                        {assignment.external_technician_name || 
-                          (assignment.profiles && 
-                            `${assignment.profiles.first_name} ${assignment.profiles.last_name}`)} ({labelForCode(assignment.role) || assignment.role})
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-muted-foreground print:text-gray-500">Sin técnicos asignados</span>
-                )}
-              </TableCell>
-              <TableCell className="border border-border print:hidden">
-                {!isViewOnly && (
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleEditClick(e, shift)}
-                      className="h-8 w-8"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleManageClick(e, shift)}
-                      className="h-8 w-8"
-                    >
-                      <Users className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleDeleteClick(e, shift.id)}
-                      className="h-8 w-8"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                )}
-              </TableCell>
+
+      <div className="overflow-x-auto">
+        <Table className="border-collapse border border-border print:border-black">
+          <TableHeader>
+            <TableRow className="bg-muted print:bg-gray-200">
+              <TableHead className="border border-border print:border-black print:text-black font-medium">Turno</TableHead>
+              <TableHead className="border border-border print:border-black print:text-black font-medium">Horario</TableHead>
+              <TableHead className="border border-border print:border-black print:text-black font-medium">Stage</TableHead>
+              <TableHead className="border border-border print:border-black print:text-black font-medium">Departamento</TableHead>
+              <TableHead className="border border-border print:border-black print:text-black font-medium">Personal</TableHead>
+              {!isViewOnly && (
+                <TableHead className="border border-border print:border-black print:text-black font-medium print:hidden">
+                  Acciones
+                </TableHead>
+              )}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {sortedShifts.map((shift) => {
+              const nextDayNote = shiftNextDayNote(shift.start_time, shift.end_time, dayStartTime);
+              return (
+                <TableRow key={shift.id} className="hover:bg-accent/5">
+                  <TableCell className="border border-border print:border-black font-medium print:text-black">
+                    {shift.name}
+                  </TableCell>
+                  <TableCell className="border border-border print:border-black print:text-black whitespace-nowrap">
+                    <div>
+                      {formatShiftTime(shift.start_time)} – {formatShiftTime(shift.end_time)}
+                      {nextDayNote && (
+                        <Badge variant="outline" className="ml-2" title={nextDayNote} aria-label={nextDayNote}>
+                          +1 día
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatShiftDuration(shiftDurationMinutes(shift.start_time, shift.end_time))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="border border-border print:border-black print:text-black">
+                    {shift.stage ? shiftStageLabel(shift.stage, stageOptions) : "-"}
+                  </TableCell>
+                  <TableCell className="border border-border print:border-black print:text-black">
+                    {shift.department ? shiftDepartmentLabel(shift.department) : "-"}
+                  </TableCell>
+                  <TableCell className="border border-border print:border-black print:text-black">
+                    {shift.assignments.length > 0 ? (
+                      <ul className="list-disc list-inside">
+                        {shift.assignments.map((assignment) => (
+                          <li key={assignment.id} className="text-sm">
+                            {assignment.external_technician_name || crewDisplayName(assignment.profiles)} (
+                            {labelForCode(assignment.role) || assignment.role})
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-muted-foreground print:text-gray-500">Sin personal asignado</span>
+                    )}
+                  </TableCell>
+                  {!isViewOnly && (
+                    <TableCell className="border border-border print:hidden">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingShiftId(shift.id)}
+                          className="h-8 w-8"
+                          aria-label={`Editar turno ${shift.name}`}
+                          title="Editar turno"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setManagingShiftId(shift.id)}
+                          className="h-8 w-8"
+                          aria-label={`Gestionar personal de ${shift.name}`}
+                          title="Gestionar personal"
+                        >
+                          <Users className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => void handleDeleteClick(shift)}
+                          className="h-8 w-8"
+                          aria-label={`Eliminar turno ${shift.name}`}
+                          title="Eliminar turno"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       {editingShift && (
         <EditShiftDialog
-          open={!!editingShift}
-          onOpenChange={(open) => !open && setEditingShift(null)}
+          open
+          onOpenChange={(open) => !open && setEditingShiftId(null)}
           shift={editingShift}
+          stageOptions={stageOptions}
           onShiftUpdated={() => {
             onShiftUpdated();
-            setEditingShift(null);
+            setEditingShiftId(null);
           }}
         />
       )}
 
       {managingShift && (
         <ManageAssignmentsDialog
-          open={!!managingShift}
-          onOpenChange={(open) => !open && setManagingShift(null)}
+          open
+          onOpenChange={(open) => !open && setManagingShiftId(null)}
           shift={managingShift}
-          onAssignmentsUpdated={() => {
-            onShiftUpdated();
-          }}
+          onAssignmentsUpdated={onShiftUpdated}
           isViewOnly={isViewOnly}
         />
       )}
@@ -330,9 +279,7 @@ export const ShiftsTable = ({
           jobDates={jobDates}
           jobId={jobId}
           onShiftsCopied={() => {
-            if (onShiftsCopied) {
-              onShiftsCopied();
-            }
+            onShiftsCopied?.();
             setIsCopyDialogOpen(false);
           }}
         />

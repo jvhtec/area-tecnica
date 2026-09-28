@@ -1,10 +1,17 @@
+import { DOCUMENT_UPLOAD_EXTENSIONS } from "@/constants/documentUploadTypes";
 import { validateFileUpload } from "@/lib/enhanced-security-config";
 import { getErrorMessage } from "@/utils/errorMessage";
 
-export const DOCUMENT_UPLOAD_ACCEPT = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.txt,.xmlp,.xmlc,.xmls,.nwm,.dwg,.dfx,.dxf,.mvr";
-export const DOCUMENT_UPLOAD_FORMAT_LABEL = DOCUMENT_UPLOAD_ACCEPT
-  .split(",")
-  .map((extension) => extension.slice(1).toUpperCase())
+// File pickers match on the last extension only, so a compound extension such
+// as `show.gz` is offered as `.gz`; validateFileUpload still requires the full
+// compound extension.
+const PICKER_EXTENSIONS = Array.from(
+  new Set(DOCUMENT_UPLOAD_EXTENSIONS.map((extension) => extension.split(".").pop() ?? extension)),
+);
+
+export const DOCUMENT_UPLOAD_ACCEPT = PICKER_EXTENSIONS.map((extension) => `.${extension}`).join(",");
+export const DOCUMENT_UPLOAD_FORMAT_LABEL = DOCUMENT_UPLOAD_EXTENSIONS
+  .map((extension) => extension.toUpperCase())
   .join(", ");
 
 export const getDocumentUploadErrorMessage = (error: unknown) => {

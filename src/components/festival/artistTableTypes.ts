@@ -98,4 +98,5 @@ export interface ArtistTableProps {
   onArtistStagePlotUpdated?: () => void;
   canDelete: boolean;
   canCreateExtras: boolean;
+  canManageFormLinks?: boolean;
 }
