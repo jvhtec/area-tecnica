@@ -124,6 +124,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     setIsRiderLibraryOpen,
     riderLibraryInitialDate,
     handleOpenRiderLibrary,
+    workspaceProfile,
   } = vm;
   const festivalWhatsappStageOptions = buildFestivalWhatsappStageOptions(festivalStageOptions, maxStages);
   const requiresStageScopedWhatsapp = requiresFestivalWhatsappStage(maxStages, waDepartment);
@@ -163,7 +164,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
         <div>
           <div className="mb-4">
             <Button variant="outline" onClick={() => navigate(`/festival-management/${jobId}`)} className="flex items-center gap-1">
-              Volver al Festival
+              {workspaceProfile.backLabel}
             </Button>
           </div>
 
@@ -172,6 +173,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
               jobId={jobId}
               jobDates={jobDates}
               stageOptions={festivalStageOptions}
+              title={workspaceProfile.schedulingTitle}
               isViewOnly={isPlanningViewOnly}
               onCreateWhatsappGroup={isManagementUser ? () => setIsWhatsappDialogOpen(true) : undefined}
               onOpenRiderLibrary={canImportRiders ? handleOpenRiderLibrary : undefined}

@@ -124,7 +124,7 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
               <>
                 <div className="space-y-2">
                   <div className="text-sm font-medium">
-                    {stage ? `Programación Stage ${stage}` : "Programación del Festival"}
+                    {stage ? `Programación del escenario ${stage}` : "Programación de la producción"}
                   </div>
                   <div className="text-sm text-muted-foreground flex items-center gap-2">
                     <Users className="h-3 w-3" />

@@ -989,7 +989,10 @@ describe('JobCardActions', () => {
       expect(screen.getByRole('button', { name: /Logística/i })).toBeTruthy();
       expect(screen.getByRole('button', { name: /Aviso WA/i })).toBeTruthy();
       expect(screen.getByRole('button', { name: /Ver Detalles/i })).toBeTruthy();
-      expect(screen.getByRole('button', { name: /Gestionar Trabajo/i })).toBeTruthy();
+      const workspaceButton = screen.getByRole("button", { name: /Gestionar bolo/i });
+      expect(workspaceButton).toBeTruthy();
+      fireEvent.click(workspaceButton);
+      expect(navigateMock).toHaveBeenCalledWith("/festival-management/test-job-id");
       expect(screen.getByRole('button', { name: /Resumen Potencia/i })).toBeTruthy();
       expect(screen.getByRole('button', { name: /Lista Material/i })).toBeDisabled();
       expect(screen.getByTitle('Actualizar')).toBeTruthy();

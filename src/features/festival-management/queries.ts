@@ -6,6 +6,7 @@ import {
   buildRiderLibraryEntries,
   type JobDateTypeRow,
 } from "@/features/festival-management/selectors";
+import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 import { fetchWithOfflineFallback, getFestivalSnapshot } from "@/lib/offline";
 import {
   normalizeVenueCoordinates,
@@ -139,7 +140,8 @@ const buildOfflineJobDetails = async (jobId: string): Promise<FestivalJobDetails
   const latestGearSetup = [...snapshot.data.gearSetups].sort((a, b) =>
     String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
   )[0];
-  let maxStages = Math.max(Number(latestGearSetup?.max_stages) || 1, 1);
+  const defaultStageCount = getJobWorkspaceProfile(job.job_type).defaultStageCount;
+  let maxStages = Math.max(Number(latestGearSetup?.max_stages) || defaultStageCount, 1);
 
   const stageRows = snapshot.data.stages
     .map((stage) => ({ number: stage.number as number, name: (stage.name as string) ?? null }))
@@ -192,7 +194,7 @@ const fetchFestivalJobDetailsOnline = async (jobId: string): Promise<FestivalJob
     .order("created_at", { ascending: false })
     .limit(1);
 
-  let resolvedMaxStages = 1;
+  let resolvedMaxStages = getJobWorkspaceProfile(job.job_type).defaultStageCount;
   if (gearError) {
     console.error("Error fetching gear setup:", gearError);
   } else if (gearSetups && gearSetups.length > 0) {

@@ -7,6 +7,7 @@ import type { useFestivalFlexControls } from "@/features/festival-management/hoo
 import type { useFestivalMapPreview } from "@/features/festival-management/hooks/useFestivalMapPreview";
 import type { useFestivalPrintActions } from "@/features/festival-management/hooks/useFestivalPrintActions";
 import type { useFestivalWhatsappActions } from "@/features/festival-management/hooks/useFestivalWhatsappActions";
+import type { JobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 import type { Department } from "@/types/department";
 import type { Job, JobType } from "@/types/job";
 
@@ -221,7 +222,6 @@ type FestivalManagementLocalVm = {
   isRouteSheetOpen: boolean;
   isRiderLibraryOpen: boolean;
   isSchedulingRoute: boolean;
-  isSingleJobMode: boolean;
   isViewOnly: boolean;
   job: FestivalJob;
   jobDates: Date[];
@@ -238,6 +238,7 @@ type FestivalManagementLocalVm = {
   riderLibraryInitialDate: string | null;
   userRole: string | null | undefined;
   venueData: FestivalVenueData;
+  workspaceProfile: JobWorkspaceProfile;
 };
 
 export type FestivalManagementVm = FestivalManagementLocalVm &

@@ -47,7 +47,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
     job,
     jobId,
     canEdit, canUploadDocuments, isPlanningViewOnly, isViewOnly, navigate,
-    isSingleJobMode,
+    workspaceProfile,
     isSchedulingRoute,
     isArtistRoute,
     isGearRoute,
@@ -121,6 +121,13 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
   } = vm;
   const isManagementUser = isManagementRole(userRole);
   const isDepartmentManager = isDepartmentManagementRole(userRole);
+  const WorkspaceIcon = {
+    cycle: RotateCw,
+    event: Calendar,
+    festival: Music2,
+    single: FileText,
+    tourdate: MapPin,
+  }[workspaceProfile.icon];
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
@@ -130,11 +137,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
             <div className="min-w-0 flex-1 space-y-3">
               <CardTitle className="text-2xl md:text-3xl font-bold flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  {isSingleJobMode ? (
-                    <FileText className="h-6 w-6 md:h-7 md:w-7" />
-                  ) : (
-                    <Music2 className="h-6 w-6 md:h-7 md:w-7" />
-                  )}
+                  <WorkspaceIcon className="h-6 w-6 md:h-7 md:w-7" aria-hidden="true" />
                 </div>
                 <span className="truncate bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                   {job?.title}
@@ -142,7 +145,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
               </CardTitle>
               <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground">
                 <Badge variant="secondary" className="font-normal">
-                  {isSingleJobMode ? "Single Job" : "Festival"}
+                  {workspaceProfile.badgeLabel}
                 </Badge>
                 <span className="hidden sm:inline">•</span>
                 <span className="flex items-center gap-1">
@@ -178,7 +181,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                     >
                       <img
                         src={mapPreviewUrl}
-                        alt="Venue location"
+                        alt="Ubicación del trabajo"
                         width={600}
                         height={300}
                         loading="lazy"
@@ -275,6 +278,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
             isPlanningViewOnly={isPlanningViewOnly}
             isViewOnly={isViewOnly}
             jobId={jobId}
+            modules={workspaceProfile.modules}
             navigate={navigate}
             onOpenRiderLibrary={() => handleOpenRiderLibrary()}
           />
