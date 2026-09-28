@@ -40,6 +40,7 @@ import type {
   JobCardActionButtonsProps,
   TechnicalPowerPackState,
 } from "@/components/jobs/cards/job-card-actions/types";
+import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 import { cn } from "@/lib/utils";
 import { getDepartmentLabel } from "@/types/department";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
@@ -172,6 +173,10 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
     job.job_type !== "dryhire";
   const flexReportDepartment = department === "sound" || department === "lights" ? department : null;
   const normalizedJobType = String(job.job_type || "").toLowerCase();
+  const workspaceProfile = getJobWorkspaceProfile(job.job_type);
+  const workspaceActionLabel = isTechnicianUser
+    ? workspaceProfile.viewActionLabel
+    : workspaceProfile.actionLabel;
   const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
     normalizedJobType !== "tourdate" || hasPrepDayDateType(job.job_date_types)
   );
@@ -297,10 +302,10 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
         size="sm"
         onClick={onFestivalArtistsClick}
         className="hover:bg-accent/50"
-        title={isTechnicianUser ? "Ver Festival" : "Gestionar Festival"}
+        title={workspaceActionLabel}
       >
         <Users className="h-4 w-4 mr-1" />
-        <span className="hidden sm:inline">{isTechnicianUser ? "Ver Festival" : "Gestionar Festival"}</span>
+        <span className="hidden sm:inline">{workspaceActionLabel}</span>
       </Button>
     )}
     {!isFestivalLike && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
@@ -309,10 +314,10 @@ export const JobCardActionButtons = (props: JobCardActionButtonsProps) => {
         size="sm"
         onClick={handleManageJob}
         className="hover:bg-accent/50"
-        title={isTechnicianUser ? "Ver Trabajo" : "Gestionar Trabajo"}
+        title={workspaceActionLabel}
       >
         <Settings className="h-4 w-4 mr-1" />
-        <span className="hidden sm:inline">{isTechnicianUser ? "Ver Trabajo" : "Gestionar Trabajo"}</span>
+        <span className="hidden sm:inline">{workspaceActionLabel}</span>
       </Button>
     )}
     {!isProductionDepartment && !isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (

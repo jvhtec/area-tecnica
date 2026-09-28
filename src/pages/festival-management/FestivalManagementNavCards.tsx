@@ -2,6 +2,7 @@ import { Calendar, Layout, Library, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { JobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 
 type FestivalManagementNavCardsProps = {
   artistCount: number;
@@ -9,6 +10,7 @@ type FestivalManagementNavCardsProps = {
   isPlanningViewOnly: boolean;
   isViewOnly: boolean;
   jobId: string;
+  modules: JobWorkspaceProfile["modules"];
   navigate: (path: string) => void;
   onOpenRiderLibrary: () => void;
 };
@@ -19,11 +21,12 @@ export const FestivalManagementNavCards = ({
   isPlanningViewOnly,
   isViewOnly,
   jobId,
+  modules,
   navigate,
   onOpenRiderLibrary,
 }: FestivalManagementNavCardsProps) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-    <Card
+    {modules.artists && <Card
       className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
       onClick={() => navigate(`/festival-management/${jobId}/artists`)}
     >
@@ -53,9 +56,9 @@ export const FestivalManagementNavCards = ({
           {isViewOnly ? "Ver Artistas" : "Gestionar Artistas"}
         </Button>
       </CardContent>
-    </Card>
+    </Card>}
 
-    <Card
+    {modules.gear && <Card
       className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
       onClick={() => navigate(`/festival-management/${jobId}/gear`)}
     >
@@ -80,9 +83,9 @@ export const FestivalManagementNavCards = ({
           {isPlanningViewOnly ? "Ver Equipo" : "Gestionar Equipo"}
         </Button>
       </CardContent>
-    </Card>
+    </Card>}
 
-    <Card
+    {modules.scheduling && <Card
       className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
       onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}
     >
@@ -109,9 +112,9 @@ export const FestivalManagementNavCards = ({
           {isPlanningViewOnly ? "Ver Planificación" : "Gestionar Planificación"}
         </Button>
       </CardContent>
-    </Card>
+    </Card>}
 
-    {canImportRiders && (
+    {modules.riderLibrary && canImportRiders && (
       <Card
         className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 bg-gradient-to-br from-background to-accent/5"
         onClick={onOpenRiderLibrary}

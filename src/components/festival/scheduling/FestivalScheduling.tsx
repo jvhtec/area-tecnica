@@ -23,6 +23,7 @@ import type { FestivalStageOption } from "@/features/festival-management/types";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
+  title?: string;
   /** The festival's stages (names from `festival_stages`, count from the gear setup). */
   stageOptions?: readonly FestivalStageOption[];
   isViewOnly?: boolean;
@@ -33,6 +34,7 @@ interface FestivalSchedulingProps {
 export const FestivalScheduling = ({
   jobId,
   jobDates,
+  title = "Planificación del trabajo",
   stageOptions,
   isViewOnly = false,
   onCreateWhatsappGroup,
@@ -221,7 +223,7 @@ export const FestivalScheduling = ({
     <Card className="mt-4 sm:mt-6">
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
-          <CardTitle className="text-base sm:text-lg">Programación del Festival</CardTitle>
+          <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
           {/* These labels are hidden below sm, which left an icon with no
               accessible name on a phone. Each aria-label contains the visible
               text, so WCAG 2.5.3 still holds at the sizes that show it. */}

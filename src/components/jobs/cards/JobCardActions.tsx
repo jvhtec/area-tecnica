@@ -170,8 +170,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   const handleManageJob = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const params = new URLSearchParams({ singleJob: "true" });
-    navigate(`/festival-management/${job.id}?${params.toString()}`);
+    navigate(`/festival-management/${job.id}`);
   }, [job.id, navigate]);
 
   const openDuplicateSoundDocsDialog = React.useCallback(() => {

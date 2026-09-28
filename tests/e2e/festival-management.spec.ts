@@ -66,9 +66,53 @@ test.describe("festival management smoke", () => {
     await page.goto("/festival-management/festival-job-1/scheduling");
 
     await expect(page.getByRole("heading", { name: "Festival Smoke" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Programación del Festival" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Planificación del festival" })).toBeVisible();
     await page.getByRole("button", { name: "WhatsApp" }).click();
     await expect(page.getByRole("heading", { name: "Crear Grupo de WhatsApp" })).toBeVisible();
+  });
+
+  test("derives the workspace identity from the job type", async ({ page }) => {
+    await bootstrapApp(page, {
+      auth: {
+        role: "management",
+        department: "sound",
+      },
+      functions: {
+        "get-google-maps-key": { apiKey: "test-google-key" },
+      },
+      rpc: { get_current_user_role: "management" },
+      tables: {
+        profiles: [
+          {
+            id: "e2e-user",
+            role: "management",
+            department: "sound",
+            soundvision_access_enabled: false,
+            assignable_as_tech: false,
+          },
+        ],
+        jobs: [{ ...festivalJob, id: "single-job-1", title: "Bolo Smoke", job_type: "single" }],
+        locations: [],
+        festival_artists: [],
+        festival_artist_files: [],
+        festival_gear_setups: [],
+        festival_stages: [],
+        flex_folders: [],
+        job_documents: [],
+        job_whatsapp_group_requests: [],
+        job_whatsapp_groups: [],
+        tour_dates: [],
+        tours: [],
+      },
+    });
+
+    await page.goto("/festival-management/single-job-1");
+
+    await expect(page.getByRole("heading", { name: "Bolo Smoke" })).toBeVisible();
+    await expect(page.getByText("Bolo", { exact: true })).toBeVisible();
+
+    await page.goto("/festival-management/single-job-1/scheduling?singleJob=true");
+    await expect(page.getByRole("heading", { name: "Planificación del bolo" })).toBeVisible();
   });
 
   test("loads the public blank artist requirements form", async ({ page }) => {

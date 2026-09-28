@@ -32,6 +32,7 @@ import type {
   JobCardActionButtonsProps,
   JobCardActionsProps,
 } from "@/components/jobs/cards/job-card-actions/types";
+import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 import { Button } from "@/components/ui/button";
 import {
   MobileActionSheet,
@@ -115,6 +116,10 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
     department === "sound" && isManagementUser && allowedJobType && job.job_type !== "dryhire";
   const flexReportDepartment = department === "sound" || department === "lights" ? department : null;
   const normalizedJobType = String(job.job_type || "").toLowerCase();
+  const workspaceProfile = getJobWorkspaceProfile(job.job_type);
+  const workspaceActionLabel = isTechnicianUser
+    ? workspaceProfile.viewActionLabel
+    : workspaceProfile.actionLabel;
   const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
     normalizedJobType !== "tourdate" || hasPrepDayDateType(job.job_date_types)
   );
@@ -182,13 +187,13 @@ export const MobileJobCardActions = (props: JobCardActionButtonsProps) => {
         }] : []),
         ...(isFestivalLike && canManageArtists ? [{
           id: "festival",
-          label: isTechnicianUser ? "Ver festival" : "Gestionar festival",
+          label: workspaceActionLabel,
           icon: Users,
           onSelect: onFestivalArtistsClick,
         }] : []),
         ...(!isFestivalLike && job.job_type !== "dryhire" && canManageArtists ? [{
           id: "manage-job",
-          label: isTechnicianUser ? "Ver trabajo" : "Gestionar trabajo",
+          label: workspaceActionLabel,
           icon: Settings,
           onSelect: handleManageJob,
         }] : []),

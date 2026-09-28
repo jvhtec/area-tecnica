@@ -22,6 +22,7 @@ import { useFestivalPrintActions } from "@/features/festival-management/hooks/us
 import { useFestivalWhatsappActions } from "@/features/festival-management/hooks/useFestivalWhatsappActions";
 import { FESTIVAL_DEPARTMENT_OPTIONS, humanizeFestivalDepartment } from "@/features/festival-management/selectors";
 import type { FestivalManagementVm } from "@/features/festival-management/types";
+import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 
 export type FestivalManagementVmResult =
   | { status: "missing_job_id" }
@@ -36,9 +37,6 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const { toast } = useToast();
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
-  const searchParams = new URLSearchParams(location.search);
-  const isSingleJobMode = searchParams.get("singleJob") === "true";
-
   const jobData = useFestivalJobData({ jobId, toast });
   const documents = useFestivalDocuments({ jobId, toast });
   const mapPreview = useFestivalMapPreview(jobData.venueData);
@@ -172,6 +170,8 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   if (jobData.isLoading) return { status: "loading" };
   if (!jobData.job) return { status: "not_found" };
 
+  const workspaceProfile = getJobWorkspaceProfile(jobData.job.job_type);
+
   return {
     status: "ready",
     vm: {
@@ -196,7 +196,6 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       isManagementUser,
       isPlanningViewOnly,
       isSchedulingRoute,
-      isSingleJobMode,
       isViewOnly,
       job: jobData.job,
       jobDates: jobData.jobDates,
@@ -205,6 +204,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       navigate,
       userRole,
       venueData: jobData.venueData,
+      workspaceProfile,
       artistCount: jobData.artistCount,
       festivalStageOptions: jobData.festivalStageOptions,
 

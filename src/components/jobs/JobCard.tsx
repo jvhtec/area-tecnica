@@ -9,6 +9,7 @@ import { useState } from "react";
 import { JobExtrasDialog } from "./JobExtrasDialog";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { canManageFestivalArtists, isManagementRole } from "@/utils/permissions";
+import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 
 interface JobCardProps {
   job: Job;
@@ -46,6 +47,7 @@ export const JobCard = ({
   // Define who can edit and delete jobs
   const canEditJobs = isManagementRole(userRole);
   const isFestivalLike = isFestivalLikeJobType(job.job_type);
+  const workspaceProfile = getJobWorkspaceProfile(job.job_type);
 
   return (
     <Card 
@@ -85,8 +87,10 @@ export const JobCard = ({
                 onClick={handleFestivalManage}
                 className="h-8 md:h-9 text-xs md:text-sm"
               >
-                <span className="hidden sm:inline">{userRole === 'technician' ? 'View Festival' : 'Manage Festival'}</span>
-                <span className="sm:hidden">{userRole === 'technician' ? 'View' : 'Manage'}</span>
+                <span className="hidden sm:inline">
+                  {userRole === "technician" ? workspaceProfile.viewActionLabel : workspaceProfile.actionLabel}
+                </span>
+                <span className="sm:hidden">{userRole === "technician" ? "Ver" : "Gestionar"}</span>
               </Button>
             )}
             {canEditJobs && !hideFestivalControls && (
