@@ -133,7 +133,7 @@ Each item is sized to be one PR. Phases can overlap. Phase 0 blocks nothing else
 - `20260928120000_scope_festival_workspace_reads.sql` scopes the nine workspace tables (0.1, 0.2). Form-link actions are hidden in the UI for roles that can no longer read tokens (`canManageArtistFormLinks`). Production matched the migration chain for these tables (one SELECT policy each).
 - `20260928130000_align_festival_artist_and_storage_reads.sql` (0.4):
   - `festival_artists` and `festival_artist_files` now use the same `can_read_festival_job` rule, so declined technicians lose access and shift-only crew gain it.
-  - It closes **FEST-SEC-03**, found while doing this. Production had seven storage policies that no migration defines (DB-06 drift). Among them, `riders_bucket_read_all` let **anyone with the anon key read all 586 rider files**, and four others let any signed-in user upload or delete any rider file or logo. These policies are dropped.
+  - It closes **FEST-SEC-03**, found while doing this. Production had seven storage policies that no migration defines (DB-06 drift). Among them, `riders_bucket_read_all` let **anyone with the anon key read all 586 rider files**, and five others let any signed-in user upload, overwrite or delete any rider file or logo. Those six are dropped; the seventh, a public logo read, is kept on purpose (see below).
   - The public form now opens and downloads its riders through the token-validated `sign` action of `upload-public-artist-rider`.
   - Logos stay publicly readable on purpose (the anonymous form and PDFs render them), and the policy is now defined in a migration.
   - Logo uploads accept every job type. Before, single jobs only worked through the dropped drift policies.
