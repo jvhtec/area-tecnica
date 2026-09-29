@@ -6,6 +6,12 @@
 -- job/technician memberships. Keep the scheduled crew and create those
 -- memberships instead of deleting shifts.
 
+-- These rows repair historical membership rather than representing new work.
+-- Suppress only the user-facing "assignment.created" activity event; all
+-- other job-assignment triggers remain active during the backfill.
+ALTER TABLE public.job_assignments
+  DISABLE TRIGGER t_ai_job_assignments_activity;
+
 INSERT INTO public.job_assignments (
   job_id,
   technician_id,
@@ -31,6 +37,9 @@ WHERE assignment.technician_id IS NOT NULL
       AND job_assignment.technician_id = assignment.technician_id
   )
 ON CONFLICT (job_id, technician_id) DO NOTHING;
+
+ALTER TABLE public.job_assignments
+  ENABLE TRIGGER t_ai_job_assignments_activity;
 
 -- Stop instead of silently discarding or rewriting any anomaly that the
 -- production audit did not observe.
