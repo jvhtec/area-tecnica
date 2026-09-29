@@ -143,4 +143,48 @@ describe("useGearSetupForm", () => {
       expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" })),
     );
   });
+  it("keeps edits made while a save is still in flight", async () => {
+    let finishSave: () => void = () => undefined;
+    apiMock.saveGlobalGearSetup.mockReturnValue(
+      new Promise((resolve) => {
+        finishSave = () => resolve({ gearSetupId: "gear-1", globalSetup: null });
+      }),
+    );
+    const { result } = setup();
+    await waitFor(() => expect(result.current.setup.notes).toBe("guardado"));
+
+    act(() => result.current.handleChange({ notes: "primero" }));
+    act(() => result.current.save());
+    // The user keeps typing while the request is pending; the server ends up with "primero".
+    act(() => result.current.handleChange({ notes: "segundo" }));
+    apiMock.fetchGearSetupState.mockResolvedValue(stateWith("primero"));
+
+    await act(async () => {
+      finishSave();
+    });
+    await waitFor(() => expect(apiMock.saveGlobalGearSetup).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Éxito" })));
+
+    expect(apiMock.saveGlobalGearSetup).toHaveBeenCalledWith(
+      expect.objectContaining({ notes: "primero" }),
+      "job-1",
+      "gear-1",
+    );
+    expect(result.current.setup.notes).toBe("segundo");
+  });
+
+  it("ends on the saved values after saving and refetches once", async () => {
+    apiMock.fetchGearSetupState.mockResolvedValueOnce(stateWith("antes"));
+    const { result } = setup();
+    await waitFor(() => expect(result.current.setup.notes).toBe("antes"));
+
+    act(() => result.current.handleChange({ notes: "nuevo" }));
+    apiMock.fetchGearSetupState.mockResolvedValue(stateWith("nuevo"));
+    act(() => result.current.save());
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Éxito" })));
+    await waitFor(() => expect(result.current.setup.notes).toBe("nuevo"));
+
+    expect(apiMock.fetchGearSetupState).toHaveBeenCalledTimes(2);
+  });
 });

@@ -14,6 +14,14 @@ interface UseGearSetupFormOptions {
   onSave?: () => void;
 }
 
+interface SaveRequest {
+  payload: GearSetupFormData;
+  /** Stage the payload belongs to (1 saves the festival-wide setup). */
+  target: number;
+  gearSetupId: string | null;
+  revision: number;
+}
+
 /**
  * State of the gear setup form for one stage: loads the saved setup, holds the edits, and saves.
  *
@@ -23,7 +31,6 @@ interface UseGearSetupFormOptions {
 export function useGearSetupForm({ jobId, stageNumber, readOnly, onSave }: UseGearSetupFormOptions) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isPrimaryStage = stageNumber === 1;
 
   const query = useQuery({
     queryKey: festivalGearKeys.setup(jobId, stageNumber),
@@ -57,23 +64,29 @@ export function useGearSetupForm({ jobId, stageNumber, readOnly, onSave }: UseGe
     });
   }, [query.error, jobId, toast]);
 
+  // Bumped on every edit, so a finished save can tell whether the form changed after it was sent.
+  const revision = useRef(0);
+
   const saveMutation = useMutation({
-    mutationFn: async (): Promise<void> => {
-      if (isPrimaryStage) {
-        await saveGlobalGearSetup(setup, jobId, query.data?.gearSetupId ?? null);
+    mutationFn: async ({ payload, target, gearSetupId }: SaveRequest): Promise<void> => {
+      if (target === 1) {
+        await saveGlobalGearSetup(payload, jobId, gearSetupId);
       } else {
-        await saveStageGearSetup(setup, jobId, stageNumber);
+        await saveStageGearSetup(payload, jobId, target);
       }
     },
-    onSuccess: async () => {
-      setIsDirty(false);
+    onSuccess: async (_result, request) => {
+      // Refetch first: clearing the flag earlier would let the form fall back to the pre-save data.
       await queryClient.invalidateQueries({ queryKey: festivalGearKeys.all(jobId) });
+      // Edits made while the save was in flight are not on the server yet; keep them.
+      if (revision.current === request.revision) setIsDirty(false);
       onSave?.();
       toast({
         title: "Éxito",
-        description: isPrimaryStage
-          ? "La configuración de equipamiento global ha sido guardada."
-          : `La configuración de Stage ${stageNumber} ha sido guardada.`,
+        description:
+          request.target === 1
+            ? "La configuración de equipamiento global ha sido guardada."
+            : `La configuración de Stage ${request.target} ha sido guardada.`,
       });
     },
     onError: (error) => {
@@ -88,13 +101,19 @@ export function useGearSetupForm({ jobId, stageNumber, readOnly, onSave }: UseGe
 
   const handleChange = (changes: Partial<GearSetupFormData>) => {
     if (readOnly) return;
+    revision.current += 1;
     setIsDirty(true);
     setSetup((previous) => ({ ...previous, ...changes }));
   };
 
   const save = () => {
     if (readOnly) return;
-    saveMutation.mutate();
+    saveMutation.mutate({
+      payload: setup,
+      target: stageNumber,
+      gearSetupId: query.data?.gearSetupId ?? null,
+      revision: revision.current,
+    });
   };
 
   return {

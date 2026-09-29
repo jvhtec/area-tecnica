@@ -21,6 +21,10 @@ export const useCombinedGearSetup = (
     queryKey: festivalGearKeys.combined(jobId, stageNumber),
     queryFn: () => fetchCombinedGearSetup(jobId, stageNumber),
     enabled: !!jobId,
+    // Gear is edited on another page and the artist routes do not subscribe to it, so a cached
+    // setup could be another user's stale one. Always read it when an editor opens.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   return {
