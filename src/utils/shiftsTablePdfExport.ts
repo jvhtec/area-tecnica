@@ -14,10 +14,12 @@ import {
   festivalTableTheme,
   loadFestivalIssuerMark,
 } from '@/utils/pdf/festival-report';
+import { getFestivalDayOffset } from '@/features/festival-management/dayStart';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
   date: string;
+  dayStartTime: string;
   jobId?: string;
   shifts: ShiftWithAssignments[];
   logoUrl?: string;
@@ -106,7 +108,10 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
 
   let sectionNumber = 1;
   for (const [department, shifts] of byDepartment.entries()) {
-    const sorted = [...shifts].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const sorted = [...shifts].sort((a, b) =>
+      (getFestivalDayOffset(a.start_time, data.dayStartTime) ?? Number.MAX_SAFE_INTEGER)
+      - (getFestivalDayOffset(b.start_time, data.dayStartTime) ?? Number.MAX_SAFE_INTEGER)
+    );
 
     if (y + 26 * mm > geo.contentBottom) {
       doc.addPage();

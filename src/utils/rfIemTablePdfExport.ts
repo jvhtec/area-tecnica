@@ -14,6 +14,10 @@ import { loadFestivalIssuerMark } from '@/utils/pdf/festival-report/issuerMark';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfIemScheduleFields';
 import { groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  isBeforeFestivalDayStart,
+} from '@/features/festival-management/dayStart';
 import type {
   ArtistRfIemData,
   RawArtistLike,
@@ -71,7 +75,10 @@ const normalizeSystems = (
     );
 };
 
-export const normalizeRfIemArtistInput = (artist: RawArtistLike): ArtistRfIemData => {
+export const normalizeRfIemArtistInput = (
+  artist: RawArtistLike,
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): ArtistRfIemData => {
   const wirelessFallback = toProvider(artist.wireless_provided_by, 'festival');
   const iemFallback = toProvider(artist.iem_provided_by, 'festival');
 
@@ -84,6 +91,13 @@ export const normalizeRfIemArtistInput = (artist: RawArtistLike): ArtistRfIemDat
     iemFallback,
   );
 
+  const schedule = extractRfIemScheduleFields(artist);
+  const explicitAfterMidnight = typeof artist.isAfterMidnight === 'boolean'
+    ? artist.isAfterMidnight
+    : typeof artist.isaftermidnight === 'boolean'
+      ? artist.isaftermidnight
+      : undefined;
+
   return {
     id: typeof (artist as { id?: unknown }).id === 'string' ? String((artist as { id?: unknown }).id) : undefined,
     name: typeof artist.name === 'string' && artist.name.trim().length > 0 ? artist.name : 'Unnamed Artist',
@@ -91,8 +105,8 @@ export const normalizeRfIemArtistInput = (artist: RawArtistLike): ArtistRfIemDat
     wirelessSystems: normalizedWireless,
     iemSystems: normalizedIem,
     date: typeof artist.date === 'string' ? artist.date : undefined,
-    isAfterMidnight: artist.isAfterMidnight === true || artist.isaftermidnight === true,
-    ...extractRfIemScheduleFields(artist),
+    isAfterMidnight: explicitAfterMidnight ?? isBeforeFestivalDayStart(schedule.showStart, dayStartTime),
+    ...schedule,
   };
 };
 
@@ -407,7 +421,7 @@ export const exportRfIemTablePDF = async (
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   const normalizedArtists = (data.artists || []).map((artist) =>
-    normalizeRfIemArtistInput(artist as RawArtistLike),
+    normalizeRfIemArtistInput(artist as RawArtistLike, data.dayStartTime),
   );
   const filteredArtists = normalizedArtists.filter(hasRfIemContent);
 
@@ -415,7 +429,7 @@ export const exportRfIemTablePDF = async (
     throw new Error('No hay datos RF/IEM para los escenarios seleccionados.');
   }
 
-  const dayGroups = groupArtistsByFestivalDay(filteredArtists);
+  const dayGroups = groupArtistsByFestivalDay(filteredArtists, data.dayStartTime);
   if (dayGroups.length === 0) {
     throw new Error('No hay datos RF/IEM para los escenarios seleccionados.');
   }

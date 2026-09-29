@@ -34,12 +34,10 @@ import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
 import { FestivalPushFeedButton } from "@/components/festival/FestivalPushFeedButton";
 import { getErrorStack } from '@/utils/errorMessage';
 import {
-  DEFAULT_FESTIVAL_DAY_START_TIME,
   fetchFestivalDateTypes,
-  fetchFestivalSettings,
 } from "@/features/festival-management/queries";
+import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
 import { trackError } from "@/lib/errorTracking";
-const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -75,13 +73,7 @@ const FestivalArtistManagement = () => {
 
   // A non-empty search term searches every festival date instead of just the selected one.
   const isCrossDateSearch = searchTerm.trim().length > 0;
-  const { data: festivalSettings, error: festivalSettingsError } = useQuery({
-    queryKey: queryKeys.scope('festival-settings', jobId),
-    networkMode: "always",
-    queryFn: () => fetchFestivalSettings(jobId!),
-    enabled: !!jobId
-  });
-  const dayStartTime = festivalSettings?.day_start_time ?? DEFAULT_FESTIVAL_DAY_START_TIME;
+  const { dayStartTime, error: festivalSettingsError } = useFestivalDayStart(jobId);
   const {
     data: dateTypeData,
     error: dateTypesError,
@@ -435,6 +427,7 @@ const FestivalArtistManagement = () => {
       const data = {
         jobTitle: jobTitle,
         date: printDate,
+        dayStartTime,
         stage: printStage,
         stageNames: stageNames,
         artists: transformedArtists,
@@ -706,6 +699,7 @@ const FestivalArtistManagement = () => {
         selectedDate={printDate}
         stageFilter={printStage}
         jobId={jobId}
+        dayStartTime={dayStartTime}
         stageNames={stageNames}
         open={isPrintDialogOpen}
         onOpenChange={setIsPrintDialogOpen}

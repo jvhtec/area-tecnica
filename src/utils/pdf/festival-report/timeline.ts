@@ -13,9 +13,15 @@ import {
 } from './tokens';
 import { drawFestivalHatch, type FestivalFlagLabel } from './components';
 import { truncateToWidth } from './chrome';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  getFestivalDayOffset,
+  getFestivalDayStartMinutes,
+  parseFestivalClockMinutes,
+} from '@/features/festival-management/dayStart';
 
-/** The programme day runs 07:00 to 07:00, not midnight to midnight. */
-export const TIMELINE_WINDOW_START_MINUTES = 7 * 60;
+/** Default boundary retained for consumers that render without a job context. */
+export const TIMELINE_WINDOW_START_MINUTES = getFestivalDayStartMinutes(DEFAULT_FESTIVAL_DAY_START_TIME);
 const MINUTES_PER_DAY = 24 * 60;
 /** A soundcheck window longer than this is not a soundcheck window. */
 const IMPLAUSIBLE_SOUNDCHECK_MINUTES = 6 * 60;
@@ -34,22 +40,14 @@ export interface TimelineFinding {
 
 /** Parses `HH:MM` / `HH:MM:SS` into minutes past midnight. */
 export const parseClockMinutes = (value: string | null | undefined): number | null => {
-  if (!value) return null;
-  const match = /^\s*(\d{1,2}):(\d{2})/.exec(value);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
+  return parseFestivalClockMinutes(value);
 };
 
-/** Position of a clock time inside the 07:00→07:00 window, in minutes. */
-export const toWindowOffset = (value: string | null | undefined): number | null => {
-  const minutes = parseClockMinutes(value);
-  if (minutes === null) return null;
-  return (minutes - TIMELINE_WINDOW_START_MINUTES + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-};
+/** Position of a clock time inside the configured festival-day window. */
+export const toWindowOffset = (
+  value: string | null | undefined,
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): number | null => getFestivalDayOffset(value, dayStartTime);
 
 interface Span {
   start: number;
@@ -59,9 +57,10 @@ interface Span {
 const toSpan = (
   start: string | null | undefined,
   end: string | null | undefined,
+  dayStartTime: string,
 ): Span | null => {
-  const from = toWindowOffset(start);
-  const to = toWindowOffset(end);
+  const from = toWindowOffset(start, dayStartTime);
+  const to = toWindowOffset(end, dayStartTime);
   if (from === null || to === null) return null;
   const duration = (to - from + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   return { start: from, duration: duration === 0 ? 5 : duration };
@@ -72,12 +71,15 @@ const toSpan = (
  * soundchecks that run for most of a day, and soundchecks that start after
  * their own show. Bad data is never silently clamped to something plausible.
  */
-export const collectTimelineFindings = (entries: TimelineEntry[]): TimelineFinding[] => {
+export const collectTimelineFindings = (
+  entries: TimelineEntry[],
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): TimelineFinding[] => {
   const findings: TimelineFinding[] = [];
 
   for (const entry of entries) {
-    const show = toSpan(entry.show?.start, entry.show?.end);
-    const soundcheck = toSpan(entry.soundcheck?.start, entry.soundcheck?.end);
+    const show = toSpan(entry.show?.start, entry.show?.end, dayStartTime);
+    const soundcheck = toSpan(entry.soundcheck?.start, entry.soundcheck?.end, dayStartTime);
     if (!soundcheck) continue;
 
     if (soundcheck.duration > IMPLAUSIBLE_SOUNDCHECK_MINUTES) {
@@ -102,6 +104,7 @@ export const collectTimelineFindings = (entries: TimelineEntry[]): TimelineFindi
 
 export interface TimelineOptions {
   entries: TimelineEntry[];
+  dayStartTime: string;
   y: number;
   /** Width reserved for the right-aligned lane labels. */
   labelWidth?: number;
@@ -131,9 +134,11 @@ export const drawFestivalTimeline = (
   const chartX = geo.left + labelWidth + 2 * mm;
   const chartWidth = geo.right - chartX;
   const perMinute = chartWidth / MINUTES_PER_DAY;
+  const dayStartMinutes = getFestivalDayStartMinutes(options.dayStartTime);
 
   const usable = options.entries.filter(
-    (entry) => toSpan(entry.show?.start, entry.show?.end) || toSpan(entry.soundcheck?.start, entry.soundcheck?.end),
+    (entry) => toSpan(entry.show?.start, entry.show?.end, options.dayStartTime)
+      || toSpan(entry.soundcheck?.start, entry.soundcheck?.end, options.dayStartTime),
   );
   const skipped = options.entries
     .filter((entry) => !usable.includes(entry))
@@ -141,12 +146,13 @@ export const drawFestivalTimeline = (
 
   let y = options.y;
 
-  // Hour scale across the top, every three hours from 07:00.
+  // Hour scale across the top, every three hours from the configured boundary.
   setFestivalMonoText(doc, FESTIVAL_SOFT, 5.2);
   for (let hour = 0; hour <= 24; hour += 3) {
     const x = chartX + hour * 60 * perMinute;
-    const clock = String((TIMELINE_WINDOW_START_MINUTES / 60 + hour) % 24).padStart(2, '0');
-    doc.text(`${clock}`, x, y, { align: hour === 24 ? 'right' : 'left' });
+    const clockMinutes = (dayStartMinutes + hour * 60) % MINUTES_PER_DAY;
+    const clock = `${String(Math.floor(clockMinutes / 60)).padStart(2, '0')}:${String(clockMinutes % 60).padStart(2, '0')}`;
+    doc.text(clock, x, y, { align: hour === 24 ? 'right' : 'left' });
   }
   y += 2.4 * mm;
 
@@ -160,7 +166,7 @@ export const drawFestivalTimeline = (
     doc.line(x, chartTop, x, chartTop + chartHeight);
   }
 
-  const findings = collectTimelineFindings(usable);
+  const findings = collectTimelineFindings(usable, options.dayStartTime);
   const flagged = new Set(findings.map((finding) => finding.name));
 
   usable.forEach((entry, index) => {
@@ -179,7 +185,7 @@ export const drawFestivalTimeline = (
       { align: 'right' },
     );
 
-    const soundcheck = toSpan(entry.soundcheck?.start, entry.soundcheck?.end);
+    const soundcheck = toSpan(entry.soundcheck?.start, entry.soundcheck?.end, options.dayStartTime);
     if (soundcheck) {
       drawSpan(doc, soundcheck, {
         x: chartX,
@@ -193,7 +199,7 @@ export const drawFestivalTimeline = (
       });
     }
 
-    const show = toSpan(entry.show?.start, entry.show?.end);
+    const show = toSpan(entry.show?.start, entry.show?.end, options.dayStartTime);
     if (show) {
       drawSpan(doc, show, {
         x: chartX,

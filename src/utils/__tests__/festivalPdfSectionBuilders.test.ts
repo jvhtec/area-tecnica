@@ -3,6 +3,7 @@ import {
   attachShiftAssignmentsAndProfiles,
   buildArtistTableArtists,
   buildInfrastructureArtists,
+  buildRfIemArtists,
   sortArtistsChronologically,
 } from '@/utils/pdf/festivalPdfSectionBuilders';
 
@@ -140,6 +141,26 @@ describe('festivalPdfSectionBuilders', () => {
       'Late Night',
       'After Midnight',
     ]);
+  });
+
+  it('preserves an explicit not-after-midnight value in RF/IEM data', () => {
+    const artists = buildRfIemArtists([{
+      name: 'Calendar-day artist',
+      stage: 1,
+      show_start: '08:30',
+      isaftermidnight: false,
+    }], '09:30');
+
+    expect(artists[0].isAfterMidnight).toBe(false);
+  });
+
+  it('sorts against a configured festival boundary', () => {
+    const sorted = sortArtistsChronologically([
+      { name: 'Before boundary', date: '2026-03-10', show_start: '08:30', stage: 1 },
+      { name: 'After boundary', date: '2026-03-10', show_start: '10:00', stage: 1 },
+    ], '09:30');
+
+    expect(sorted.map((artist) => artist.name)).toEqual(['After boundary', 'Before boundary']);
   });
 
   it('does not push late-night shows to end when after-midnight flag is true', () => {

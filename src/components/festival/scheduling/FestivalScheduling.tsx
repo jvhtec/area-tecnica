@@ -22,10 +22,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { formatMadridDateKey, getMadridTodayKey } from "@/utils/timezoneUtils";
 import {
-  DEFAULT_FESTIVAL_DAY_START_TIME,
   fetchFestivalDateTypes,
-  fetchFestivalSettings,
 } from "@/features/festival-management/queries";
+import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
 import { trackError } from "@/lib/errorTracking";
 interface FestivalSchedulingProps {
   jobId: string;
@@ -66,14 +65,7 @@ export const FestivalScheduling = ({
     }
   }, []);
 
-  // Fetch festival settings for day start time
-  const { data: festivalSettings, error: festivalSettingsError } = useQuery({
-    queryKey: queryKeys.scope('festival-settings', jobId),
-    networkMode: "always",
-    queryFn: () => fetchFestivalSettings(jobId),
-    enabled: !!jobId
-  });
-  const dayStartTime = festivalSettings?.day_start_time ?? DEFAULT_FESTIVAL_DAY_START_TIME;
+  const { dayStartTime, error: festivalSettingsError } = useFestivalDayStart(jobId);
 
   // Fetch date types for navigation
   const { data: dateTypeData, error: dateTypesError, refetch: refetchDateTypes } = useQuery({

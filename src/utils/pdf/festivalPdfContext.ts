@@ -1,20 +1,26 @@
 import { supabase } from "@/lib/supabase";
 import { fetchPreparedFestivalLogo } from "@/utils/pdf/logoOptimization";
+import { normalizeFestivalDayStartTime } from "@/features/festival-management/dayStart";
+import { fetchFestivalSettings } from "@/features/festival-management/queries";
 import {
   clampPdfConcurrency,
   DEFAULT_PDF_GENERATION_CONCURRENCY,
   runWithConcurrency,
 } from "@/utils/pdf/festivalPdfSupport";
 
-export const loadFestivalStageMetadata = async (jobId: string) => {
+export const loadFestivalPdfContext = async (jobId: string) => {
   // Every document in the bundle embeds this, so it is downscaled once here to
   // the size it is actually placed rather than shipped at upload resolution.
-  const logoUrl = await fetchPreparedFestivalLogo(jobId);
-  const { data: stageNames, error } = await supabase
-    .from("festival_stages")
-    .select("number, name")
-    .eq("job_id", jobId)
-    .order("number");
+  const [logoUrl, settings, stageResult] = await Promise.all([
+    fetchPreparedFestivalLogo(jobId),
+    fetchFestivalSettings(jobId),
+    supabase
+      .from("festival_stages")
+      .select("number, name")
+      .eq("job_id", jobId)
+      .order("number"),
+  ]);
+  const { data: stageNames, error } = stageResult;
   if (error) console.error("Error fetching stage names:", error);
 
   const getStageNameByNumber = (stageNumber: number): string =>
@@ -24,7 +30,12 @@ export const loadFestivalStageMetadata = async (jobId: string) => {
     return names;
   }, {});
 
-  return { getStageNameByNumber, logoUrl, stageNamesByNumber };
+  return {
+    dayStartTime: normalizeFestivalDayStartTime(settings?.day_start_time),
+    getStageNameByNumber,
+    logoUrl,
+    stageNamesByNumber,
+  };
 };
 
 export const loadStagePlotUrls = async (

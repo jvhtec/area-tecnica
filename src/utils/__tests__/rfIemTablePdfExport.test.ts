@@ -197,4 +197,18 @@ describe('rfIemTablePdfExport helpers', () => {
       ).toBe('2026-03-11');
     }
   });
+
+  it('uses the configured festival-day rollover', () => {
+    const artist = {
+      name: 'Custom Boundary',
+      stage: 1,
+      date: '2026-03-11',
+      showStart: '08:30',
+      wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+      iemSystems: [],
+    };
+
+    expect(computeRfIemFestivalDayKey(artist, '09:30')).toBe('2026-03-10');
+    expect(computeRfIemFestivalDayKey(artist, '08:00')).toBe('2026-03-11');
+  });
 });

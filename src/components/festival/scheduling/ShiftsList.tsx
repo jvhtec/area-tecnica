@@ -32,7 +32,7 @@ interface ShiftsListProps {
   selectedDate: string;
   onShiftsCopied: () => void;
   stageOptions?: readonly FestivalStageOption[];
-  dayStartTime?: string;
+  dayStartTime: string;
 }
 
 const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
@@ -47,7 +47,7 @@ export const ShiftsList = ({
   selectedDate,
   onShiftsCopied,
   stageOptions = EMPTY_STAGE_OPTIONS,
-  dayStartTime = "07:00",
+  dayStartTime,
 }: ShiftsListProps) => {
   const confirm = useConfirm();
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);

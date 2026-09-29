@@ -1,18 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadStagePlotUrls } from "@/utils/pdf/festivalPdfContext";
+import { loadFestivalPdfContext, loadStagePlotUrls } from "@/utils/pdf/festivalPdfContext";
 
 const mocks = vi.hoisted(() => ({
   createSignedUrl: vi.fn(),
+  fetchFestivalSettings: vi.fn(),
+  fetchPreparedFestivalLogo: vi.fn(),
+  supabaseFrom: vi.fn(),
   storageFrom: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
+    from: mocks.supabaseFrom,
     storage: {
       from: mocks.storageFrom,
     },
   },
+}));
+
+vi.mock("@/features/festival-management/queries", () => ({
+  fetchFestivalSettings: mocks.fetchFestivalSettings,
+}));
+
+vi.mock("@/utils/pdf/logoOptimization", () => ({
+  fetchPreparedFestivalLogo: mocks.fetchPreparedFestivalLogo,
 }));
 
 vi.mock("@/utils/pdf/logoUtils", () => ({
@@ -62,5 +74,35 @@ describe("loadStagePlotUrls", () => {
     );
 
     consoleError.mockRestore();
+  });
+});
+
+describe("loadFestivalPdfContext", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.fetchPreparedFestivalLogo.mockResolvedValue("https://logo.example/festival.png");
+  });
+
+  it("loads the configured boundary with shared PDF metadata", async () => {
+    mocks.fetchFestivalSettings.mockResolvedValue({ day_start_time: "06:30:00" });
+    const stageQuery = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+    };
+    stageQuery.select.mockReturnValue(stageQuery);
+    stageQuery.eq.mockReturnValue(stageQuery);
+    stageQuery.order.mockResolvedValue({
+      data: [{ number: 2, name: "Escenario Norte" }],
+      error: null,
+    });
+    mocks.supabaseFrom.mockReturnValue(stageQuery);
+
+    const context = await loadFestivalPdfContext("job-1");
+
+    expect(mocks.fetchFestivalSettings).toHaveBeenCalledWith("job-1");
+    expect(context.dayStartTime).toBe("06:30");
+    expect(context.stageNamesByNumber).toEqual({ 2: "Escenario Norte" });
+    expect(context.getStageNameByNumber(2)).toBe("Escenario Norte");
   });
 });

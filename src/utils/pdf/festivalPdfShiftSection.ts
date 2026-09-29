@@ -14,6 +14,7 @@ import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog"
 type Options = {
   jobId: string;
   jobTitle: string;
+  dayStartTime: string;
   logoUrl: string | undefined;
   options: PrintOptions;
   pdfConcurrency: number;
@@ -23,6 +24,7 @@ type Options = {
 export const generateFestivalShiftPdfs = async ({
   jobId,
   jobTitle,
+  dayStartTime,
   logoUrl,
   options,
   pdfConcurrency,
@@ -156,6 +158,7 @@ export const generateFestivalShiftPdfs = async ({
                 const shiftsTableData: ShiftsTablePdfData = {
                   jobTitle: jobTitle || "Festival",
                   date: date,
+                  dayStartTime,
                   jobId: jobId,
                   shifts: typedShifts,
                   logoUrl,

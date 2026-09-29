@@ -35,6 +35,11 @@ describe('timeline clock parsing', () => {
     expect(toWindowOffset('02:00')).toBe(19 * 60);
     expect(toWindowOffset('06:59')).toBe(24 * 60 - 1);
   });
+
+  it('uses the configured programme-day boundary', () => {
+    expect(toWindowOffset('09:30', '09:30')).toBe(0);
+    expect(toWindowOffset('08:30', '09:30')).toBe(23 * 60);
+  });
 });
 
 describe('timeline findings', () => {

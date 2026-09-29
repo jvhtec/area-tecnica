@@ -38,7 +38,7 @@ interface ShiftsTableProps {
   jobDates?: Date[];
   onShiftsCopied?: () => void;
   stageOptions?: readonly FestivalStageOption[];
-  dayStartTime?: string;
+  dayStartTime: string;
 }
 
 const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
@@ -76,7 +76,7 @@ export const ShiftsTable = ({
   jobDates = [],
   onShiftsCopied,
   stageOptions = EMPTY_STAGE_OPTIONS,
-  dayStartTime = "07:00",
+  dayStartTime,
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -108,7 +108,14 @@ export const ShiftsTable = ({
     setIsExporting(true);
     try {
       const { jobTitle, logoUrl } = await loadPdfBranding(jobId);
-      const pdfData: ShiftsTablePdfData = { jobTitle, date, jobId, shifts: sortedShifts, logoUrl };
+      const pdfData: ShiftsTablePdfData = {
+        jobTitle,
+        date,
+        dayStartTime,
+        jobId,
+        shifts: sortedShifts,
+        logoUrl,
+      };
       const blob = await exportShiftsTablePDF(pdfData);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");

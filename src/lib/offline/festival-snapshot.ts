@@ -1,6 +1,10 @@
 import { capturePrivateDataScope, type PrivateDataScope } from "@/lib/private-data-scope";
 import { createPrivateSupabaseClient, type PrivateSupabaseClient } from "@/lib/private-supabase-client";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  isBeforeFestivalDayStart,
+} from "@/features/festival-management/dayStart";
 import { assertFestivalAccess } from "./festival-access";
 
 import {
@@ -262,7 +266,7 @@ const compareTimeStrings = (a: unknown, b: unknown): number => {
 export const getOfflineArtistsForDate = async (
   jobId: string,
   selectedDate: string,
-  dayStartTime = "07:00",
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ): Promise<Row[] | null> => {
   const snapshot = await getFestivalSnapshot(jobId);
   if (!snapshot) return null;
@@ -284,9 +288,7 @@ export const getOfflineArtistsForDate = async (
       if (processed.isaftermidnight === undefined || processed.isaftermidnight === null) {
         const showStart = processed.show_start;
         if (typeof showStart === "string" && showStart) {
-          const [hours] = showStart.split(":").map(Number);
-          const [startHour] = dayStartTime.split(":").map(Number);
-          processed.isaftermidnight = hours < startHour;
+          processed.isaftermidnight = isBeforeFestivalDayStart(showStart, dayStartTime);
         }
       }
 
@@ -302,7 +304,7 @@ export const getOfflineArtistsForDate = async (
  */
 export const getOfflineArtistsForJob = async (
   jobId: string,
-  dayStartTime = "07:00",
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ): Promise<Row[] | null> => {
   const snapshot = await getFestivalSnapshot(jobId);
   if (!snapshot) return null;
@@ -323,9 +325,7 @@ export const getOfflineArtistsForJob = async (
       if (processed.isaftermidnight === undefined || processed.isaftermidnight === null) {
         const showStart = processed.show_start;
         if (typeof showStart === "string" && showStart) {
-          const [hours] = showStart.split(":").map(Number);
-          const [startHour] = dayStartTime.split(":").map(Number);
-          processed.isaftermidnight = hours < startHour;
+          processed.isaftermidnight = isBeforeFestivalDayStart(showStart, dayStartTime);
         }
       }
 

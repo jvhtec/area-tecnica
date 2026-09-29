@@ -2,8 +2,11 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import type { ArtistRfIemData } from '@/utils/pdf/rfIemTableTypes';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  getFestivalDayStartMinutes,
+} from '@/features/festival-management/dayStart';
 
-const FESTIVAL_DAY_ROLLOVER_HOUR = 7;
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
 function parseTimeToMinutes(value: string | null | undefined): number {
@@ -29,22 +32,25 @@ function toMadridIsoDate(value: Date): string {
   return format(toZonedTime(value, MADRID_TIMEZONE), 'yyyy-MM-dd');
 }
 
-function getShowSortMinutes(artist: ArtistRfIemData): number {
+function getShowSortMinutes(artist: ArtistRfIemData, dayStartTime: string): number {
   const parsed = parseTimeToMinutes(artist.showStart);
   if (!Number.isFinite(parsed)) return Number.MAX_SAFE_INTEGER;
-  return parsed >= FESTIVAL_DAY_ROLLOVER_HOUR * 60
+  return parsed >= getFestivalDayStartMinutes(dayStartTime)
     ? parsed
     : parsed + 24 * 60;
 }
 
-export function computeRfIemFestivalDayKey(artist: ArtistRfIemData): string {
+export function computeRfIemFestivalDayKey(
+  artist: ArtistRfIemData,
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): string {
   const parsedDate = parseIsoDate(artist.date);
   if (!parsedDate) return 'Sin fecha';
 
   const showMinutes = parseTimeToMinutes(artist.showStart);
   const shouldUsePreviousDay = artist.isAfterMidnight !== true
     && Number.isFinite(showMinutes)
-    && showMinutes < FESTIVAL_DAY_ROLLOVER_HOUR * 60;
+    && showMinutes < getFestivalDayStartMinutes(dayStartTime);
   if (!shouldUsePreviousDay) return toMadridIsoDate(parsedDate);
 
   const madridDate = toZonedTime(parsedDate, MADRID_TIMEZONE);
@@ -60,18 +66,21 @@ function formatFestivalDayLabel(dayKey: string): string {
     : dayKey;
 }
 
-export function groupArtistsByFestivalDay(artists: ArtistRfIemData[]): Array<{
+export function groupArtistsByFestivalDay(
+  artists: ArtistRfIemData[],
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): Array<{
   key: string;
   label: string;
   artists: ArtistRfIemData[];
 }> {
   const sorted = [...artists].sort((first, second) => {
-    const firstDay = computeRfIemFestivalDayKey(first);
-    const secondDay = computeRfIemFestivalDayKey(second);
+    const firstDay = computeRfIemFestivalDayKey(first, dayStartTime);
+    const secondDay = computeRfIemFestivalDayKey(second, dayStartTime);
     if (firstDay !== secondDay) return firstDay.localeCompare(secondDay);
 
-    const firstTime = getShowSortMinutes(first);
-    const secondTime = getShowSortMinutes(second);
+    const firstTime = getShowSortMinutes(first, dayStartTime);
+    const secondTime = getShowSortMinutes(second, dayStartTime);
     if (firstTime !== secondTime) return firstTime - secondTime;
     if (first.stage !== second.stage) return first.stage - second.stage;
     return (first.name || '').localeCompare(second.name || '');
@@ -79,7 +88,7 @@ export function groupArtistsByFestivalDay(artists: ArtistRfIemData[]): Array<{
 
   const grouped = new Map<string, ArtistRfIemData[]>();
   for (const artist of sorted) {
-    const dayKey = computeRfIemFestivalDayKey(artist);
+    const dayKey = computeRfIemFestivalDayKey(artist, dayStartTime);
     const group = grouped.get(dayKey) || [];
     group.push(artist);
     grouped.set(dayKey, group);

@@ -38,6 +38,7 @@ import { formatDifferentScheduleDate } from '@/utils/artistScheduleDates';
 export interface ArtistTablePdfData {
   jobTitle: string;
   date: string;
+  dayStartTime: string;
   stage?: string;
   stageNames?: Record<number, string>;
   artists: Array<{
@@ -213,7 +214,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   const showTimes = data.artists
     .map((artist) => artist.showTime?.start)
     .filter((value): value is string => Boolean(value))
-    .map((start) => ({ start, offset: toWindowOffset(start) ?? Number.POSITIVE_INFINITY }))
+    .map((start) => ({ start, offset: toWindowOffset(start, data.dayStartTime) ?? Number.POSITIVE_INFINITY }))
     .sort((a, b) => a.offset - b.offset)
     .map((entry) => entry.start);
   const pendingRiders = data.artists.filter((artist) => artist.riderMissing).length;
@@ -252,7 +253,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       name: artist.name,
       show: artist.showTime,
       // A setup-day soundcheck is listed with its date in the table below,
-      // but it does not belong on this show day's 07:00 -> 07:00 timeline.
+      // but it does not belong on this show day's configured timeline.
       soundcheck: !artist.soundcheck?.date || artist.soundcheck.date === data.date
         ? artist.soundcheck
         : undefined,
@@ -276,7 +277,12 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       const chunk = remaining.slice(0, lanesThatFit);
       remaining = remaining.slice(lanesThatFit);
 
-      const timeline = drawFestivalTimeline(doc, geo, { entries: chunk, y, laneHeight });
+      const timeline = drawFestivalTimeline(doc, geo, {
+        entries: chunk,
+        y,
+        laneHeight,
+        dayStartTime: data.dayStartTime,
+      });
       y = timeline.y;
       findings.push(...timeline.findings);
       skipped.push(...timeline.skipped);

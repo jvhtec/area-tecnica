@@ -12,7 +12,7 @@ interface ArtistManagementDialogProps {
   artist?: any;
   jobId?: string;
   selectedDate: string;
-  dayStartTime?: string;
+  dayStartTime: string;
 }
 
 export const ArtistManagementDialog = ({
@@ -21,7 +21,7 @@ export const ArtistManagementDialog = ({
   artist,
   jobId,
   selectedDate,
-  dayStartTime = "07:00"
+  dayStartTime
 }: ArtistManagementDialogProps) => {
   const { createArtistAsync, updateArtistAsync, isCreating, isUpdating } = useArtistMutations(jobId, selectedDate);
   const isMobile = useIsMobile();

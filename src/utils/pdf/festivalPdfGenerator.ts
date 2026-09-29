@@ -35,7 +35,7 @@ import {
   type FestivalPdfProgress,
 } from "@/utils/pdf/festivalPdfSupport";
 import { generateFestivalShiftPdfs } from "@/utils/pdf/festivalPdfShiftSection";
-import { loadFestivalStageMetadata, loadStagePlotUrls } from "@/utils/pdf/festivalPdfContext";
+import { loadFestivalPdfContext, loadStagePlotUrls } from "@/utils/pdf/festivalPdfContext";
 export type { FestivalPdfGenerationOptions, FestivalPdfProgress, FestivalPdfProgressPhase } from "@/utils/pdf/festivalPdfSupport";
 
 
@@ -52,7 +52,7 @@ export const generateAndMergeFestivalPDFs = async (
     generationOptions.onProgress?.(progress);
   };
 
-  const { getStageNameByNumber, logoUrl, stageNamesByNumber } = await loadFestivalStageMetadata(jobId);
+  const { dayStartTime, getStageNameByNumber, logoUrl, stageNamesByNumber } = await loadFestivalPdfContext(jobId);
   console.log("Logo URL for PDFs:", logoUrl);
   
   const gearPdfs: Blob[] = [];
@@ -124,6 +124,7 @@ export const generateAndMergeFestivalPDFs = async (
     shiftPdfs.push(...await generateFestivalShiftPdfs({
       jobId,
       jobTitle,
+      dayStartTime,
       logoUrl,
       options,
       pdfConcurrency,
@@ -138,7 +139,7 @@ export const generateAndMergeFestivalPDFs = async (
       
       if (stageFilteredArtists && stageFilteredArtists.length > 0) {
         // Sort ALL artists chronologically first
-        const sortedArtists = sortArtistsChronologically(stageFilteredArtists);
+        const sortedArtists = sortArtistsChronologically(stageFilteredArtists, dayStartTime);
         
         // Then group by date while maintaining chronological order
         const dateGroups = new Map<string, typeof sortedArtists>();
@@ -197,6 +198,7 @@ export const generateAndMergeFestivalPDFs = async (
             const tableData: ArtistTablePdfData = {
               jobTitle: jobTitle,
               date: date,
+              dayStartTime,
               stage: String(stageNum),
               stageNames: stageNamesByNumber,
               artists: buildArtistTableArtists(stageArtists as unknown as Record<string, unknown>[]),
@@ -238,7 +240,7 @@ export const generateAndMergeFestivalPDFs = async (
       );
       
       // Use the same chronological sorting for individual artist requirements
-      const sortedArtists = sortArtistsChronologically(filteredArtists);
+      const sortedArtists = sortArtistsChronologically(filteredArtists, dayStartTime);
       
       console.log(`Sorted ${sortedArtists.length} artists for PDF generation`);
       let completedArtistRequirementPdfs = 0;
@@ -374,14 +376,18 @@ export const generateAndMergeFestivalPDFs = async (
       );
       
       // Use chronological sorting for RF & IEM table as well
-      const sortedArtists = sortArtistsChronologically(filteredArtists);
+      const sortedArtists = sortArtistsChronologically(filteredArtists, dayStartTime);
       
       console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
       
       if (sortedArtists.length > 0) {
-        const rfIemArtists = buildRfIemArtists(sortedArtists as unknown as Record<string, unknown>[]);
+        const rfIemArtists = buildRfIemArtists(
+          sortedArtists as unknown as Record<string, unknown>[],
+          dayStartTime,
+        );
         const rfIemData: RfIemTablePdfData & { paginate?: boolean } = {
           jobTitle,
+          dayStartTime,
           logoUrl,
           artists: rfIemArtists,
           paginate: false,
@@ -403,7 +409,7 @@ export const generateAndMergeFestivalPDFs = async (
       );
       
       // Use chronological sorting for Infrastructure table as well
-      const sortedArtists = sortArtistsChronologically(filteredArtists);
+      const sortedArtists = sortArtistsChronologically(filteredArtists, dayStartTime);
       
       console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
       
@@ -542,7 +548,7 @@ export const generateAndMergeFestivalPDFs = async (
         console.log(`Found ${missingRiderArtists.length} artists with missing or outdated riders out of ${artists.length} total artists`);
         
         // Use chronological sorting for Missing Rider Report as well
-        const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
+        const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists, dayStartTime);
         const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
           sortedMissingRiderArtists.map((artist) => ({
             id: artist.id,
