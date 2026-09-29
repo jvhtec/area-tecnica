@@ -2,10 +2,13 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { QuantityInput } from "../shared/QuantityInput";
-import { SectionProps } from "@/types/festival-form";
+import type { SectionProps } from "@/types/festival-form";
+import type { GearSetupFormData } from "@/types/festival-gear";
+
+type MonitorFields = Pick<GearSetupFormData, "monitors_enabled" | "monitors_quantity">;
 import { useEquipmentValidation } from "@/hooks/useEquipmentValidation";
 
-export const MonitorSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps) => {
+export const MonitorSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps<MonitorFields>) => {
   const { validateEquipment } = useEquipmentValidation(gearSetup);
   const locked = (field: string) => isFieldLocked?.(field) ?? false;
   const tx = (es: string, en: string) => (language === "en" ? en : es);

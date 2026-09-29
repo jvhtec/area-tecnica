@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-27T14:44:24.185Z",
+  "generatedAt": "2026-09-29T15:48:24.870Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 1038,
+  "total": 996,
   "domains": {
     "app": {
-      "total": 734,
+      "total": 692,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 602,
+        "@typescript-eslint/no-explicit-any": 560,
         "react-hooks/exhaustive-deps": 68,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 871,
+    "@typescript-eslint/no-explicit-any": 829,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -104,21 +104,8 @@
     "src/components/festival/ArtistFileDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 5
     },
-    "src/components/festival/ArtistManagementDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/components/festival/ArtistManagementForm.tsx": {
-      "@typescript-eslint/no-explicit-any": 10
-    },
     "src/components/festival/form/sections/WirelessSetupSection.tsx": {
-      "@typescript-eslint/no-explicit-any": 4,
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/festival/mobile/MobileArtistConfigEditor.tsx": {
-      "@typescript-eslint/no-explicit-any": 6
-    },
-    "src/components/festival/mobile/MobileArtistFormSheet.tsx": {
-      "@typescript-eslint/no-explicit-any": 16
     },
     "src/components/festival/ViewFileDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 1
@@ -371,9 +358,6 @@
     "src/components/tours/RequestTourAvailabilityDialog.tsx": {
       "@typescript-eslint/no-explicit-any": 7,
       "react-hooks/exhaustive-deps": 1
-    },
-    "src/components/tours/scheduling/TourContactsManager.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/tours/scheduling/TourMapViewMapbox.tsx": {
       "@typescript-eslint/no-explicit-any": 6,
@@ -650,9 +634,6 @@
     "src/pages/FestivalGearManagement.tsx": {
       "react-hooks/exhaustive-deps": 2
     },
-    "src/pages/Festivals.tsx": {
-      "@typescript-eslint/no-explicit-any": 2
-    },
     "src/pages/job-assignment-matrix/MatrixPageControls.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
@@ -717,9 +698,6 @@
     },
     "src/test/setup.ts": {
       "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/types/artist-form.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/types/google-maps.d.ts": {
       "@typescript-eslint/no-unsafe-function-type": 3,

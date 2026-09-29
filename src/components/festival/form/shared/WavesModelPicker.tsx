@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus } from "lucide-react";
 import { WAVES_MODEL_OPTIONS, getWavesModelQuantity, type WavesModel, type WavesModelSelection } from "@/constants/wavesModels";
 import { ProviderSelector } from "./ProviderSelector";
+import type { ProviderValue } from "@/types/festival-form";
 
 interface WavesModelPickerProps {
   idPrefix: string;
@@ -15,8 +16,8 @@ interface WavesModelPickerProps {
   outboard: string;
   onModelsChange: (models: WavesModelSelection[]) => void;
   onOutboardChange: (outboard: string) => void;
-  providedBy?: string;
-  onProvidedByChange?: (providedBy: string) => void;
+  providedBy?: ProviderValue;
+  onProvidedByChange?: (providedBy: ProviderValue) => void;
   providedByLabel?: string;
   disabled?: boolean;
   language?: "es" | "en";

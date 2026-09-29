@@ -1,4 +1,5 @@
 
+import type { ArtistEditTarget, ArtistFormValues } from "@/features/festival-artists/model";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArtistManagementForm } from "./ArtistManagementForm";
@@ -9,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface ArtistManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean, wasUpdated?: boolean) => void;
-  artist?: any;
+  artist?: ArtistEditTarget | null;
   jobId?: string;
   selectedDate: string;
   dayStartTime: string;
@@ -27,7 +28,7 @@ export const ArtistManagementDialog = ({
   const isMobile = useIsMobile();
   const formId = artist ? "artist-management-edit-form" : "artist-management-create-form";
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: ArtistFormValues) => {
     try {
       if (artist) {
         // Update existing artist

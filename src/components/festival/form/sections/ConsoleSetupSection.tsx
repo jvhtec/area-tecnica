@@ -2,6 +2,7 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toProviderValue } from "@/features/festival-artists/model";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { useEffect } from "react";
@@ -104,7 +105,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
             <Label>{tx("Proporcionado por", "Provided by")}</Label>
             <Select
               value={formData.foh_console_provided_by || "festival"}
-              onValueChange={(value) => onChange({ foh_console_provided_by: value })}
+              onValueChange={(value) => onChange({ foh_console_provided_by: toProviderValue(value) })}
               disabled={locked("foh_console_provided_by")}
             >
               <SelectTrigger>
@@ -161,7 +162,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
           <Checkbox
             id="foh-tech"
             checked={formData.foh_tech}
-            onCheckedChange={(checked) => onChange({ foh_tech: checked })}
+            onCheckedChange={(checked) => onChange({ foh_tech: checked === true })}
             disabled={locked("foh_tech")}
           />
           <Label htmlFor="foh-tech">{tx("Requiere Técnico FOH", "Requires FOH engineer")}</Label>
@@ -235,7 +236,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
                 <Label>{tx("Proporcionado por", "Provided by")}</Label>
                 <Select
                   value={formData.mon_console_provided_by || "festival"}
-                  onValueChange={(value) => onChange({ mon_console_provided_by: value })}
+                  onValueChange={(value) => onChange({ mon_console_provided_by: toProviderValue(value) })}
                   disabled={locked("mon_console_provided_by")}
                 >
                   <SelectTrigger>
@@ -292,7 +293,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
           <Checkbox
             id="mon-tech"
             checked={formData.mon_tech}
-            onCheckedChange={(checked) => onChange({ mon_tech: checked })}
+            onCheckedChange={(checked) => onChange({ mon_tech: checked === true })}
             disabled={locked("mon_tech")}
           />
           <Label htmlFor="mon-tech">{tx("Requiere Técnico de Monitores", "Requires MON engineer")}</Label>

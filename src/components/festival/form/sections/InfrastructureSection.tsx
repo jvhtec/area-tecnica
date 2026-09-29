@@ -3,11 +3,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { QuantityInput } from "../shared/QuantityInput";
-import { SectionProps } from "@/types/festival-form";
+import type { SectionProps } from "@/types/festival-form";
+import type { GearSetupFormData } from "@/types/festival-gear";
+
+type InfrastructureFields = Pick<GearSetupFormData, "infra_cat6" | "infra_cat6_quantity" | "infra_hma" | "infra_hma_quantity" | "infra_coax" | "infra_coax_quantity" | "infra_opticalcon_duo" | "infra_opticalcon_duo_quantity" | "infra_analog" | "other_infrastructure">;
 import { useEquipmentValidation } from "@/hooks/useEquipmentValidation";
 import { useEffect } from "react";
 
-interface InfrastructureSectionProps extends SectionProps {
+interface InfrastructureSectionProps extends SectionProps<InfrastructureFields> {
   restrictToAvailable?: boolean;
 }
 
