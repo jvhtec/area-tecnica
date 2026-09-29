@@ -26,6 +26,11 @@ class LogoUrlCache {
   set(bucket: string, path: string, url: string, ttlMs: number) {
     this.cache.set(this.key(bucket, path), { url, expiresAt: Date.now() + ttlMs });
   }
+
+  /** Forgets a URL, e.g. after the file behind the path was replaced. */
+  delete(bucket: string, path: string) {
+    this.cache.delete(this.key(bucket, path));
+  }
 }
 
 export const logoUrlCache = LogoUrlCache.getInstance();

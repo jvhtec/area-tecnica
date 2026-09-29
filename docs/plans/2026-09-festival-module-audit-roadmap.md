@@ -249,7 +249,7 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 | 2.3 | Gear and stages. **Done** (see the Phase 2 status note) | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC), DATA-04 (stage rows) |
 | 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | Delivered as **SCH-A → SCH-B** (see §4b); the UX redesign continues as SCH-C–E |
 | 2.5 | Forms and assets. **Done** (see the Phase 2 status note) | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links: not an RPC, see note) |
-| 2.6 | Shell and realtime | `useFestivalManagementVm` channel → `useTableSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
+| 2.6 | Shell and realtime. **Done** (see the Phase 2 status note) | `useFestivalManagementVm` channel → `useRealtimeSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
 | 2.7 | Print | `usePrintOptionDownloads`, `PrintOptionsDialog`, `festivalPdfGenerator` split by section | ARCH-05 |
 | 2.8 | Flex pullsheet | `PushToFlexPullsheetDialog` → model already extracted (`push-to-flex-pullsheet/model.ts`); split view | ARCH-05 |
 
@@ -281,6 +281,12 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
   - **Deviation from the plan:** the bulk "copy all links" action is client-side text over already-fetched rows (no writes), so there is no bulk-link RPC to build; the plan's DATA-03 note for this screen no longer applies.
   - Small behaviour changes: "copy all links" orders stages ascending with "Sin escenario" last (before, first appearance in the list); a file row with no `file_type` no longer crashes the artist file dialog; the logo view refetches on open because its URL is signed for an hour.
   - Still open in Phase 2: 2.6 (shell and realtime), 2.7 (print) and 2.8 (Flex pullsheet).
+- **2.6 done.**
+  - **Realtime (ARCH-03):** the shell's raw `supabase.channel('job-…-updates')` is gone. `useFestivalManagementVm` now registers its `jobs` subscription through `useRealtimeSubscription`, so it goes through the unified manager (multi-tab leader election, route-aware cleanup) and invalidates the two shell queries via the new `festivalManagementKeys`. The artists and gear pages already used this path; scheduling's `useTableSubscription` use is unchanged.
+  - **Silent background refreshes:** the old channel refetched with `silent: true`. Invalidation cannot pass that flag, so `useFestivalJobData` now stays quiet when a refetch nobody asked for fails while data is already on screen, and still reports a failed first load and a failed refresh the user requested (tested). Failures go to error tracking instead of `console.error`.
+  - **Festival list (ARCH-06):** the server-side filter and pagination had already landed (#970). Logos are now one batched lookup per visible page (`festivalLogos.ts`: three `in` queries instead of up to two per festival, then the shared cached URL resolvers, extracted from `logoUtils` as `resolveFestivalLogoUrl` / `resolveTourLogoUrl`). Tours without a `tour_logos` row still fall back to a storage search, once per distinct tour. The resolvers no longer log signed URLs.
+  - **Size (ARCH-05):** `FestivalManagementView` 789 → 55 lines, split into `management/FestivalManagementHeader`, `FestivalQuickActions` and `FestivalDocumentsCard`. Markup is unchanged.
+  - Still open: `FestivalManagementDialogs` (530 lines), the remaining `console.*` in the shell, and 2.7/2.8.
 
 ### Phase 3: enhancements (after Phase 2 lands for the relevant sub-domain)
 

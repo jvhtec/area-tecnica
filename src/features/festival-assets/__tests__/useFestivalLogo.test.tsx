@@ -21,10 +21,13 @@ vi.mock("@/lib/errorTracking", () => ({ trackError: vi.fn() }));
 vi.mock("@/utils/imageOptimization", () => ({ validateImageFile }));
 vi.mock("../api", () => apiMock);
 
+import { festivalAssetKeys } from "../keys";
 import { useFestivalLogo } from "../hooks/useFestivalLogo";
 
+let queryClient = createTestQueryClient();
+
 const setup = (userId: string | null = "user-1") => {
-  const queryClient = createTestQueryClient();
+  queryClient = createTestQueryClient();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -40,6 +43,20 @@ describe("useFestivalLogo", () => {
     apiMock.fetchFestivalLogoDisplayUrl.mockResolvedValue("https://logo/current.png");
     apiMock.uploadFestivalLogo.mockResolvedValue("https://logo/new.png");
     apiMock.deleteFestivalLogo.mockResolvedValue(true);
+  });
+
+  it("marks the festival list's logos stale after an upload and after a delete", async () => {
+    const { result } = setup();
+    await waitFor(() => expect(result.current.logoUrl).toBe("https://logo/current.png"));
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const listLogos = expect.objectContaining({ queryKey: festivalAssetKeys.listLogos() });
+
+    act(() => result.current.uploadLogo(image));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith(listLogos));
+
+    invalidate.mockClear();
+    act(() => result.current.deleteLogo());
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith(listLogos));
   });
 
   it("loads the current logo", async () => {

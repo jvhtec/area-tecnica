@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-29T17:40:22.240Z",
+  "generatedAt": "2026-09-29T19:52:29.186Z",
   "note": "Generated from current legacy debt. CI fails when current matches exceed these fingerprints.",
   "rules": {
     "pages-supabase-client-import": {

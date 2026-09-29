@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import type { Department } from "@/types/department";
 import {
   canEditJobs,
@@ -22,6 +22,7 @@ import { useFestivalPrintActions } from "@/features/festival-management/hooks/us
 import { useFestivalWhatsappActions } from "@/features/festival-management/hooks/useFestivalWhatsappActions";
 import { FESTIVAL_DEPARTMENT_OPTIONS, humanizeFestivalDepartment } from "@/features/festival-management/selectors";
 import type { FestivalManagementVm } from "@/features/festival-management/types";
+import { festivalManagementKeys } from "@/features/festival-management/keys";
 import { getJobWorkspaceProfile } from "@/features/festival-management/workspaceProfile";
 
 export type FestivalManagementVmResult =
@@ -95,32 +96,16 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const isPlanningViewOnly = isViewOnly || isHouseTech;
   const canUploadDocuments = canUploadFestivalDocuments(userRole);
 
-  useEffect(() => {
-    if (!jobId) {
-      return;
-    }
-
-    const channel = supabase
-      .channel(`job-${jobId}-updates`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "jobs",
-          filter: `id=eq.${jobId}`,
-        },
-        () => {
-          jobData.fetchJobDetails({ silent: true });
-          documents.fetchDocuments();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [documents.fetchDocuments, jobData.fetchJobDetails, jobId]);
+  // One subscription per table for the festival, through the unified manager (multi-tab leader
+  // election, route-aware cleanup). A change to the job refreshes its details and documents.
+  useRealtimeSubscription(
+    jobId
+      ? [
+          { table: "jobs", filter: `id=eq.${jobId}`, queryKey: festivalManagementKeys.jobDetails(jobId) },
+          { table: "jobs", filter: `id=eq.${jobId}`, queryKey: festivalManagementKeys.documents(jobId) },
+        ]
+      : [],
+  );
 
   const handleAssignmentChange = useCallback(() => {
     jobData.fetchJobDetails({ silent: true });

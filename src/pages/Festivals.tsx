@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
@@ -9,7 +9,6 @@ import { ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
@@ -19,7 +18,10 @@ import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils
 import { canPrintFestivalDocuments, isAdminRole } from "@/utils/permissions";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { useFestivalJobs } from "@/features/festival-management/festivalJobs";
-import type { Job } from "@/types/job";
+import { useQueryClient } from "@tanstack/react-query";
+import { festivalAssetKeys } from "@/features/festival-assets/keys";
+import { useFestivalListLogos } from "@/features/festival-management/festivalLogos";
+import { trackError } from "@/lib/errorTracking";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -38,7 +40,6 @@ const Festivals = () => {
     refetch,
   } = useFestivalJobs(showCompleted);
   
-  const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
@@ -81,6 +82,15 @@ const Festivals = () => {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedFestivals = festivalJobs.slice(startIndex, endIndex);
 
+  // Only the festivals on screen need their logo; one batched lookup per page.
+  const queryClient = useQueryClient();
+  const { logos: festivalLogos, error: logosError } = useFestivalListLogos(
+    paginatedFestivals.map((job) => job.id),
+  );
+  useEffect(() => {
+    if (logosError) void trackError(logosError, { system: "festivals", operation: "load-festival-list-logos" });
+  }, [logosError]);
+
   // Auto-recover connection if needed
   useEffect(() => {
     if (isError || (connectionStatus !== 'connected' && !isLoading)) {
@@ -92,28 +102,6 @@ const Festivals = () => {
       attemptRecovery();
     }
   }, [isError, connectionStatus, isLoading, recoverConnection, refetch]);
-
-  // Fetch festival logo for each festival job
-  const fetchFestivalLogo = useCallback(async (job: Job) => {
-    try {
-      const logoUrl = await fetchJobLogo(job.id);
-      
-      if (logoUrl) {
-        setFestivalLogos(prev => ({
-          ...prev,
-          [job.id]: logoUrl
-        }));
-      }
-    } catch (err) {
-      console.error('Error in fetchFestivalLogo:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    festivalJobs.forEach((job) => {
-      void fetchFestivalLogo(job);
-    });
-  }, [festivalJobs, fetchFestivalLogo]);
 
   // Scroll to specific festival
   const scrollToFestival = (festivalId: string) => {
@@ -180,6 +168,7 @@ const Festivals = () => {
   const handleRefreshClick = async () => {
     try {
       toast.info("Actualizando datos de festivales...");
+      void queryClient.invalidateQueries({ queryKey: festivalAssetKeys.listLogos() });
       
       // First try to ensure realtime connection
       const connectionRestored = await ensureRealtimeConnection();
