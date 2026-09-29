@@ -26,7 +26,7 @@ const renderActions = (canManageFormLinks?: boolean) =>
       canCreateExtras={false}
       canManageFormLinks={canManageFormLinks}
       isCreatingExtrasFor={() => false}
-      onGenerateLink={vi.fn()}
+      onSendForm={vi.fn()}
       onManageFiles={vi.fn()}
       onPrintArtist={vi.fn()}
       onOpenStagePlotCapture={vi.fn()}
@@ -51,7 +51,7 @@ describe("public artist form link gating", () => {
     const user = userEvent.setup();
     renderActions();
     await user.click(screen.getByTitle("Más acciones"));
-    expect(screen.queryByText("Generar enlace de formulario")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enviar formulario al artista")).not.toBeInTheDocument();
     expect(screen.getByText("Gestionar archivos/riders")).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe("public artist form link gating", () => {
     const user = userEvent.setup();
     renderActions(true);
     await user.click(screen.getByTitle("Más acciones"));
-    expect(screen.getByText("Generar enlace de formulario")).toBeInTheDocument();
+    expect(screen.getByText("Enviar formulario al artista")).toBeInTheDocument();
   });
 
   it("shows the links list button only to managers", () => {

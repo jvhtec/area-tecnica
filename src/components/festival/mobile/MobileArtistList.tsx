@@ -26,7 +26,7 @@ interface MobileArtistListProps {
   crossDateSearch?: boolean;
   onEditArtist: (artist: Artist) => void;
   onDeleteArtist: (artist: Artist) => void;
-  onGenerateLink: (artist: Artist) => void;
+  onSendForm: (artist: Artist) => void;
   onManageFiles: (artist: Artist) => void;
   onPrintArtist: (artist: Artist) => void;
   onOpenStagePlotCapture: (artist: Artist) => void;
@@ -56,7 +56,7 @@ export const MobileArtistList = ({
   crossDateSearch = false,
   onEditArtist,
   onDeleteArtist,
-  onGenerateLink,
+  onSendForm,
   onManageFiles,
   onPrintArtist,
   onOpenStagePlotCapture,
@@ -157,7 +157,7 @@ export const MobileArtistList = ({
             mode={mode}
             onEditCategory={handleEditCategory}
             onEditArtist={onEditArtist}
-            onGenerateLink={onGenerateLink}
+            onSendForm={onSendForm}
             onManageFiles={onManageFiles}
             onPrintArtist={onPrintArtist}
             onDeleteArtist={onDeleteArtist}
