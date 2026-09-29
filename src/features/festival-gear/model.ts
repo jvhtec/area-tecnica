@@ -143,7 +143,9 @@ export function toGlobalGearPayload(
   return {
     ...(id ? { id } : {}),
     job_id: jobId,
-    max_stages: setup.max_stages,
+    // `max_stages` is deliberately not written here: nothing in the form edits it, and the stage
+    // count is owned by `set_festival_max_stages` / `save_festival_stage_gear_setup`. Sending the
+    // value the form was seeded with would put an outdated count back after either of them ran.
     ...sharedPayload(setup),
     has_side_fills: setup.extras_sf,
     has_drum_fills: setup.extras_df,

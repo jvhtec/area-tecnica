@@ -116,12 +116,18 @@ describe("gear save payloads", () => {
     expect(toGlobalGearPayload(setup, "job-1", "gear-1")).toMatchObject({
       id: "gear-1",
       job_id: "job-1",
-      max_stages: 2,
       available_monitors: 0,
       available_cat6_runs: 4,
       available_hma_runs: 0,
       available_analog_runs: 10,
     });
+  });
+
+  it("never writes the stage count, so a save cannot undo a stage added meanwhile", () => {
+    // The form was seeded when the festival had 2 stages; the count is managed elsewhere.
+    const setup = buildEmptyGearFormData(2);
+    expect(toGlobalGearPayload(setup, "job-1", "gear-1")).not.toHaveProperty("max_stages");
+    expect(toGlobalGearPayload(setup, "job-1", null)).not.toHaveProperty("max_stages");
   });
 
   it("omits the id for a festival that has no setup yet", () => {
