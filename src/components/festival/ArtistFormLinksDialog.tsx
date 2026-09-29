@@ -1,35 +1,29 @@
-
+import { useState } from "react";
+import { isAfter } from "date-fns";
+import { Copy, Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/ui/loading";
-import { useState, useEffect, useCallback } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { Copy, Printer } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { isAfter } from "date-fns";
-import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
-import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { buildReadableFilename } from "@/utils/fileName";
+import { useToast } from "@/hooks/use-toast";
+import { trackError } from "@/lib/errorTracking";
+import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
+import { downloadBlobInBrowser } from "@/features/festival-management/commands";
+import { buildStageBlankTemplatePdf } from "@/features/festival-forms/blankTemplatePdf";
+import { useArtistFormLinks } from "@/features/festival-forms/hooks/useArtistFormLinks";
+import {
+  buildAllLinksText,
+  buildArtistFormUrl,
+  buildStageLinksText,
+  formatStageLabel,
+  sortStages,
+} from "@/features/festival-forms/links";
 
-/** `festival_artists.stage` is nullable; group those artists explicitly rather than hiding them. */
-const formatStageLabel = (stage: number | null) =>
-  stage === null ? "Sin escenario" : `Escenario ${stage}`;
+const ALL_DATES_VALUE = "__all_dates__";
 
-interface ArtistLinkData {
-  artistId: string;
-  name: string;
-  /** Nullable to match the `festival_artists.stage` column. */
-  stage: number | null;
-  date?: string | null;
-  form_language?: "es" | "en";
-  token?: string;
-  expires_at?: string;
-  status?: string;
-}
+const formatDateLabel = (value?: string | null) =>
+  value ? formatFestivalDayKey(value, "dd/MM/yyyy", "Sin fecha") : "Sin fecha";
 
 interface ArtistFormLinksDialogProps {
   open: boolean;
@@ -38,181 +32,36 @@ interface ArtistFormLinksDialogProps {
   jobId: string;
 }
 
-export const ArtistFormLinksDialog = ({
-  open,
-  onOpenChange,
-  selectedDate,
-  jobId
-}: ArtistFormLinksDialogProps) => {
-  const ALL_DATES_VALUE = "__all_dates__";
+export const ArtistFormLinksDialog = ({ open, onOpenChange, selectedDate, jobId }: ArtistFormLinksDialogProps) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [artistLinks, setArtistLinks] = useState<ArtistLinkData[]>([]);
+  const { links, isLoading } = useArtistFormLinks(jobId, open);
   const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
-  const [dateFilter, setDateFilter] = useState<string>(selectedDate || ALL_DATES_VALUE);
+  // `null` follows the date the page has selected; picking one here overrides it until closed.
+  const [pickedFilter, setPickedFilter] = useState<{ forDate: string; value: string } | null>(null);
+  const dateFilter =
+    pickedFilter && pickedFilter.forDate === selectedDate ? pickedFilter.value : selectedDate || ALL_DATES_VALUE;
 
-  const fetchArtistLinks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data: artistsData, error: artistsError } = await dataLayerClient.from('festival_artists')
-        .select('id, name, stage, date, form_language')
-        .eq('job_id', jobId)
-        .not('date', 'is', null)
-        .order('date')
-        .order('stage')
-        .order('show_start');
-
-      if (artistsError) throw artistsError;
-
-      if (!artistsData || artistsData.length === 0) {
-        setArtistLinks([]);
-        return;
-      }
-
-      const artistIds = artistsData.map((artist) => artist.id);
-      const now = new Date();
-
-      const { data: formsData, error: formsError } = await dataLayerClient.from('festival_artist_forms')
-        .select('artist_id, token, expires_at, status, updated_at, created_at')
-        .in('artist_id', artistIds)
-        .eq('status', 'pending')
-        .gt('expires_at', now.toISOString())
-        .order('updated_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false, nullsFirst: false });
-
-      if (formsError) throw formsError;
-
-      // Mirrors the selected `festival_artist_forms` columns, which are all nullable.
-      const formByArtistId = new Map<
-        string,
-        {
-          token?: string | null;
-          expires_at?: string | null;
-          status?: string | null;
-          updated_at?: string | null;
-          created_at?: string | null;
-        }
-      >();
-
-      (formsData || []).forEach((form) => {
-        if (form.artist_id && !formByArtistId.has(form.artist_id)) {
-          formByArtistId.set(form.artist_id, form);
-        }
-      });
-
-      const formattedData: ArtistLinkData[] = artistsData.map((artist) => {
-        const form = formByArtistId.get(artist.id);
-        return {
-          artistId: artist.id,
-          name: artist.name,
-          stage: artist.stage,
-          date: artist.date,
-          form_language: artist.form_language === "en" ? "en" : "es",
-          token: form?.token ?? undefined,
-          expires_at: form?.expires_at ?? undefined,
-          status: form?.status ?? undefined,
-        };
-      });
-
-      setArtistLinks(formattedData);
-    } catch (error) {
-      console.error('Error fetching artist links:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron obtener los enlaces de artistas",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [jobId, toast]);
-
-  useEffect(() => {
-    if (open) {
-      fetchArtistLinks();
-    }
-  }, [fetchArtistLinks, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    setDateFilter(selectedDate || ALL_DATES_VALUE);
-  }, [open, selectedDate]);
-
-  const filteredArtistLinks = artistLinks.filter((artist) =>
-    dateFilter === ALL_DATES_VALUE ? true : artist.date === dateFilter,
-  );
-
-  const formatDateLabel = (value?: string | null) => {
-    if (!value) return "Sin fecha";
-    return formatFestivalDayKey(value, "dd/MM/yyyy", "Sin fecha");
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) setPickedFilter(null);
+    onOpenChange(nextOpen);
   };
 
-  const availableDates = [...new Set(artistLinks.map((artist) => artist.date).filter(Boolean) as string[])].sort(
+  const isAllDates = dateFilter === ALL_DATES_VALUE;
+  const filteredLinks = links.filter((artist) => isAllDates || artist.date === dateFilter);
+  const scopeLabel = isAllDates ? "Todas las fechas" : formatDateLabel(dateFilter);
+  const availableDates = [...new Set(links.map((artist) => artist.date).filter((date): date is string => !!date))].sort(
     (a, b) => new Date(a).getTime() - new Date(b).getTime(),
   );
+  const stages = sortStages(filteredLinks.map((artist) => artist.stage));
+  const linksTextOptions = { scopeLabel, showDate: isAllDates, formatDate: formatDateLabel };
 
-  const copyAllLinks = () => {
-    const buildLink = (artist: ArtistLinkData) =>
-      artist.token
-        ? `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`
-        : "Enlace aún no generado";
-
-    const groupedByStage = filteredArtistLinks.reduce((acc, artist) => {
-      const stage = formatStageLabel(artist.stage);
-      if (!acc[stage]) acc[stage] = [];
-      acc[stage].push(artist);
-      return acc;
-    }, {} as Record<string, ArtistLinkData[]>);
-
-    const scopeLabel =
-      dateFilter === ALL_DATES_VALUE
-        ? "Todas las fechas"
-        : formatDateLabel(dateFilter);
-    let text = `Enlaces de Formularios de Artistas - ${scopeLabel}\n\n`;
-
-    Object.entries(groupedByStage).forEach(([stage, artists]) => {
-      text += `${stage}:\n`;
-      artists.forEach(artist => {
-        const link = buildLink(artist);
-        text += `${artist.name}${dateFilter === ALL_DATES_VALUE ? ` (${formatDateLabel(artist.date)})` : ""} - ${link}\n`;
-      });
-      text += '\n';
-    });
-
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado",
-      description: "Todos los enlaces copiados al portapapeles",
-    });
-  };
-
-  const copyStageLinks = (stage: number | null) => {
-    const buildLink = (artist: ArtistLinkData) =>
-      artist.token
-        ? `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`
-        : "Enlace aún no generado";
-
-    const stageArtists = filteredArtistLinks.filter(a => a.stage === stage);
-    const scopeLabel =
-      dateFilter === ALL_DATES_VALUE
-        ? "Todas las fechas"
-        : formatDateLabel(dateFilter);
-    let text = `${formatStageLabel(stage)} - ${scopeLabel}\n\n`;
-
-    stageArtists.forEach(artist => {
-      const link = buildLink(artist);
-      text += `${artist.name}${dateFilter === ALL_DATES_VALUE ? ` (${formatDateLabel(artist.date)})` : ""} - ${link}\n`;
-    });
-
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado",
-      description: `Enlaces de ${formatStageLabel(stage)} copiados al portapapeles`,
-    });
+  const copyText = (text: string, description: string) => {
+    void navigator.clipboard.writeText(text);
+    toast({ title: "Copiado", description });
   };
 
   const downloadBlankTemplatePdf = async (stageNumber?: number) => {
-    if (dateFilter === ALL_DATES_VALUE) {
+    if (isAllDates) {
       toast({
         title: "Selecciona una fecha",
         description: "La plantilla en blanco requiere una fecha específica.",
@@ -223,75 +72,15 @@ export const ArtistFormLinksDialog = ({
 
     setIsGeneratingBlankPdf(true);
     try {
-      let logoUrl: string | undefined;
-      let festivalOptions: ArtistPdfData["festivalOptions"];
-      const templateStage = stageNumber ?? filteredArtistLinks[0]?.stage ?? 1;
-      if (jobId) {
-        logoUrl = await fetchJobLogo(jobId);
-        festivalOptions = await fetchFestivalGearOptionsForTemplate(jobId, templateStage);
-      }
-
-      const blankPdfData: ArtistPdfData = {
-        name: "Plantilla Artista",
-        stage: templateStage,
+      const { blob, fileName } = await buildStageBlankTemplatePdf({
+        jobId,
         date: dateFilter,
-        schedule: {
-          loadIn: "",
-          show: {
-            start: "",
-            end: "",
-          },
-          lineCheck: {
-            start: "",
-            end: "",
-          },
-        },
-        technical: {
-          fohTech: false,
-          monTech: false,
-          fohConsole: { model: "", providedBy: "festival" },
-          monConsole: { model: "", providedBy: "festival" },
-          wireless: { systems: [], providedBy: "festival" },
-          iem: { systems: [], providedBy: "festival" },
-          monitors: { enabled: false, quantity: 0 },
-        },
-        infrastructure: {
-          providedBy: "festival",
-          cat6: { enabled: false, quantity: 0 },
-          hma: { enabled: false, quantity: 0 },
-          coax: { enabled: false, quantity: 0 },
-          opticalconDuo: { enabled: false, quantity: 0 },
-          analog: 0,
-          other: "",
-        },
-        extras: {
-          sideFill: false,
-          drumFill: false,
-          djBooth: false,
-          wired: "",
-        },
-        notes: "",
-        wiredMics: [],
-        logoUrl,
-        festivalOptions,
-      };
-
-      const blob = await exportArtistPDF(blankPdfData, { templateMode: true });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildReadableFilename(["Plantilla en blanco artista", dateFilter]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error generating blank template PDF:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo generar la plantilla PDF.",
-        variant: "destructive",
+        stage: stageNumber ?? filteredLinks[0]?.stage ?? 1,
       });
+      downloadBlobInBrowser(blob, fileName);
+    } catch (error) {
+      void trackError(error, { system: "festivals", operation: "download-stage-blank-template", jobId });
+      toast({ title: "Error", description: "No se pudo generar la plantilla PDF.", variant: "destructive" });
     } finally {
       setIsGeneratingBlankPdf(false);
     }
@@ -299,7 +88,7 @@ export const ArtistFormLinksDialog = ({
 
   if (isLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent>
           <Loading hideLabel size="lg" className="h-40" />
         </DialogContent>
@@ -307,29 +96,24 @@ export const ArtistFormLinksDialog = ({
     );
   }
 
-  // Artists whose `stage` is null still need a section — dropping them here would hide
-  // them from the dialog entirely while `filteredArtistLinks.length > 0` reports results.
-  // Null sorts last, under an explicit "Sin escenario" heading.
-  const stages = [...new Set(filteredArtistLinks.map(a => a.stage))].sort((a, b) => {
-    if (a === null) return 1;
-    if (b === null) return -1;
-    return a - b;
-  });
-  const titleDate = dateFilter === ALL_DATES_VALUE ? "Todas las fechas" : formatDateLabel(dateFilter);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[calc(80vh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Enlaces de Formularios de Artistas - {titleDate}</DialogTitle>
+          <DialogTitle>Enlaces de Formularios de Artistas - {scopeLabel}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           <div className="rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
-            Los enlaces públicos se crean al enviar cada formulario y expiran en 7 días. Puedes filtrar por fecha o ver todas las fechas del trabajo.
+            Los enlaces públicos se crean al enviar cada formulario y expiran en 7 días. Puedes filtrar por fecha o ver
+            todas las fechas del trabajo.
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Fecha:</span>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
+            <Select
+              value={dateFilter}
+              onValueChange={(value) => setPickedFilter({ forDate: selectedDate, value })}
+            >
               <SelectTrigger className="w-full sm:w-[240px]">
                 <SelectValue placeholder="Selecciona fecha" />
               </SelectTrigger>
@@ -348,19 +132,24 @@ export const ArtistFormLinksDialog = ({
               <Button
                 variant="outline"
                 onClick={() => downloadBlankTemplatePdf()}
-                disabled={isGeneratingBlankPdf || dateFilter === ALL_DATES_VALUE}
+                disabled={isGeneratingBlankPdf || isAllDates}
               >
                 <Printer className="h-4 w-4 mr-2" />
                 {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
               </Button>
-              <Button onClick={copyAllLinks} disabled={filteredArtistLinks.length === 0}>
+              <Button
+                onClick={() =>
+                  copyText(buildAllLinksText(filteredLinks, linksTextOptions), "Todos los enlaces copiados al portapapeles")
+                }
+                disabled={filteredLinks.length === 0}
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copiar Todos los Enlaces
               </Button>
             </div>
           </div>
 
-          {stages.map(stage => (
+          {stages.map((stage) => (
             <div key={stage ?? "sin-escenario"} className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">{formatStageLabel(stage)}</h3>
@@ -377,29 +166,34 @@ export const ArtistFormLinksDialog = ({
                       Plantilla de Escenario
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      copyText(
+                        buildStageLinksText(filteredLinks, stage, linksTextOptions),
+                        `Enlaces de ${formatStageLabel(stage)} copiados al portapapeles`,
+                      )
+                    }
+                  >
                     <Copy className="h-4 w-4 mr-2" />
                     Copiar Enlaces del Escenario
                   </Button>
                 </div>
               </div>
               <div className="border rounded-lg divide-y">
-                {filteredArtistLinks
-                  .filter(artist => artist.stage === stage)
-                  .map(artist => (
+                {filteredLinks
+                  .filter((artist) => artist.stage === stage)
+                  .map((artist) => (
                     <div key={artist.artistId} className="p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{artist.name}</span>
-                        {dateFilter === ALL_DATES_VALUE && artist.date && (
-                          <Badge variant="outline">{formatDateLabel(artist.date)}</Badge>
-                        )}
+                        {isAllDates && artist.date && <Badge variant="outline">{formatDateLabel(artist.date)}</Badge>}
                       </div>
                       <div className="flex items-center gap-2">
                         {artist.token ? (
                           <>
-                            {artist.status === 'expired' && (
-                              <Badge variant="destructive">Expirado</Badge>
-                            )}
+                            {artist.status === "expired" && <Badge variant="destructive">Expirado</Badge>}
                             {artist.expires_at && isAfter(new Date(artist.expires_at), new Date()) && (
                               <Badge variant="secondary">
                                 Expira {formatFestivalInstant(artist.expires_at, "dd/MM/yyyy")}
@@ -408,14 +202,12 @@ export const ArtistFormLinksDialog = ({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                const link = `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`;
-                                navigator.clipboard.writeText(link);
-                                toast({
-                                  title: "Copiado",
-                                  description: "Enlace copiado al portapapeles",
-                                });
-                              }}
+                              onClick={() =>
+                                copyText(
+                                  buildArtistFormUrl(artist.token!, artist.form_language),
+                                  "Enlace copiado al portapapeles",
+                                )
+                              }
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
@@ -429,7 +221,7 @@ export const ArtistFormLinksDialog = ({
               </div>
             </div>
           ))}
-          {filteredArtistLinks.length === 0 && (
+          {filteredLinks.length === 0 && (
             <div className="text-sm text-muted-foreground">No hay artistas para la fecha seleccionada.</div>
           )}
         </div>

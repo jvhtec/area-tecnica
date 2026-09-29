@@ -1,19 +1,10 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { Copy, Mail, Printer } from "lucide-react";
-import { useState, useEffect } from "react";
-import { generateQRCode } from "@/utils/qrcode";
-import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
-import { buildReadableFilename } from "@/utils/fileName";
-import { getOrCreateArtistFormTokenForSend } from "@/features/festival-forms/formTokens";
+import { useArtistFormSend } from "@/features/festival-forms/hooks/useArtistFormSend";
 
 interface ArtistFormLinkDialogProps {
   open: boolean;
@@ -32,507 +23,49 @@ export const ArtistFormLinkDialog = ({
   jobId,
   selectedDate,
 }: ArtistFormLinkDialogProps) => {
-  const { toast } = useToast();
-  const [formToken, setFormToken] = useState<string>("");
-  const [recipientEmails, setRecipientEmails] = useState("");
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
-  const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
-  const [artistLanguage, setArtistLanguage] = useState<"es" | "en">("es");
-  const [formExpiresAt, setFormExpiresAt] = useState<string>("");
+  const form = useArtistFormSend({ open, artistId, artistName, jobId, selectedDate });
+  const { tx } = form;
 
-  const tx = (es: string, en: string) => (artistLanguage === "en" ? en : es);
-  const buildFormUrl = (token: string) =>
-    `${window.location.origin}/festival/artist-form/${token}?lang=${artistLanguage}`;
-  const formLink = formToken ? buildFormUrl(formToken) : "";
   const formatExpiry = (value: string) =>
-    new Intl.DateTimeFormat(artistLanguage === "en" ? "en-GB" : "es-ES", {
+    new Intl.DateTimeFormat(form.language === "en" ? "en-GB" : "es-ES", {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: "Europe/Madrid",
     }).format(new Date(value));
-  const isExpiringSoon = !!formExpiresAt && new Date(formExpiresAt).getTime() - Date.now() <= 24 * 60 * 60 * 1000;
-
-  const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : "Ocurrió un error inesperado";
-
-  const escapeHtml = (str: string) =>
-    str.replace(/[&<>"']/g, (char) => {
-      const escaped: Record<string, string> = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      };
-      return escaped[char] || char;
-    });
-
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(formLink);
-      toast({
-        title: tx("Copiado", "Copied"),
-        description: tx("Enlace copiado al portapapeles", "Link copied to clipboard"),
-      });
-    } catch (error) {
-      toast({
-        title: tx("Error", "Error"),
-        description: tx("No se pudo copiar el enlace", "Could not copy the link"),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const parseRecipientEmails = (value: string) =>
-    Array.from(
-      new Set(
-        value
-          .split(/[,\n;]+/)
-          .map((email) => email.trim())
-          .filter(Boolean),
-      ),
-    );
-
-  const blobToBase64 = (blob: Blob) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = String(reader.result || "");
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        if (!base64) {
-          reject(new Error("No se pudo convertir la plantilla PDF"));
-          return;
-        }
-        resolve(base64);
-      };
-      reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer la plantilla PDF"));
-      reader.readAsDataURL(blob);
-    });
-
-  const buildBlankTemplatePdf = async (preferredFormUrl?: string) => {
-    if (!artistId) {
-      throw new Error("Se requiere el ID del artista");
-    }
-
-    const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
-      .select("*")
-      .eq("id", artistId)
-      .maybeSingle();
-
-    if (artistError) throw artistError;
-
-    const artistScheduleData = artistData as (typeof artistData & { soundcheck_date?: string | null }) | null;
-    const templateDate = artistData?.date || selectedDate || new Date().toISOString().slice(0, 10);
-    const templateName = artistData?.name || artistName || "Artista";
-    const templateStage = typeof artistData?.stage === "number" ? artistData.stage : 1;
-    let publicFormUrl = preferredFormUrl || (formToken ? buildFormUrl(formToken) : "");
-    let publicFormQrDataUrl = "";
-
-    if (!publicFormUrl) {
-      const { data: existingForm, error: existingFormError } = await dataLayerClient.from("festival_artist_forms")
-        .select("token")
-        .eq("artist_id", artistId)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .limit(1)
-        .maybeSingle();
-
-      if (!existingFormError && existingForm?.token) {
-        publicFormUrl = buildFormUrl(existingForm.token);
-      }
-    }
-
-    if (publicFormUrl) {
-      try {
-        publicFormQrDataUrl = await generateQRCode(publicFormUrl);
-      } catch (qrError) {
-        console.error("Error generating QR for blank template PDF:", qrError);
-      }
-    }
-
-    let logoUrl: string | undefined;
-    let festivalOptions: ArtistPdfData["festivalOptions"];
-    if (jobId) {
-      logoUrl = await fetchJobLogo(jobId);
-      festivalOptions = await fetchFestivalGearOptionsForTemplate(jobId, templateStage);
-    }
-
-    const blankPdfData: ArtistPdfData = {
-      name: templateName,
-      stage: templateStage,
-      date: templateDate,
-      schedule: {
-        loadIn: artistData?.load_in_time || "",
-        show: {
-          start: artistData?.show_start || "",
-          end: artistData?.show_end || "",
-        },
-        soundcheck: artistData?.soundcheck
-          ? {
-              date: artistScheduleData?.soundcheck_date || templateDate,
-              start: artistData?.soundcheck_start || "",
-              end: artistData?.soundcheck_end || "",
-            }
-          : undefined,
-        lineCheck: artistData?.line_check
-          ? {
-              start: artistData?.line_check_start || "",
-              end: artistData?.line_check_end || "",
-            }
-          : undefined,
-      },
-      technical: {
-        fohTech: false,
-        monTech: false,
-        fohConsole: { model: "", providedBy: "festival" },
-        monConsole: { model: "", providedBy: "festival" },
-        wireless: { systems: [], providedBy: "festival" },
-        iem: { systems: [], providedBy: "festival" },
-        monitors: {
-          enabled: false,
-          quantity: 0,
-        },
-      },
-      infrastructure: {
-        providedBy: "festival",
-        cat6: { enabled: false, quantity: 0 },
-        hma: { enabled: false, quantity: 0 },
-        coax: { enabled: false, quantity: 0 },
-        opticalconDuo: { enabled: false, quantity: 0 },
-        analog: 0,
-        other: "",
-      },
-      extras: {
-        sideFill: false,
-        drumFill: false,
-        djBooth: false,
-        wired: "",
-      },
-      notes: "",
-      wiredMics: [],
-      micKit: "festival",
-      riderMissing: false,
-      logoUrl,
-      festivalOptions,
-      publicFormUrl,
-      publicFormQrDataUrl,
-    };
-
-    const blob = await exportArtistPDF(blankPdfData, {
-      templateMode: true,
-      language: artistLanguage,
-    });
-
-    const fileName = buildReadableFilename([
-      artistLanguage === "en" ? "Template" : "Plantilla",
-      templateName,
-      templateDate,
-    ]);
-
-    return { blob, fileName };
-  };
-
-  const saveArtistLanguage = async (nextLanguage: "es" | "en") => {
-    setArtistLanguage(nextLanguage);
-    const { error } = await dataLayerClient.from("festival_artists")
-      .update({ form_language: nextLanguage })
-      .eq("id", artistId);
-
-    if (error) {
-      console.error("Error saving artist form language:", error);
-      toast({
-        title: tx("Error", "Error"),
-        description: tx("No se pudo guardar el idioma del artista.", "Could not save artist language."),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const sendLinkByEmail = async () => {
-    const recipients = parseRecipientEmails(recipientEmails);
-    if (!artistId || recipients.length === 0) {
-      toast({
-        title: tx("Faltan datos", "Missing data"),
-        description: tx(
-          "Añade al menos un correo antes de enviar.",
-          "Add at least one email before sending."
-        ),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSendingEmail(true);
-    try {
-      const issuedForm = await getOrCreateArtistFormTokenForSend(artistId);
-      const outgoingToken = issuedForm.token;
-      setFormToken(issuedForm.token);
-      setFormExpiresAt(issuedForm.expiresAt);
-
-      const outgoingFormLink = buildFormUrl(outgoingToken);
-      const outgoingQrCodeDataUrl = await generateQRCode(outgoingFormLink);
-      setQrCodeDataUrl(outgoingQrCodeDataUrl);
-
-      const { blob: blankTemplateBlob, fileName: blankTemplateFileName } =
-        await buildBlankTemplatePdf(outgoingFormLink);
-      const blankTemplateBase64 = await blobToBase64(blankTemplateBlob);
-
-      const inlineImages =
-        outgoingQrCodeDataUrl.startsWith("data:")
-          ? (() => {
-              const [meta, content] = outgoingQrCodeDataUrl.split(",", 2);
-              const mimeType = meta.match(/data:(.*?);base64/)?.[1] || "image/png";
-              return [
-                {
-                  cid: "artist_form_qr",
-                  content,
-                  mimeType,
-                  filename: `artist-form-${artistName || "artist"}.png`,
-                },
-              ];
-            })()
-          : [];
-
-      const bodyHtml =
-        artistLanguage === "en"
-          ? `
-        <p>Hello,</p>
-        <p>You can complete the technical form for <strong>${escapeHtml(artistName)}</strong> using the button below.</p>
-        <p>
-          <a
-            href="${outgoingFormLink}"
-            target="_blank"
-            rel="noopener noreferrer"
-            style="display:inline-block;padding:10px 16px;border-radius:6px;background:#7d0101;color:#ffffff;text-decoration:none;font-weight:600;"
-          >
-            Click here to fill the form
-          </a>
-        </p>
-        <p>You can also scan this QR code:</p>
-        <p><img src="cid:artist_form_qr" alt="Artist form QR" style="max-width:220px;height:auto;" /></p>
-        <p>We have also attached a printable blank template for this artist.</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
-        <p style="font-size:12px;color:#6b7280;">
-          This is an automated email. Please do not reply. For any issues, contact the festival technical office at
-          <a href="mailto:sonido@sector-pro.com">sonido@sector-pro.com</a>.
-        </p>
-      `
-          : `
-        <p>Hola,</p>
-        <p>Puedes completar el formulario técnico de <strong>${escapeHtml(artistName)}</strong> usando el botón de abajo.</p>
-        <p>
-          <a
-            href="${outgoingFormLink}"
-            target="_blank"
-            rel="noopener noreferrer"
-            style="display:inline-block;padding:10px 16px;border-radius:6px;background:#7d0101;color:#ffffff;text-decoration:none;font-weight:600;"
-          >
-            Haz clic aquí para completar el formulario
-          </a>
-        </p>
-        <p>También puedes escanear este código QR:</p>
-        <p><img src="cid:artist_form_qr" alt="QR formulario artista" style="max-width:220px;height:auto;" /></p>
-        <p>Adjuntamos también la plantilla imprimible en blanco para este artista.</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
-        <p style="font-size:12px;color:#6b7280;">
-          Este correo es automático. Por favor, no respondas a este email. Si tienes incidencias, contacta con la oficina técnica del festival en
-          <a href="mailto:sonido@sector-pro.com">sonido@sector-pro.com</a>.
-        </p>
-      `;
-
-      const { data, error } = await dataLayerClient.functions.invoke("send-corporate-email", {
-        body: {
-          subject:
-            artistLanguage === "en"
-              ? `Technical form - ${artistName}`
-              : `Formulario técnico - ${artistName}`,
-          bodyHtml,
-          recipients: {
-            emails: recipients,
-          },
-          inlineImages,
-          pdfAttachments: [
-            {
-              filename: blankTemplateFileName,
-              content: blankTemplateBase64,
-              size: blankTemplateBlob.size,
-            },
-          ],
-          senderNameOverride: "Festivales - Sector Pro",
-        },
-      });
-
-      if (error) throw error;
-      if (!data?.success) {
-        throw new Error(data?.error || "No se pudo enviar el correo");
-      }
-
-      toast({
-        title: tx("Correo enviado", "Email sent"),
-        description:
-          artistLanguage === "en"
-            ? `Link sent to ${recipients.length} recipient(s).`
-            : `Se envió el enlace a ${recipients.length} destinatario(s).`,
-      });
-    } catch (error: unknown) {
-      console.error("Error sending artist form email:", error);
-      toast({
-        title: tx("Error", "Error"),
-        description:
-          getErrorMessage(error) ||
-          tx("No se pudo enviar el correo con el enlace.", "Could not send the email with the link."),
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
-  const downloadBlankTemplatePdf = async () => {
-    if (!artistId) return;
-
-    setIsGeneratingBlankPdf(true);
-    try {
-      const { blob, fileName } = await buildBlankTemplatePdf();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: tx("Plantilla generada", "Template generated"),
-        description: tx("Se descargó la plantilla PDF en blanco.", "Blank PDF template downloaded."),
-      });
-    } catch (error) {
-      console.error("Error generating blank artist template PDF:", error);
-      toast({
-        title: tx("Error", "Error"),
-        description: tx("No se pudo generar la plantilla PDF en blanco.", "Could not generate the blank PDF template."),
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingBlankPdf(false);
-    }
-  };
-
-  useEffect(() => {
-    if (open && artistId) {
-      // Check for existing unexpired form link for THIS SPECIFIC ARTIST
-      const checkExistingLink = async () => {
-        try {
-          const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
-            .select("form_language")
-            .eq("id", artistId)
-            .maybeSingle();
-
-          if (artistError) {
-            console.warn("Could not load artist language preference:", artistError);
-          } else if (artistData?.form_language === "en" || artistData?.form_language === "es") {
-            setArtistLanguage(artistData.form_language);
-          } else {
-            setArtistLanguage("es");
-          }
-
-          const { data, error } = await dataLayerClient.from('festival_artist_forms')
-            .select('token, expires_at')
-            .eq('artist_id', artistId) // Only check THIS artist's forms
-            .eq('status', 'pending')
-            .gt('expires_at', new Date().toISOString())
-            .limit(1)
-            .maybeSingle();
-
-          if (error) {
-            console.error('Error checking existing link:', error);
-            throw error;
-          }
-
-          if (data?.token) {
-            setFormToken(data.token);
-            setFormExpiresAt(data.expires_at || "");
-          } else {
-            setFormToken("");
-            setFormExpiresAt("");
-          }
-        } catch (error) {
-          console.error('Error checking existing link:', error);
-          setFormToken("");
-          setFormExpiresAt("");
-          toast({
-            title: "Error",
-            description: "No se pudo verificar el enlace de formulario existente.",
-            variant: "destructive",
-          });
-        }
-      };
-
-      checkExistingLink();
-    }
-  }, [open, artistId, toast]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const makeQr = async () => {
-      if (!formLink) {
-        setQrCodeDataUrl("");
-        return;
-      }
-
-      try {
-        const qr = await generateQRCode(formLink);
-        if (!cancelled) {
-          setQrCodeDataUrl(qr);
-        }
-      } catch (error) {
-        console.error("Error generating QR code for artist form:", error);
-        if (!cancelled) {
-          setQrCodeDataUrl("");
-        }
-      }
-    };
-
-    makeQr();
-    return () => {
-      cancelled = true;
-    };
-  }, [formLink]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{tx("Enviar formulario a", "Send form to")} {artistName}</DialogTitle>
+          <DialogTitle>
+            {tx("Enviar formulario a", "Send form to")} {artistName}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
-          {formLink ? (
+          {form.formLink ? (
             <>
               <div className="flex space-x-2">
-                <Input value={formLink} readOnly className="flex-1" />
+                <Input value={form.formLink} readOnly className="flex-1" />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={copyToClipboard}
+                  onClick={form.copyLink}
                   title={tx("Copiar enlace", "Copy link")}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              {formExpiresAt && (
+              {form.formExpiresAt && (
                 <div
                   className={`rounded-md border px-3 py-2 text-sm ${
-                    isExpiringSoon
+                    form.isExpiringSoon
                       ? "border-amber-300 bg-amber-50 text-amber-900"
                       : "border-blue-200 bg-blue-50 text-blue-900"
                   }`}
                 >
-                  {tx("Este enlace expira:", "This link expires:")} {" "}
-                  <strong>{formatExpiry(formExpiresAt)}</strong>
+                  {tx("Este enlace expira:", "This link expires:")}{" "}
+                  <strong>{formatExpiry(form.formExpiresAt)}</strong>
                 </div>
               )}
             </>
@@ -546,15 +79,10 @@ export const ArtistFormLinkDialog = ({
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              {tx("Idioma del artista", "Artist language")}
-            </label>
+            <label className="text-sm font-medium">{tx("Idioma del artista", "Artist language")}</label>
             <Select
-              value={artistLanguage}
-              onValueChange={(value) => {
-                const nextLanguage = value === "en" ? "en" : "es";
-                void saveArtistLanguage(nextLanguage);
-              }}
+              value={form.language}
+              onValueChange={(value) => void form.changeLanguage(value === "en" ? "en" : "es")}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -566,21 +94,21 @@ export const ArtistFormLinkDialog = ({
             </Select>
           </div>
 
-          {qrCodeDataUrl && (
+          {form.qrCodeDataUrl && (
             <div className="flex justify-center p-2 border rounded-md">
-              <img src={qrCodeDataUrl} alt="QR Formulario Artista" className="h-40 w-40 object-contain" />
+              <img src={form.qrCodeDataUrl} alt="QR Formulario Artista" className="h-40 w-40 object-contain" />
             </div>
           )}
 
           <Button
             type="button"
             variant="outline"
-            onClick={downloadBlankTemplatePdf}
-            disabled={isGeneratingBlankPdf}
+            onClick={form.downloadBlankTemplate}
+            disabled={form.isGeneratingBlankPdf}
             className="w-full"
           >
             <Printer className="h-4 w-4 mr-2" />
-            {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
+            {form.isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
           </Button>
 
           <div className="space-y-2">
@@ -589,20 +117,20 @@ export const ArtistFormLinkDialog = ({
             </label>
             <Textarea
               id="recipient-emails"
-              value={recipientEmails}
-              onChange={(event) => setRecipientEmails(event.target.value)}
+              value={form.recipientEmails}
+              onChange={(event) => form.setRecipientEmails(event.target.value)}
               placeholder="correo1@dominio.com, correo2@dominio.com"
               rows={3}
             />
             <Button
               type="button"
               variant="secondary"
-              onClick={sendLinkByEmail}
-              disabled={isSendingEmail}
+              onClick={form.sendByEmail}
+              disabled={form.isSendingEmail}
               className="w-full"
             >
               <Mail className="h-4 w-4 mr-2" />
-              {isSendingEmail
+              {form.isSendingEmail
                 ? tx("Enviando formulario...", "Sending form...")
                 : tx("Enviar formulario + QR", "Send form + QR")}
             </Button>
