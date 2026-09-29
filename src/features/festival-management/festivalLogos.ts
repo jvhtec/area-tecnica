@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { festivalAssetKeys } from "@/features/festival-assets/keys";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { resolveFestivalLogoUrl, resolveTourLogoUrl } from "@/utils/pdf/logoUtils";
 
@@ -78,7 +79,7 @@ export async function fetchFestivalListLogoUrls(jobIds: readonly string[]): Prom
 export function useFestivalListLogos(jobIds: readonly string[]) {
   const ids = [...new Set(jobIds)].sort();
   const query = useQuery({
-    queryKey: ["festival-list-logos", ids],
+    queryKey: [...festivalAssetKeys.listLogos(), ids],
     queryFn: () => fetchFestivalListLogoUrls(ids),
     enabled: ids.length > 0,
     // Signed URLs live for an hour and are cached for 45 minutes by the resolvers.

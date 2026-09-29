@@ -18,6 +18,8 @@ import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils
 import { canPrintFestivalDocuments, isAdminRole } from "@/utils/permissions";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { useFestivalJobs } from "@/features/festival-management/festivalJobs";
+import { useQueryClient } from "@tanstack/react-query";
+import { festivalAssetKeys } from "@/features/festival-assets/keys";
 import { useFestivalListLogos } from "@/features/festival-management/festivalLogos";
 import { trackError } from "@/lib/errorTracking";
 
@@ -81,6 +83,7 @@ const Festivals = () => {
   const paginatedFestivals = festivalJobs.slice(startIndex, endIndex);
 
   // Only the festivals on screen need their logo; one batched lookup per page.
+  const queryClient = useQueryClient();
   const { logos: festivalLogos, error: logosError } = useFestivalListLogos(
     paginatedFestivals.map((job) => job.id),
   );
@@ -165,6 +168,7 @@ const Festivals = () => {
   const handleRefreshClick = async () => {
     try {
       toast.info("Actualizando datos de festivales...");
+      void queryClient.invalidateQueries({ queryKey: festivalAssetKeys.listLogos() });
       
       // First try to ensure realtime connection
       const connectionRestored = await ensureRealtimeConnection();

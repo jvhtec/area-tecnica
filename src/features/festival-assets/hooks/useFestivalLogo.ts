@@ -36,6 +36,7 @@ export function useFestivalLogo(jobId: string, userId: string | undefined) {
     mutationFn: (file: File) => uploadFestivalLogo({ jobId, file, userId: userId! }),
     onSuccess: (url) => {
       queryClient.setQueryData(key, url);
+      void queryClient.invalidateQueries({ queryKey: festivalAssetKeys.listLogos() });
       toast({ title: "Éxito", description: "El logo del festival ha sido actualizado" });
     },
     onError: (error) => reportError(error, "No se pudo subir el logo", "upload-festival-logo"),
@@ -46,6 +47,7 @@ export function useFestivalLogo(jobId: string, userId: string | undefined) {
     onSuccess: (deleted) => {
       if (!deleted) return;
       queryClient.setQueryData(key, null);
+      void queryClient.invalidateQueries({ queryKey: festivalAssetKeys.listLogos() });
       toast({ title: "Éxito", description: "El logo del festival ha sido eliminado" });
     },
     onError: (error) => reportError(error, "No se pudo eliminar el logo", "delete-festival-logo"),
