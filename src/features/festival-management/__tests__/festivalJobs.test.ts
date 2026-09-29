@@ -27,9 +27,20 @@ vi.mock("@/services/dataLayerClient", () => ({
           queryState.calls.push(["in", { column, values }]);
           return builder;
         }),
-        order: vi.fn(async (column: string, options: unknown) => {
+        or: vi.fn((filter: string) => {
+          queryState.calls.push(["or", filter]);
+          return builder;
+        }),
+        order: vi.fn((column: string, options: unknown) => {
           queryState.calls.push(["order", { column, options }]);
-          return { data: queryState.data, error: queryState.error };
+          return builder;
+        }),
+        range: vi.fn(async (from: number, to: number) => {
+          queryState.calls.push(["range", { from, to }]);
+          return {
+            data: queryState.data.slice(from, to + 1),
+            error: queryState.error,
+          };
         }),
         select: vi.fn((columns: string) => {
           queryState.calls.push(["select", columns]);
@@ -75,7 +86,10 @@ describe("fetchFestivalJobs", () => {
       ([method]) => method === "select",
     )?.[1];
     expect(selectedColumns).not.toContain("job_departments");
-    expect(queryState.calls.some(([method]) => method === "neq")).toBe(false);
+    expect(queryState.calls).toContainEqual([
+      "or",
+      "status.is.null,and(status.neq.Cancelado,status.neq.Completado)",
+    ]);
   });
 
   it("filters cancelled and completed rows while preserving null statuses", async () => {
@@ -90,6 +104,26 @@ describe("fetchFestivalJobs", () => {
       festivalRow,
       { ...festivalRow, id: "completed", status: "Completado" },
     ]);
+    expect(queryState.calls).toContainEqual([
+      "or",
+      "status.is.null,status.neq.Cancelado",
+    ]);
+  });
+
+  it("fetches every page with deterministic ordering", async () => {
+    queryState.data = Array.from({ length: 501 }, (_, index) => ({
+      ...festivalRow,
+      id: `festival-${index.toString().padStart(3, "0")}`,
+    }));
+
+    await expect(fetchFestivalJobs(false)).resolves.toHaveLength(501);
+    expect(queryState.calls.filter(([method]) => method === "range")).toEqual([
+      ["range", { from: 0, to: 499 }],
+      ["range", { from: 500, to: 999 }],
+    ]);
+    expect(
+      queryState.calls.filter(([method]) => method === "order"),
+    ).toContainEqual(["order", { column: "id", options: { ascending: true } }]);
   });
 
   it("registers realtime invalidation for the dedicated festival cache", () => {

@@ -5,6 +5,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Job, JobType } from "@/types/job";
 
 const FESTIVAL_JOB_TYPES = ["festival", "ciclo"] as const;
+const FESTIVAL_JOBS_PAGE_SIZE = 500;
 
 export const festivalJobKeys = {
   all: () => ["jobs", "festival-list"] as const,
@@ -25,17 +26,39 @@ const isFestivalJobType = (
 export async function fetchFestivalJobs(
   showCompleted: boolean,
 ): Promise<Job[]> {
-  const query = dataLayerClient
-    .from("jobs")
-    .select(
-      "id, title, description, start_time, end_time, created_at, job_type, status, color",
-    )
-    .in("job_type", [...FESTIVAL_JOB_TYPES]);
+  const statusFilter = showCompleted
+    ? "status.is.null,status.neq.Cancelado"
+    : "status.is.null,and(status.neq.Cancelado,status.neq.Completado)";
+  const rows: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    start_time: string;
+    end_time: string;
+    created_at: string | null;
+    job_type: string | null;
+    status: string | null;
+    color: string | null;
+  }> = [];
 
-  const { data, error } = await query.order("start_time", { ascending: true });
-  if (error) throw error;
+  for (let from = 0; ; from += FESTIVAL_JOBS_PAGE_SIZE) {
+    const { data, error } = await dataLayerClient
+      .from("jobs")
+      .select(
+        "id, title, description, start_time, end_time, created_at, job_type, status, color",
+      )
+      .in("job_type", [...FESTIVAL_JOB_TYPES])
+      .or(statusFilter)
+      .order("start_time", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + FESTIVAL_JOBS_PAGE_SIZE - 1);
 
-  return (data ?? []).flatMap((row) => {
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < FESTIVAL_JOBS_PAGE_SIZE) break;
+  }
+
+  return rows.flatMap((row) => {
     if (!isFestivalJobType(row.job_type)) return [];
     if (row.status === "Cancelado") return [];
     if (!showCompleted && row.status === "Completado") return [];
