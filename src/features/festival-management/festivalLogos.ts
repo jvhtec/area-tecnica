@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { festivalAssetKeys } from "@/features/festival-assets/keys";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { resolveFestivalLogoUrl, resolveTourLogoUrl } from "@/utils/pdf/logoUtils";
+import { resolveFestivalLogoUrl, resolveTourLogoPath, resolveTourLogoUrl } from "@/utils/pdf/logoUtils";
 
 type LogoUrlsByJob = Record<string, string>;
 
@@ -15,8 +15,8 @@ const NO_LOGOS: LogoUrlsByJob = {};
  * lookup this replaces made up to two queries each). Turning a stored path into a display URL
  * goes through the shared, cached resolvers, so a logo is signed at most once.
  *
- * A tour without a `tour_logos` row is not searched for in storage here; that fallback only
- * exists in the single-job lookup used by PDFs.
+ * A tour without a `tour_logos` row falls back to a storage search, once per distinct tour, as the
+ * single-job lookup does.
  */
 export async function fetchFestivalListLogoUrls(jobIds: readonly string[]): Promise<LogoUrlsByJob> {
   const ids = [...new Set(jobIds)];
@@ -53,6 +53,15 @@ export async function fetchFestivalListLogoUrls(jobIds: readonly string[]): Prom
       const pathByTour = new Map<string, string>();
       for (const logo of tourLogos ?? []) {
         if (logo.tour_id && logo.file_path) pathByTour.set(logo.tour_id, logo.file_path);
+      }
+      // A tour with no `tour_logos` row may still have a file in storage: search once per such tour.
+      const fallbacks = await Promise.all(
+        tourIds
+          .filter((tourId) => !pathByTour.has(tourId))
+          .map(async (tourId) => [tourId, await resolveTourLogoPath(tourId)] as const),
+      );
+      for (const [tourId, storagePath] of fallbacks) {
+        if (storagePath) pathByTour.set(tourId, storagePath);
       }
       for (const job of jobs ?? []) {
         const tourPath = job.tour_id ? pathByTour.get(job.tour_id) : undefined;

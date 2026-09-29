@@ -61,7 +61,7 @@ const parseSupabaseStoragePath = (value: string, bucket: string): string | null 
   return normalize(trimmed);
 };
 
-const resolveTourLogoPath = async (tourId: string): Promise<string | null> => {
+export const resolveTourLogoPath = async (tourId: string): Promise<string | null> => {
   try {
     const { data: tourLogo, error: tourLogoError } = await supabase
       .from("tour_logos")

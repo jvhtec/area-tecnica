@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { tables, calls, resolveFestivalLogoUrl, resolveTourLogoUrl } = vi.hoisted(() => {
+const { tables, calls, resolveFestivalLogoUrl, resolveTourLogoUrl, resolveTourLogoPath } = vi.hoisted(() => {
   const state = {
     tables: {} as Record<string, { data: unknown[] | null; error: unknown }>,
     calls: [] as string[],
@@ -10,6 +10,7 @@ const { tables, calls, resolveFestivalLogoUrl, resolveTourLogoUrl } = vi.hoisted
     calls: state.calls,
     resolveFestivalLogoUrl: vi.fn(async (path: string) => `https://cdn/festival/${path}`),
     resolveTourLogoUrl: vi.fn(async (path: string) => `https://cdn/tour/${path}`),
+    resolveTourLogoPath: vi.fn(async (): Promise<string | null> => null),
   };
 });
 
@@ -28,7 +29,7 @@ vi.mock("@/services/dataLayerClient", () => ({
     },
   },
 }));
-vi.mock("@/utils/pdf/logoUtils", () => ({ resolveFestivalLogoUrl, resolveTourLogoUrl }));
+vi.mock("@/utils/pdf/logoUtils", () => ({ resolveFestivalLogoUrl, resolveTourLogoPath, resolveTourLogoUrl }));
 
 import { fetchFestivalListLogoUrls } from "../festivalLogos";
 
@@ -79,6 +80,29 @@ describe("fetchFestivalListLogoUrls", () => {
       c: "https://cdn/tour/t1.png",
     });
     expect(calls).toEqual(["festival_logos", "jobs", "tour_logos"]);
+  });
+
+  it("searches storage once for each tour that has no logo record", async () => {
+    tables.jobs = {
+      data: [
+        { id: "a", tour_id: "t1" },
+        { id: "b", tour_id: "t1" },
+        { id: "c", tour_id: "t2" },
+      ],
+      error: null,
+    };
+    tables.tour_logos = { data: [{ tour_id: "t1", file_path: "t1.png" }], error: null };
+    resolveTourLogoPath.mockResolvedValueOnce("t2-from-storage.png");
+
+    const urls = await fetchFestivalListLogoUrls(["a", "b", "c"]);
+
+    expect(resolveTourLogoPath).toHaveBeenCalledTimes(1);
+    expect(resolveTourLogoPath).toHaveBeenCalledWith("t2");
+    expect(urls).toEqual({
+      a: "https://cdn/tour/t1.png",
+      b: "https://cdn/tour/t1.png",
+      c: "https://cdn/tour/t2-from-storage.png",
+    });
   });
 
   it("omits festivals whose logo cannot be resolved to a URL", async () => {

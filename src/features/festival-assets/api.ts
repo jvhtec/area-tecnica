@@ -1,3 +1,4 @@
+import { logoUrlCache } from "@/lib/logo-url-cache";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Tables } from "@/integrations/supabase/types";
 import { optimizeImageForUpload } from "@/utils/imageOptimization";
@@ -84,6 +85,10 @@ export async function uploadFestivalLogo({
     uploaded_by: userId,
   });
   if (dbError) throw new Error(`Error saving logo information: ${dbError.message}`);
+
+  // A replacement reuses the path, and the list resolves logos through a URL cache keyed by it.
+  logoUrlCache.delete(LOGO_BUCKET, filePath);
+  if (previousPath) logoUrlCache.delete(LOGO_BUCKET, previousPath);
 
   return resolveLogoUrl(filePath);
 }
