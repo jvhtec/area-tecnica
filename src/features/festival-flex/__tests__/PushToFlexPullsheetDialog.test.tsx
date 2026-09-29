@@ -116,6 +116,53 @@ describe("PushToFlexPullsheetDialog", () => {
     expect(button).toBeEnabled();
   });
 
+  it("shows the loading state, not the URL box, while the job's pullsheets load", async () => {
+    mocks.getJobPullsheetsWithFlexApi.mockReturnValue(new Promise(() => undefined));
+    renderDialog();
+
+    expect(await screen.findByText("Cargando pullsheets...")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Pega aquí la URL/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a URL being typed as the target when the job's pullsheets arrive late", async () => {
+    let resolvePullsheets: (value: unknown[]) => void = () => undefined;
+    mocks.getJobPullsheetsWithFlexApi.mockReturnValue(new Promise((resolve) => (resolvePullsheets = resolve)));
+    renderDialog();
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Introducir URL/ }), { button: 0 });
+    const url = "https://flex.example.com/app/element/3f2a1b4c-1111-2222-3333-444455556666";
+    fireEvent.change(await screen.findByPlaceholderText(/Pega aquí la URL/), { target: { value: url } });
+
+    resolvePullsheets([pullsheet, { ...pullsheet, id: "p2", element_id: "elem-2" }]);
+
+    const button = screen.getByRole("button", { name: /Enviar artículos/ });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(screen.getByPlaceholderText(/Pega aquí la URL/)).toHaveValue(url);
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.pushEquipmentToPullsheet).toHaveBeenCalled());
+    expect(mocks.pushEquipmentToPullsheet.mock.calls[0][0]).toBe("3f2a1b4c-1111-2222-3333-444455556666");
+  });
+
+  it("does not push to a target or resources it is still refreshing after a reopen", async () => {
+    const queryClient = createTestQueryClient();
+    const tree = (open: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <PushToFlexPullsheetDialog open={open} onOpenChange={vi.fn()} gearSetup={gearSetup} jobId="job-1" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(true));
+    const button = await screen.findByRole("button", { name: /Enviar artículos/ });
+    await waitFor(() => expect(button).toBeEnabled());
+
+    rerender(tree(false));
+    // The Flex side changed meanwhile; the fresh answer has not arrived yet.
+    mocks.getJobPullsheetsWithFlexApi.mockReturnValue(new Promise(() => undefined));
+    mocks.api.fetchFlexResourceIdsByName.mockReturnValue(new Promise(() => undefined));
+    rerender(tree(true));
+
+    expect(await screen.findByRole("button", { name: /Enviar artículos/ })).toBeDisabled();
+  });
+
   it("reports items Flex refused", async () => {
     mocks.pushEquipmentToPullsheet.mockResolvedValue({ succeeded: 1, failed: [{ name: "SM58", error: "cantidad no válida" }] });
     renderDialog();

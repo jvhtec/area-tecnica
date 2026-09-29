@@ -57,7 +57,7 @@ export function usePushToFlexPullsheet({ open, onOpenChange, gearSetup, jobId }:
   // What the user chose; until they choose, the loaded pullsheets decide (see below).
   const [chosenMode, setChosenMode] = useState<InputMode | null>(null);
   const [chosenPullsheetId, setChosenPullsheetId] = useState<string | null>(null);
-  const [pullsheetUrl, setPullsheetUrl] = useState("");
+  const [pullsheetUrl, setPullsheetUrlText] = useState("");
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState<PushOutcome | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,7 +77,7 @@ export function usePushToFlexPullsheet({ open, onOpenChange, gearSetup, jobId }:
     setPaPresetId(null);
     setChosenMode(null);
     setChosenPullsheetId(null);
-    setPullsheetUrl("");
+    setPullsheetUrlText("");
     setPushResult(null);
   }, [open]);
 
@@ -91,7 +91,9 @@ export function usePushToFlexPullsheet({ open, onOpenChange, gearSetup, jobId }:
   });
   const pullsheets = pullsheetsQuery.data ?? [];
 
-  const mode: InputMode = chosenMode ?? (pullsheets.length > 0 ? "select" : "url");
+  // Until the list has loaded the tab stays on "select" (its loading state), so pullsheets that
+  // arrive late cannot switch the target under someone who is typing a URL.
+  const mode: InputMode = chosenMode ?? (pullsheetsQuery.isPending || pullsheets.length > 0 ? "select" : "url");
   // A single pullsheet is selected for the user.
   const selectedPullsheetId = chosenPullsheetId ?? (pullsheets.length === 1 ? pullsheets[0].element_id : null);
   const urlElementId = extractFlexElementId(pullsheetUrl);
@@ -152,8 +154,22 @@ export function usePushToFlexPullsheet({ open, onOpenChange, gearSetup, jobId }:
     setPaPresetId(null);
   };
 
+  const setPullsheetUrl = (url: string) => {
+    // Typing a URL is choosing the URL target, whatever the list later says.
+    if (url) setChosenMode("url");
+    setPullsheetUrlText(url);
+  };
+
+  // Cached results are shown while they refresh; pushing waits until the target and the Flex
+  // resources it is built from are fresh.
+  const isRefreshing = pullsheetsQuery.isFetching || resourcesQuery.isFetching || presetItemsQuery.isFetching;
+
   const canPush =
-    !!elementId && equipmentToPush.length > 0 && !isPushing && (mode === "select" ? !!selectedPullsheetId : isValidUrl);
+    !!elementId &&
+    equipmentToPush.length > 0 &&
+    !isPushing &&
+    !isRefreshing &&
+    (mode === "select" ? !!selectedPullsheetId : isValidUrl);
 
   const push = async () => {
     if (!elementId || equipmentToPush.length === 0) return;
