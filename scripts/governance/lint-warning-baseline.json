@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-09-29T16:13:59.301Z",
+  "generatedAt": "2026-09-29T17:06:32.221Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 993,
+  "total": 991,
   "domains": {
     "app": {
-      "total": 689,
+      "total": 687,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
         "@typescript-eslint/no-explicit-any": 557,
-        "react-hooks/exhaustive-deps": 68,
+        "react-hooks/exhaustive-deps": 66,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
         "@typescript-eslint/no-empty-object-type": 4,
@@ -43,7 +43,7 @@
     "no-empty": 13,
     "no-useless-escape": 22,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 68,
+    "react-hooks/exhaustive-deps": 66,
     "react-refresh/only-export-components": 43
   },
   "files": {
@@ -627,9 +627,6 @@
     },
     "src/pages/EquipmentManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/pages/FestivalGearManagement.tsx": {
-      "react-hooks/exhaustive-deps": 2
     },
     "src/pages/job-assignment-matrix/MatrixPageControls.tsx": {
       "@typescript-eslint/no-explicit-any": 1

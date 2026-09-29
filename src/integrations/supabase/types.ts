@@ -13589,6 +13589,14 @@ export type Database = {
         Returns: undefined
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
+      save_festival_stage_gear_setup: {
+        Args: { p_job_id: string; p_payload: Json; p_stage_number: number }
+        Returns: {
+          gear_setup_id: string
+          max_stages: number
+          stage_setup_id: string
+        }[]
+      }
       save_hoja_de_ruta:
         | {
             Args: {
@@ -13730,6 +13738,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_festival_max_stages: {
+        Args: { p_job_id: string; p_max_stages: number }
+        Returns: number
       }
       set_hoja_de_ruta_status:
         | {
