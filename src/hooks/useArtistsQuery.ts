@@ -14,21 +14,27 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  isBeforeFestivalDayStart,
+} from "@/features/festival-management/dayStart";
 
 interface UseArtistsQueryOptions {
   /** When true, fetches artists across every festival date instead of just `selectedDate` (used by the "search all dates" mode). */
   searchAllDates?: boolean;
+  /** Boundary-sensitive normalization must wait until festival settings resolve. */
+  enabled?: boolean;
 }
 
 export const useArtistsQuery = (
   jobId: string | undefined,
   selectedDate: string,
-  dayStartTime: string = "07:00",
+  dayStartTime: string = DEFAULT_FESTIVAL_DAY_START_TIME,
   options: UseArtistsQueryOptions = {},
 ) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { searchAllDates = false } = options;
+  const { searchAllDates = false, enabled = true } = options;
 
   const fetchArtistsOnline = async () => {
     // The query is only `enabled` with a jobId; guard so the id is narrowed here too.
@@ -70,15 +76,13 @@ export const useArtistsQuery = (
         artist_submitted: artistSubmitted,
       };
 
-      if (artist.isaftermidnight !== undefined) {
+      if (typeof artist.isaftermidnight === "boolean") {
         return cleanedArtist;
       }
 
       if (!artist.show_start) return cleanedArtist;
 
-      const [hours] = artist.show_start.split(':').map(Number);
-      const [startHour] = dayStartTime.split(':').map(Number);
-      const isAfterMidnight = hours < startHour;
+      const isAfterMidnight = isBeforeFestivalDayStart(artist.show_start, dayStartTime);
 
       return {
         ...cleanedArtist,
@@ -99,8 +103,8 @@ export const useArtistsQuery = (
     refetch
   } = useQuery({
     queryKey: searchAllDates
-      ? queryKeys.scope('festival-artists', jobId, 'all-dates')
-      : queryKeys.scope('festival-artists', jobId, selectedDate),
+      ? queryKeys.scope('festival-artists', jobId, dayStartTime, 'all-dates')
+      : queryKeys.scope('festival-artists', jobId, dayStartTime, selectedDate),
     queryFn: async () => {
       if (!jobId || !selectedDate) return { rows: [], isOffline: false };
 
@@ -115,7 +119,7 @@ export const useArtistsQuery = (
       });
       return { rows: result.data, isOffline: result.fromOffline };
     },
-    enabled: !!jobId && !!selectedDate,
+    enabled: enabled && !!jobId && !!selectedDate,
     staleTime: 1000 * 60 * 2, // 2 minutes
     refetchOnWindowFocus: true,
     networkMode: "always", // run the queryFn even offline so the snapshot can be served

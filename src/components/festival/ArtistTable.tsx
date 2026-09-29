@@ -236,7 +236,7 @@ export const ArtistTable = ({
   // Apply sorting to filtered artists using imported utility
   const sortedFilteredArtists = (
     sortBy === 'chronological'
-      ? sortArtistsChronologically(filteredArtists)
+      ? sortArtistsChronologically(filteredArtists, dayStartTime)
       : sortArtistsByField(filteredArtists, sortBy)
   ) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);

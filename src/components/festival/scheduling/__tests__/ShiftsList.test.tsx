@@ -36,6 +36,7 @@ const renderList = (onDeleteShift = vi.fn()) =>
   renderWithProviders(
     <ConfirmDialogProvider>
       <ShiftsList
+        dayStartTime="07:00"
         shifts={[shift("night", "Noche", "22:00", "06:00"), shift("morning", "Mañana", "09:00", "15:00")]}
         onDeleteShift={onDeleteShift}
         onShiftUpdated={() => {}}

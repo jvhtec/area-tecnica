@@ -1,5 +1,9 @@
 
 import { getEffectiveSoundcheckDate } from '@/utils/artistScheduleDates';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  getFestivalDayOffset,
+} from '@/features/festival-management/dayStart';
 
 interface Artist {
   id: string;
@@ -25,7 +29,13 @@ export const ARTIST_SORT_FIELD_LABELS: Record<ArtistSortField, string> = {
   line_check_start: 'Line check',
 };
 
-export const sortArtistsChronologically = (artists: Artist[]) => {
+export const sortArtistsChronologically = (
+  artists: Artist[],
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+) => {
+  const sortableMinutes = (artist: Artist): number =>
+    getFestivalDayOffset(artist.show_start, dayStartTime) ?? Number.MAX_SAFE_INTEGER;
+
   return artists.sort((a, b) => {
     // First sort by date
     if (a.date !== b.date) {
@@ -38,35 +48,9 @@ export const sortArtistsChronologically = (artists: Artist[]) => {
     }
 
     // Finally sort by show time within the same date and stage
-    const aTime = a.show_start || '';
-    const bTime = b.show_start || '';
-
-    // Use isaftermidnight field if available, otherwise fall back to time-based logic
-    let adjustedATime = aTime;
-    let adjustedBTime = bTime;
-    
-    if (a.isaftermidnight !== undefined && b.isaftermidnight !== undefined) {
-      // Use the calculated isaftermidnight field for more accurate sorting
-      if (a.isaftermidnight) {
-        const aHour = parseInt(aTime.split(':')[0], 10);
-        adjustedATime = `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}`;
-      }
-      if (b.isaftermidnight) {
-        const bHour = parseInt(bTime.split(':')[0], 10);
-        adjustedBTime = `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}`;
-      }
-    } else {
-      // Fallback to hardcoded logic for backward compatibility
-      const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
-      const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
-      
-      // If show starts between 00:00-06:59, treat it as next day for sorting
-      adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
-      adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
-    }
-    
-    if (adjustedATime < adjustedBTime) return -1;
-    if (adjustedATime > adjustedBTime) return 1;
+    const adjustedATime = sortableMinutes(a);
+    const adjustedBTime = sortableMinutes(b);
+    if (adjustedATime !== adjustedBTime) return adjustedATime - adjustedBTime;
 
     // Fallback to artist name
     return (a.name || '').localeCompare(b.name || '');

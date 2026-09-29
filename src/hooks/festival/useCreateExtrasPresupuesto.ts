@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 
 const FLEX_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
@@ -18,7 +19,7 @@ export function buildArtistFlexDateRange(
   showStart: string | null | undefined,
   showEnd: string | null | undefined,
   isAfterMidnight = false,
-  dayStartTime = "07:00",
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ): { plannedStartDate: string; plannedEndDate: string } {
   const parsedDate = parseISO(artistDate);
   const effectiveShowStart = showStart?.trim() || dayStartTime;
@@ -34,7 +35,10 @@ export function formatArtistExtrasFolderDocumentNumber(date: Date): string {
   return `${format(date, "ddMMyy")}ESQT`;
 }
 
-export function useCreateExtrasPresupuesto(jobId: string | undefined, dayStartTime = "07:00") {
+export function useCreateExtrasPresupuesto(
+  jobId: string | undefined,
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+) {
   const [creatingExtrasForArtistIds, setCreatingExtrasForArtistIds] = useState<Set<string>>(new Set());
   const isCreatingExtrasFor = (id: string) => creatingExtrasForArtistIds.has(id);
 

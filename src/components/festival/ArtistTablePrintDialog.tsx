@@ -30,6 +30,7 @@ interface ArtistTablePrintDialogProps {
   selectedDate: string;
   stageFilter: string;
   jobId?: string;
+  dayStartTime: string;
   stageNames?: Record<number, string>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -46,6 +47,7 @@ export const ArtistTablePrintDialog = ({
   selectedDate,
   stageFilter,
   jobId,
+  dayStartTime,
   stageNames,
   open,
   onOpenChange,
@@ -99,7 +101,7 @@ export const ArtistTablePrintDialog = ({
       });
 
       // Sort artists chronologically using the shared utility
-      const sortedArtists = sortArtistsChronologically(filteredArtists) as Artist[];
+      const sortedArtists = sortArtistsChronologically(filteredArtists, dayStartTime) as Artist[];
 
       console.log('Filtered artists count:', filteredArtists.length);
       
@@ -278,6 +280,7 @@ export const ArtistTablePrintDialog = ({
         stage: stageFilter !== 'all' ? stageFilter : undefined,
         stageNames: stageNames,
         artists: transformedArtists,
+        dayStartTime,
         logoUrl: logoUrl,
         includeGearConflicts: includeGearConflicts
       };

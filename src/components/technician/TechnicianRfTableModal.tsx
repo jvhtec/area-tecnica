@@ -31,6 +31,8 @@ import {
 } from "@/utils/rfIemTablePdfExport";
 import { ArtistRfCard } from "@/components/technician/rf-table/ArtistRfCard";
 import { Theme } from "./types";
+import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
+import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +78,13 @@ export function TechnicianRfTableModal({
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const {
+    dayStartTime,
+    error: festivalSettingsError,
+    isDayStartReady,
+    isPending: isFestivalSettingsLoading,
+  } = useFestivalDayStart(job?.id);
+  const resolvedDayStartTime = dayStartTime ?? DEFAULT_FESTIVAL_DAY_START_TIME;
 
   // --- Data fetching ---
 
@@ -120,8 +129,12 @@ export function TechnicianRfTableModal({
   // --- Normalization & filtering ---
 
   const normalizedArtists = useMemo(
-    () => rawArtists.map((a) => normalizeRfIemArtistInput(a as RawArtistLike)).filter(hasRfIemContent),
-    [rawArtists]
+    () => isDayStartReady
+      ? rawArtists
+        .map((a) => normalizeRfIemArtistInput(a as RawArtistLike, resolvedDayStartTime))
+        .filter(hasRfIemContent)
+      : [],
+    [isDayStartReady, rawArtists, resolvedDayStartTime]
   );
 
   const searchFilteredArtists = useMemo(() => {
@@ -146,7 +159,10 @@ export function TechnicianRfTableModal({
     return searchFilteredArtists.filter((a) => String(a.stage) === selectedStage);
   }, [searchFilteredArtists, selectedStage]);
 
-  const dayGroups = useMemo(() => groupArtistsByFestivalDay(stageFilteredArtists), [stageFilteredArtists]);
+  const dayGroups = useMemo(
+    () => groupArtistsByFestivalDay(stageFilteredArtists, resolvedDayStartTime),
+    [resolvedDayStartTime, stageFilteredArtists],
+  );
 
   const filteredDayGroups = useMemo(() => {
     if (selectedDay === "all") return dayGroups;
@@ -350,11 +366,11 @@ export function TechnicianRfTableModal({
         {/* Card list */}
         <ScrollArea className="flex-1">
           <div className="p-4">
-            {isLoading ? (
+            {isLoading || isFestivalSettingsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
               </div>
-            ) : isError ? (
+            ) : isError || festivalSettingsError ? (
               <div
                 className={`h-32 border border-dashed rounded-xl flex flex-col items-center justify-center ${
                   isDark ? "border-red-800 text-red-400" : "border-red-200 text-red-500"
@@ -362,7 +378,11 @@ export function TechnicianRfTableModal({
               >
                 <Radio size={28} className="mb-2 opacity-40" />
                 <span className="text-xs font-medium">Error al cargar datos RF/IEM</span>
-                {error && <span className="text-[10px] mt-1 opacity-70">{String(error)}</span>}
+                {(error || festivalSettingsError) && (
+                  <span className="text-[10px] mt-1 opacity-70">
+                    {String(error || festivalSettingsError)}
+                  </span>
+                )}
               </div>
             ) : filteredDayGroups.length === 0 ? (
               <div

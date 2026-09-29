@@ -23,6 +23,7 @@ export interface ArtistRfIemData extends RfIemScheduleFields {
 
 export interface RfIemTablePdfData {
   jobTitle: string;
+  dayStartTime: string;
   logoUrl?: string;
   artists: ArtistRfIemData[];
 }

@@ -22,10 +22,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { formatMadridDateKey, getMadridTodayKey } from "@/utils/timezoneUtils";
 import {
-  DEFAULT_FESTIVAL_DAY_START_TIME,
   fetchFestivalDateTypes,
-  fetchFestivalSettings,
 } from "@/features/festival-management/queries";
+import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
+import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 import { trackError } from "@/lib/errorTracking";
 interface FestivalSchedulingProps {
   jobId: string;
@@ -66,14 +66,13 @@ export const FestivalScheduling = ({
     }
   }, []);
 
-  // Fetch festival settings for day start time
-  const { data: festivalSettings, error: festivalSettingsError } = useQuery({
-    queryKey: queryKeys.scope('festival-settings', jobId),
-    networkMode: "always",
-    queryFn: () => fetchFestivalSettings(jobId),
-    enabled: !!jobId
-  });
-  const dayStartTime = festivalSettings?.day_start_time ?? DEFAULT_FESTIVAL_DAY_START_TIME;
+  const {
+    dayStartTime,
+    error: festivalSettingsError,
+    isDayStartReady,
+    isPending: festivalSettingsPending,
+  } = useFestivalDayStart(jobId);
+  const resolvedDayStartTime = dayStartTime ?? DEFAULT_FESTIVAL_DAY_START_TIME;
 
   // Fetch date types for navigation
   const { data: dateTypeData, error: dateTypesError, refetch: refetchDateTypes } = useQuery({
@@ -283,11 +282,14 @@ export const FestivalScheduling = ({
             <Alert variant="destructive">
               <AlertTitle>No se pudo cargar toda la configuración</AlertTitle>
               <AlertDescription>
-                Revisa la conexión y vuelve a intentarlo. Se mantienen valores seguros por defecto sin guardar cambios.
+                Revisa la conexión y vuelve a intentarlo. La programación queda bloqueada hasta recuperar la configuración.
               </AlertDescription>
             </Alert>
           )}
-          {jobDates.length > 0 && (
+          {festivalSettingsPending && (
+            <Loading label="Cargando configuración de jornada…" className="p-8" />
+          )}
+          {isDayStartReady && jobDates.length > 0 && (
             <FestivalDateNavigation
               jobDates={jobDates}
               selectedDate={selectedDate}
@@ -295,11 +297,11 @@ export const FestivalScheduling = ({
               dateTypes={dateTypes}
               jobId={jobId}
               onTypeChange={() => refetchDateTypes()}
-              dayStartTime={dayStartTime}
+              dayStartTime={resolvedDayStartTime}
             />
           )}
 
-          {selectedDate && (
+          {isDayStartReady && selectedDate && (
             isLoading ? (
               <Loading label="Cargando turnos…" className="p-8" />
             ) : shifts.length === 0 ? (
@@ -313,7 +315,7 @@ export const FestivalScheduling = ({
               <ShiftsTable 
                 shifts={shifts} 
                 stageOptions={stageOptions}
-                dayStartTime={dayStartTime}
+                dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift}
                 onShiftUpdated={refetch}
                 date={selectedDate}
@@ -326,7 +328,7 @@ export const FestivalScheduling = ({
               <ShiftsList 
                 shifts={shifts} 
                 stageOptions={stageOptions}
-                dayStartTime={dayStartTime}
+                dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift} 
                 onShiftUpdated={refetch}
                 jobId={jobId}

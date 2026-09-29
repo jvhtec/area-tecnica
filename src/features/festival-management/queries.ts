@@ -42,8 +42,6 @@ type HojaVenueRow = {
 
 const RIDER_LIBRARY_FILE_LIMIT = 1000;
 
-export const DEFAULT_FESTIVAL_DAY_START_TIME = "07:00";
-
 export type FestivalSettings = Tables<"festival_settings">;
 
 type FestivalSettingsEnvelope = {

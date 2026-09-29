@@ -92,7 +92,7 @@ export const ArtistManagementForm = ({
   artist,
   jobId,
   selectedDate,
-  dayStartTime = "07:00",
+  dayStartTime,
   onSubmit,
   formId
 }: ArtistManagementFormProps) => {

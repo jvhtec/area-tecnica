@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  getFestivalDayOffset,
+  getFestivalDayStartMinutes,
+} from "@/features/festival-management/dayStart";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { roleOptionsForDiscipline } from "@/types/roles";
 
@@ -56,11 +61,15 @@ export const formatShiftTime = (time: string): string => time.slice(0, 5);
 
 /**
  * Where a shift falls relative to its festival date. The festival day runs from
- * `dayStartTime` (07:00 by default) to the same time next morning, so a 02:00
+ * the configured `dayStartTime` to the same time next morning, so an early
  * shift on the 10th happens in the early hours of the 11th.
  */
-export const shiftNextDayNote = (startTime: string, endTime: string, dayStartTime = "07:00"): string | null => {
-  const dayStart = TIME_PATTERN.test(dayStartTime) ? toMinutes(dayStartTime) : 7 * 60;
+export const shiftNextDayNote = (
+  startTime: string,
+  endTime: string,
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): string | null => {
+  const dayStart = getFestivalDayStartMinutes(dayStartTime);
   if (toMinutes(startTime) < dayStart) return "Se hace en la madrugada del día siguiente";
   if (isOvernightShift(startTime, endTime)) return "Termina al día siguiente";
   return null;
@@ -114,15 +123,14 @@ export const shiftFormDefaults = (shift?: {
 
 /**
  * Orders shifts along the festival day, which starts at `dayStartTime`
- * (07:00 by default) and runs past midnight: a 02:00 shift belongs after a
+ * and runs past midnight: an early-morning shift belongs after an evening
  * 20:00 one, not first.
  */
 export const sortShiftsForFestivalDay = <T extends { start_time: string; end_time: string; name: string }>(
   shifts: readonly T[],
-  dayStartTime = "07:00",
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ): T[] => {
-  const dayStart = TIME_PATTERN.test(dayStartTime) ? toMinutes(dayStartTime) : 7 * 60;
-  const position = (time: string) => (toMinutes(time) - dayStart + 24 * 60) % (24 * 60);
+  const position = (time: string) => getFestivalDayOffset(time, dayStartTime) ?? Number.MAX_SAFE_INTEGER;
   return [...shifts].sort(
     (a, b) =>
       position(a.start_time) - position(b.start_time) ||

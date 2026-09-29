@@ -3,6 +3,10 @@ import type { ArtistRfIemData, RfIemSystemData } from '@/utils/rfIemTablePdfExpo
 import type { ArtistInfrastructureData } from '@/utils/infrastructureTablePdfExport';
 import type { ShiftAssignment, ShiftWithAssignments } from '@/types/festival-scheduling';
 import { combineWavesDisplay } from '@/constants/wavesModels';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  getFestivalDayStartMinutes,
+} from '@/features/festival-management/dayStart';
 
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
@@ -66,16 +70,17 @@ const parseShowMinutes = (value: string | null | undefined): number => {
   return hour * 60 + minute + second / 60;
 };
 
-const toSortableShowMinutes = (value: string | null | undefined): number => {
+const toSortableShowMinutes = (
+  value: string | null | undefined,
+  dayStartTime: string,
+): number => {
   const parsed = parseShowMinutes(value);
   if (!Number.isFinite(parsed)) {
     return Number.MAX_SAFE_INTEGER;
   }
 
   let total = parsed;
-  const hour = Math.floor(parsed / 60);
-  // Festival-style default: early-morning shows belong to end-of-day timeline.
-  if (hour >= 0 && hour < 7) {
+  if (parsed < getFestivalDayStartMinutes(dayStartTime)) {
     total += 24 * 60;
   }
 
@@ -88,7 +93,10 @@ export const sortArtistsChronologically = <T extends {
   show_start?: string | null;
   name?: string | null;
   isaftermidnight?: boolean | null;
-}>(artists: T[]): T[] => {
+}>(
+  artists: T[],
+  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): T[] => {
   return [...artists].sort((a, b) => {
     const dateA = a.date || '';
     const dateB = b.date || '';
@@ -97,32 +105,8 @@ export const sortArtistsChronologically = <T extends {
       return new Date(dateA).getTime() - new Date(dateB).getTime();
     }
 
-    let aTime = toSortableShowMinutes(a.show_start || '');
-    let bTime = toSortableShowMinutes(b.show_start || '');
-
-    // Prefer explicit flag if present from backend/UI preprocessing.
-    if (typeof a.isaftermidnight === 'boolean') {
-      const baseA = parseShowMinutes(a.show_start || '');
-      if (Number.isFinite(baseA)) {
-        const isEarlyA = baseA < (7 * 60);
-        aTime = isEarlyA
-          ? (a.isaftermidnight ? baseA + (24 * 60) : baseA)
-          : baseA;
-      } else {
-        aTime = Number.MAX_SAFE_INTEGER;
-      }
-    }
-    if (typeof b.isaftermidnight === 'boolean') {
-      const baseB = parseShowMinutes(b.show_start || '');
-      if (Number.isFinite(baseB)) {
-        const isEarlyB = baseB < (7 * 60);
-        bTime = isEarlyB
-          ? (b.isaftermidnight ? baseB + (24 * 60) : baseB)
-          : baseB;
-      } else {
-        bTime = Number.MAX_SAFE_INTEGER;
-      }
-    }
+    const aTime = toSortableShowMinutes(a.show_start || '', dayStartTime);
+    const bTime = toSortableShowMinutes(b.show_start || '', dayStartTime);
 
     if (aTime !== bTime) {
       return aTime - bTime;
@@ -224,13 +208,14 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
   });
 };
 
-export const buildRfIemArtists = (artists: Record<string, unknown>[] = []): ArtistRfIemData[] => {
+export const buildRfIemArtists = (
+  artists: Record<string, unknown>[] = [],
+  _dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+): ArtistRfIemData[] => {
   return artists.map((artist) => {
     const wirelessProvidedBy = normalizeProvider(artist.wireless_provided_by, 'festival');
     const iemProvidedBy = normalizeProvider(artist.iem_provided_by, 'festival');
     const showStart = toStringValue(artist.show_start || artist.showStart);
-    const baseShowMinutes = parseShowMinutes(showStart);
-    const computedAfterMidnight = Number.isFinite(baseShowMinutes) && baseShowMinutes < (7 * 60);
     const explicitAfterMidnight = typeof artist.isaftermidnight === 'boolean'
       ? artist.isaftermidnight
       : typeof artist.isAfterMidnight === 'boolean'
@@ -243,7 +228,7 @@ export const buildRfIemArtists = (artists: Record<string, unknown>[] = []): Arti
       wirelessSystems: normalizeRfIemSystems(artist.wirelessSystems ?? artist.wireless_systems, wirelessProvidedBy),
       iemSystems: normalizeRfIemSystems(artist.iemSystems ?? artist.iem_systems, iemProvidedBy),
       date: toStringValue(artist.date),
-      isAfterMidnight: explicitAfterMidnight === true || computedAfterMidnight,
+      isAfterMidnight: explicitAfterMidnight,
       loadInTime: toStringValue(artist.load_in_time || artist.loadInTime),
       showStart,
       showEnd: toStringValue(artist.show_end || artist.showEnd),
