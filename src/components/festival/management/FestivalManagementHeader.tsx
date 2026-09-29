@@ -119,6 +119,7 @@ export const FestivalManagementHeader = ({ vm }: { vm: FestivalManagementVm }) =
                     className="flex items-center gap-2 hover:bg-accent/50 transition-all"
                     onClick={handlePrintButtonClick}
                     disabled={isPrinting}
+                    aria-label="Imprimir"
                   >
                     {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                     <span className="hidden sm:inline">{isPrinting ? "Generando..." : "Imprimir"}</span>
