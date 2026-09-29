@@ -170,7 +170,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_technician_id uuid;
+  v_lock_key bigint;
 BEGIN
   IF NEW.job_id IS NOT DISTINCT FROM OLD.job_id THEN
     RETURN NEW;
@@ -178,19 +178,20 @@ BEGIN
 
   -- Lock every affected job/technician pair in an explicit stable order before
   -- checking membership so concurrent assignment lifecycle changes serialize.
-  FOR v_technician_id IN
-    SELECT DISTINCT assignment.technician_id
-    FROM public.festival_shift_assignments AS assignment
-    WHERE assignment.shift_id = OLD.id
-      AND assignment.technician_id IS NOT NULL
-    ORDER BY assignment.technician_id
-  LOOP
-    IF NEW.job_id IS NOT NULL THEN
-      PERFORM pg_catalog.pg_advisory_xact_lock(
-        pg_catalog.hashtextextended(NEW.job_id::text || ':' || v_technician_id::text, 0)
-      );
-    END IF;
-  END LOOP;
+  IF NEW.job_id IS NOT NULL THEN
+    FOR v_lock_key IN
+      SELECT DISTINCT pg_catalog.hashtextextended(
+        NEW.job_id::text || ':' || assignment.technician_id::text,
+        0
+      )
+      FROM public.festival_shift_assignments AS assignment
+      WHERE assignment.shift_id = OLD.id
+        AND assignment.technician_id IS NOT NULL
+      ORDER BY 1
+    LOOP
+      PERFORM pg_catalog.pg_advisory_xact_lock(v_lock_key);
+    END LOOP;
+  END IF;
 
   IF EXISTS (
     SELECT 1
