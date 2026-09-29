@@ -10,11 +10,10 @@ import { ExtraRequirementsSection } from "../form/sections/ExtraRequirementsSect
 import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { fetchFestivalArtist, updateFestivalArtist } from "@/features/festival-artists/api";
 import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
 import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
-import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
 import type { Artist } from "@/components/festival/artistTableTypes";
@@ -25,7 +24,6 @@ import {
 } from "@/features/festival-artists/model";
 import type { FestivalRadioSystem } from "@/types/festival-equipment";
 
-type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
 
 interface MobileArtistConfigEditorProps {
   artist: Artist;
@@ -325,8 +323,7 @@ export const ReadOnlyArtistCategoryContent = ({
   );
 };
 
-const buildFormData = (artist: Artist | ArtistRowInput) =>
-  toArtistFormValues(artist as ArtistRowInput);
+const buildFormData = (artist: ArtistRowInput) => toArtistFormValues(artist);
 
 export const MobileArtistConfigEditor = ({
   artist,
@@ -345,14 +342,7 @@ export const MobileArtistConfigEditor = ({
   useEffect(() => {
     const fetchFreshData = async () => {
       try {
-        const { data, error } = await dataLayerClient.from("festival_artists")
-          .select("*")
-          .eq("id", artist.id)
-          .single();
-
-        if (!error && data) {
-          setFormData(buildFormData(data));
-        }
+        setFormData(buildFormData(await fetchFestivalArtist(artist.id)));
       } catch (err) {
         console.error("Error fetching artist data:", err);
       } finally {
@@ -374,13 +364,7 @@ export const MobileArtistConfigEditor = ({
 
     setIsSaving(true);
     try {
-      const updatePayload = toArtistCategoryPatch(formData, category) as FestivalArtistUpdate;
-
-      const { error } = await dataLayerClient.from("festival_artists")
-        .update(updatePayload)
-        .eq("id", artist.id);
-
-      if (error) throw error;
+      await updateFestivalArtist(artist.id, toArtistCategoryPatch(formData, category));
 
       toast.success("Configuración guardada");
       onSaved();

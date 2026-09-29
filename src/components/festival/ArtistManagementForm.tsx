@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { fetchFestivalArtist } from "@/features/festival-artists/api";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
@@ -57,21 +57,7 @@ export const ArtistManagementForm = ({
 
     const fetchArtist = async () => {
       try {
-        const { data, error } = await dataLayerClient.from("festival_artists")
-          .select("*")
-          .eq("id", artist.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching artist:", error);
-          toast({
-            title: "Error",
-            description: "No se pudieron cargar los detalles del artista",
-            variant: "destructive",
-          });
-        } else if (data) {
-          setFormData(createFormData(data));
-        }
+        setFormData(createFormData(await fetchFestivalArtist(artist.id)));
       } catch (error) {
         console.error("Error fetching artist:", error);
         toast({

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { ArtistManagementForm } from "./ArtistManagementForm";
 import { MobileArtistFormSheet } from "./mobile/MobileArtistFormSheet";
-import { useArtistMutations } from "@/hooks/useArtistMutations";
+import { useArtistMutations } from "@/features/festival-artists/hooks/useArtistMutations";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ArtistManagementDialogProps {
