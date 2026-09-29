@@ -43,6 +43,10 @@ The public artist form allows festival artists to submit their technical require
 6. EXPIRE → Auto-expire past expiry date; prevent resubmission (409 if already submitted)
 ```
 
+Missing-rider reports and festival PDF bundles only reuse an active token that
+was issued by the send action. Generating or downloading a report never creates
+a public bearer credential.
+
 ## Form Sections
 
 1. **Basic Info**: Artist name, stage, date, schedule (show start/end, soundcheck times)
