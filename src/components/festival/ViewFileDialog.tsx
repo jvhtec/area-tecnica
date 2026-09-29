@@ -6,12 +6,12 @@ import { X } from "lucide-react";
 interface ViewFileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  file: any;
+  file: { file_type: string | null; file_name: string } | null;
   url: string;
 }
 
 export const ViewFileDialog = ({ open, onOpenChange, file, url }: ViewFileDialogProps) => {
-  const isImage = file?.file_type.startsWith('image/');
+  const isImage = file?.file_type?.startsWith('image/') ?? false;
   const isPDF = file?.file_type === 'application/pdf';
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 

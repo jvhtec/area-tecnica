@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createTestQueryClient } from "@/test/createTestQueryClient";
 
 const {
   exportArtistPDFMock,
@@ -89,13 +92,15 @@ describe("ArtistFormLinkDialog send-owned token lifecycle", () => {
   it("does not mint a token when opened and mints it from the send action", async () => {
     const user = userEvent.setup();
     render(
-      <ArtistFormLinkDialog
-        open
-        onOpenChange={vi.fn()}
-        artistId="artist-1"
-        artistName="Artist One"
-        selectedDate="2031-07-10"
-      />,
+      <QueryClientProvider client={createTestQueryClient()}>
+        <ArtistFormLinkDialog
+          open
+          onOpenChange={vi.fn()}
+          artistId="artist-1"
+          artistName="Artist One"
+          selectedDate="2031-07-10"
+        />
+      </QueryClientProvider>,
     );
 
     await screen.findByText(/El enlace público se creará al enviar/i);

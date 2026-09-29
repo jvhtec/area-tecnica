@@ -248,7 +248,7 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 | 2.2 | Artists list/table. **Done** (see the Phase 2 status note below the table) | `FestivalArtistManagement`, `ArtistTable`, `useArtistsQuery`, `useArtistMutations`, `CopyArtistsDialog` | ARCH-05, ARCH-06 (artist hooks), BUG-07 |
 | 2.3 | Gear and stages. **Done** (see the Phase 2 status note) | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC), DATA-04 (stage rows) |
 | 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | Delivered as **SCH-A → SCH-B** (see §4b); the UX redesign continues as SCH-C–E |
-| 2.5 | Forms and assets | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links) |
+| 2.5 | Forms and assets. **Done** (see the Phase 2 status note) | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links: not an RPC, see note) |
 | 2.6 | Shell and realtime | `useFestivalManagementVm` channel → `useTableSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
 | 2.7 | Print | `usePrintOptionDownloads`, `PrintOptionsDialog`, `festivalPdfGenerator` split by section | ARCH-05 |
 | 2.8 | Flex pullsheet | `PushToFlexPullsheetDialog` → model already extracted (`push-to-flex-pullsheet/model.ts`); split view | ARCH-05 |
@@ -273,6 +273,14 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
   - `FestivalGearManagement` 637 → 174 lines and `FestivalGearSetupForm` 767 → 114; desktop and mobile layouts render from one section list (`GearSetupSections`), and the stage tabs are `StageSelector`.
   - Dead code removed from the page: the print-options dialog and `handlePrintAllDocumentation` (nothing ever opened the dialog).
   - Still open: `PushToFlexPullsheetDialog` (2.8), the shell's gear reads (2.6), and per-stage rows for `max_stages` beyond what is created on demand (ENH-05).
+- **2.5 done.**
+  - `features/festival-forms/` gains `api.ts`, `links.ts`, `emailTemplate.ts`, `blankTemplate.ts`, `blankTemplatePdf.ts`, `keys.ts` and hooks (`useArtistFormSend`, `useArtistFormLinks`); the new `features/festival-assets/` owns logos and rider files (`api.ts`, `keys.ts`, hooks).
+  - The four components drop from 614/439/354/385 to 142/231/73/156 lines and no longer touch Supabase (four source-boundary exemptions removed; lint baseline 991 → 985).
+  - The send flow keeps the send-owned token lifecycle of #969 (a token is minted only by the send action); the existing dialog test still pins it. The two copies of the blank-template skeleton became one `buildBlankArtistPdfData`, and the email body is a pure, tested `buildArtistFormEmail` (the link is now HTML-escaped inside the `href`).
+  - Artist-file batch uploads keep their all-or-nothing rollback, now covered by tests (`uploadArtistFiles`).
+  - **Deviation from the plan:** the bulk "copy all links" action is client-side text over already-fetched rows (no writes), so there is no bulk-link RPC to build; the plan's DATA-03 note for this screen no longer applies.
+  - Small behaviour changes: "copy all links" orders stages ascending with "Sin escenario" last (before, first appearance in the list); a file row with no `file_type` no longer crashes the artist file dialog; the logo view refetches on open because its URL is signed for an hour.
+  - Still open in Phase 2: 2.6 (shell and realtime), 2.7 (print) and 2.8 (Flex pullsheet).
 
 ### Phase 3: enhancements (after Phase 2 lands for the relevant sub-domain)
 

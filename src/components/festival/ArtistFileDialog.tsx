@@ -1,20 +1,23 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect, useCallback } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { FileText, Loader2, Trash2, Upload, Eye, X } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ViewFileDialog } from "./ViewFileDialog";
+import { FileText, Loader2, Trash2, Upload, Eye } from "lucide-react";
 import {
-  DOCUMENT_UPLOAD_ACCEPT,
-  getDocumentUploadValidationError,
-} from "@/utils/documentUploadValidation";
-import { optimizeImageForUpload } from "@/utils/imageOptimization";
-import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
-import { getErrorMessage } from "@/utils/errorMessage";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
+import { useArtistFiles } from "@/features/festival-assets/hooks/useArtistFiles";
+import type { ArtistFileRow } from "@/features/festival-assets/api";
+import { ViewFileDialog } from "./ViewFileDialog";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -22,261 +25,32 @@ interface ArtistFileDialogProps {
   artistId: string;
 }
 
+/** Only images and PDFs can be previewed in the browser. */
+const isPreviewable = (file: Pick<ArtistFileRow, "file_type">) =>
+  !!file.file_type && (file.file_type.startsWith("image/") || file.file_type === "application/pdf");
+
 export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDialogProps) => {
-  const { toast } = useToast();
-  const [isUploading, setIsUploading] = useState(false);
-  const [files, setFiles] = useState<any[]>([]);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<any>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [viewingFile, setViewingFile] = useState<any>(null);
-  const [viewFileUrl, setViewFileUrl] = useState<string>("");
+  const { files, isUploading, uploadFiles, deleteFile, downloadFile, getPreviewUrl } = useArtistFiles(artistId, open);
+  const [fileToDelete, setFileToDelete] = useState<ArtistFileRow | null>(null);
+  const [preview, setPreview] = useState<{ file: ArtistFileRow; url: string } | null>(null);
 
-  const fetchFiles = useCallback(async () => {
-    try {
-      const { data, error } = await dataLayerClient.from("festival_artist_files")
-        .select("*")
-        .eq("artist_id", artistId);
-
-      if (error) {
-        console.error("Error fetching files:", error);
-        toast({
-          title: "Error",
-          description: "No se pudieron obtener los archivos",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setFiles(data || []);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron obtener los archivos",
-        variant: "destructive",
-      });
-    }
-  }, [artistId, toast]);
-
-  useEffect(() => {
-    if (open && artistId) {
-      fetchFiles();
-    }
-  }, [open, artistId, fetchFiles]);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(event.target.files ?? []);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    // Reset so choosing the same files again still fires a change.
     event.target.value = "";
-    if (selectedFiles.length === 0) return;
-
-    const validationError = getDocumentUploadValidationError(selectedFiles);
-    if (validationError) {
-      toast({
-        title: "Archivo no permitido",
-        description: validationError,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const uploadedPaths: string[] = [];
-    const insertedIds: string[] = [];
-    setIsUploading(true);
-    try {
-      for (const file of selectedFiles) {
-        const uploadFile = await optimizeImageForUpload(file, {
-          maxWidth: 1800,
-          maxHeight: 1800,
-          quality: 0.82,
-          outputFormat: 'image/webp',
-        });
-        const fileExt = uploadFile.name.split('.').pop();
-        const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
-
-        // First upload the file to storage. Large CAD/rider files use resumable chunks.
-        try {
-          await uploadStorageObject(dataLayerClient, {
-            bucket: 'festival_artist_files',
-            path: filePath,
-            file: uploadFile,
-            contentType: uploadFile.type || file.type || 'application/octet-stream',
-          });
-        } catch (uploadError) {
-          console.error("Storage upload error:", uploadError);
-          throw new Error(getStorageUploadErrorMessage(uploadError, uploadFile));
-        }
-        uploadedPaths.push(filePath);
-
-        // Then create the database record
-        const { data: insertedFile, error: dbError } = await dataLayerClient.from('festival_artist_files')
-          .insert({
-            artist_id: artistId,
-            file_name: file.name,
-            file_path: filePath,
-            file_type: uploadFile.type || file.type,
-            file_size: uploadFile.size,
-          })
-          .select("id")
-          .single();
-
-        if (dbError) {
-          console.error("Database insert error:", dbError);
-          throw dbError;
-        }
-
-        if (insertedFile?.id) {
-          insertedIds.push(insertedFile.id);
-        }
-      }
-
-      const { error: artistUpdateError } = await dataLayerClient
-        .from("festival_artists")
-        .update({
-          rider_missing: false,
-          rider_outdated: false,
-          rider_copied_from_date: null,
-          rider_outdated_dismissed: false,
-        })
-        .eq("id", artistId);
-
-      if (artistUpdateError) {
-        console.error("Artist rider state update error:", artistUpdateError);
-      }
-
-      const uploadSuccessDescription =
-        selectedFiles.length === 1
-          ? "Archivo cargado correctamente"
-          : `${selectedFiles.length} archivos cargados correctamente`;
-
-      toast({
-        title: artistUpdateError ? "Carga completada con aviso" : "Éxito",
-        description: artistUpdateError
-          ? `${uploadSuccessDescription}, pero no se pudo actualizar el estado del rider.`
-          : uploadSuccessDescription,
-      });
-
-      fetchFiles();
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      const uploadErrorMessage = getErrorMessage(
-        error,
-        "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
-      );
-      try {
-        if (insertedIds.length > 0) {
-          await dataLayerClient.from('festival_artist_files').delete().in('id', insertedIds);
-        }
-        if (uploadedPaths.length > 0) {
-          await dataLayerClient.storage.from('festival_artist_files').remove(uploadedPaths);
-        }
-      } catch (cleanupError) {
-        console.error("Error rolling back artist file upload batch:", cleanupError);
-      }
-      toast({
-        title: "Error",
-        description: uploadErrorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
+    uploadFiles(selected);
   };
 
-  const handleFileDelete = async () => {
-    if (!selectedFile) return;
-
-    try {
-      const { data: deleteRows, error: dbError } = await dataLayerClient
-        .rpc("delete_festival_artist_file_reference", {
-          p_file_id: selectedFile.id,
-        });
-
-      if (dbError) {
-        console.error("Database delete error:", dbError);
-        throw dbError;
-      }
-
-      const deleteResult = deleteRows?.[0];
-      if (!deleteResult) {
-        throw new Error("No se recibió confirmación de eliminación.");
-      }
-
-      if (deleteResult.should_delete_storage && deleteResult.file_path) {
-        const { error: storageError } = await dataLayerClient.storage
-          .from('festival_artist_files')
-          .remove([deleteResult.file_path]);
-
-        if (storageError) {
-          console.error("Storage delete error:", storageError);
-        }
-      }
-
-      toast({
-        title: "Éxito",
-        description: "Archivo eliminado correctamente",
-      });
-
-      fetchFiles();
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      toast({
-        title: "Error",
-        description: getErrorMessage(error, "No se pudo eliminar el archivo"),
-        variant: "destructive",
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setSelectedFile(null);
-    }
+  const confirmDelete = async () => {
+    if (!fileToDelete) return;
+    const id = fileToDelete.id;
+    setFileToDelete(null);
+    await deleteFile(id);
   };
 
-  const downloadFile = async (file: any) => {
-    try {
-      const { data, error } = await dataLayerClient.storage
-        .from('festival_artist_files')
-        .download(file.file_path);
-
-      if (error) {
-        console.error("Download error:", error);
-        throw error;
-      }
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.file_name;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      toast({
-        title: "Error",
-        description: getErrorMessage(error, "No se pudo descargar el archivo"),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleViewFile = async (file: any) => {
-    try {
-      const { data } = await dataLayerClient.storage
-        .from('festival_artist_files')
-        .createSignedUrl(file.file_path, 3600); // URL valid for 1 hour
-
-      if (data?.signedUrl) {
-        setViewFileUrl(data.signedUrl);
-        setViewingFile(file);
-        setViewDialogOpen(true);
-      }
-    } catch (error) {
-      console.error("Error getting file URL:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo ver el archivo",
-        variant: "destructive",
-      });
-    }
+  const openPreview = async (file: ArtistFileRow) => {
+    const url = await getPreviewUrl(file);
+    if (url) setPreview({ file, url });
   };
 
   return (
@@ -296,7 +70,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                   type="file"
                   multiple
                   accept={DOCUMENT_UPLOAD_ACCEPT}
-                  onChange={handleFileUpload}
+                  onChange={handleFileChange}
                   disabled={isUploading}
                   className="cursor-pointer"
                 />
@@ -311,21 +85,19 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
               ) : (
                 <div className="space-y-2">
                   {files.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-2 border rounded"
-                    >
+                    <div key={file.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
                         <span className="text-sm">{file.file_name}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {(file.file_type.startsWith('image/') || file.file_type === 'application/pdf') && (
+                        {isPreviewable(file) && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleViewFile(file)}
+                            onClick={() => openPreview(file)}
                             title="Ver archivo"
+                            aria-label="Ver archivo"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -335,17 +107,16 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                           size="sm"
                           onClick={() => downloadFile(file)}
                           title="Descargar archivo"
+                          aria-label="Descargar archivo"
                         >
                           <Upload className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setSelectedFile(file);
-                            setDeleteDialogOpen(true);
-                          }}
+                          onClick={() => setFileToDelete(file)}
                           title="Eliminar archivo"
+                          aria-label="Eliminar archivo"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -359,7 +130,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={!!fileToDelete} onOpenChange={(isOpen) => !isOpen && setFileToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar Archivo</AlertDialogTitle>
@@ -369,16 +140,16 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleFileDelete}>Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <ViewFileDialog
-        open={viewDialogOpen}
-        onOpenChange={setViewDialogOpen}
-        file={viewingFile}
-        url={viewFileUrl}
+        open={!!preview}
+        onOpenChange={(isOpen) => !isOpen && setPreview(null)}
+        file={preview?.file ?? null}
+        url={preview?.url ?? ""}
       />
     </>
   );
