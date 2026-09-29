@@ -39,6 +39,15 @@ vi.mock("@/hooks/useArtistsQuery", () => ({
   }),
 }));
 
+vi.mock("@/features/festival-management/useFestivalDayStart", () => ({
+  useFestivalDayStart: () => ({
+    dayStartTime: "07:00",
+    isDayStartReady: true,
+    isPending: false,
+    error: null,
+  }),
+}));
+
 vi.mock("@/hooks/festival/useFestivalArtistJobDetails", () => ({
   useFestivalArtistJobDetails: () => ({
     jobTitle: "Festival Uno",

@@ -107,9 +107,10 @@ export const usePrintOptionDownloads = ({
   } = useFestivalDayStart(jobId);
   const assertFestivalDayStartReady = () => {
     if (festivalDayStartError) throw festivalDayStartError;
-    if (isFestivalDayStartPending) {
+    if (isFestivalDayStartPending || !dayStartTime) {
       throw new Error("La configuración de jornada todavía se está cargando");
     }
+    return dayStartTime;
   };
   const [missingRiderRecipientEmails, setMissingRiderRecipientEmails] =
     useState("");
@@ -347,7 +348,7 @@ export const usePrintOptionDownloads = ({
     }
 
     try {
-      assertFestivalDayStartReady();
+      const resolvedDayStartTime = assertFestivalDayStartReady();
       console.log("Downloading Shift Schedules for job:", jobId);
 
       const logoUrl = await fetchPreparedFestivalLogo(jobId);
@@ -434,7 +435,7 @@ export const usePrintOptionDownloads = ({
         const shiftsData: ShiftsTablePdfData = {
           jobTitle,
           date,
-          dayStartTime,
+          dayStartTime: resolvedDayStartTime,
           logoUrl,
           shifts: dailyShifts,
         };
@@ -474,7 +475,7 @@ export const usePrintOptionDownloads = ({
     }
 
     try {
-      assertFestivalDayStartReady();
+      const resolvedDayStartTime = assertFestivalDayStartReady();
       console.log("Downloading Artist Tables for job:", jobId);
 
       const logoUrl = await fetchPreparedFestivalLogo(jobId);
@@ -495,7 +496,7 @@ export const usePrintOptionDownloads = ({
         return;
       }
 
-      const sortedArtists = sortArtistsChronologically(artists, dayStartTime);
+      const sortedArtists = sortArtistsChronologically(artists, resolvedDayStartTime);
       const { data: stageRows, error: stageError } = await dataLayerClient
         .from("festival_stages")
         .select("number, name")
@@ -527,7 +528,7 @@ export const usePrintOptionDownloads = ({
           const artistData: ArtistTablePdfData = {
             jobTitle,
             date,
-            dayStartTime,
+            dayStartTime: resolvedDayStartTime,
             stage: String(stage),
             stageNames,
             logoUrl,
@@ -569,7 +570,7 @@ export const usePrintOptionDownloads = ({
     }
 
     try {
-      assertFestivalDayStartReady();
+      const resolvedDayStartTime = assertFestivalDayStartReady();
       console.log("Downloading RF/IEM Table for job:", jobId);
 
       const logoUrl = await fetchPreparedFestivalLogo(jobId);
@@ -588,11 +589,11 @@ export const usePrintOptionDownloads = ({
 
       const sortedArtists = sortArtistsChronologically(
         (artists || []) as any[],
-        dayStartTime,
+        resolvedDayStartTime,
       );
       const normalizedArtists = buildRfIemArtists(
         sortedArtists as unknown as Record<string, unknown>[],
-        dayStartTime,
+        resolvedDayStartTime,
       );
       const artistsWithRfIem = normalizedArtists.filter(hasRfIemSystems);
       if (artistsWithRfIem.length === 0) {
@@ -602,7 +603,7 @@ export const usePrintOptionDownloads = ({
 
       const rfIemData: RfIemTablePdfData = {
         jobTitle,
-        dayStartTime,
+        dayStartTime: resolvedDayStartTime,
         logoUrl,
         artists: artistsWithRfIem,
       };
@@ -630,7 +631,7 @@ export const usePrintOptionDownloads = ({
     }
 
     try {
-      assertFestivalDayStartReady();
+      const resolvedDayStartTime = assertFestivalDayStartReady();
       console.log("Downloading Infrastructure Table for job:", jobId);
 
       const logoUrl = await fetchPreparedFestivalLogo(jobId);
@@ -649,7 +650,7 @@ export const usePrintOptionDownloads = ({
 
       const sortedArtists = sortArtistsChronologically(
         (artists || []) as any[],
-        dayStartTime,
+        resolvedDayStartTime,
       );
       const normalizedInfrastructureArtists = buildInfrastructureArtists(
         sortedArtists as unknown as Record<string, unknown>[]

@@ -154,6 +154,16 @@ describe('festivalPdfSectionBuilders', () => {
     expect(artists[0].isAfterMidnight).toBe(false);
   });
 
+  it('keeps an inferred RF/IEM rollover distinct from an explicit flag', () => {
+    const artists = buildRfIemArtists([{
+      name: 'Inferred rollover',
+      stage: 1,
+      show_start: '08:30',
+    }], '09:30');
+
+    expect(artists[0].isAfterMidnight).toBeUndefined();
+  });
+
   it('sorts against a configured festival boundary', () => {
     const sorted = sortArtistsChronologically([
       { name: 'Before boundary', date: '2026-03-10', show_start: '08:30', stage: 1 },
@@ -161,6 +171,20 @@ describe('festivalPdfSectionBuilders', () => {
     ], '09:30');
 
     expect(sorted.map((artist) => artist.name)).toEqual(['After boundary', 'Before boundary']);
+  });
+
+  it('uses the configured boundary when an artist explicitly has a false flag', () => {
+    const sorted = sortArtistsChronologically([
+      { name: 'Explicit 10:00', date: '2026-03-10', show_start: '10:00', stage: 1, isaftermidnight: false },
+      { name: 'Inferred 11:00', date: '2026-03-10', show_start: '11:00', stage: 1 },
+      { name: 'Explicit early', date: '2026-03-10', show_start: '08:30', stage: 1, isaftermidnight: false },
+    ], '09:30');
+
+    expect(sorted.map((artist) => artist.name)).toEqual([
+      'Explicit 10:00',
+      'Inferred 11:00',
+      'Explicit early',
+    ]);
   });
 
   it('does not push late-night shows to end when after-midnight flag is true', () => {

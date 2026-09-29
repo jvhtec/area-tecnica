@@ -3,8 +3,6 @@ import { getEffectiveSoundcheckDate } from '@/utils/artistScheduleDates';
 import {
   DEFAULT_FESTIVAL_DAY_START_TIME,
   getFestivalDayOffset,
-  getFestivalDayStartMinutes,
-  parseFestivalClockMinutes,
 } from '@/features/festival-management/dayStart';
 
 interface Artist {
@@ -35,16 +33,8 @@ export const sortArtistsChronologically = (
   artists: Artist[],
   dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ) => {
-  const sortableMinutes = (artist: Artist): number => {
-    const minutes = parseFestivalClockMinutes(artist.show_start);
-    if (minutes === null) return Number.MAX_SAFE_INTEGER;
-    if (typeof artist.isaftermidnight === 'boolean') {
-      return artist.isaftermidnight && minutes < getFestivalDayStartMinutes(dayStartTime)
-        ? minutes + 24 * 60
-        : minutes;
-    }
-    return getFestivalDayOffset(artist.show_start, dayStartTime) ?? Number.MAX_SAFE_INTEGER;
-  };
+  const sortableMinutes = (artist: Artist): number =>
+    getFestivalDayOffset(artist.show_start, dayStartTime) ?? Number.MAX_SAFE_INTEGER;
 
   return artists.sort((a, b) => {
     // First sort by date

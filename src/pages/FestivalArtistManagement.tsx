@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Info } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
@@ -37,6 +38,7 @@ import {
   fetchFestivalDateTypes,
 } from "@/features/festival-management/queries";
 import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
+import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 import { trackError } from "@/lib/errorTracking";
 
 const FestivalArtistManagement = () => {
@@ -73,7 +75,13 @@ const FestivalArtistManagement = () => {
 
   // A non-empty search term searches every festival date instead of just the selected one.
   const isCrossDateSearch = searchTerm.trim().length > 0;
-  const { dayStartTime, error: festivalSettingsError } = useFestivalDayStart(jobId);
+  const {
+    dayStartTime,
+    error: festivalSettingsError,
+    isDayStartReady,
+    isPending: festivalSettingsPending,
+  } = useFestivalDayStart(jobId);
+  const resolvedDayStartTime = dayStartTime ?? DEFAULT_FESTIVAL_DAY_START_TIME;
   const {
     data: dateTypeData,
     error: dateTypesError,
@@ -109,8 +117,8 @@ const FestivalArtistManagement = () => {
   const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(
     jobId,
     selectedDate,
-    dayStartTime,
-    { searchAllDates: isCrossDateSearch },
+    resolvedDayStartTime,
+    { searchAllDates: isCrossDateSearch, enabled: isDayStartReady },
   );
   const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
 
@@ -333,7 +341,14 @@ const FestivalArtistManagement = () => {
   };
 
   const handlePrintTable = async () => {
-    if (!jobId) return;
+    if (!jobId || !dayStartTime || !isDayStartReady) {
+      toast({
+        title: "Configuración pendiente",
+        description: "Espera a que se cargue el inicio de jornada antes de generar el PDF.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsPrinting(true);
     
     console.log('Starting PDF print with logo URL:', logoUrl);
@@ -593,25 +608,29 @@ const FestivalArtistManagement = () => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-sm">
-                  <p>Los días del festival van desde las {dayStartTime} hasta las {dayStartTime} del día siguiente.</p>
+                  <p>
+                    Los días del festival van desde las {resolvedDayStartTime} hasta las {resolvedDayStartTime} del día siguiente.
+                  </p>
                   <p>Los shows después de medianoche se incluyen en el horario del día anterior.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
           
-          <ArtistPageActions
-            showArtistControls={showArtistControls}
-            isFullSchedulePrinting={isFullSchedulePrinting}
-            selectedDate={selectedDate}
-            onAddArtist={handleAddArtist}
-            onCopyArtists={() => setIsCopyDialogOpen(true)}
-            onPrintFullSchedule={handlePrintFullSchedule}
-            onOpenPrintDialog={(date) => {
-              setPrintDate(date);
-              setIsPrintDialogOpen(true);
-            }}
-          />
+          {isDayStartReady && (
+            <ArtistPageActions
+              showArtistControls={showArtistControls}
+              isFullSchedulePrinting={isFullSchedulePrinting}
+              selectedDate={selectedDate}
+              onAddArtist={handleAddArtist}
+              onCopyArtists={() => setIsCopyDialogOpen(true)}
+              onPrintFullSchedule={handlePrintFullSchedule}
+              onOpenPrintDialog={(date) => {
+                setPrintDate(date);
+                setIsPrintDialogOpen(true);
+              }}
+            />
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-4 p-6">
@@ -619,7 +638,7 @@ const FestivalArtistManagement = () => {
               <Alert variant="destructive">
                 <AlertTitle>No se pudo cargar toda la configuración</AlertTitle>
                 <AlertDescription>
-                  Revisa la conexión y vuelve a intentarlo. Se mantienen valores seguros por defecto sin guardar cambios.
+                  Revisa la conexión y vuelve a intentarlo. Las acciones que dependen de la jornada quedan bloqueadas.
                 </AlertDescription>
               </Alert>
             )}
@@ -635,7 +654,10 @@ const FestivalArtistManagement = () => {
               />
             )}
             
-            {jobDates.length > 0 ? (
+            {festivalSettingsPending && (
+              <Loading label="Cargando configuración de jornada…" className="p-8" />
+            )}
+            {isDayStartReady && jobDates.length > 0 ? (
               <FestivalDateNavigation
                 jobDates={jobDates}
                 selectedDate={selectedDate}
@@ -643,7 +665,7 @@ const FestivalArtistManagement = () => {
                 dateTypes={dateTypes}
                 jobId={jobId || ''}
                 onTypeChange={() => refetchDateTypes()}
-                dayStartTime={dayStartTime}
+                dayStartTime={resolvedDayStartTime}
                 showStageFilter={showArtistControls}
                 selectedStage={stageFilter}
                 onStageChange={setStageFilter}
@@ -651,7 +673,7 @@ const FestivalArtistManagement = () => {
               />
             ) : null}
 
-            {selectedDate && (
+            {isDayStartReady && selectedDate && (
               isShowDate(new Date(selectedDate)) ? (
                 <div className="w-full">
                   <ArtistTable
@@ -662,7 +684,7 @@ const FestivalArtistManagement = () => {
                     searchTerm={searchTerm}
                     stageFilter={stageFilter}
                     riderFilter={riderFilter}
-                    dayStartTime={dayStartTime}
+                    dayStartTime={resolvedDayStartTime}
                     jobId={jobId}
                     selectedDate={selectedDate}
                     crossDateSearch={isCrossDateSearch}
@@ -682,33 +704,35 @@ const FestivalArtistManagement = () => {
         </CardContent>
       </Card>
 
-      {showArtistControls && (
+      {showArtistControls && isDayStartReady && (
         <ArtistManagementDialog
           open={isDialogOpen}
           onOpenChange={handleArtistDialogClose}
           artist={selectedArtist}
           jobId={jobId}
           selectedDate={selectedDate}
-          dayStartTime={dayStartTime}
+          dayStartTime={resolvedDayStartTime}
         />
       )}
 
-      <ArtistTablePrintDialog
-        artists={artistRows}
-        jobTitle={jobTitle}
-        selectedDate={printDate}
-        stageFilter={printStage}
-        jobId={jobId}
-        dayStartTime={dayStartTime}
-        stageNames={stageNames}
-        open={isPrintDialogOpen}
-        onOpenChange={setIsPrintDialogOpen}
-        jobDates={jobDates}
-        onDateChange={setPrintDate}
-        onStageChange={setPrintStage}
-        onPrint={undefined}
-        isLoading={isPrinting}
-      />
+      {isDayStartReady && (
+        <ArtistTablePrintDialog
+          artists={artistRows}
+          jobTitle={jobTitle}
+          selectedDate={printDate}
+          stageFilter={printStage}
+          jobId={jobId}
+          dayStartTime={resolvedDayStartTime}
+          stageNames={stageNames}
+          open={isPrintDialogOpen}
+          onOpenChange={setIsPrintDialogOpen}
+          jobDates={jobDates}
+          onDateChange={setPrintDate}
+          onStageChange={setPrintStage}
+          onPrint={undefined}
+          isLoading={isPrinting}
+        />
+      )}
 
       {showArtistControls && jobId && (
         <CopyArtistsDialog

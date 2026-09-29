@@ -16,7 +16,6 @@ import { extractRfIemScheduleFields, formatRfIemScheduleCell } from '@/utils/rfI
 import { groupArtistsByFestivalDay } from '@/utils/pdf/rfIemFestivalDays';
 import {
   DEFAULT_FESTIVAL_DAY_START_TIME,
-  isBeforeFestivalDayStart,
 } from '@/features/festival-management/dayStart';
 import type {
   ArtistRfIemData,
@@ -105,7 +104,10 @@ export const normalizeRfIemArtistInput = (
     wirelessSystems: normalizedWireless,
     iemSystems: normalizedIem,
     date: typeof artist.date === 'string' ? artist.date : undefined,
-    isAfterMidnight: explicitAfterMidnight ?? isBeforeFestivalDayStart(schedule.showStart, dayStartTime),
+    // Keep provenance intact: grouping infers the configured rollover only
+    // when this flag is absent. Converting an inferred value to `true` here
+    // would make it indistinguishable from an explicit calendar-day override.
+    isAfterMidnight: explicitAfterMidnight,
     ...schedule,
   };
 };

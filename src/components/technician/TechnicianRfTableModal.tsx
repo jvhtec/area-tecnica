@@ -32,6 +32,7 @@ import {
 import { ArtistRfCard } from "@/components/technician/rf-table/ArtistRfCard";
 import { Theme } from "./types";
 import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
+import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,8 +81,10 @@ export function TechnicianRfTableModal({
   const {
     dayStartTime,
     error: festivalSettingsError,
-    isLoading: isFestivalSettingsLoading,
+    isDayStartReady,
+    isPending: isFestivalSettingsLoading,
   } = useFestivalDayStart(job?.id);
+  const resolvedDayStartTime = dayStartTime ?? DEFAULT_FESTIVAL_DAY_START_TIME;
 
   // --- Data fetching ---
 
@@ -126,10 +129,12 @@ export function TechnicianRfTableModal({
   // --- Normalization & filtering ---
 
   const normalizedArtists = useMemo(
-    () => rawArtists
-      .map((a) => normalizeRfIemArtistInput(a as RawArtistLike, dayStartTime))
-      .filter(hasRfIemContent),
-    [dayStartTime, rawArtists]
+    () => isDayStartReady
+      ? rawArtists
+        .map((a) => normalizeRfIemArtistInput(a as RawArtistLike, resolvedDayStartTime))
+        .filter(hasRfIemContent)
+      : [],
+    [isDayStartReady, rawArtists, resolvedDayStartTime]
   );
 
   const searchFilteredArtists = useMemo(() => {
@@ -155,8 +160,8 @@ export function TechnicianRfTableModal({
   }, [searchFilteredArtists, selectedStage]);
 
   const dayGroups = useMemo(
-    () => groupArtistsByFestivalDay(stageFilteredArtists, dayStartTime),
-    [dayStartTime, stageFilteredArtists],
+    () => groupArtistsByFestivalDay(stageFilteredArtists, resolvedDayStartTime),
+    [resolvedDayStartTime, stageFilteredArtists],
   );
 
   const filteredDayGroups = useMemo(() => {

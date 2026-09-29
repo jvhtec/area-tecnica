@@ -3,6 +3,7 @@ import {
   buildRfIemTableRow,
   computeRfIemFestivalDayKey,
   getUniqueFormattedBands,
+  groupArtistsByFestivalDay,
   hasRfIemContent,
   normalizeRfIemArtistInput,
 } from '@/utils/rfIemTablePdfExport';
@@ -210,5 +211,33 @@ describe('rfIemTablePdfExport helpers', () => {
 
     expect(computeRfIemFestivalDayKey(artist, '09:30')).toBe('2026-03-10');
     expect(computeRfIemFestivalDayKey(artist, '08:00')).toBe('2026-03-11');
+  });
+
+  it('keeps an explicit false flag on its stated calendar date', () => {
+    expect(
+      computeRfIemFestivalDayKey({
+        name: 'Explicit Calendar Day',
+        stage: 1,
+        date: '2026-03-11',
+        showStart: '08:30',
+        isAfterMidnight: false,
+        wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+        iemSystems: [],
+      }, '09:30'),
+    ).toBe('2026-03-11');
+  });
+
+  it('preserves an absent flag through normalization for export grouping', () => {
+    const normalized = normalizeRfIemArtistInput({
+      name: 'Inferred Previous Day',
+      stage: 1,
+      date: '2026-03-11',
+      show_start: '08:30',
+      wireless_systems: [{ model: 'RF', quantity_ch: 1 }],
+      iem_systems: [],
+    }, '09:30');
+
+    expect(normalized.isAfterMidnight).toBeUndefined();
+    expect(groupArtistsByFestivalDay([normalized], '09:30')[0]?.key).toBe('2026-03-10');
   });
 });

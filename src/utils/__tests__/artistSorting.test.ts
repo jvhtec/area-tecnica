@@ -1,6 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import { sortArtistsByField } from '@/utils/artistSorting';
+import { sortArtistsByField, sortArtistsChronologically } from '@/utils/artistSorting';
+
+const makeArtist = (
+  name: string,
+  showStart: string,
+  isAfterMidnight?: boolean,
+) => ({
+  id: name,
+  name,
+  stage: 1,
+  date: '2031-07-10',
+  show_start: showStart,
+  show_end: showStart,
+  isaftermidnight: isAfterMidnight,
+});
+
+describe('sortArtistsChronologically', () => {
+  it('uses festival-day offsets for explicit and inferred flags', () => {
+    const sorted = sortArtistsChronologically([
+      makeArtist('Explicit 10:00', '10:00', false),
+      makeArtist('Inferred 11:00', '11:00'),
+      makeArtist('Early AM', '08:30', true),
+    ], '09:30');
+
+    expect(sorted.map(({ name }) => name)).toEqual([
+      'Explicit 10:00',
+      'Inferred 11:00',
+      'Early AM',
+    ]);
+  });
+});
 
 describe('sortArtistsByField', () => {
   it('sorts previous-day soundchecks before later show-day soundchecks', () => {

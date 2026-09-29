@@ -14,6 +14,9 @@ export const useFestivalDayStart = (jobId: string | undefined) => {
 
   return {
     ...query,
-    dayStartTime: normalizeFestivalDayStartTime(query.data?.day_start_time),
+    dayStartTime: query.isSuccess
+      ? normalizeFestivalDayStartTime(query.data?.day_start_time)
+      : undefined,
+    isDayStartReady: query.isSuccess,
   };
 };

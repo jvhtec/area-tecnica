@@ -6,7 +6,6 @@ import { combineWavesDisplay } from '@/constants/wavesModels';
 import {
   DEFAULT_FESTIVAL_DAY_START_TIME,
   getFestivalDayStartMinutes,
-  isBeforeFestivalDayStart,
 } from '@/features/festival-management/dayStart';
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -106,32 +105,8 @@ export const sortArtistsChronologically = <T extends {
       return new Date(dateA).getTime() - new Date(dateB).getTime();
     }
 
-    let aTime = toSortableShowMinutes(a.show_start || '', dayStartTime);
-    let bTime = toSortableShowMinutes(b.show_start || '', dayStartTime);
-
-    // Prefer explicit flag if present from backend/UI preprocessing.
-    if (typeof a.isaftermidnight === 'boolean') {
-      const baseA = parseShowMinutes(a.show_start || '');
-      if (Number.isFinite(baseA)) {
-        const isEarlyA = baseA < getFestivalDayStartMinutes(dayStartTime);
-        aTime = isEarlyA
-          ? (a.isaftermidnight ? baseA + (24 * 60) : baseA)
-          : baseA;
-      } else {
-        aTime = Number.MAX_SAFE_INTEGER;
-      }
-    }
-    if (typeof b.isaftermidnight === 'boolean') {
-      const baseB = parseShowMinutes(b.show_start || '');
-      if (Number.isFinite(baseB)) {
-        const isEarlyB = baseB < getFestivalDayStartMinutes(dayStartTime);
-        bTime = isEarlyB
-          ? (b.isaftermidnight ? baseB + (24 * 60) : baseB)
-          : baseB;
-      } else {
-        bTime = Number.MAX_SAFE_INTEGER;
-      }
-    }
+    const aTime = toSortableShowMinutes(a.show_start || '', dayStartTime);
+    const bTime = toSortableShowMinutes(b.show_start || '', dayStartTime);
 
     if (aTime !== bTime) {
       return aTime - bTime;
@@ -235,13 +210,12 @@ export const buildArtistTableArtists = (artists: Record<string, unknown>[] = [])
 
 export const buildRfIemArtists = (
   artists: Record<string, unknown>[] = [],
-  dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
+  _dayStartTime = DEFAULT_FESTIVAL_DAY_START_TIME,
 ): ArtistRfIemData[] => {
   return artists.map((artist) => {
     const wirelessProvidedBy = normalizeProvider(artist.wireless_provided_by, 'festival');
     const iemProvidedBy = normalizeProvider(artist.iem_provided_by, 'festival');
     const showStart = toStringValue(artist.show_start || artist.showStart);
-    const computedAfterMidnight = isBeforeFestivalDayStart(showStart, dayStartTime);
     const explicitAfterMidnight = typeof artist.isaftermidnight === 'boolean'
       ? artist.isaftermidnight
       : typeof artist.isAfterMidnight === 'boolean'
@@ -254,7 +228,7 @@ export const buildRfIemArtists = (
       wirelessSystems: normalizeRfIemSystems(artist.wirelessSystems ?? artist.wireless_systems, wirelessProvidedBy),
       iemSystems: normalizeRfIemSystems(artist.iemSystems ?? artist.iem_systems, iemProvidedBy),
       date: toStringValue(artist.date),
-      isAfterMidnight: explicitAfterMidnight ?? computedAfterMidnight,
+      isAfterMidnight: explicitAfterMidnight,
       loadInTime: toStringValue(artist.load_in_time || artist.loadInTime),
       showStart,
       showEnd: toStringValue(artist.show_end || artist.showEnd),

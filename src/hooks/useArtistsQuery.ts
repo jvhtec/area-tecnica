@@ -22,6 +22,8 @@ import {
 interface UseArtistsQueryOptions {
   /** When true, fetches artists across every festival date instead of just `selectedDate` (used by the "search all dates" mode). */
   searchAllDates?: boolean;
+  /** Boundary-sensitive normalization must wait until festival settings resolve. */
+  enabled?: boolean;
 }
 
 export const useArtistsQuery = (
@@ -32,7 +34,7 @@ export const useArtistsQuery = (
 ) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { searchAllDates = false } = options;
+  const { searchAllDates = false, enabled = true } = options;
 
   const fetchArtistsOnline = async () => {
     // The query is only `enabled` with a jobId; guard so the id is narrowed here too.
@@ -117,7 +119,7 @@ export const useArtistsQuery = (
       });
       return { rows: result.data, isOffline: result.fromOffline };
     },
-    enabled: !!jobId && !!selectedDate,
+    enabled: enabled && !!jobId && !!selectedDate,
     staleTime: 1000 * 60 * 2, // 2 minutes
     refetchOnWindowFocus: true,
     networkMode: "always", // run the queryFn even offline so the snapshot can be served

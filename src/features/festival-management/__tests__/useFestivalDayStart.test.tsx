@@ -27,6 +27,16 @@ const createWrapper = () => {
 describe("useFestivalDayStart", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("does not expose the default boundary while settings are unresolved", () => {
+    fetchFestivalSettingsMock.mockReturnValue(new Promise(() => undefined));
+    const { result } = renderHook(() => useFestivalDayStart("job-1"), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.isDayStartReady).toBe(false);
+    expect(result.current.dayStartTime).toBeUndefined();
+  });
+
   it("returns the configured normalized boundary", async () => {
     fetchFestivalSettingsMock.mockResolvedValue({ day_start_time: "06:30:00" });
     const { result } = renderHook(() => useFestivalDayStart("job-1"), {
@@ -34,6 +44,7 @@ describe("useFestivalDayStart", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.isDayStartReady).toBe(true);
     expect(result.current.dayStartTime).toBe("06:30");
   });
 
@@ -44,6 +55,7 @@ describe("useFestivalDayStart", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.isDayStartReady).toBe(true);
     expect(result.current.dayStartTime).toBe("07:00");
   });
 
@@ -55,6 +67,8 @@ describe("useFestivalDayStart", () => {
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.isDayStartReady).toBe(false);
+    expect(result.current.dayStartTime).toBeUndefined();
     expect(result.current.error).toBe(queryError);
   });
 });

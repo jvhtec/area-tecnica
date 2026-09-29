@@ -48,7 +48,7 @@ export function computeRfIemFestivalDayKey(
   if (!parsedDate) return 'Sin fecha';
 
   const showMinutes = parseTimeToMinutes(artist.showStart);
-  const shouldUsePreviousDay = artist.isAfterMidnight !== true
+  const shouldUsePreviousDay = artist.isAfterMidnight === undefined
     && Number.isFinite(showMinutes)
     && showMinutes < getFestivalDayStartMinutes(dayStartTime);
   if (!shouldUsePreviousDay) return toMadridIsoDate(parsedDate);
