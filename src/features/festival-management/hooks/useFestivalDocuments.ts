@@ -12,7 +12,7 @@ import {
 import { fetchFestivalDocuments } from "@/features/festival-management/queries";
 import { formatFestivalDateLabel, groupFestivalRiderFiles } from "@/features/festival-management/selectors";
 import type { ArtistRiderFile, JobDocumentEntry } from "@/features/festival-management/types";
-import { queryKeys } from "@/lib/react-query";
+import { festivalManagementKeys } from "@/features/festival-management/keys";
 import { getDocumentUploadValidationError } from "@/utils/documentUploadValidation";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
@@ -30,7 +30,7 @@ type UploadFestivalDocumentVariables = {
 
 export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
   const queryClient = useQueryClient();
-  const documentsQueryKey = useMemo(() => queryKeys.scope("festival-documents", jobId ?? "none"), [jobId]);
+  const documentsQueryKey = useMemo(() => festivalManagementKeys.documents(jobId ?? "none"), [jobId]);
   const {
     data: documents,
     error: documentsError,

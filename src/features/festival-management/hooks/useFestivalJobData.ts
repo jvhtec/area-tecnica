@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchFestivalJobDetails } from "@/features/festival-management/queries";
-import { queryKeys } from "@/lib/react-query";
+import { trackError } from "@/lib/errorTracking";
+import { festivalManagementKeys } from "@/features/festival-management/keys";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
 export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
-  const silentErrorRef = useRef(false);
-  const jobDetailsQueryKey = useMemo(() => queryKeys.scope("festival-job-details", jobId ?? "none"), [jobId]);
+  /** Set by an explicit refresh, so its failure is shown even though the page already has data. */
+  const surfaceErrorRef = useRef(false);
+  const jobDetailsQueryKey = useMemo(() => festivalManagementKeys.jobDetails(jobId ?? "none"), [jobId]);
 
   const { data, error, errorUpdatedAt, isLoading, refetch } = useQuery({
     queryKey: jobDetailsQueryKey,
@@ -24,20 +26,25 @@ export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: To
     },
   });
 
+  const hasDataRef = useRef(false);
+  hasDataRef.current = data !== undefined;
+
+  // A refetch nobody asked for (a realtime change, a focus refetch) must not interrupt someone who
+  // already has the page open; a failed first load and a refresh they asked for are reported.
   useEffect(() => {
     if (!error) {
       return;
     }
 
-    console.error("Error fetching festival details:", error);
-    if (!silentErrorRef.current) {
+    void trackError(error, { system: "festivals", operation: "load-festival-details" });
+    if (surfaceErrorRef.current || !hasDataRef.current) {
       toast({
         title: "Error",
         description: "Could not load festival details",
         variant: "destructive",
       });
     }
-    silentErrorRef.current = false;
+    surfaceErrorRef.current = false;
   }, [error, errorUpdatedAt, toast]);
 
   const fetchJobDetails = useCallback(
@@ -46,10 +53,10 @@ export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: To
         return;
       }
 
-      silentErrorRef.current = options?.silent ?? false;
+      surfaceErrorRef.current = !(options?.silent ?? false);
       const result = await refetch();
       if (!result.error) {
-        silentErrorRef.current = false;
+        surfaceErrorRef.current = false;
       }
     },
     [jobId, refetch],

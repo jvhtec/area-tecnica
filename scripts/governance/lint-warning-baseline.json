@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-09-29T17:40:50.889Z",
+  "generatedAt": "2026-09-29T19:52:59.290Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 985,
+  "total": 984,
   "domains": {
     "app": {
-      "total": 681,
+      "total": 680,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
         "@typescript-eslint/no-explicit-any": 551,
-        "react-hooks/exhaustive-deps": 66,
+        "react-hooks/exhaustive-deps": 65,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
         "@typescript-eslint/no-empty-object-type": 4,
@@ -43,7 +43,7 @@
     "no-empty": 13,
     "no-useless-escape": 22,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 66,
+    "react-hooks/exhaustive-deps": 65,
     "react-refresh/only-export-components": 43
   },
   "files": {
@@ -400,7 +400,7 @@
       "react-refresh/only-export-components": 2
     },
     "src/features/festival-management/useFestivalManagementVm.ts": {
-      "react-hooks/exhaustive-deps": 3
+      "react-hooks/exhaustive-deps": 2
     },
     "src/features/rack-builder/components/editor/DraggableDevice.tsx": {
       "react-refresh/only-export-components": 2
