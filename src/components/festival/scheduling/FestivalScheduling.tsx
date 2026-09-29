@@ -2,19 +2,18 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { CalendarX, Library, MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { CalendarX, Library, MessageCircle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { deleteFestivalShift } from "@/features/festival-scheduling/api";
+import { useFestivalShifts } from "@/features/festival-scheduling/hooks/useFestivalShifts";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { ShiftsList } from "./ShiftsList";
 import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
-import { useQuery } from "@tanstack/react-query";
-
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -53,7 +52,6 @@ export const FestivalScheduling = ({
   const isMobile = useIsMobile();
   const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
   const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   
   const formatDateToString = useCallback((date: Date): string => {
@@ -108,8 +106,7 @@ export const FestivalScheduling = ({
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
         const formattedDate = formatDateToString(jobDates[0]);
-        console.log("Setting initial date to:", formattedDate);
-        
+
         if (formattedDate) {
           setSelectedDate(formattedDate);
         } else {
@@ -123,76 +120,45 @@ export const FestivalScheduling = ({
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  // Use our enhanced hook to fetch shifts with real-time updates and auto-recovery
-  const { shifts, isLoading, refetch } = useFestivalShifts({
+  const { shifts, isLoading, error: shiftsError, retry: retryShifts, invalidate: refreshShifts } = useFestivalShifts({
     jobId,
-    selectedDate
+    selectedDate,
   });
 
+  useEffect(() => {
+    if (shiftsError) void trackError(shiftsError, { system: "festivals", operation: "load-festival-shifts", jobId });
+  }, [shiftsError, jobId]);
+
   const handleShiftCreated = async () => {
-    console.log("Shift created - refreshing data");
-    await refetch();
+    await refreshShifts();
     setIsCreateShiftOpen(false);
   };
 
-  // The copy dialog awaits every write before calling back, so refetch directly.
+  // The copy dialog awaits every write before calling back.
   const handleShiftsCopied = async () => {
-    await refetch();
+    await refreshShifts();
   };
 
-  const handleDeleteShift = async (shiftId: string) => {
-    try {
-      setIsRefreshing(true);
-      
-      // festival_shift_assignments.shift_id cascades on delete, so one
-      // statement removes the shift and its crew together.
-      const { error } = await dataLayerClient.from("festival_shifts")
-        .delete()
-        .eq("id", shiftId);
-
-      if (error) {
-        throw error;
-      }
-
-      await refetch();
-      toast({
-        title: "Turno eliminado",
-        description: "Se ha quitado el turno y su personal.",
-      });
-    } catch (error) {
-      console.error("Error deleting shift:", error);
+  const deleteShiftMutation = useMutation({
+    // festival_shift_assignments.shift_id cascades on delete, so one statement removes the shift
+    // and its crew together.
+    mutationFn: deleteFestivalShift,
+    onSuccess: async () => {
+      await refreshShifts();
+      toast({ title: "Turno eliminado", description: "Se ha quitado el turno y su personal." });
+    },
+    onError: (error: unknown) => {
+      void trackError(error, { system: "festivals", operation: "delete-festival-shift", jobId });
       toast({
         title: "Error",
-        description: `No se pudo eliminar el turno: ${getErrorMessage(error, 'Error desconocido')}`,
+        description: `No se pudo eliminar el turno: ${getErrorMessage(error, "Error desconocido")}`,
         variant: "destructive",
       });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refetch();
-      toast({
-        title: "Éxito",
-        description: "Turnos actualizados exitosamente",
-      });
-    } catch (error) {
-      console.error("Error refreshing shifts:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron actualizar los turnos",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+    },
+  });
+  const handleDeleteShift = (shiftId: string) => deleteShiftMutation.mutateAsync(shiftId).catch(() => undefined);
 
   if (!jobDates || jobDates.length === 0) {
-    console.log("No job dates available");
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -246,25 +212,12 @@ export const FestivalScheduling = ({
                 <span className="hidden sm:inline">Crear Turno</span>
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              aria-label="Actualizar programación"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Actualizar</span>
-            </Button>
           </div>
         </div>
         <div className="mt-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <SubscriptionIndicator 
             tables={['festival_shifts', 'festival_shift_assignments']} 
             variant="compact"
-            showRefreshButton
-            onRefresh={handleRefresh}
           />
           <Button
             variant="ghost"
@@ -304,6 +257,16 @@ export const FestivalScheduling = ({
           {isDayStartReady && selectedDate && (
             isLoading ? (
               <Loading label="Cargando turnos…" className="p-8" />
+            ) : shiftsError ? (
+              <Alert variant="destructive">
+                <AlertTitle>No se pudieron cargar los turnos</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>{getErrorMessage(shiftsError, "Revisa la conexión y vuelve a intentarlo.")}</p>
+                  <Button size="sm" variant="outline" onClick={() => void retryShifts()}>
+                    Reintentar
+                  </Button>
+                </AlertDescription>
+              </Alert>
             ) : shifts.length === 0 ? (
               <EmptyState
                 icon={CalendarX}
@@ -317,7 +280,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift}
-                onShiftUpdated={refetch}
+                onShiftUpdated={refreshShifts}
                 date={selectedDate}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
@@ -330,7 +293,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift} 
-                onShiftUpdated={refetch}
+                onShiftUpdated={refreshShifts}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
                 jobDates={jobDates}

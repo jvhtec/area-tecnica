@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { buildFallbackStageOptions } from "@/features/festival-management/selectors";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { createFestivalShift } from "@/features/festival-scheduling/api";
 import { getErrorMessage } from "@/utils/errorMessage";
 
 import { ShiftFormFields } from "./ShiftFormFields";
@@ -58,11 +58,7 @@ export const CreateShiftDialog = ({
   const handleSubmit = async (values: ShiftFormValues) => {
     setIsSubmitting(true);
     try {
-      const { error } = await dataLayerClient
-        .from("festival_shifts")
-        .insert({ job_id: jobId, date, ...shiftFormToRow(values) });
-
-      if (error) throw error;
+      await createFestivalShift({ job_id: jobId, date, ...shiftFormToRow(values) });
 
       onShiftCreated();
       toast({ title: "Turno creado", description: `${values.name.trim()} se ha añadido a la programación.` });

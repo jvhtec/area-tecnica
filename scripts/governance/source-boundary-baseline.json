@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-29T19:52:29.186Z",
+  "generatedAt": "2026-09-29T21:38:49.773Z",
   "note": "Generated from current legacy debt. CI fails when current matches exceed these fingerprints.",
   "rules": {
     "pages-supabase-client-import": {
@@ -36,11 +36,6 @@
         "src/components/festival/ArtistRequirementsForm.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/festival/ArtistTablePrintDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/festival/PushToFlexPullsheetDialog.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
-        "src/components/festival/scheduling/CreateShiftDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/scheduling/EditShiftDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/scheduling/FestivalScheduling.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/scheduling/ManageAssignmentsDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/scheduling/ShiftsTable.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/hoja-de-ruta/components/ProfileAutocomplete.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/hoja-de-ruta/sections/ModernStaffSection.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/hoja-de-ruta/sections/ModernTransportSection.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
