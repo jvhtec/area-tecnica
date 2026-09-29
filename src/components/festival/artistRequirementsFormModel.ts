@@ -1,5 +1,5 @@
 import type { ConsoleSetup, FestivalGearSetup } from "@/types/festival";
-import type { ArtistSectionProps } from "@/types/artist-form";
+import type { ArtistSectionFormData } from "@/types/artist-form";
 import { normalizeWirelessSystem } from "@/lib/wirelessSystemNormalizer";
 import type { PublicRiderFileRecord } from "@/utils/publicArtistRiderUpload";
 
@@ -23,7 +23,11 @@ export interface PublicSubmitResponse {
   status?: string;
 }
 
-export type ArtistFormState = ArtistSectionProps["formData"];
+export type ArtistFormState = ArtistSectionFormData & {
+  max_stages: number;
+  foh_consoles: ConsoleSetup[];
+  mon_consoles: ConsoleSetup[];
+};
 export type RiderFileRecord = PublicRiderFileRecord;
 
 export const makeBlankWirelessSystem = () =>

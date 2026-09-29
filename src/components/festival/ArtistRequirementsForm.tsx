@@ -21,6 +21,7 @@ import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
 import { normalizeWavesModelSelections } from "@/constants/wavesModels";
 import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import { usePublicArtistRiderFiles } from "@/hooks/festival/usePublicArtistRiderFiles";
+import { toProviderValue } from "@/features/festival-artists/model";
 import { usePublicArtistFormSubmit } from "@/hooks/festival/usePublicArtistFormSubmit";
 
 import {
@@ -340,26 +341,26 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         load_in_time: normalizeTime(asString(artistData.load_in_time)),
         foh_console: asString(artistData.foh_console),
         foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
-        foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
+        foh_console_provided_by: toProviderValue(artistData.foh_console_provided_by),
         foh_drive: asString(artistData.foh_drive),
         foh_drive_position: asString(artistData.foh_drive_position),
         foh_tech: asBoolean(artistData.foh_tech),
         foh_waves_models: normalizeWavesModelSelections(artistData.foh_waves_models),
         foh_outboard: asString(artistData.foh_outboard),
-        foh_waves_provided_by: asString(artistData.foh_waves_provided_by) || "festival",
+        foh_waves_provided_by: toProviderValue(artistData.foh_waves_provided_by),
         mon_console: asString(artistData.mon_console),
         mon_consoles: monConsoles.length > 0 ? monConsoles : prev.mon_consoles,
-        mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
+        mon_console_provided_by: toProviderValue(artistData.mon_console_provided_by),
         mon_position: asString(artistData.mon_position),
         monitors_from_foh: asBoolean(artistData.monitors_from_foh),
         mon_waves_models: normalizeWavesModelSelections(artistData.mon_waves_models),
         mon_outboard: asString(artistData.mon_outboard),
-        mon_waves_provided_by: asString(artistData.mon_waves_provided_by) || "festival",
+        mon_waves_provided_by: toProviderValue(artistData.mon_waves_provided_by),
         mon_tech: asBoolean(artistData.mon_tech),
         wireless_systems: normalizeWirelessSystems(artistData.wireless_systems, "wireless"),
         iem_systems: normalizeWirelessSystems(artistData.iem_systems, "iem"),
-        wireless_provided_by: asString(artistData.wireless_provided_by) || "festival",
-        iem_provided_by: asString(artistData.iem_provided_by) || "festival",
+        wireless_provided_by: toProviderValue(artistData.wireless_provided_by),
+        iem_provided_by: toProviderValue(artistData.iem_provided_by),
         monitors_enabled: asBoolean(artistData.monitors_enabled),
         monitors_quantity: asNumber(artistData.monitors_quantity),
         extras_sf: asBoolean(artistData.extras_sf),
@@ -375,7 +376,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         infra_opticalcon_duo: asBoolean(artistData.infra_opticalcon_duo),
         infra_opticalcon_duo_quantity: asNumber(artistData.infra_opticalcon_duo_quantity),
         infra_analog: asNumber(artistData.infra_analog),
-        infrastructure_provided_by: asString(artistData.infrastructure_provided_by) || "festival",
+        infrastructure_provided_by: toProviderValue(artistData.infrastructure_provided_by),
         other_infrastructure: asString(artistData.other_infrastructure),
         notes: asString(artistData.notes),
         rider_missing: asBoolean(artistData.rider_missing),

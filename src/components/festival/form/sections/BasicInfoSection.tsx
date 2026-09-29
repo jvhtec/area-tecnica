@@ -122,8 +122,8 @@ export const BasicInfoSection = ({
             id="soundcheck"
             checked={formData.soundcheck}
             onCheckedChange={(checked) => onChange({
-              soundcheck: checked,
-              ...(checked && !formData.soundcheck_date
+              soundcheck: checked === true,
+              ...(checked === true && !formData.soundcheck_date
                 ? { soundcheck_date: formData.date }
                 : {}),
             })}
@@ -219,7 +219,7 @@ export const BasicInfoSection = ({
             <Checkbox
               id="after-midnight"
               checked={formData.isaftermidnight}
-              onCheckedChange={(checked) => onChange({ isaftermidnight: checked })}
+              onCheckedChange={(checked) => onChange({ isaftermidnight: checked === true })}
               disabled={locked("isaftermidnight")}
             />
             <Label htmlFor="after-midnight">{tx("El show es después de medianoche", "Show is after midnight")}</Label>
@@ -229,7 +229,7 @@ export const BasicInfoSection = ({
             <Checkbox
               id="rider-missing"
               checked={formData.rider_missing}
-              onCheckedChange={(checked) => onChange({ rider_missing: checked })}
+              onCheckedChange={(checked) => onChange({ rider_missing: checked === true })}
               disabled={locked("rider_missing")}
             />
             <Label htmlFor="rider-missing">{tx("El rider está faltando", "Rider is missing")}</Label>

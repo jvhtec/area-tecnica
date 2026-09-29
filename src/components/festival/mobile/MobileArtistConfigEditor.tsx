@@ -407,7 +407,7 @@ export const MobileArtistConfigEditor = ({
       case 'consoles':
         return (
           <ConsoleSetupSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={gearSetup}
           />
@@ -415,7 +415,7 @@ export const MobileArtistConfigEditor = ({
       case 'wireless':
         return (
           <WirelessSetupSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={gearSetup}
           />
@@ -433,12 +433,12 @@ export const MobileArtistConfigEditor = ({
         return (
           <>
             <MonitorSetupSection
-              formData={formData as any}
+              formData={formData}
               onChange={updateFormData}
               gearSetup={gearSetup}
             />
             <ExtraRequirementsSection
-              formData={formData as any}
+              formData={formData}
               onChange={updateFormData}
               gearSetup={gearSetup}
             />
@@ -447,7 +447,7 @@ export const MobileArtistConfigEditor = ({
       case 'infrastructure':
         return (
           <InfrastructureSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={gearSetup}
           />
@@ -455,7 +455,7 @@ export const MobileArtistConfigEditor = ({
       case 'notes':
         return (
           <NotesSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
           />
         );

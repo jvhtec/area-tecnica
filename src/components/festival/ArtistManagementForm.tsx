@@ -13,15 +13,16 @@ import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import {
   toArtistFormValues,
   type ArtistFormValues,
+  type ArtistEditTarget,
   type ArtistRowInput,
 } from "@/features/festival-artists/model";
 
 interface ArtistManagementFormProps {
-  artist?: any;
+  artist?: ArtistEditTarget | null;
   jobId?: string;
   selectedDate: string;
   dayStartTime: string;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: ArtistFormValues) => Promise<void>;
   formId?: string;
 }
 
@@ -101,17 +102,17 @@ export const ArtistManagementForm = ({
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <div className="space-y-4">
           <BasicInfoSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />
           <ConsoleSetupSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />
           <MonitorSetupSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />
@@ -119,16 +120,16 @@ export const ArtistManagementForm = ({
 
         <div className="space-y-4">
           <InfrastructureSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />
           <NotesSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
           />
           <WirelessSetupSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />
@@ -136,7 +137,7 @@ export const ArtistManagementForm = ({
 
         <div className="space-y-4">
           <ExtraRequirementsSection
-            formData={formData as any}
+            formData={formData}
             onChange={updateFormData}
             gearSetup={combinedSetup?.globalSetup || null}
           />

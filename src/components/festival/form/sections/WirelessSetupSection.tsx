@@ -3,32 +3,19 @@ import { WirelessConfig } from "../../gear-setup/WirelessConfig";
 import { ProviderSelector } from "../shared/ProviderSelector";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEffect } from "react";
+import type { ProviderValue } from "@/features/festival-artists/model";
+import type { IEMSystem, WirelessSystem } from "@/types/festival-equipment";
+
+type ProviderSource = { provided_by?: ProviderValue };
+
+/** Mixed as soon as the systems disagree; systems with no provider count as festival. */
+const detectProvider = (systems: ProviderSource[]): ProviderValue => {
+  const providers = new Set(systems.map((system) => system.provided_by || "festival"));
+  if (providers.size > 1) return "mixed";
+  return [...providers][0] ?? "festival";
+};
 
 export const WirelessSetupSection = ({ formData, onChange, readOnly = false }: ArtistSectionProps) => {
-  // Auto-detect mixed providers for wireless systems
-  const detectWirelessProvider = (systems: any[]) => {
-    const providers = systems.map(system => system.provided_by || "festival");
-    const uniqueProviders = [...new Set(providers)];
-
-    if (uniqueProviders.length > 1) {
-      return "mixed";
-    }
-
-    return uniqueProviders[0] || "festival";
-  };
-
-  // Auto-detect mixed providers for IEM systems
-  const detectIEMProvider = (systems: any[]) => {
-    const providers = systems.map(system => system.provided_by || "festival");
-    const uniqueProviders = [...new Set(providers)];
-
-    if (uniqueProviders.length > 1) {
-      return "mixed";
-    }
-
-    return uniqueProviders[0] || "festival";
-  };
-
   // Auto-update provider when systems change. Only runs when systems exist -
   // otherwise a manually selected provider (e.g. "band" with no systems added
   // yet) would get overwritten back to "festival" and never get persisted.
@@ -39,41 +26,33 @@ export const WirelessSetupSection = ({ formData, onChange, readOnly = false }: A
     const iemSystems = formData.iem_systems || [];
 
     if (wirelessSystems.length > 0) {
-      const detectedWirelessProvider = detectWirelessProvider(wirelessSystems);
+      const detectedWirelessProvider = detectProvider(wirelessSystems);
       if (detectedWirelessProvider !== formData.wireless_provided_by) {
         onChange({ wireless_provided_by: detectedWirelessProvider });
       }
     }
 
     if (iemSystems.length > 0) {
-      const detectedIEMProvider = detectIEMProvider(iemSystems);
+      const detectedIEMProvider = detectProvider(iemSystems);
       if (detectedIEMProvider !== formData.iem_provided_by) {
         onChange({ iem_provided_by: detectedIEMProvider });
       }
     }
   }, [formData.wireless_systems, formData.iem_systems, readOnly]);
 
-  const handleWirelessChange = (systems: any[]) => {
-    console.log('WirelessSetupSection: Wireless systems changed:', systems);
-    onChange({ 
-      wireless_systems: systems
-    });
+  const handleWirelessChange = (systems: WirelessSystem[]) => {
+    onChange({ wireless_systems: systems });
   };
 
-  const handleIEMChange = (systems: any[]) => {
-    console.log('WirelessSetupSection: IEM systems changed:', systems);
-    onChange({ 
-      iem_systems: systems
-    });
+  const handleIEMChange = (systems: IEMSystem[]) => {
+    onChange({ iem_systems: systems });
   };
 
-  const handleWirelessProviderChange = (provider: string) => {
-    console.log('WirelessSetupSection: Wireless provider changed:', provider);
+  const handleWirelessProviderChange = (provider: ProviderValue) => {
     onChange({ wireless_provided_by: provider });
   };
 
-  const handleIEMProviderChange = (provider: string) => {
-    console.log('WirelessSetupSection: IEM provider changed:', provider);
+  const handleIEMProviderChange = (provider: ProviderValue) => {
     onChange({ iem_provided_by: provider });
   };
 

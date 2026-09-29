@@ -1,9 +1,12 @@
 
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SectionProps } from "@/types/festival-form";
+import type { SectionProps } from "@/types/festival-form";
+import type { GearSetupFormData } from "@/types/festival-gear";
 
-export const NotesSection = ({ formData, onChange, isFieldLocked, language = "es" }: SectionProps) => {
+type NotesFields = Pick<GearSetupFormData, "notes">;
+
+export const NotesSection = ({ formData, onChange, isFieldLocked, language = "es" }: SectionProps<NotesFields>) => {
   const notesLocked = isFieldLocked?.("notes") ?? false;
   const tx = (es: string, en: string) => (language === "en" ? en : es);
 

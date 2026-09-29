@@ -3,9 +3,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { SectionProps } from "@/types/festival-form";
+import type { SectionProps } from "@/types/festival-form";
+import type { GearSetupFormData } from "@/types/festival-gear";
 
-export const ExtraRequirementsSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps) => {
+type ExtraFields = Pick<GearSetupFormData, "extras_sf" | "extras_df" | "extras_djbooth" | "extras_wired">;
+
+export const ExtraRequirementsSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps<ExtraFields>) => {
   const locked = (field: string) => isFieldLocked?.(field) ?? false;
   const tx = (es: string, en: string) => (language === "en" ? en : es);
 

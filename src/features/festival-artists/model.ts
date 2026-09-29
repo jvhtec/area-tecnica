@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderValue } from "@/types/festival-form";
 import type { WavesModelSelection } from "@/constants/wavesModels";
 import type { IEMSystem, WirelessSystem } from "@/types/festival-equipment";
 
@@ -8,14 +9,15 @@ import type { IEMSystem, WirelessSystem } from "@/types/festival-equipment";
  * its own `createFormData` with divergent defaults (`show_start`, `rider_missing`).
  */
 
-export type ProviderValue = "festival" | "band" | "mixed";
+export type { ProviderValue };
 
-export interface WiredMicValue {
+// A `type` alias (not an interface) so it stays assignable to the generated `Json` column type.
+export type WiredMicValue = {
   model: string;
   quantity: number;
   exclusive_use?: boolean;
   notes?: string;
-}
+};
 
 export interface ArtistFormValues {
   name: string;
@@ -32,23 +34,23 @@ export interface ArtistFormValues {
   line_check_end: string;
   load_in_time: string;
   foh_console: string;
-  foh_console_provided_by: string;
+  foh_console_provided_by: ProviderValue;
   foh_drive: string;
   foh_drive_position: string;
   mon_console: string;
-  mon_console_provided_by: string;
+  mon_console_provided_by: ProviderValue;
   mon_position: string;
   monitors_from_foh: boolean;
   foh_waves_models: WavesModelSelection[];
   foh_outboard: string;
-  foh_waves_provided_by: string;
+  foh_waves_provided_by: ProviderValue;
   mon_waves_models: WavesModelSelection[];
   mon_outboard: string;
-  mon_waves_provided_by: string;
+  mon_waves_provided_by: ProviderValue;
   wireless_systems: WirelessSystem[];
   iem_systems: IEMSystem[];
-  wireless_provided_by: string;
-  iem_provided_by: string;
+  wireless_provided_by: ProviderValue;
+  iem_provided_by: ProviderValue;
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
@@ -64,7 +66,7 @@ export interface ArtistFormValues {
   infra_opticalcon_duo: boolean;
   infra_opticalcon_duo_quantity: number;
   infra_analog: number;
-  infrastructure_provided_by: string;
+  infrastructure_provided_by: ProviderValue;
   other_infrastructure: string;
   notes: string;
   foh_tech: boolean;
@@ -81,7 +83,7 @@ export const NEW_ARTIST_DEFAULTS = {
   show_end: "21:00",
   soundcheck_start: "18:00",
   soundcheck_end: "19:00",
-  provided_by: "festival",
+  provided_by: "festival" as ProviderValue,
   /** A newly created artist has no rider yet; an existing row keeps what the DB says. */
   rider_missing: true,
 } as const;
@@ -89,16 +91,22 @@ export const NEW_ARTIST_DEFAULTS = {
 /** Rows come from PostgREST (nullable columns) or from the older `Artist` UI type. */
 export type ArtistRowInput = Record<string, unknown>;
 
+/** An existing artist handed to an editor: any row shape, but it must be identifiable. */
+export type ArtistEditTarget = ArtistRowInput & { id: string };
+
 const text = (value: unknown, fallback = ""): string =>
   typeof value === "string" && value !== "" ? value : fallback;
 const flag = (value: unknown): boolean => value === true;
 const count = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
 const list = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-const provider = (value: unknown): string => text(value, NEW_ARTIST_DEFAULTS.provided_by);
-
-const isProviderValue = (value: unknown): value is ProviderValue =>
+export const isProviderValue = (value: unknown): value is ProviderValue =>
   value === "festival" || value === "band" || value === "mixed";
+
+/** Narrows a raw column or select value to a provider, defaulting to the festival. */
+export const toProviderValue = (value: unknown): ProviderValue =>
+  isProviderValue(value) ? value : NEW_ARTIST_DEFAULTS.provided_by;
+const provider = toProviderValue;
 
 /**
  * Builds the editor values from a `festival_artists` row (or from nothing, for a new artist).

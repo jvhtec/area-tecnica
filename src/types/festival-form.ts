@@ -2,9 +2,14 @@
 import { FestivalGearSetup } from "./festival";
 import { GearSetupFormData } from "./festival-gear";
 
-export interface SectionProps {
-  formData: GearSetupFormData;
-  onChange: (changes: Partial<GearSetupFormData>) => void;
+/**
+ * Props of a form section. `F` is the slice of form data the section reads and writes, so
+ * the same section serves the gear setup form and the artist editors (which have different
+ * models) without either casting to the other.
+ */
+export interface SectionProps<F = GearSetupFormData> {
+  formData: F;
+  onChange: (changes: Partial<F>) => void;
   gearSetup?: FestivalGearSetup | null;
   stageNumber?: number;
   isFieldLocked?: (field: string) => boolean;

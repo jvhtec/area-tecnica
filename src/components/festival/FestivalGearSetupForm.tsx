@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Save, Upload } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
+import type { ArtistSectionFormData } from "@/types/artist-form";
 import { FestivalGearSetup } from "@/types/festival";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
@@ -505,7 +506,7 @@ export const FestivalGearSetupForm = ({
   const alertVariant = isPrimaryStage ? "default" : hasStageSpecificSetup ? "info" : "default";
 
   // Create a compatible form data object for the sections
-  const getCompatibleFormData = () => ({
+  const getCompatibleFormData = (): ArtistSectionFormData => ({
     ...setup,
     name: "",
     stage: stageNumber,
@@ -515,9 +516,9 @@ export const FestivalGearSetupForm = ({
     soundcheck: false,
     line_check: false,
     foh_console: "",
-    foh_console_provided_by: "",
+    foh_console_provided_by: "festival",
     mon_console: "",
-    mon_console_provided_by: "",
+    mon_console_provided_by: "festival",
     monitors_from_foh: false,
     foh_waves_models: [] as WavesModelSelection[],
     foh_outboard: "",
@@ -525,9 +526,9 @@ export const FestivalGearSetupForm = ({
     mon_waves_models: [] as WavesModelSelection[],
     mon_outboard: "",
     mon_waves_provided_by: "festival",
-    wireless_provided_by: "",
-    iem_provided_by: "",  
-    infrastructure_provided_by: "",
+    wireless_provided_by: "festival",
+    iem_provided_by: "festival",
+    infrastructure_provided_by: "festival",
     foh_tech: false,
     mon_tech: false,
     rider_missing: false,

@@ -12,17 +12,17 @@ import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { toArtistFormValues, type ArtistRowInput } from "@/features/festival-artists/model";
+import { toArtistFormValues, type ArtistFormValues, type ArtistEditTarget, type ArtistRowInput } from "@/features/festival-artists/model";
 import type { LucideIcon } from "lucide-react";
 
 type FormSection = 'hub' | 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes';
 
 interface MobileArtistFormSheetProps {
-  artist?: any;
+  artist?: ArtistEditTarget | null;
   jobId?: string;
   selectedDate: string;
   dayStartTime: string;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: ArtistFormValues) => Promise<void>;
   isSubmitting: boolean;
   onClose: () => void;
 }
@@ -68,7 +68,7 @@ const buildFormData = (artistData: ArtistRowInput | null | undefined, selectedDa
   toArtistFormValues(artistData, { selectedDate });
 
 // Summary helpers
-function consoleSummary(fd: any): string {
+function consoleSummary(fd: ArtistFormValues): string {
   if (!fd.foh_console && !fd.mon_console) return "Sin configurar";
   const parts: string[] = [];
   if (fd.foh_console) parts.push(`FOH: ${fd.foh_console}`);
@@ -80,7 +80,7 @@ function consoleSummary(fd: any): string {
   return parts.join(", ");
 }
 
-function wirelessSummary(fd: any): string {
+function wirelessSummary(fd: ArtistFormValues): string {
   const ws = fd.wireless_systems || [];
   const iems = fd.iem_systems || [];
   if (ws.length === 0 && iems.length === 0) {
@@ -95,14 +95,14 @@ function wirelessSummary(fd: any): string {
   return parts.join(", ");
 }
 
-function micSummary(fd: any): string {
+function micSummary(fd: ArtistFormValues): string {
   const label = fd.mic_kit === "festival" ? "Festival" : fd.mic_kit === "mixed" ? "Mixed" : "Band";
   const mics = fd.wired_mics || [];
   if (mics.length > 0) return `${label} Kit + ${mics.length} micros`;
   return `${label} Kit`;
 }
 
-function monitorSummary(fd: any): string {
+function monitorSummary(fd: ArtistFormValues): string {
   const parts: string[] = [];
   if (fd.monitors_enabled && fd.monitors_quantity > 0) parts.push(`${fd.monitors_quantity}x Cuñas`);
   if (fd.extras_sf) parts.push("SF");
@@ -111,7 +111,7 @@ function monitorSummary(fd: any): string {
   return parts.length > 0 ? parts.join(", ") : "Sin configurar";
 }
 
-function infraSummary(fd: any): string {
+function infraSummary(fd: ArtistFormValues): string {
   const items: string[] = [];
   if (fd.infra_cat6 && fd.infra_cat6_quantity) items.push(`${fd.infra_cat6_quantity}x CAT6`);
   if (fd.infra_hma && fd.infra_hma_quantity) items.push(`${fd.infra_hma_quantity}x HMA`);
@@ -158,7 +158,7 @@ export const MobileArtistFormSheet = ({
     fetchArtist();
   }, [artist?.id, selectedDate]);
 
-  const updateFormData = (changes: any) => {
+  const updateFormData = (changes: Partial<ArtistFormValues>) => {
     setFormData(prev => ({ ...prev, ...changes }));
   };
 
@@ -189,10 +189,10 @@ export const MobileArtistFormSheet = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {activeSection === 'consoles' && (
-            <ConsoleSetupSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
+            <ConsoleSetupSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
           )}
           {activeSection === 'wireless' && (
-            <WirelessSetupSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
+            <WirelessSetupSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
           )}
           {activeSection === 'microphones' && (
             <MicKitSection
@@ -204,15 +204,15 @@ export const MobileArtistFormSheet = ({
           )}
           {activeSection === 'monitors' && (
             <>
-              <MonitorSetupSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
-              <ExtraRequirementsSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
+              <MonitorSetupSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
+              <ExtraRequirementsSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
             </>
           )}
           {activeSection === 'infrastructure' && (
-            <InfrastructureSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
+            <InfrastructureSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
           )}
           {activeSection === 'notes' && (
-            <NotesSection formData={formData as any} onChange={updateFormData} />
+            <NotesSection formData={formData} onChange={updateFormData} />
           )}
         </div>
 
@@ -256,7 +256,7 @@ export const MobileArtistFormSheet = ({
         ) : (
           <>
             {/* Basic Info - always visible */}
-            <BasicInfoSection formData={formData as any} onChange={updateFormData} gearSetup={gearSetup} />
+            <BasicInfoSection formData={formData} onChange={updateFormData} gearSetup={gearSetup} />
 
             {/* Technical Sections Navigation */}
             <div className="space-y-2">
