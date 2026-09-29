@@ -83,8 +83,12 @@ export function useArtistFormSend({ open, artistId, artistName, jobId, selectedD
     });
   }, [existing.error, artistId, toast]);
 
-  // Forget a token issued for a previous artist when the dialog is reused.
-  useEffect(() => setIssued(null), [artistId]);
+  // A token issued here is only trusted while the dialog stays open on the same artist. When it
+  // closes, reopens or is reused for another artist, the link shown is whatever the server says
+  // now: the form may have been submitted, expired or replaced in the meantime.
+  useEffect(() => {
+    setIssued(null);
+  }, [open, artistId]);
 
   const token = issued?.token ?? existing.data?.pending?.token ?? "";
   const formExpiresAt = issued?.expiresAt ?? existing.data?.pending?.expiresAt ?? "";
