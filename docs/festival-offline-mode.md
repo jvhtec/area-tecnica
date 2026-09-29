@@ -65,8 +65,8 @@ Con conexión, el menú Offline muestra **Sincronizar cambios** (solo roles de e
 
 ### Puntos de integración
 
-- `src/hooks/useArtistsQuery.ts` — lectura de artistas con fallback offline + borrado encolado.
-- `src/hooks/useArtistMutations.ts` — creación/edición encoladas offline.
+- `src/features/festival-artists/hooks/useArtistsQuery.ts` — lectura de artistas con fallback offline + borrado encolado.
+- `src/features/festival-artists/hooks/useArtistMutations.ts` — creación/edición encoladas offline.
 - `src/features/festival-management/queries.ts` — detalles del festival y documentos desde la instantánea.
 - `src/pages/FestivalArtistManagement.tsx` — contexto (ajustes, tipos de fecha, escenarios) desde la instantánea + banner offline.
 

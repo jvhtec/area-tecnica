@@ -29,7 +29,7 @@ vi.mock("@/hooks/useRealtimeSubscription", () => ({
   useRealtimeSubscription: vi.fn(),
 }));
 
-vi.mock("@/hooks/useArtistsQuery", () => ({
+vi.mock("@/features/festival-artists/hooks/useArtistsQuery", () => ({
   useArtistsQuery: () => ({
     artists: [] as unknown[],
     isLoading: false,

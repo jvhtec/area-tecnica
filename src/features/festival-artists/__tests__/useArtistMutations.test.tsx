@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
-import { useArtistMutations } from "@/hooks/useArtistMutations";
+import { useArtistMutations } from "@/features/festival-artists/hooks/useArtistMutations";
 
 const createWrapper = () => {
   const queryClient = createTestQueryClient();

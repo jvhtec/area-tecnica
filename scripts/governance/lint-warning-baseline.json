@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-29T15:48:24.870Z",
+  "generatedAt": "2026-09-29T16:13:59.301Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 996,
+  "total": 993,
   "domains": {
     "app": {
-      "total": 692,
+      "total": 689,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 560,
+        "@typescript-eslint/no-explicit-any": 557,
         "react-hooks/exhaustive-deps": 68,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 829,
+    "@typescript-eslint/no-explicit-any": 826,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -627,9 +627,6 @@
     },
     "src/pages/EquipmentManagement.tsx": {
       "@typescript-eslint/no-explicit-any": 1
-    },
-    "src/pages/FestivalArtistManagement.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
     },
     "src/pages/FestivalGearManagement.tsx": {
       "react-hooks/exhaustive-deps": 2

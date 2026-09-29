@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type { ProviderValue } from "@/types/festival-form";
 import type { WavesModelSelection } from "@/constants/wavesModels";
 import type { IEMSystem, WirelessSystem } from "@/types/festival-equipment";
@@ -89,10 +90,10 @@ export const NEW_ARTIST_DEFAULTS = {
 } as const;
 
 /** Rows come from PostgREST (nullable columns) or from the older `Artist` UI type. */
-export type ArtistRowInput = Record<string, unknown>;
+export type ArtistRowInput = object;
 
 /** An existing artist handed to an editor: any row shape, but it must be identifiable. */
-export type ArtistEditTarget = ArtistRowInput & { id: string };
+export type ArtistEditTarget = { id: string } & ArtistRowInput;
 
 const text = (value: unknown, fallback = ""): string =>
   typeof value === "string" && value !== "" ? value : fallback;
@@ -118,7 +119,8 @@ export function toArtistFormValues(
   options: { selectedDate?: string } = {},
 ): ArtistFormValues {
   const isNew = !row;
-  const r: ArtistRowInput = row ?? {};
+  // Columns are read one by one through the coercion helpers above, so an untyped view is safe.
+  const r = (row ?? {}) as Record<string, unknown>;
   const date = text(r.date, options.selectedDate ?? "");
   const riderMissing = typeof r.rider_missing === "boolean" ? r.rider_missing : isNew;
 
@@ -252,11 +254,12 @@ const NULLABLE_TEXT_FIELDS: ReadonlySet<keyof ArtistFormValues> = new Set([
 export function toArtistCategoryPatch(
   values: ArtistFormValues,
   category: ArtistEditCategory,
-): Partial<Record<keyof ArtistFormValues, unknown>> {
+): TablesUpdate<"festival_artists"> {
   const patch: Partial<Record<keyof ArtistFormValues, unknown>> = {};
   for (const field of ARTIST_CATEGORY_FIELDS[category] as readonly (keyof ArtistFormValues)[]) {
     const value = values[field];
     patch[field] = NULLABLE_TEXT_FIELDS.has(field) && value === "" ? null : value;
   }
-  return patch;
+  // Every field listed in ARTIST_CATEGORY_FIELDS is a `festival_artists` column of the same type.
+  return patch as TablesUpdate<"festival_artists">;
 }

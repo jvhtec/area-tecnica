@@ -245,13 +245,26 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 | # | Sub-domain | Files | Also closes |
 | --- | --- | --- | --- |
 | 2.1 | **Artist model**: shared zod schema and mapping for all four editors | `ArtistManagementForm`, `MobileArtistFormSheet`, `MobileArtistConfigEditor`, `artistRequirementsFormModel` | FEST-ARCH-01, about 32 `any` warnings |
-| 2.2 | Artists list/table | `FestivalArtistManagement`, `ArtistTable`, `useArtistsQuery`, `useArtistMutations`, `CopyArtistsDialog` (RPC) | ARCH-05, ARCH-06, BUG-07 |
+| 2.2 | Artists list/table. **Done** (see the Phase 2 status note below the table) | `FestivalArtistManagement`, `ArtistTable`, `useArtistsQuery`, `useArtistMutations`, `CopyArtistsDialog` | ARCH-05, ARCH-06 (artist hooks), BUG-07 |
 | 2.3 | Gear and stages | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC) |
 | 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | Delivered as **SCH-A → SCH-B** (see §4b); the UX redesign continues as SCH-C–E |
 | 2.5 | Forms and assets | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links) |
 | 2.6 | Shell and realtime | `useFestivalManagementVm` channel → `useTableSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
 | 2.7 | Print | `usePrintOptionDownloads`, `PrintOptionsDialog`, `festivalPdfGenerator` split by section | ARCH-05 |
 | 2.8 | Flex pullsheet | `PushToFlexPullsheetDialog` → model already extracted (`push-to-flex-pullsheet/model.ts`); split view | ARCH-05 |
+
+**Phase 2 status.**
+
+- **2.1 done** (PR: shared artist form model). `features/festival-artists/model.ts` is the single defaults/mapping table for the desktop form, the mobile sheet and the mobile category editor; the form sections take typed slices of form data instead of `any`.
+- **2.2 done.**
+  - Data access lives in `features/festival-artists/` (`api.ts`, `keys.ts`, `hooks/`). The artist hooks moved there, and `ArtistTable`, `FestivalArtistManagement` and `CopyArtistsDialog` no longer query Supabase directly (five source-boundary exemptions removed). The three editors read and save through `api.ts` too.
+  - `FestivalArtistManagement` 750 → 383 lines, `ArtistTable` 793 → 347, `CopyArtistsDialog` 623 → 178 (split into `artist-table/` and `copy-artists/`).
+  - Dead code removed from the page: `handlePrintTable` (the print dialog has always generated its own PDF) and its `console.log` tracing.
+  - Gear comparisons are derived with `useMemo` instead of effect + state, and gear setups refetch on mount so the table never compares against a stale setup.
+  - **Deviation from the plan:** copying artists is *not* an RPC. It is already a single `INSERT` (atomic), and an RPC would duplicate `rebaseSoundcheckDate` in SQL. The row-building rules moved to the pure, tested `copyArtists.ts`. Revisit if copies ever need server-side authorisation beyond RLS.
+  - BUG-07's stale `soundcheck_date` cast is gone.
+  - Still open for this domain: `ArtistTablePrintDialog` and `ArtistFileDialog` (Phase 2.7 / 2.5) and the offline snapshot readers.
+
 
 ### Phase 3: enhancements (after Phase 2 lands for the relevant sub-domain)
 

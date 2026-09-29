@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
-import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, ImageOff, ImagePlus, Loader2 } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -18,30 +16,25 @@ import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically, sortArtistsByField, ARTIST_SORT_FIELD_LABELS, type ArtistSortField } from "@/utils/artistSorting";
-import { combineWavesDisplay } from "@/constants/wavesModels";
-import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition, type MonConsolePosition } from "@/constants/consoleDrive";
 import { toast } from "sonner";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
-import { GearMismatchIndicator } from "./GearMismatchIndicator";
-import { OutdatedRiderBadge } from "./OutdatedRiderBadge";
-import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
-import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
-import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
-import { ArtistActionButtons } from "./ArtistActionButtons";
+import { ArtistTableRow, type ArtistRowActionProps } from "./artist-table/ArtistTableRow";
+import { StagePlotDialog } from "./artist-table/StagePlotDialog";
 import { ArtistTableHeader } from "./ArtistTableHeader";
 import { buildArtistPdfData } from "@/utils/artistPdfDataMapper";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
-import { formatDifferentScheduleDate, getEffectiveSoundcheckDate } from "@/utils/artistScheduleDates";
 
+import { compareArtistsWithGear } from "@/features/festival-artists/gearComparison";
+import {
+  useFestivalGearSetups,
+  useFestivalStageNames,
+} from "@/features/festival-artists/hooks/useFestivalArtistLookups";
+import { downloadBlobInBrowser } from "@/features/festival-management/commands";
 import type { Artist, ArtistTableProps } from "@/components/festival/artistTableTypes";
 import { useArtistStagePlots } from "@/hooks/festival/useArtistStagePlots";
-import { formatInfrastructure, formatNotes, formatTime, formatTimeRange, formatWiredMics, formatWirelessSystems, renderProviderBadge } from "@/components/festival/artistTableFormatters";
 
 export const ArtistTable = ({
   artists,
@@ -72,133 +65,13 @@ export const ArtistTable = ({
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [printingArtistId, setPrintingArtistId] = useState<string | null>(null);
-  const [stageNames, setStageNames] = useState<Record<number, string>>({});
-  const [gearComparisons, setGearComparisons] = useState<Record<string, ArtistGearComparison>>({});
-  const [festivalGearSetup, setFestivalGearSetup] = useState<FestivalGearSetup | null>(null);
-  const [stageGearSetups, setStageGearSetups] = useState<Record<number, StageGearSetup>>({});
 
-  // Fetch custom stage names
-  useEffect(() => {
-    const fetchStageNames = async () => {
-      if (!jobId) return;
-      
-      const { data: stages, error } = await dataLayerClient.from('festival_stages')
-        .select('number, name')
-        .eq('job_id', jobId);
-        
-      if (error) {
-        console.error('Error fetching stage names:', error);
-        return;
-      }
-      
-      const stageMap: Record<number, string> = {};
-      stages?.forEach(stage => {
-        stageMap[stage.number] = stage.name;
-      });
-      setStageNames(stageMap);
-    };
-    
-    fetchStageNames();
-  }, [jobId]);
-
-  // Fetch festival gear setup and stage-specific setups
-  useEffect(() => {
-    const fetchGearSetups = async () => {
-      if (!jobId) return;
-
-      try {
-        // Fetch main festival gear setup
-        const { data: mainSetup, error: mainError } = await dataLayerClient.from('festival_gear_setups')
-          .select('*')
-          .eq('job_id', jobId)
-          .single();
-
-        if (mainError && mainError.code !== 'PGRST116') {
-          console.error('Error fetching festival gear setup:', mainError);
-          return;
-        }
-
-        setFestivalGearSetup(mapFestivalGearSetup(mainSetup));
-
-        // Fetch stage-specific setups if main setup exists
-        if (mainSetup) {
-          const { data: stageSetups, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
-            .select('*')
-            .eq('gear_setup_id', mainSetup.id);
-
-          if (stageError) {
-            console.error('Error fetching stage gear setups:', stageError);
-          } else {
-            setStageGearSetups(mapStageGearSetups(stageSetups));
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching gear setups:', error);
-      }
-    };
-
-    fetchGearSetups();
-  }, [jobId]);
-
-  // Run gear comparison for all artists when gear setups or artists change
-  useEffect(() => {
-    if (!festivalGearSetup || artists.length === 0) {
-      setGearComparisons({});
-      return;
-    }
-
-    const comparisons: Record<string, ArtistGearComparison> = {};
-    
-    artists.forEach(artist => {
-      const stageSetup = stageGearSetups[artist.stage] || null;
-      
-      // Transform artist to match ArtistRequirements interface
-      const artistRequirements = {
-        name: artist.name,
-        stage: artist.stage,
-        foh_console: artist.foh_console,
-        foh_console_provided_by: artist.foh_console_provided_by,
-        foh_drive: artist.foh_drive as FohDrive | '' | undefined,
-        foh_drive_position: artist.foh_drive_position as ConsolePosition | '' | undefined,
-        mon_console: artist.mon_console,
-        mon_console_provided_by: artist.mon_console_provided_by,
-        mon_position: artist.mon_position as MonConsolePosition | '' | undefined,
-        monitors_from_foh: artist.monitors_from_foh || false,
-        foh_waves_models: artist.foh_waves_models || [],
-        foh_outboard: artist.foh_outboard || "",
-        foh_waves_provided_by: artist.foh_waves_provided_by,
-        mon_waves_models: artist.mon_waves_models || [],
-        mon_outboard: artist.mon_outboard || "",
-        mon_waves_provided_by: artist.mon_waves_provided_by,
-        wireless_systems: artist.wireless_systems || [],
-        wireless_provided_by: artist.wireless_provided_by,
-        iem_systems: artist.iem_systems || [],
-        iem_provided_by: artist.iem_provided_by,
-        monitors_enabled: artist.monitors_enabled,
-        monitors_quantity: artist.monitors_quantity,
-        extras_sf: artist.extras_sf,
-        extras_df: artist.extras_df,
-        extras_djbooth: artist.extras_djbooth,
-        infra_cat6: artist.infra_cat6 || false,
-        infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-        infra_hma: artist.infra_hma || false,
-        infra_hma_quantity: artist.infra_hma_quantity || 0,
-        infra_coax: artist.infra_coax || false,
-        infra_coax_quantity: artist.infra_coax_quantity || 0,
-        infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-        infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-        infra_analog: artist.infra_analog || 0,
-        infrastructure_provided_by: artist.infrastructure_provided_by,
-        mic_kit: artist.mic_kit || 'band',
-        wired_mics: artist.wired_mics || []
-      };
-      
-      const comparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
-      comparisons[artist.id] = comparison;
-    });
-
-    setGearComparisons(comparisons);
-  }, [artists, festivalGearSetup, stageGearSetups]);
+  const { stageNames } = useFestivalStageNames(jobId);
+  const { festivalGearSetup, stageGearSetups } = useFestivalGearSetups(jobId);
+  const gearComparisons = useMemo(
+    () => compareArtistsWithGear(artists, festivalGearSetup, stageGearSetups),
+    [artists, festivalGearSetup, stageGearSetups],
+  );
 
   // Helper function to get stage display name
   const getStageDisplayName = (stageNumber: number) => {
@@ -260,21 +133,11 @@ export const ArtistTable = ({
     try {
       const pdfData = await buildArtistPdfData(artist, jobId);
       
-      // Remove the gearComparison assignment as it doesn't exist in ArtistPdfData
       const blob = await exportArtistPDF(pdfData, {
         language: artist.form_language === "en" ? "en" : "es",
       });
 
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = buildReadableFilename([artist.name, "Requisitos técnicos"]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
+      downloadBlobInBrowser(blob, buildReadableFilename([artist.name, "Requisitos técnicos"]));
 
       toast.success(`PDF generado para ${artist.name}`);
     } catch (error) {
@@ -295,6 +158,25 @@ export const ArtistTable = ({
     setSelectedArtist(artist);
     setFileDialogOpen(true);
   };
+  const actionProps: ArtistRowActionProps = {
+    printingArtistId,
+    uploadingStagePlotArtistId,
+    deletingStagePlotArtistId,
+    deletingArtistId,
+    canDelete,
+    canCreateExtras,
+    canManageFormLinks,
+    isCreatingExtrasFor,
+    onSendForm: handleSendForm,
+    onManageFiles: handleManageFiles,
+    onPrintArtist: handlePrintArtist,
+    onOpenStagePlotCapture: handleOpenStagePlotCapture,
+    onDeleteStagePlot: handleDeleteStagePlot,
+    onEditArtist,
+    onDeleteArtist: handleDeleteClick,
+    onCreateFlexExtras: createExtrasPresupuesto,
+  };
+
   if (isLoading) {
     return <div className="w-full">
         <Loading label="Cargando artistas…" size="lg" className="py-8" />
@@ -363,287 +245,18 @@ export const ArtistTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedFilteredArtists.map(artist => {
-                  const gearComparison = gearComparisons[artist.id];
-                  
-                  return (
-                    <TableRow key={artist.id}>
-                      {/* Artista: name, badges, stage, plot thumbnail */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm break-words">{artist.name}</div>
-                          <div className="flex flex-wrap gap-1">
-                            {crossDateSearch && artist.date && (
-                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                                {formatFestivalDayKey(artist.date, "d MMM", artist.date)}
-                              </Badge>
-                            )}
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">{getStageDisplayName(artist.stage)}</Badge>
-                            {artist.artist_submitted && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-900 border-amber-300" title="Enviado por artista mediante formulario público">
-                                Enviado
-                              </Badge>
-                            )}
-                            {artist.isaftermidnight && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-700 text-white" title="Show después de medianoche">
-                                +24h
-                              </Badge>
-                            )}
-                          </div>
-                          {stagePlotUrls[artist.id] && (
-                            <button
-                              type="button"
-                              className="group relative h-10 w-16 overflow-hidden rounded border"
-                              onClick={() => window.open(stagePlotUrls[artist.id], "_blank", "noopener,noreferrer")}
-                              title="Ver stage plot"
-                            >
-                              <img
-                                src={stagePlotUrls[artist.id]}
-                                alt={`Stage plot de ${artist.name}`}
-                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                              />
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Horarios: load in, show, soundcheck, line check */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="text-xs space-y-0.5">
-                          {artist.load_in_time && (
-                            <div className="text-muted-foreground">Load in: {formatTime(artist.load_in_time)}</div>
-                          )}
-                          <div className="font-medium">Show: {formatTimeRange(artist.show_start, artist.show_end)}</div>
-                          {artist.soundcheck && (
-                            <div className="text-muted-foreground">SC: {[formatDifferentScheduleDate(getEffectiveSoundcheckDate(artist), artist.date),
-                              formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)].filter(Boolean).join(" · ")}</div>
-                          )}
-                          {artist.line_check && (
-                            <div className="text-muted-foreground">LC: {formatTimeRange(artist.line_check_start, artist.line_check_end)}</div>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Consolas: FOH/MON with provider, tech, drive and position */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="text-xs space-y-1">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="break-words">FOH: {artist.foh_console || "Sin especificar"}</span>
-                            {renderProviderBadge(artist.foh_console_provided_by)}
-                            {artist.foh_tech && <Badge variant="outline" className="text-[10px] px-1 py-0">Téc</Badge>}
-                          </div>
-                          {(artist.foh_drive || artist.foh_drive_position) && (
-                            <div className="text-muted-foreground">
-                              Drive: {artist.foh_drive ? FOH_DRIVE_LABELS[artist.foh_drive as FohDrive] || artist.foh_drive : "-"}
-                              {artist.foh_drive_position && ` (${CONSOLE_POSITION_LABELS[artist.foh_drive_position as ConsolePosition] || artist.foh_drive_position})`}
-                            </div>
-                          )}
-                          {artist.monitors_from_foh ? (
-                            <div className="text-muted-foreground">MON desde FOH</div>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="break-words">MON: {artist.mon_console || "Sin especificar"}</span>
-                                {renderProviderBadge(artist.mon_console_provided_by)}
-                                {artist.mon_tech && <Badge variant="outline" className="text-[10px] px-1 py-0">Téc</Badge>}
-                              </div>
-                              {artist.mon_position && (
-                                <div className="text-muted-foreground">
-                                  Pos: {CONSOLE_POSITION_LABELS[artist.mon_position as ConsolePosition] || artist.mon_position}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Waves/Outboard: FOH + MON */}
-                      <TableCell className="px-2 py-2 align-top">
-                        {(artist.foh_waves_models?.length || artist.foh_outboard ||
-                          (!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard))) ? (
-                          <div className="text-xs space-y-1 text-muted-foreground">
-                            {(artist.foh_waves_models?.length || artist.foh_outboard) && (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="break-words">FOH: {combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard)}</span>
-                                {renderProviderBadge(artist.foh_waves_provided_by)}
-                              </div>
-                            )}
-                            {!artist.monitors_from_foh && (artist.mon_waves_models?.length || artist.mon_outboard) && (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="break-words">MON: {combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard)}</span>
-                                {renderProviderBadge(artist.mon_waves_provided_by)}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-
-                      {/* RF/IEM */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="text-xs space-y-1">
-                          {(artist.wireless_provided_by || (artist.wireless_systems && artist.wireless_systems.length > 0)) && (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="break-words" title={formatWirelessSystems(artist.wireless_systems)}>
-                                RF: {formatWirelessSystems(artist.wireless_systems)}
-                              </span>
-                              {renderProviderBadge(artist.wireless_provided_by)}
-                            </div>
-                          )}
-                          {(artist.iem_provided_by || (artist.iem_systems && artist.iem_systems.length > 0)) && (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="break-words" title={formatWirelessSystems(artist.iem_systems, true)}>
-                                IEM: {formatWirelessSystems(artist.iem_systems, true)}
-                              </span>
-                              {renderProviderBadge(artist.iem_provided_by)}
-                            </div>
-                          )}
-                          {!artist.wireless_provided_by && !artist.iem_provided_by &&
-                            !(artist.wireless_systems?.length) && !(artist.iem_systems?.length) && (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Micrófonos */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="text-xs space-y-1">
-                          <Badge variant={
-                            artist.mic_kit === 'festival' ? 'default' :
-                            artist.mic_kit === 'mixed' ? 'secondary' :
-                            'outline'
-                          } className={`text-[10px] px-1 py-0 ${artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''}`}>
-                            {artist.mic_kit === 'festival' ? 'Festival' :
-                             artist.mic_kit === 'mixed' ? 'Mixto' :
-                             'Banda'}
-                          </Badge>
-                          {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="text-muted-foreground line-clamp-3 cursor-help break-words">
-                                  {formatWiredMics(artist.wired_mics)}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-sm">{formatWiredMics(artist.wired_mics)}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Monitores y extras */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="flex flex-wrap gap-1">
-                          {artist.monitors_enabled ? (
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0" title="Cuñas de monitor">
-                              {artist.monitors_quantity}x
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">0x</Badge>
-                          )}
-                          {artist.extras_sf && <Badge variant="outline" className="text-[10px] px-1 py-0" title="Side fill">SF</Badge>}
-                          {artist.extras_df && <Badge variant="outline" className="text-[10px] px-1 py-0" title="Drum fill">DF</Badge>}
-                          {artist.extras_djbooth && <Badge variant="outline" className="text-[10px] px-1 py-0" title="DJ booth">DJ</Badge>}
-                        </div>
-                      </TableCell>
-
-                      {/* Infraestructura */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="text-xs space-y-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="text-muted-foreground line-clamp-3 cursor-help break-words">
-                                {formatInfrastructure(artist)}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="max-w-sm">
-                                <p className="font-medium">Requisitos de infraestructura:</p>
-                                <p>{formatInfrastructure(artist)}</p>
-                                {artist.infrastructure_provided_by && (
-                                  <p className="text-xs mt-1">Provisto por: {artist.infrastructure_provided_by}</p>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                          {renderProviderBadge(artist.infrastructure_provided_by)}
-                        </div>
-                      </TableCell>
-
-                      {/* Notas */}
-                      <TableCell className="px-2 py-2 align-top">
-                        {artist.notes && artist.notes.trim() !== '' ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="text-xs text-muted-foreground line-clamp-3 cursor-help break-words">
-                                {formatNotes(artist.notes)}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="max-w-sm">
-                                <p className="font-medium">Notas:</p>
-                                <p className="whitespace-pre-wrap">{artist.notes}</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-
-                      {/* Estado: rider + material */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <div className="flex flex-col items-start gap-1">
-                          {getArtistRiderStatus(artist) === "outdated" ? (
-                            <OutdatedRiderBadge
-                              artistId={artist.id}
-                              copiedFromDate={artist.rider_copied_from_date}
-                              onDismissed={() => onArtistStagePlotUpdated?.()}
-                              compact
-                            />
-                          ) : (
-                            <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-[10px] px-1 py-0">
-                              {artist.rider_missing ? "Faltante" : "Completo"}
-                            </Badge>
-                          )}
-                          {gearComparison ? (
-                            <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0" title="Sin configuración de material del festival">
-                              Sin conf.
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Acciones */}
-                      <TableCell className="px-2 py-2 align-top">
-                        <ArtistActionButtons
-                          artist={artist}
-                          gearComparison={gearComparison}
-                          printingArtistId={printingArtistId}
-                          uploadingStagePlotArtistId={uploadingStagePlotArtistId}
-                          deletingStagePlotArtistId={deletingStagePlotArtistId}
-                          deletingArtistId={deletingArtistId}
-                          canDelete={canDelete}
-                          canCreateExtras={canCreateExtras}
-                          canManageFormLinks={canManageFormLinks}
-                          isCreatingExtrasFor={isCreatingExtrasFor}
-                          onSendForm={handleSendForm}
-                          onManageFiles={handleManageFiles}
-                          onPrintArtist={handlePrintArtist}
-                          onOpenStagePlotCapture={handleOpenStagePlotCapture}
-                          onDeleteStagePlot={handleDeleteStagePlot}
-                          onEditArtist={onEditArtist}
-                          onDeleteArtist={handleDeleteClick}
-                          onCreateFlexExtras={createExtrasPresupuesto}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {sortedFilteredArtists.map((artist) => (
+                  <ArtistTableRow
+                    key={artist.id}
+                    artist={artist}
+                    stageName={getStageDisplayName(artist.stage)}
+                    crossDateSearch={crossDateSearch}
+                    stagePlotUrl={stagePlotUrls[artist.id]}
+                    gearComparison={gearComparisons[artist.id]}
+                    actionProps={actionProps}
+                    onArtistChanged={onArtistStagePlotUpdated}
+                  />
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -696,81 +309,22 @@ export const ArtistTable = ({
         onChange={handleStagePlotUpload}
       />
 
-      <Dialog
+      <StagePlotDialog
         open={stagePlotDialogOpen}
         onOpenChange={(open) => {
           setStagePlotDialogOpen(open);
-          if (!open) {
-            setSelectedStagePlotArtist(null);
-          }
+          if (!open) setSelectedStagePlotArtist(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Stage Plot {selectedStagePlotArtist ? `- ${selectedStagePlotArtist.name}` : ""}
-            </DialogTitle>
-            <DialogDescription>
-              Pega una captura con `Ctrl+V` / `Cmd+V`, o carga una imagen desde archivo/cámara.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {selectedStagePlotArtist && stagePlotUrls[selectedStagePlotArtist.id] ? (
-              <div className="overflow-hidden rounded border">
-                <img
-                  src={stagePlotUrls[selectedStagePlotArtist.id]}
-                  alt={`Stage plot de ${selectedStagePlotArtist.name}`}
-                  className="max-h-64 w-full object-contain bg-muted/30"
-                />
-              </div>
-            ) : (
-              <div className="rounded border border-dashed p-4 text-sm text-muted-foreground">
-                Este artista todavía no tiene stage plot.
-              </div>
-            )}
-
-            <div
-              className="rounded-lg border border-dashed p-4 text-sm"
-              tabIndex={0}
-              onPaste={handleStagePlotPaste}
-            >
-              Pega aquí la imagen del portapapeles.
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="default"
-                onClick={handleReadClipboardImage}
-                disabled={!selectedStagePlotArtist || isClipboardReading || uploadingStagePlotArtistId === selectedStagePlotArtist?.id}
-              >
-                {isClipboardReading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-2" />}
-                Pegar desde portapapeles
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => stagePlotInputRef.current?.click()}
-                disabled={!selectedStagePlotArtist || uploadingStagePlotArtistId === selectedStagePlotArtist?.id}
-              >
-                Seleccionar archivo
-              </Button>
-              {selectedStagePlotArtist?.stage_plot_file_path && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => handleDeleteStagePlot(selectedStagePlotArtist)}
-                  disabled={deletingStagePlotArtistId === selectedStagePlotArtist.id}
-                >
-                  {deletingStagePlotArtistId === selectedStagePlotArtist.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageOff className="h-4 w-4 mr-2" />}
-                  Eliminar stage plot
-                </Button>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        artist={selectedStagePlotArtist}
+        stagePlotUrls={stagePlotUrls}
+        inputRef={stagePlotInputRef}
+        isClipboardReading={isClipboardReading}
+        uploadingArtistId={uploadingStagePlotArtistId}
+        deletingArtistId={deletingStagePlotArtistId}
+        onPaste={handleStagePlotPaste}
+        onReadClipboard={handleReadClipboardImage}
+        onDelete={handleDeleteStagePlot}
+      />
 
       {selectedArtist && (
         <>

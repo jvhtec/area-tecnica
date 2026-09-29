@@ -11,7 +11,7 @@ import { ExtraRequirementsSection } from "../form/sections/ExtraRequirementsSect
 import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { fetchFestivalArtist } from "@/features/festival-artists/api";
 import { toArtistFormValues, type ArtistFormValues, type ArtistEditTarget, type ArtistRowInput } from "@/features/festival-artists/model";
 import type { LucideIcon } from "lucide-react";
 
@@ -142,13 +142,7 @@ export const MobileArtistFormSheet = ({
     setIsLoading(true);
     const fetchArtist = async () => {
       try {
-        const { data, error } = await dataLayerClient.from("festival_artists")
-          .select("*")
-          .eq("id", artist.id)
-          .single();
-        if (!error && data) {
-          setFormData(buildFormData(data, selectedDate));
-        }
+        setFormData(buildFormData(await fetchFestivalArtist(artist.id), selectedDate));
       } catch (err) {
         console.error("Error fetching artist:", err);
       } finally {
