@@ -1,18 +1,63 @@
-
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { getErrorMessage } from '@/utils/errorMessage';
+import {
+  formatFestivalDayKey,
+  formatFestivalInstant,
+} from "@/features/festival-management/dateFormatting";
+import { copyFestivalShifts } from "@/features/festival-scheduling/api";
+import { getErrorMessage } from "@/utils/errorMessage";
 import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 const formatShiftDate = (value: Date | string) =>
   typeof value === "string"
     ? formatFestivalDayKey(value, "d MMM yyyy", value)
     : formatFestivalInstant(value, "d MMM yyyy");
+
+const copyErrorMessage = (error: unknown): string => {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "23505"
+  ) {
+    return "La fecha destino ya tiene turnos. No se ha copiado nada.";
+  }
+
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? error.message
+      : undefined;
+
+  if (code === "P0002" && message === "festival_shift_copy_source_empty") {
+    return "No se encontraron turnos en la fecha de origen.";
+  }
+  if (code === "P0002" && message === "festival_shift_copy_job_not_found") {
+    return "El trabajo ya no existe.";
+  }
+  if (code === "22023") return "Elige dos fechas distintas.";
+  if (code === "22004") return "Faltan datos para copiar los turnos.";
+  if (code === "42501") return "No tienes permiso para copiar turnos.";
+
+  return getErrorMessage(error, "No se pudieron copiar los turnos.");
+};
 
 interface CopyShiftsDialogProps {
   open: boolean;
@@ -23,13 +68,13 @@ interface CopyShiftsDialogProps {
   onShiftsCopied: () => void;
 }
 
-export const CopyShiftsDialog = ({ 
-  open, 
-  onOpenChange, 
-  sourceDate, 
+export const CopyShiftsDialog = ({
+  open,
+  onOpenChange,
+  sourceDate,
   jobDates,
   jobId,
-  onShiftsCopied 
+  onShiftsCopied,
 }: CopyShiftsDialogProps) => {
   const [targetDate, setTargetDate] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -42,104 +87,20 @@ export const CopyShiftsDialog = ({
 
     try {
       setIsLoading(true);
-      console.log(`Starting copy operation from ${sourceDate} to ${targetDate} for job ${jobId}`);
-
-      // Fetch source shifts and their assignments
-      const { data: shifts, error: shiftsError } = await dataLayerClient.from("festival_shifts")
-        .select(`
-          id,
-          name,
-          start_time,
-          end_time,
-          department,
-          stage,
-          notes
-        `)
-        .eq("job_id", jobId)
-        .eq("date", sourceDate);
-
-      if (shiftsError) {
-        console.error("Error fetching source shifts:", shiftsError);
-        throw shiftsError;
-      }
-
-      if (!shifts || shifts.length === 0) {
-        toast.error("No se encontraron turnos para la fecha de origen seleccionada");
-        return;
-      }
-
-      console.log(`Found ${shifts.length} shifts to copy:`, shifts);
-
-      // For each shift, create a new one and copy its assignments
-      for (const shift of shifts) {
-        console.log(`Copying shift: ${shift.name} (ID: ${shift.id})`);
-        
-        const { data: newShift, error: newShiftError } = await dataLayerClient.from("festival_shifts")
-          .insert({
-            name: shift.name,
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            department: shift.department,
-            stage: shift.stage,
-            notes: shift.notes,
-            date: targetDate,
-            job_id: jobId
-          })
-          .select()
-          .single();
-
-        if (newShiftError) {
-          console.error("Error creating new shift:", newShiftError);
-          throw newShiftError;
-        }
-
-        console.log(`Created new shift with ID: ${newShift.id}`);
-
-        // Get assignments for the source shift
-        const { data: assignments, error: assignmentsError } = await dataLayerClient.from("festival_shift_assignments")
-          .select("*")
-          .eq("shift_id", shift.id);
-
-        if (assignmentsError) {
-          console.error("Error fetching assignments:", assignmentsError);
-          throw assignmentsError;
-        }
-
-        console.log(`Found ${assignments?.length || 0} assignments for shift ${shift.id}:`, assignments);
-
-        // Create new assignments for the new shift
-        if (assignments && assignments.length > 0) {
-          const newAssignments = assignments.map(assignment => ({
-            shift_id: newShift.id,
-            technician_id: assignment.technician_id,
-            external_technician_name: assignment.external_technician_name,
-            role: assignment.role
-          }));
-
-          console.log("Creating new assignments:", newAssignments);
-
-          const { error: insertError } = await dataLayerClient.from("festival_shift_assignments")
-            .insert(newAssignments);
-
-          if (insertError) {
-            console.error("Error creating assignments:", insertError);
-            throw insertError;
-          }
-
-          console.log(`Successfully created ${newAssignments.length} assignments for new shift`);
-        }
-      }
-
-      console.log("Copy operation completed successfully");
-      toast.success(`Se copiaron exitosamente ${shifts.length} turnos con todas las asignaciones a ${formatShiftDate(targetDate)}`);
+      const result = await copyFestivalShifts({
+        jobId,
+        sourceDate,
+        targetDate,
+      });
+      toast.success(
+        `Se copiaron ${result.copiedShifts} turnos y ${result.copiedAssignments} asignaciones a ${formatShiftDate(targetDate)}`,
+      );
 
       // Call the callback to refresh data
       onShiftsCopied();
       onOpenChange(false);
-
     } catch (error) {
-      console.error("Error copying shifts:", error);
-      toast.error(`Error al copiar turnos: ${getErrorMessage(error, 'Error desconocido')}`);
+      toast.error(`Error al copiar turnos: ${copyErrorMessage(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +110,9 @@ export const CopyShiftsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Copiar Turnos a Otra Fecha</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">
+            Copiar Turnos a Otra Fecha
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div>
@@ -157,12 +120,10 @@ export const CopyShiftsDialog = ({
               Fecha de origen: {formatShiftDate(sourceDate)}
             </p>
             <p className="text-xs text-muted-foreground mb-4">
-              Esto copiará todos los turnos y sus técnicos asignados a la fecha destino.
+              Esto copiará todos los turnos y sus técnicos asignados a la fecha
+              destino.
             </p>
-            <Select
-              value={targetDate}
-              onValueChange={setTargetDate}
-            >
+            <Select value={targetDate} onValueChange={setTargetDate}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar fecha destino" />
               </SelectTrigger>
@@ -187,10 +148,7 @@ export const CopyShiftsDialog = ({
             >
               Cancelar
             </Button>
-            <Button
-              onClick={handleCopy}
-              disabled={!targetDate || isLoading}
-            >
+            <Button onClick={handleCopy} disabled={!targetDate || isLoading}>
               {isLoading ? "Copiando..." : "Copiar Turnos y Asignaciones"}
             </Button>
           </div>

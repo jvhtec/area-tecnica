@@ -233,7 +233,7 @@ Each item is sized to be one PR. Phases can overlap. Phase 0 blocks nothing else
 | --- | --- | --- |
 | 1.1 | `JobWorkspaceProfile` derived from `job_type` (labels only, every module on). Drop `?singleJob`, fix the entry points, move labels to Spanish and set them per type. `tourdate` keeps its button. | FEST-BUG-01, -06, ARCH-07 (ENH-01 foundation) |
 | 1.6 | Remove the automatic public-form trigger (`trg_ensure_artist_form_for_missing_rider`) and expire the unused pending tokens that were never sent. Forms are created only from production's send action. | FEST-SEC-01 hardening, ENH-02 prerequisite |
-| 1.2 | `copy_festival_shifts` RPC plus assignment constraints (cleanup query first). | FEST-DATA-01, -02 |
+| 1.2 | **Implemented:** `copy_festival_shifts` copies a day atomically; internal shift crew are unique, require a shift, and must hold an assignment to the same job regardless of status/source. The audited 16 missing production memberships are backfilled without deleting shift data, and membership cleanup removes shift crew when their job assignment is deleted or moved. | FEST-DATA-01, -02 |
 | 1.3 | A single festival day-start source, threaded into the PDF context. | FEST-BUG-03 |
 | 1.4 | Madrid timezone and `es` locale for every date in the module. Remove the 4 source-boundary date entries. | FEST-BUG-04 |
 | 1.5 | Settings read with no insert side effect. Query functions throw, with no silent defaults. | FEST-DATA-04, FEST-BUG-05 |

@@ -34,6 +34,7 @@ import {
   buildShiftCrewCandidates,
   crewDisplayName,
   defaultShiftRole,
+  festivalAssignmentErrorMessage,
   shiftDepartmentLabel,
   shiftRoleOptions,
   type CrewDirectoryEntry,
@@ -51,12 +52,11 @@ interface ManageAssignmentsDialogProps {
 
 type JobCrewData = {
   jobAssignments: JobCrewAssignment[];
-  shiftCrewIds: string[];
   directory: CrewDirectoryEntry[];
   externalNames: string[];
 };
 
-const EMPTY_CREW: JobCrewData = { jobAssignments: [], shiftCrewIds: [], directory: [], externalNames: [] };
+const EMPTY_CREW: JobCrewData = { jobAssignments: [], directory: [], externalNames: [] };
 
 const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
   const [assignmentsResult, shiftCrewResult] = await Promise.all([
@@ -66,7 +66,7 @@ const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
       .eq("job_id", jobId),
     dataLayerClient
       .from("festival_shift_assignments")
-      .select("technician_id, external_technician_name, festival_shifts!inner(job_id)")
+      .select("external_technician_name, festival_shifts!inner(job_id)")
       .eq("festival_shifts.job_id", jobId),
   ]);
 
@@ -75,7 +75,6 @@ const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
 
   const jobAssignments: JobCrewAssignment[] = assignmentsResult.data ?? [];
   const shiftRows = shiftCrewResult.data ?? [];
-  const shiftCrewIds = shiftRows.map((row) => row.technician_id).filter((id): id is string => Boolean(id));
   const externalNames = Array.from(
     new Set(
       shiftRows
@@ -84,7 +83,7 @@ const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
     ),
   ).sort((a, b) => a.localeCompare(b, "es"));
 
-  const ids = Array.from(new Set([...jobAssignments.map((row) => row.technician_id), ...shiftCrewIds]));
+  const ids = Array.from(new Set(jobAssignments.map((row) => row.technician_id)));
   if (ids.length === 0) return { ...EMPTY_CREW, externalNames };
 
   // Display names come from the safe directory: direct `profiles` reads are
@@ -94,7 +93,7 @@ const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
   });
   if (directoryError) throw directoryError;
 
-  return { jobAssignments, shiftCrewIds, directory: directory ?? [], externalNames };
+  return { jobAssignments, directory: directory ?? [], externalNames };
 };
 
 export const ManageAssignmentsDialog = ({
@@ -124,7 +123,6 @@ export const ManageAssignmentsDialog = ({
     () =>
       buildShiftCrewCandidates({
         jobAssignments: crew.jobAssignments,
-        shiftCrewIds: crew.shiftCrewIds,
         directory: crew.directory,
         shiftDepartment: shift.department,
         excludeIds: shift.assignments
@@ -174,7 +172,7 @@ export const ManageAssignmentsDialog = ({
     onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: getErrorMessage(error, "No se pudo asignar el técnico"),
+        description: festivalAssignmentErrorMessage(error),
         variant: "destructive",
       });
     },

@@ -18,9 +18,15 @@ Represents schedule blocks by festival day:
 Represents staffing allocations per shift:
 
 - `shift_id` (FK to `festival_shifts`).
-- `technician_id` (internal user assignment).
+- `technician_id` (internal profile assignment).
 - `external_technician_name` (external staffing).
 - `role`.
+
+Internal technicians must have a `job_assignments` row for the shift's job,
+regardless of assignment status or source. Database triggers enforce this when
+crew or a shift's job changes. Removing or moving a technician's job assignment
+also removes that technician from the old job's shifts. External technicians are exempt from job membership.
+An internal technician can appear only once per shift.
 
 ## 2) Main UI modules
 
@@ -35,6 +41,8 @@ Represents staffing allocations per shift:
   - `src/components/festival/scheduling/ManageAssignmentsDialog.tsx`
   - `src/components/festival/scheduling/CopyShiftsDialog.tsx`
   - `src/components/festival/scheduling/ShiftTimeCalculator.tsx`
+- Scheduling data commands:
+  - `src/features/festival-scheduling/api.ts`
 
 ## 3) Scheduling workflow
 
@@ -57,4 +65,5 @@ Create shifts per day/stage/department
 - Keep shift entity small and declarative; assignments are separate join records.
 - Support both internal and external staffing in the same assignment model.
 - Preserve day/stage segmentation to avoid cross-stage ambiguity.
-- Make copy operations explicit/auditable to reduce accidental propagation.
+- Copy a complete day through `copy_festival_shifts`, which copies shifts and
+  crew atomically and requires an empty target day.
