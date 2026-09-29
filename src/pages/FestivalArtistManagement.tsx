@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentProps } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Info } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
@@ -32,6 +33,12 @@ import { FestivalOfflineBanner } from "@/components/festival/FestivalOfflineBann
 import { ArtistPageActions } from "@/components/festival/ArtistPageActions";
 import { FestivalPushFeedButton } from "@/components/festival/FestivalPushFeedButton";
 import { getErrorStack } from '@/utils/errorMessage';
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  fetchFestivalDateTypes,
+  fetchFestivalSettings,
+} from "@/features/festival-management/queries";
+import { trackError } from "@/lib/errorTracking";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -58,8 +65,6 @@ const FestivalArtistManagement = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printDate, setPrintDate] = useState("");
   const [printStage, setPrintStage] = useState("");
-  const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
-  const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
@@ -70,114 +75,52 @@ const FestivalArtistManagement = () => {
 
   // A non-empty search term searches every festival date instead of just the selected one.
   const isCrossDateSearch = searchTerm.trim().length > 0;
-  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(jobId, selectedDate, dayStartTime, { searchAllDates: isCrossDateSearch });
-  const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
-  const {
-    data: festivalSettings
-  } = useQuery({
+  const { data: festivalSettings, error: festivalSettingsError } = useQuery({
     queryKey: queryKeys.scope('festival-settings', jobId),
     networkMode: "always",
-    queryFn: async () => {
-      if (!jobId) return null;
-
-      // Read-only inside the fallback race: a timed-out online promise is
-      // abandoned, so it must never write. Throws on Supabase errors so
-      // fetchWithOfflineFallback can serve the snapshot.
-      const fetchSettingsOnline = async () => {
-        const {
-          data: existingSettings,
-          error: fetchError
-        } = await supabase.from('festival_settings').select('*').eq('job_id', jobId).maybeSingle();
-        if (fetchError) throw fetchError;
-        return { settings: existingSettings ?? null };
-      };
-
-      try {
-        const result = await fetchWithOfflineFallback({
-          jobId,
-          online: fetchSettingsOnline,
-          offline: async () => {
-            const offlineContext = await getOfflineFestivalContext(jobId);
-            return offlineContext ? { settings: offlineContext.festivalSettings } : null;
-          },
-        });
-        if (result.fromOffline || result.data.settings) {
-          return result.data.settings;
-        }
-
-        // Row confirmed missing by a live online read: create the defaults
-        // here, outside the race, where the write is awaited (never abandoned)
-        const {
-          data: newSettings,
-          error: createError
-        } = await supabase.from('festival_settings').insert({
-          job_id: jobId,
-          day_start_time: "07:00"
-        }).select().single();
-        if (createError) {
-          console.error('Error creating festival settings:', createError);
-          return null;
-        }
-        return newSettings;
-      } catch (error) {
-        // No snapshot to fall back to: keep the previous default behaviour
-        console.error('Error fetching festival settings:', error);
-        return null;
-      }
-    },
+    queryFn: () => fetchFestivalSettings(jobId!),
     enabled: !!jobId
   });
-  useEffect(() => {
-    if (festivalSettings?.day_start_time) {
-      setDayStartTime(festivalSettings.day_start_time);
-    }
-  }, [festivalSettings]);
+  const dayStartTime = festivalSettings?.day_start_time ?? DEFAULT_FESTIVAL_DAY_START_TIME;
   const {
     data: dateTypeData,
+    error: dateTypesError,
     refetch: refetchDateTypes
   } = useQuery({
     queryKey: queryKeys.scope('job-date-types', jobId),
     networkMode: "always",
-    queryFn: async () => {
-      if (!jobId) return {};
-
-      // Throws on error so the snapshot fallback kicks in — an empty map
-      // would silently mark every festival date as a show day.
-      const fetchDateTypesOnline = async () => {
-        const {
-          data,
-          error
-        } = await supabase.from('job_date_types').select('*').eq('job_id', jobId);
-        if (error) throw error;
-        const dateTypeMap: Record<string, string> = {};
-        data.forEach(item => {
-          dateTypeMap[`${jobId}-${item.date}`] = item.type;
-        });
-        return dateTypeMap;
-      };
-
-      try {
-        const result = await fetchWithOfflineFallback({
-          jobId,
-          online: fetchDateTypesOnline,
-          offline: async () => (await getOfflineFestivalContext(jobId))?.dateTypes ?? null,
-        });
-        return result.data;
-      } catch (error) {
-        // Return null (not {}) so previously loaded date types are kept:
-        // the state effect skips null, while an empty map would silently
-        // mark every festival date as a show day.
-        console.error('Error fetching date types:', error);
-        return null;
-      }
-    },
+    queryFn: () => fetchFestivalDateTypes(jobId!),
     enabled: !!jobId
   });
+  const dateTypes = dateTypeData ?? {};
+
   useEffect(() => {
-    if (dateTypeData) {
-      setDateTypes(dateTypeData);
+    if (festivalSettingsError) {
+      void trackError(festivalSettingsError, {
+        system: "festivals",
+        operation: "load-festival-settings",
+        jobId,
+      });
     }
-  }, [dateTypeData]);
+  }, [festivalSettingsError, jobId]);
+
+  useEffect(() => {
+    if (dateTypesError) {
+      void trackError(dateTypesError, {
+        system: "festivals",
+        operation: "load-festival-date-types",
+        jobId,
+      });
+    }
+  }, [dateTypesError, jobId]);
+
+  const { artists, isLoading: artistsLoading, deleteArtist, invalidateArtists, isOfflineData } = useArtistsQuery(
+    jobId,
+    selectedDate,
+    dayStartTime,
+    { searchAllDates: isCrossDateSearch },
+  );
+  const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
 
   const { data: stageNamesData } = useQuery({
     queryKey: queryKeys.scope('festival-stages', jobId),
@@ -679,6 +622,14 @@ const FestivalArtistManagement = () => {
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-4 p-6">
+            {(festivalSettingsError || dateTypesError) && (
+              <Alert variant="destructive">
+                <AlertTitle>No se pudo cargar toda la configuración</AlertTitle>
+                <AlertDescription>
+                  Revisa la conexión y vuelve a intentarlo. Se mantienen valores seguros por defecto sin guardar cambios.
+                </AlertDescription>
+              </Alert>
+            )}
             {showArtistControls && (
               <ArtistTableFilters
                 searchTerm={searchTerm}

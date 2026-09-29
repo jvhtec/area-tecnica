@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CalendarX, Library, MessageCircle, Plus, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,6 +21,12 @@ import { getErrorMessage } from '@/utils/errorMessage';
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { formatMadridDateKey, getMadridTodayKey } from "@/utils/timezoneUtils";
+import {
+  DEFAULT_FESTIVAL_DAY_START_TIME,
+  fetchFestivalDateTypes,
+  fetchFestivalSettings,
+} from "@/features/festival-management/queries";
+import { trackError } from "@/lib/errorTracking";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
@@ -47,8 +54,6 @@ export const FestivalScheduling = ({
   const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
   const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
-  const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const { toast } = useToast();
   
   const formatDateToString = useCallback((date: Date): string => {
@@ -62,62 +67,42 @@ export const FestivalScheduling = ({
   }, []);
 
   // Fetch festival settings for day start time
-  const { data: festivalSettings } = useQuery({
+  const { data: festivalSettings, error: festivalSettingsError } = useQuery({
     queryKey: queryKeys.scope('festival-settings', jobId),
-    queryFn: async () => {
-      if (!jobId) return null;
-
-      const { data: existingSettings, error: fetchError } = await dataLayerClient.from('festival_settings')
-        .select('*')
-        .eq('job_id', jobId)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('Error fetching festival settings:', fetchError);
-        return null;
-      }
-
-      return existingSettings;
-    },
+    networkMode: "always",
+    queryFn: () => fetchFestivalSettings(jobId),
     enabled: !!jobId
   });
-
-  useEffect(() => {
-    if (festivalSettings?.day_start_time) {
-      setDayStartTime(festivalSettings.day_start_time);
-    }
-  }, [festivalSettings]);
+  const dayStartTime = festivalSettings?.day_start_time ?? DEFAULT_FESTIVAL_DAY_START_TIME;
 
   // Fetch date types for navigation
-  const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
+  const { data: dateTypeData, error: dateTypesError, refetch: refetchDateTypes } = useQuery({
     queryKey: queryKeys.scope('job-date-types', jobId),
-    queryFn: async () => {
-      if (!jobId) return {};
-
-      const { data, error } = await dataLayerClient.from('job_date_types')
-        .select('*')
-        .eq('job_id', jobId);
-
-      if (error) {
-        console.error('Error fetching date types:', error);
-        return {};
-      }
-
-      const dateTypeMap: Record<string, string> = {};
-      data.forEach(item => {
-        dateTypeMap[`${jobId}-${item.date}`] = item.type;
-      });
-
-      return dateTypeMap;
-    },
+    networkMode: "always",
+    queryFn: () => fetchFestivalDateTypes(jobId),
     enabled: !!jobId
   });
+  const dateTypes = dateTypeData ?? {};
 
   useEffect(() => {
-    if (dateTypeData) {
-      setDateTypes(dateTypeData);
+    if (festivalSettingsError) {
+      void trackError(festivalSettingsError, {
+        system: "festivals",
+        operation: "load-festival-settings",
+        jobId,
+      });
     }
-  }, [dateTypeData]);
+  }, [festivalSettingsError, jobId]);
+
+  useEffect(() => {
+    if (dateTypesError) {
+      void trackError(dateTypesError, {
+        system: "festivals",
+        operation: "load-festival-date-types",
+        jobId,
+      });
+    }
+  }, [dateTypesError, jobId]);
 
   // Set initial selected date
   useEffect(() => {
@@ -294,6 +279,14 @@ export const FestivalScheduling = ({
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
+          {(festivalSettingsError || dateTypesError) && (
+            <Alert variant="destructive">
+              <AlertTitle>No se pudo cargar toda la configuración</AlertTitle>
+              <AlertDescription>
+                Revisa la conexión y vuelve a intentarlo. Se mantienen valores seguros por defecto sin guardar cambios.
+              </AlertDescription>
+            </Alert>
+          )}
           {jobDates.length > 0 && (
             <FestivalDateNavigation
               jobDates={jobDates}
