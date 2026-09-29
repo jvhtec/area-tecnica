@@ -19,7 +19,7 @@ SELECT ok(
 
 SELECT ok(
   (
-    SELECT bool_and(proconfig @> ARRAY['search_path=pg_catalog, public']::text[])
+    SELECT bool_and(proconfig = ARRAY['search_path=""']::text[])
     FROM pg_proc
     WHERE oid IN (
       to_regprocedure('public.can_read_festival_job(uuid)'),
@@ -27,7 +27,7 @@ SELECT ok(
       to_regprocedure('public.festival_department_matches(text,text)')
     )
   ),
-  'festival read-scope helpers pin pg_catalog/public search_path'
+  'festival read-scope helpers pin an empty search path'
 );
 
 SELECT ok(
@@ -228,6 +228,8 @@ INSERT INTO public.job_assignments (
    'fa100000-0000-0000-0000-000000000001'::uuid, 'confirmed', 'FOH-A', NULL, false, 'direct'),
   ('fa300000-0000-0000-0000-000000000002'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
    'fa100000-0000-0000-0000-000000000002'::uuid, 'invited', NULL, 'OP-L', false, 'direct'),
+  ('fa300000-0000-0000-0000-000000000004'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
+   'fa100000-0000-0000-0000-000000000004'::uuid, 'declined', 'SND-TECH-A', NULL, false, 'direct'),
   ('fa300000-0000-0000-0000-000000000005'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
    'fa100000-0000-0000-0000-000000000005'::uuid, 'declined', 'FOH-A', NULL, false, 'direct'),
   ('fa300000-0000-0000-0000-000000000008'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
@@ -245,7 +247,7 @@ VALUES
   ('fa400000-0000-0000-0000-000000000003'::uuid, 'fa200000-0000-0000-0000-000000000001'::uuid,
    '2031-07-10'::date, '08:00'::time, '09:00'::time, 'Briefing general', 1, NULL);
 
--- The shift-only technician has no job_assignments row, only this shift.
+-- A declined job assignment still establishes membership for shift integrity.
 INSERT INTO public.festival_shift_assignments (id, shift_id, technician_id, role, external_technician_name)
 VALUES
   ('fa500000-0000-0000-0000-000000000001'::uuid, 'fa400000-0000-0000-0000-000000000002'::uuid,
@@ -373,24 +375,24 @@ SELECT results_eq(
 );
 
 -- ---------------------------------------------------------------------------
--- Technician on a shift but with no job assignment
+-- Declined job technician on an out-of-department shift
 -- ---------------------------------------------------------------------------
 SELECT set_config('request.jwt.claim.sub', 'fa100000-0000-0000-0000-000000000004', true);
 
 SELECT results_eq(
   $$SELECT name FROM public.festival_shifts WHERE job_id = 'fa200000-0000-0000-0000-000000000001'::uuid ORDER BY name$$,
   $$VALUES ('Luces tarde'::text)$$,
-  'shift-only tech sees the shift they are on, even outside their profile department'
+  'a declined job technician sees only the shift they are still on'
 );
-SELECT is((SELECT shift_assignments FROM public.__fest_scope_counts), 1, 'shift-only tech sees their own shift assignment');
+SELECT is((SELECT shift_assignments FROM public.__fest_scope_counts), 1, 'declined shift technician sees their own crew row');
 SELECT ok(
   (SELECT gear = 1 AND settings = 1 AND stages = 1 AND logos = 1 FROM public.__fest_scope_counts),
-  'shift-only tech reads job-level festival data for that job'
+  'a declined shift technician still reads job-level festival data for that shift job'
 );
-SELECT is((SELECT forms FROM public.__fest_scope_counts), 0, 'shift-only tech cannot read public form tokens');
+SELECT is((SELECT forms FROM public.__fest_scope_counts), 0, 'declined shift technician cannot read public form tokens');
 SELECT ok(
   (SELECT artists = 1 AND artist_files = 1 AND rider_objects = 2 FROM public.__fest_scope_counts),
-  'shift-only tech reads the artists and riders of the job they work on'
+  'declined shift technician reads artists and riders through their shift membership'
 );
 
 -- ---------------------------------------------------------------------------

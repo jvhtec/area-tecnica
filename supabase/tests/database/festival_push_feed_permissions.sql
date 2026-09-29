@@ -311,7 +311,9 @@ SET email = excluded.email,
     department = excluded.department;
 
 INSERT INTO public.activity_catalog (code, label, default_visibility, severity, toast_enabled)
-VALUES ('job.created', 'Job created', 'management', 'info', false)
+VALUES
+  ('job.created', 'Job created', 'management', 'info', false),
+  ('assignment.created', 'Assignment created', 'management', 'info', false)
 ON CONFLICT (code) DO UPDATE
 SET label = excluded.label,
     default_visibility = excluded.default_visibility,
@@ -331,6 +333,33 @@ SET title = excluded.title,
     start_time = excluded.start_time,
     end_time = excluded.end_time,
     job_type = excluded.job_type;
+
+INSERT INTO public.job_assignments (
+  id, job_id, technician_id, status, sound_role,
+  use_tour_multipliers, assignment_source
+)
+VALUES
+  (
+    '21000000-0000-0000-0000-000000000001'::uuid,
+    '20000000-0000-0000-0000-000000000001'::uuid,
+    '10000000-0000-0000-0000-000000000003'::uuid,
+    'confirmed',
+    'foh',
+    false,
+    'direct'
+  ),
+  (
+    '21000000-0000-0000-0000-000000000002'::uuid,
+    '20000000-0000-0000-0000-000000000001'::uuid,
+    '10000000-0000-0000-0000-000000000004'::uuid,
+    'confirmed',
+    'house',
+    false,
+    'direct'
+  )
+ON CONFLICT (job_id, technician_id) DO UPDATE
+SET status = excluded.status,
+    sound_role = excluded.sound_role;
 
 INSERT INTO public.festival_shifts (id, job_id, date, start_time, end_time, name, stage, department)
 VALUES

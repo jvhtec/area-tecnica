@@ -2543,7 +2543,7 @@ export type Database = {
           external_technician_name: string | null
           id: string
           role: string
-          shift_id: string | null
+          shift_id: string
           technician_id: string | null
         }
         Insert: {
@@ -2551,7 +2551,7 @@ export type Database = {
           external_technician_name?: string | null
           id?: string
           role: string
-          shift_id?: string | null
+          shift_id: string
           technician_id?: string | null
         }
         Update: {
@@ -2559,7 +2559,7 @@ export type Database = {
           external_technician_name?: string | null
           id?: string
           role?: string
-          shift_id?: string | null
+          shift_id?: string
           technician_id?: string | null
         }
         Relationships: [
@@ -2568,6 +2568,20 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "festival_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_shift_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_shift_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -12706,6 +12720,17 @@ export type Database = {
       convert_to_timezone: {
         Args: { target_timezone?: string; timestamp_val: string }
         Returns: string
+      }
+      copy_festival_shifts: {
+        Args: {
+          p_job_id: string
+          p_source_date: string
+          p_target_date: string
+        }
+        Returns: {
+          copied_assignments: number
+          copied_shifts: number
+        }[]
       }
       create_default_logistics_events_for_job: {
         Args: { job_id: string }

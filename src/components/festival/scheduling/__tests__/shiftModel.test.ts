@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildShiftCrewCandidates,
   defaultShiftRole,
+  festivalAssignmentErrorMessage,
   formatShiftDuration,
   isOvernightShift,
   normalizeShiftDepartment,
@@ -103,7 +104,6 @@ describe("crew candidates", () => {
 
   const candidates = buildShiftCrewCandidates({
     jobAssignments,
-    shiftCrewIds: ["shift-only"],
     directory,
     shiftDepartment: "lights",
     excludeIds: ["already-on-shift"],
@@ -111,16 +111,28 @@ describe("crew candidates", () => {
 
   it("puts people working the shift's department on this job first", () => {
     const inDepartment = candidates.filter((candidate) => candidate.inShiftDepartment).map((candidate) => candidate.id);
-    expect(inDepartment).toEqual(["sound-profile-lights-role", "no-role"]);
+    expect(inDepartment).toEqual(["sound-profile-lights-role", "declined", "no-role"]);
   });
 
-  it("keeps the rest of the crew available, drops declined and already assigned people", () => {
+  it("keeps every job member available regardless of status and drops non-members and existing crew", () => {
     const ids = candidates.map((candidate) => candidate.id);
     expect(ids).toContain("sound-tech");
-    expect(ids).toContain("shift-only");
-    expect(ids).not.toContain("declined");
+    expect(ids).toContain("declined");
+    expect(ids).not.toContain("shift-only");
     expect(ids).not.toContain("already-on-shift");
     expect(candidates.find((candidate) => candidate.id === "house")?.isHouseTech).toBe(true);
+  });
+
+  it("translates assignment integrity failures", () => {
+    expect(festivalAssignmentErrorMessage({ code: "23505", message: "duplicate" })).toBe(
+      "Este técnico ya está asignado al turno.",
+    );
+    expect(
+      festivalAssignmentErrorMessage({
+        code: "23514",
+        message: "festival_shift_technician_not_on_job",
+      }),
+    ).toBe("Este técnico no pertenece al trabajo.");
   });
 
   it("preselects the person's job role and otherwise keeps the current role", () => {

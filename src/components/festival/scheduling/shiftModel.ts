@@ -211,21 +211,19 @@ const hasAnyJobRole = (assignment: JobCrewAssignment | undefined) =>
   );
 
 /**
- * Crew who can be put on a shift: everyone on the job (not declined) plus
- * people already on another shift of the job, minus those already on this
- * shift. Whether someone belongs to the shift's department comes from the
- * role they hold on the job, and only falls back to their profile department
- * when the assignment has no role at all.
+ * Crew who can be put on a shift: everyone with an assignment to the job,
+ * regardless of status or assignment source, minus those already on this shift. Whether someone belongs to
+ * the shift's department comes from the role they hold on the job, and only
+ * falls back to their profile department when the assignment has no role at
+ * all.
  */
 export const buildShiftCrewCandidates = ({
   jobAssignments,
-  shiftCrewIds,
   directory,
   shiftDepartment,
   excludeIds,
 }: {
   jobAssignments: readonly JobCrewAssignment[];
-  shiftCrewIds: readonly string[];
   directory: readonly CrewDirectoryEntry[];
   shiftDepartment: string | null | undefined;
   excludeIds: readonly string[];
@@ -234,12 +232,10 @@ export const buildShiftCrewCandidates = ({
   const roleColumn = department ? ROLE_COLUMN_BY_DEPARTMENT[department] : undefined;
   const directoryById = new Map(directory.map((entry) => [entry.id, entry]));
   const assignmentById = new Map(
-    jobAssignments
-      .filter((assignment) => assignment.status !== "declined")
-      .map((assignment) => [assignment.technician_id, assignment]),
+    jobAssignments.map((assignment) => [assignment.technician_id, assignment]),
   );
   const excluded = new Set(excludeIds);
-  const ids = new Set([...assignmentById.keys(), ...shiftCrewIds]);
+  const ids = new Set(assignmentById.keys());
 
   const candidates: ShiftCrewCandidate[] = [];
   for (const id of ids) {
@@ -267,6 +263,21 @@ export const buildShiftCrewCandidates = ({
       Number(b.isHouseTech) - Number(a.isHouseTech) ||
       a.name.localeCompare(b.name, "es"),
   );
+};
+
+/** User-facing copy for database invariants enforced on shift assignments. */
+export const festivalAssignmentErrorMessage = (error: unknown): string => {
+  if (!error || typeof error !== "object") return "No se pudo asignar el técnico";
+
+  const code = "code" in error && typeof error.code === "string" ? error.code : "";
+  const message = "message" in error && typeof error.message === "string" ? error.message : "";
+
+  if (code === "23505") return "Este técnico ya está asignado al turno.";
+  if (code === "23514" && message.includes("festival_shift_technician_not_on_job")) {
+    return "Este técnico no pertenece al trabajo.";
+  }
+
+  return "No se pudo asignar el técnico";
 };
 
 /** Role options for a shift's department; empty means the role is typed freely. */
