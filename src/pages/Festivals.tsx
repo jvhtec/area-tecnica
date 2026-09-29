@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { Loading } from "@/components/ui/loading";
 import { ensureRealtimeConnection } from "@/lib/supabase";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
@@ -18,9 +16,10 @@ import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/Prin
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
-import { isFestivalLikeJobType } from "@/utils/jobType";
 import { canPrintFestivalDocuments, isAdminRole } from "@/utils/permissions";
 import { getErrorMessage } from '@/utils/errorMessage';
+import { useFestivalJobs } from "@/features/festival-management/festivalJobs";
+import type { Job } from "@/types/job";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -30,45 +29,23 @@ const ITEMS_PER_PAGE = 9; // 3x3 grid
 const Festivals = () => {
   const navigate = useNavigate();
   const { userRole, userDepartment, isLoading: authLoading } = useOptimizedAuth();
+  const [showCompleted, setShowCompleted] = useState(false);
   const {
-    jobs,
+    data: festivalJobs = [],
     isLoading,
     isError,
     error,
-    isRefreshing,
     refetch,
-    realtimeStatus
-  } = useJobsRealtime();
+  } = useFestivalJobs(showCompleted);
   
-  const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
-  const [showCompleted, setShowCompleted] = useState(false);
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  // Filter jobs to only show festivals, excluding cancelled ones, and optionally completed ones
-  useEffect(() => {
-    if (jobs) {
-      let festivals = jobs.filter(job => 
-        isFestivalLikeJobType(job.job_type) &&
-        job.status !== 'Cancelado'
-      );
-      
-      // Filter out completed festivals if showCompleted is false
-      if (!showCompleted) {
-        festivals = festivals.filter(job => job.status !== 'Completado');
-      }
-      
-      setFestivalJobs(festivals);
-      
-      festivals.forEach(fetchFestivalLogo);
-    }
-  }, [jobs, showCompleted]);
 
   // Auto-center on closest festival when festivals are loaded
   useEffect(() => {
@@ -117,7 +94,7 @@ const Festivals = () => {
   }, [isError, connectionStatus, isLoading, recoverConnection, refetch]);
 
   // Fetch festival logo for each festival job
-  const fetchFestivalLogo = async (job: any) => {
+  const fetchFestivalLogo = useCallback(async (job: Job) => {
     try {
       const logoUrl = await fetchJobLogo(job.id);
       
@@ -130,7 +107,13 @@ const Festivals = () => {
     } catch (err) {
       console.error('Error in fetchFestivalLogo:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    festivalJobs.forEach((job) => {
+      void fetchFestivalLogo(job);
+    });
+  }, [festivalJobs, fetchFestivalLogo]);
 
   // Scroll to specific festival
   const scrollToFestival = (festivalId: string) => {
