@@ -12,6 +12,7 @@ import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { toArtistFormValues, type ArtistRowInput } from "@/features/festival-artists/model";
 import type { LucideIcon } from "lucide-react";
 
 type FormSection = 'hub' | 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes';
@@ -63,66 +64,8 @@ const SECTION_META: Record<Exclude<FormSection, 'hub'>, { title: string; subtitl
   notes: { title: "Notas", subtitle: "Notas de producción" },
 };
 
-function buildFormData(artistData?: any, selectedDate?: string) {
-  const isNewArtist = !artistData;
-  return {
-    name: artistData?.name || "",
-    stage: artistData?.stage || 1,
-    date: artistData?.date || selectedDate || "",
-    show_start: artistData?.show_start || "20:00",
-    show_end: artistData?.show_end || "21:00",
-    soundcheck: artistData?.soundcheck || false,
-    soundcheck_date: artistData?.soundcheck_date || artistData?.date || selectedDate || "",
-    soundcheck_start: artistData?.soundcheck_start || "18:00",
-    soundcheck_end: artistData?.soundcheck_end || "19:00",
-    line_check: artistData?.line_check || false,
-    line_check_start: artistData?.line_check_start || "",
-    line_check_end: artistData?.line_check_end || "",
-    load_in_time: artistData?.load_in_time || "",
-    foh_console: artistData?.foh_console || "",
-    foh_console_provided_by: artistData?.foh_console_provided_by || "festival",
-    foh_drive: artistData?.foh_drive || "",
-    foh_drive_position: artistData?.foh_drive_position || "",
-    mon_console: artistData?.mon_console || "",
-    mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
-    mon_position: artistData?.mon_position || "",
-    monitors_from_foh: artistData?.monitors_from_foh || false,
-    foh_waves_models: artistData?.foh_waves_models || [],
-    foh_outboard: artistData?.foh_outboard || "",
-    foh_waves_provided_by: artistData?.foh_waves_provided_by || "festival",
-    mon_waves_models: artistData?.mon_waves_models || [],
-    mon_outboard: artistData?.mon_outboard || "",
-    mon_waves_provided_by: artistData?.mon_waves_provided_by || "festival",
-    wireless_systems: artistData?.wireless_systems || [],
-    iem_systems: artistData?.iem_systems || [],
-    wireless_provided_by: artistData?.wireless_provided_by || "festival",
-    iem_provided_by: artistData?.iem_provided_by || "festival",
-    monitors_enabled: artistData?.monitors_enabled || false,
-    monitors_quantity: artistData?.monitors_quantity || 0,
-    extras_sf: artistData?.extras_sf || false,
-    extras_df: artistData?.extras_df || false,
-    extras_djbooth: artistData?.extras_djbooth || false,
-    extras_wired: artistData?.extras_wired || "",
-    infra_cat6: artistData?.infra_cat6 || false,
-    infra_cat6_quantity: artistData?.infra_cat6_quantity || 0,
-    infra_hma: artistData?.infra_hma || false,
-    infra_hma_quantity: artistData?.infra_hma_quantity || 0,
-    infra_coax: artistData?.infra_coax || false,
-    infra_coax_quantity: artistData?.infra_coax_quantity || 0,
-    infra_opticalcon_duo: artistData?.infra_opticalcon_duo || false,
-    infra_opticalcon_duo_quantity: artistData?.infra_opticalcon_duo_quantity || 0,
-    infra_analog: artistData?.infra_analog || 0,
-    infrastructure_provided_by: artistData?.infrastructure_provided_by || "festival",
-    other_infrastructure: artistData?.other_infrastructure || "",
-    notes: artistData?.notes || "",
-    foh_tech: artistData?.foh_tech || false,
-    mon_tech: artistData?.mon_tech || false,
-    rider_missing: artistData?.rider_missing ?? isNewArtist,
-    isaftermidnight: artistData?.isaftermidnight || false,
-    mic_kit: (artistData?.mic_kit || "festival") as 'festival' | 'band' | 'mixed',
-    wired_mics: artistData?.wired_mics || [],
-  };
-}
+const buildFormData = (artistData: ArtistRowInput | null | undefined, selectedDate?: string) =>
+  toArtistFormValues(artistData, { selectedDate });
 
 // Summary helpers
 function consoleSummary(fd: any): string {

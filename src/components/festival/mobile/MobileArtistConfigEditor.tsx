@@ -18,6 +18,11 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { combineWavesDisplay } from "@/constants/wavesModels";
 import { FOH_DRIVE_LABELS, CONSOLE_POSITION_LABELS, type FohDrive, type ConsolePosition } from "@/constants/consoleDrive";
 import type { Artist } from "@/components/festival/artistTableTypes";
+import {
+  toArtistCategoryPatch,
+  toArtistFormValues,
+  type ArtistRowInput,
+} from "@/features/festival-artists/model";
 import type { FestivalRadioSystem } from "@/types/festival-equipment";
 
 type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
@@ -320,61 +325,8 @@ export const ReadOnlyArtistCategoryContent = ({
   );
 };
 
-function buildFormData(artist: Artist) {
-  return {
-    name: artist.name || "",
-    stage: artist.stage || 1,
-    date: artist.date || "",
-    show_start: artist.show_start || "",
-    show_end: artist.show_end || "",
-    soundcheck: artist.soundcheck || false,
-    soundcheck_date: artist.soundcheck_date || artist.date || "",
-    soundcheck_start: artist.soundcheck_start || "",
-    soundcheck_end: artist.soundcheck_end || "",
-    foh_console: artist.foh_console || "",
-    foh_console_provided_by: artist.foh_console_provided_by || "festival",
-    foh_drive: artist.foh_drive || "",
-    foh_drive_position: artist.foh_drive_position || "",
-    mon_console: artist.mon_console || "",
-    mon_console_provided_by: artist.mon_console_provided_by || "festival",
-    mon_position: artist.mon_position || "",
-    monitors_from_foh: artist.monitors_from_foh || false,
-    foh_waves_models: artist.foh_waves_models || [],
-    foh_outboard: artist.foh_outboard || "",
-    foh_waves_provided_by: artist.foh_waves_provided_by || "festival",
-    mon_waves_models: artist.mon_waves_models || [],
-    mon_outboard: artist.mon_outboard || "",
-    mon_waves_provided_by: artist.mon_waves_provided_by || "festival",
-    wireless_systems: artist.wireless_systems || [],
-    iem_systems: artist.iem_systems || [],
-    wireless_provided_by: artist.wireless_provided_by || "festival",
-    iem_provided_by: artist.iem_provided_by || "festival",
-    monitors_enabled: artist.monitors_enabled || false,
-    monitors_quantity: artist.monitors_quantity || 0,
-    extras_sf: artist.extras_sf || false,
-    extras_df: artist.extras_df || false,
-    extras_djbooth: artist.extras_djbooth || false,
-    extras_wired: artist.extras_wired || "",
-    infra_cat6: artist.infra_cat6 || false,
-    infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-    infra_hma: artist.infra_hma || false,
-    infra_hma_quantity: artist.infra_hma_quantity || 0,
-    infra_coax: artist.infra_coax || false,
-    infra_coax_quantity: artist.infra_coax_quantity || 0,
-    infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-    infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-    infra_analog: artist.infra_analog || 0,
-    infrastructure_provided_by: artist.infrastructure_provided_by || "festival",
-    other_infrastructure: artist.other_infrastructure || "",
-    notes: artist.notes || "",
-    foh_tech: artist.foh_tech || false,
-    mon_tech: artist.mon_tech || false,
-    rider_missing: artist.rider_missing ?? false,
-    isaftermidnight: artist.isaftermidnight || false,
-    mic_kit: (artist.mic_kit || "festival") as 'festival' | 'band' | 'mixed',
-    wired_mics: artist.wired_mics || [],
-  };
-}
+const buildFormData = (artist: Artist | ArtistRowInput) =>
+  toArtistFormValues(artist as ArtistRowInput);
 
 export const MobileArtistConfigEditor = ({
   artist,
@@ -399,7 +351,7 @@ export const MobileArtistConfigEditor = ({
           .single();
 
         if (!error && data) {
-          setFormData(buildFormData(data as unknown as Artist));
+          setFormData(buildFormData(data));
         }
       } catch (err) {
         console.error("Error fetching artist data:", err);
@@ -422,75 +374,7 @@ export const MobileArtistConfigEditor = ({
 
     setIsSaving(true);
     try {
-      // Build the update payload based on category
-      let updatePayload: FestivalArtistUpdate = {};
-
-      switch (category) {
-        case 'consoles':
-          updatePayload = {
-            foh_console: formData.foh_console,
-            foh_console_provided_by: formData.foh_console_provided_by,
-            foh_drive: formData.foh_drive || null,
-            foh_drive_position: formData.foh_drive_position || null,
-            mon_console: formData.mon_console,
-            mon_console_provided_by: formData.mon_console_provided_by,
-            mon_position: formData.mon_position || null,
-            monitors_from_foh: formData.monitors_from_foh,
-            foh_waves_models: formData.foh_waves_models,
-            foh_outboard: formData.foh_outboard || null,
-            foh_waves_provided_by: formData.foh_waves_provided_by,
-            mon_waves_models: formData.mon_waves_models,
-            mon_outboard: formData.mon_outboard || null,
-            mon_waves_provided_by: formData.mon_waves_provided_by,
-            foh_tech: formData.foh_tech,
-            mon_tech: formData.mon_tech,
-          };
-          break;
-        case 'wireless':
-          updatePayload = {
-            wireless_systems: formData.wireless_systems as Json,
-            wireless_provided_by: formData.wireless_provided_by,
-            iem_systems: formData.iem_systems as Json,
-            iem_provided_by: formData.iem_provided_by,
-          };
-          break;
-        case 'microphones':
-          updatePayload = {
-            mic_kit: formData.mic_kit,
-            wired_mics: formData.wired_mics as Json,
-          };
-          break;
-        case 'monitors':
-          updatePayload = {
-            monitors_enabled: formData.monitors_enabled,
-            monitors_quantity: formData.monitors_quantity,
-            extras_sf: formData.extras_sf,
-            extras_df: formData.extras_df,
-            extras_djbooth: formData.extras_djbooth,
-            extras_wired: formData.extras_wired || null,
-          };
-          break;
-        case 'infrastructure':
-          updatePayload = {
-            infra_cat6: formData.infra_cat6,
-            infra_cat6_quantity: formData.infra_cat6_quantity,
-            infra_hma: formData.infra_hma,
-            infra_hma_quantity: formData.infra_hma_quantity,
-            infra_coax: formData.infra_coax,
-            infra_coax_quantity: formData.infra_coax_quantity,
-            infra_opticalcon_duo: formData.infra_opticalcon_duo,
-            infra_opticalcon_duo_quantity: formData.infra_opticalcon_duo_quantity,
-            infra_analog: formData.infra_analog,
-            infrastructure_provided_by: formData.infrastructure_provided_by,
-            other_infrastructure: formData.other_infrastructure || null,
-          };
-          break;
-        case 'notes':
-          updatePayload = {
-            notes: formData.notes || null,
-          };
-          break;
-      }
+      const updatePayload = toArtistCategoryPatch(formData, category) as FestivalArtistUpdate;
 
       const { error } = await dataLayerClient.from("festival_artists")
         .update(updatePayload)
