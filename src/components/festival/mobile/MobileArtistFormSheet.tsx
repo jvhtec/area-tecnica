@@ -10,7 +10,7 @@ import { MonitorSetupSection } from "../form/sections/MonitorSetupSection";
 import { ExtraRequirementsSection } from "../form/sections/ExtraRequirementsSection";
 import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
-import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
+import { useCombinedGearSetup } from "@/features/festival-gear/hooks/useCombinedGearSetup";
 import { fetchFestivalArtist } from "@/features/festival-artists/api";
 import { toArtistFormValues, type ArtistFormValues, type ArtistEditTarget, type ArtistRowInput } from "@/features/festival-artists/model";
 import type { LucideIcon } from "lucide-react";

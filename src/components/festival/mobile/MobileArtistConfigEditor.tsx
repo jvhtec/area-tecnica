@@ -9,7 +9,7 @@ import { MonitorSetupSection } from "../form/sections/MonitorSetupSection";
 import { ExtraRequirementsSection } from "../form/sections/ExtraRequirementsSection";
 import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
-import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
+import { useCombinedGearSetup } from "@/features/festival-gear/hooks/useCombinedGearSetup";
 import { fetchFestivalArtist, updateFestivalArtist } from "@/features/festival-artists/api";
 import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";

@@ -246,7 +246,7 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
 | --- | --- | --- | --- |
 | 2.1 | **Artist model**: shared zod schema and mapping for all four editors | `ArtistManagementForm`, `MobileArtistFormSheet`, `MobileArtistConfigEditor`, `artistRequirementsFormModel` | FEST-ARCH-01, about 32 `any` warnings |
 | 2.2 | Artists list/table. **Done** (see the Phase 2 status note below the table) | `FestivalArtistManagement`, `ArtistTable`, `useArtistsQuery`, `useArtistMutations`, `CopyArtistsDialog` | ARCH-05, ARCH-06 (artist hooks), BUG-07 |
-| 2.3 | Gear and stages | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC) |
+| 2.3 | Gear and stages. **Done** (see the Phase 2 status note) | `FestivalGearManagement`, `FestivalGearSetupForm`, `gear-setup/*`, `useCombinedGearSetup` | DATA-03 (gear save RPC), DATA-04 (stage rows) |
 | 2.4 | Scheduling | `FestivalScheduling`, `ShiftsTable`, `Create/Edit/ManageAssignments/CopyShifts` dialogs, `useFestivalShifts` | Delivered as **SCH-A → SCH-B** (see §4b); the UX redesign continues as SCH-C–E |
 | 2.5 | Forms and assets | `ArtistFormLinkDialog`, `ArtistFormLinksDialog`, `FestivalLogoManager`, `ArtistFileDialog` | DATA-03 (bulk links) |
 | 2.6 | Shell and realtime | `useFestivalManagementVm` channel → `useTableSubscription`, `FestivalManagementView` split, `Festivals` page server-side filter and batched logos | ARCH-03, ARCH-06 |
@@ -265,6 +265,14 @@ Each PR has the same shape: move reads and writes into `features/festival-<domai
   - BUG-07's stale `soundcheck_date` cast is gone.
   - Still open for this domain: `ArtistTablePrintDialog` and `ArtistFileDialog` (Phase 2.7 / 2.5) and the offline snapshot readers.
 
+- **2.3 done.**
+  - `features/festival-gear/` (`model.ts`, `api.ts`, `keys.ts`, `hooks/`) owns the gear setup and stages. `useCombinedGearSetup` moved there and now uses React Query.
+  - Two `SECURITY INVOKER` RPCs (`20260929170000_festival_gear_stage_rpcs.sql`, pgTAP in `festival_gear_stage_rpcs.sql`): `save_festival_stage_gear_setup` replaces the three-statement client save of a non-primary stage (create/widen the global setup + upsert the stage row) with one transaction, and `set_festival_max_stages` sets the stage count and creates the missing named stage rows atomically. Row-level policies still decide who may write.
+  - Stage rows are no longer inserted as a side effect of *reading* the gear page (FEST-DATA-04's sibling): unnamed stages read as "Stage n" through `buildFestivalStageOptions`, and renaming upserts.
+  - The form only takes server data on stage change or while pristine, so a realtime refetch cannot wipe unsaved edits (tested).
+  - `FestivalGearManagement` 637 → 174 lines and `FestivalGearSetupForm` 767 → 114; desktop and mobile layouts render from one section list (`GearSetupSections`), and the stage tabs are `StageSelector`.
+  - Dead code removed from the page: the print-options dialog and `handlePrintAllDocumentation` (nothing ever opened the dialog).
+  - Still open: `PushToFlexPullsheetDialog` (2.8), the shell's gear reads (2.6), and per-stage rows for `max_stages` beyond what is created on demand (ENH-05).
 
 ### Phase 3: enhancements (after Phase 2 lands for the relevant sub-domain)
 

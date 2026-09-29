@@ -9,7 +9,7 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
-import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
+import { useCombinedGearSetup } from "@/features/festival-gear/hooks/useCombinedGearSetup";
 import {
   toArtistFormValues,
   type ArtistFormValues,
