@@ -284,7 +284,7 @@ export const ArtistTable = ({
       setPrintingArtistId(null);
     }
   };
-  const handleGenerateLink = (artist: Artist) => {
+  const handleSendForm = (artist: Artist) => {
     setSelectedArtist(artist);
     setLinkDialogOpen(true);
   };
@@ -631,7 +631,7 @@ export const ArtistTable = ({
                           canCreateExtras={canCreateExtras}
                           canManageFormLinks={canManageFormLinks}
                           isCreatingExtrasFor={isCreatingExtrasFor}
-                          onGenerateLink={handleGenerateLink}
+                          onSendForm={handleSendForm}
                           onManageFiles={handleManageFiles}
                           onPrintArtist={handlePrintArtist}
                           onOpenStagePlotCapture={handleOpenStagePlotCapture}
@@ -660,7 +660,7 @@ export const ArtistTable = ({
               crossDateSearch={crossDateSearch}
               onEditArtist={onEditArtist}
               onDeleteArtist={handleDeleteClick}
-              onGenerateLink={handleGenerateLink}
+              onSendForm={handleSendForm}
               onManageFiles={handleManageFiles}
               onPrintArtist={handlePrintArtist}
               onOpenStagePlotCapture={handleOpenStagePlotCapture}

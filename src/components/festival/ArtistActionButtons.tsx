@@ -30,7 +30,7 @@ interface ArtistActionButtonsProps<TArtist extends ArtistActionArtist> {
   canCreateExtras: boolean;
   canManageFormLinks?: boolean;
   isCreatingExtrasFor: (id: string) => boolean;
-  onGenerateLink: (artist: TArtist) => void;
+  onSendForm: (artist: TArtist) => void;
   onManageFiles: (artist: TArtist) => void;
   onPrintArtist: (artist: TArtist) => void;
   onOpenStagePlotCapture: (artist: TArtist) => void;
@@ -51,7 +51,7 @@ export function ArtistActionButtons<TArtist extends ArtistActionArtist>({
   canCreateExtras,
   canManageFormLinks = false,
   isCreatingExtrasFor,
-  onGenerateLink,
+  onSendForm,
   onManageFiles,
   onPrintArtist,
   onOpenStagePlotCapture,
@@ -85,9 +85,9 @@ export function ArtistActionButtons<TArtist extends ArtistActionArtist>({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {canManageFormLinks && (
-            <DropdownMenuItem onClick={() => onGenerateLink(artist)}>
+            <DropdownMenuItem onClick={() => onSendForm(artist)}>
               <Link className="h-4 w-4 mr-2" />
-              Generar enlace de formulario
+              Enviar formulario al artista
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={() => onManageFiles(artist)}>

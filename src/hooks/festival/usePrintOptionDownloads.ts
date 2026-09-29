@@ -31,7 +31,7 @@ import {
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { fetchPreparedFestivalLogo } from "@/utils/pdf/logoOptimization";
-import { ensurePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
+import { getActivePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
 import { buildReadableFilename } from "@/utils/fileName";
 import { getArtistRiderStatus } from "@/features/festival-management/selectors";
 import {
@@ -152,7 +152,7 @@ export const usePrintOptionDownloads = ({
       ])
     );
 
-    const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
+    const publicFormLinksByArtistId = await getActivePublicArtistFormLinks(
       missingRiderArtists.map((artist) => ({
         id: artist.id,
         form_language: artist.form_language,

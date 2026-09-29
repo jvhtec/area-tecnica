@@ -6,14 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { Copy, Mail, Printer, RefreshCcw } from "lucide-react";
+import { Copy, Mail, Printer } from "lucide-react";
 import { useState, useEffect } from "react";
-import { addDays } from "date-fns";
 import { generateQRCode } from "@/utils/qrcode";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 import { buildReadableFilename } from "@/utils/fileName";
+import { getOrCreateArtistFormTokenForSend } from "@/features/festival-forms/formTokens";
 
 interface ArtistFormLinkDialogProps {
   open: boolean;
@@ -34,7 +34,6 @@ export const ArtistFormLinkDialog = ({
 }: ArtistFormLinkDialogProps) => {
   const { toast } = useToast();
   const [formToken, setFormToken] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
   const [recipientEmails, setRecipientEmails] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
@@ -68,77 +67,6 @@ export const ArtistFormLinkDialog = ({
       };
       return escaped[char] || char;
     });
-
-  const generateNewLink = async () => {
-    if (!artistId) {
-      toast({
-        title: "Error",
-        description: "Se requiere el ID del artista para generar un enlace de formulario.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // First, mark any existing pending forms for THIS ARTIST as expired
-      const { error: updateError } = await dataLayerClient.from('festival_artist_forms')
-        .update({
-          status: 'expired',
-          expires_at: new Date().toISOString() // Expire immediately
-        })
-        .eq('artist_id', artistId) // Only affect THIS artist's forms
-        .eq('status', 'pending');
-
-      if (updateError) {
-        console.error('Error expiring existing forms:', updateError);
-        throw updateError;
-      }
-
-      // Create a new form entry that expires in 7 days
-      const expiresAt = addDays(new Date(), 7);
-      
-      const { data, error } = await dataLayerClient.from('festival_artist_forms')
-        .insert({
-          artist_id: artistId,
-          expires_at: expiresAt.toISOString(),
-          status: 'pending'
-        })
-        .select('token')
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error generating form link:', error);
-        throw error;
-      }
-
-      if (!data?.token) {
-        throw new Error('Failed to generate form token');
-      }
-
-      setFormToken(data.token);
-      setFormExpiresAt(expiresAt.toISOString());
-
-      toast({
-        title: tx("Enlace generado", "Link generated"),
-        description: tx(
-          "El nuevo enlace de formulario ha sido generado correctamente.",
-          "The new form link was generated successfully."
-        ),
-      });
-    } catch (error: unknown) {
-      console.error('Error generating form link:', error);
-      toast({
-        title: tx("Error", "Error"),
-        description:
-          getErrorMessage(error) ||
-          tx("No se pudo generar el enlace del formulario.", "Could not generate the form link."),
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const copyToClipboard = async () => {
     try {
@@ -323,12 +251,12 @@ export const ArtistFormLinkDialog = ({
 
   const sendLinkByEmail = async () => {
     const recipients = parseRecipientEmails(recipientEmails);
-    if (!formLink || recipients.length === 0) {
+    if (!artistId || recipients.length === 0) {
       toast({
         title: tx("Faltan datos", "Missing data"),
         description: tx(
-          "Añade al menos un correo y genera un enlace antes de enviar.",
-          "Add at least one email and generate a link before sending."
+          "Añade al menos un correo antes de enviar.",
+          "Add at least one email before sending."
         ),
         variant: "destructive",
       });
@@ -337,13 +265,23 @@ export const ArtistFormLinkDialog = ({
 
     setIsSendingEmail(true);
     try {
-      const { blob: blankTemplateBlob, fileName: blankTemplateFileName } = await buildBlankTemplatePdf(formLink);
+      const issuedForm = await getOrCreateArtistFormTokenForSend(artistId);
+      const outgoingToken = issuedForm.token;
+      setFormToken(issuedForm.token);
+      setFormExpiresAt(issuedForm.expiresAt);
+
+      const outgoingFormLink = buildFormUrl(outgoingToken);
+      const outgoingQrCodeDataUrl = await generateQRCode(outgoingFormLink);
+      setQrCodeDataUrl(outgoingQrCodeDataUrl);
+
+      const { blob: blankTemplateBlob, fileName: blankTemplateFileName } =
+        await buildBlankTemplatePdf(outgoingFormLink);
       const blankTemplateBase64 = await blobToBase64(blankTemplateBlob);
 
       const inlineImages =
-        qrCodeDataUrl && qrCodeDataUrl.startsWith("data:")
+        outgoingQrCodeDataUrl.startsWith("data:")
           ? (() => {
-              const [meta, content] = qrCodeDataUrl.split(",", 2);
+              const [meta, content] = outgoingQrCodeDataUrl.split(",", 2);
               const mimeType = meta.match(/data:(.*?);base64/)?.[1] || "image/png";
               return [
                 {
@@ -363,7 +301,7 @@ export const ArtistFormLinkDialog = ({
         <p>You can complete the technical form for <strong>${escapeHtml(artistName)}</strong> using the button below.</p>
         <p>
           <a
-            href="${formLink}"
+            href="${outgoingFormLink}"
             target="_blank"
             rel="noopener noreferrer"
             style="display:inline-block;padding:10px 16px;border-radius:6px;background:#7d0101;color:#ffffff;text-decoration:none;font-weight:600;"
@@ -385,7 +323,7 @@ export const ArtistFormLinkDialog = ({
         <p>Puedes completar el formulario técnico de <strong>${escapeHtml(artistName)}</strong> usando el botón de abajo.</p>
         <p>
           <a
-            href="${formLink}"
+            href="${outgoingFormLink}"
             target="_blank"
             rel="noopener noreferrer"
             style="display:inline-block;padding:10px 16px;border-radius:6px;background:#7d0101;color:#ffffff;text-decoration:none;font-weight:600;"
@@ -568,35 +506,23 @@ export const ArtistFormLinkDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Enlace de Formulario para {artistName}</DialogTitle>
+          <DialogTitle>{tx("Enviar formulario a", "Send form to")} {artistName}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
           {formLink ? (
             <>
               <div className="flex space-x-2">
-                <Input
-                  value={formLink}
-                  readOnly
-                  className="flex-1"
-                />
+                <Input value={formLink} readOnly className="flex-1" />
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={copyToClipboard}
-                  title="Copiar enlace"
+                  title={tx("Copiar enlace", "Copy link")}
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <Button
-                onClick={generateNewLink}
-                className="w-full"
-                disabled={isLoading}
-              >
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Generar Nuevo Enlace
-              </Button>
               {formExpiresAt && (
                 <div
                   className={`rounded-md border px-3 py-2 text-sm ${
@@ -605,122 +531,82 @@ export const ArtistFormLinkDialog = ({
                       : "border-blue-200 bg-blue-50 text-blue-900"
                   }`}
                 >
-                  <p>
-                    {tx("Este enlace expira:", "This link expires:")} <strong>{formatExpiry(formExpiresAt)}</strong>
-                  </p>
-                  <p className="text-xs mt-1">
-                    {tx(
-                      "Si necesitas rotarlo antes, usa “Generar Nuevo Enlace”.",
-                      "If you need to rotate it before then, use “Generate New Link”."
-                    )}
-                  </p>
+                  {tx("Este enlace expira:", "This link expires:")} {" "}
+                  <strong>{formatExpiry(formExpiresAt)}</strong>
                 </div>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={downloadBlankTemplatePdf}
-                disabled={isGeneratingBlankPdf}
-                className="w-full"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
-              </Button>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  {tx("Idioma del artista", "Artist language")}
-                </label>
-                <Select
-                  value={artistLanguage}
-                  onValueChange={(value) => {
-                    const nextLanguage = value === "en" ? "en" : "es";
-                    void saveArtistLanguage(nextLanguage);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="es">Español</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {qrCodeDataUrl && (
-                <div className="flex justify-center p-2 border rounded-md">
-                  <img src={qrCodeDataUrl} alt="QR Formulario Artista" className="h-40 w-40 object-contain" />
-                </div>
-              )}
-              <div className="space-y-2">
-                <label htmlFor="recipient-emails" className="text-sm font-medium">
-                  Enviar enlace por email (externo)
-                </label>
-                <Textarea
-                  id="recipient-emails"
-                  value={recipientEmails}
-                  onChange={(e) => setRecipientEmails(e.target.value)}
-                  placeholder="correo1@dominio.com, correo2@dominio.com"
-                  rows={3}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={sendLinkByEmail}
-                  disabled={isSendingEmail}
-                  className="w-full"
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  {isSendingEmail ? "Enviando correo..." : "Enviar Enlace + QR"}
-                </Button>
-              </div>
             </>
           ) : (
-            <div className="space-y-2">
-              <div className="rounded-md border border-muted px-3 py-2 text-xs text-muted-foreground">
-                {tx(
-                  "Los enlaces públicos expiran en 7 días. Puedes regenerarlos para rotarlos cuando sea necesario.",
-                  "Public links expire in 7 days. You can regenerate them to rotate when needed."
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  {tx("Idioma del artista", "Artist language")}
-                </label>
-                <Select
-                  value={artistLanguage}
-                  onValueChange={(value) => {
-                    const nextLanguage = value === "en" ? "en" : "es";
-                    void saveArtistLanguage(nextLanguage);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="es">Español</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={generateNewLink}
-                className="w-full"
-                disabled={isLoading}
-              >
-                Generar Enlace
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={downloadBlankTemplatePdf}
-                disabled={isGeneratingBlankPdf}
-                className="w-full"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
-              </Button>
+            <div className="rounded-md border border-muted px-3 py-2 text-xs text-muted-foreground">
+              {tx(
+                "El enlace público se creará al enviar el formulario y expirará en 7 días.",
+                "The public link will be created when the form is sent and will expire in 7 days.",
+              )}
             </div>
           )}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              {tx("Idioma del artista", "Artist language")}
+            </label>
+            <Select
+              value={artistLanguage}
+              onValueChange={(value) => {
+                const nextLanguage = value === "en" ? "en" : "es";
+                void saveArtistLanguage(nextLanguage);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {qrCodeDataUrl && (
+            <div className="flex justify-center p-2 border rounded-md">
+              <img src={qrCodeDataUrl} alt="QR Formulario Artista" className="h-40 w-40 object-contain" />
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={downloadBlankTemplatePdf}
+            disabled={isGeneratingBlankPdf}
+            className="w-full"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
+          </Button>
+
+          <div className="space-y-2">
+            <label htmlFor="recipient-emails" className="text-sm font-medium">
+              {tx("Enviar formulario por email", "Send form by email")}
+            </label>
+            <Textarea
+              id="recipient-emails"
+              value={recipientEmails}
+              onChange={(event) => setRecipientEmails(event.target.value)}
+              placeholder="correo1@dominio.com, correo2@dominio.com"
+              rows={3}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={sendLinkByEmail}
+              disabled={isSendingEmail}
+              className="w-full"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              {isSendingEmail
+                ? tx("Enviando formulario...", "Sending form...")
+                : tx("Enviar formulario + QR", "Send form + QR")}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

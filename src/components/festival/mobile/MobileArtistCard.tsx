@@ -175,7 +175,7 @@ interface MobileArtistCardProps {
   mode?: 'edit' | 'readonly';
   onEditCategory: (artistId: string, category: MobileConfigCategory) => void;
   onEditArtist: (artist: Artist) => void;
-  onGenerateLink: (artist: Artist) => void;
+  onSendForm: (artist: Artist) => void;
   onManageFiles: (artist: Artist) => void;
   onPrintArtist: (artist: Artist) => void;
   onDeleteArtist: (artist: Artist) => void;
@@ -203,7 +203,7 @@ export const MobileArtistCard = ({
   mode = 'edit',
   onEditCategory,
   onEditArtist,
-  onGenerateLink,
+  onSendForm,
   onManageFiles,
   onPrintArtist,
   onDeleteArtist,
@@ -411,9 +411,9 @@ export const MobileArtistCard = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => onGenerateLink(artist)}
-              aria-label="Generar enlace de formulario"
-              title="Generar enlace de formulario"
+              onClick={() => onSendForm(artist)}
+              aria-label="Enviar formulario al artista"
+              title="Enviar formulario al artista"
             >
               <Link className="h-4 w-4" />
             </Button>

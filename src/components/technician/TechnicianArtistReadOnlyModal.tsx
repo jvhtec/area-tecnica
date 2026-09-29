@@ -708,7 +708,7 @@ export function TechnicianArtistReadOnlyModal({
                     selectedDate={group.date}
                     onEditArtist={NOOP}
                     onDeleteArtist={NOOP}
-                    onGenerateLink={NOOP}
+                    onSendForm={NOOP}
                     onManageFiles={NOOP}
                     onPrintArtist={NOOP}
                     onOpenStagePlotCapture={NOOP}

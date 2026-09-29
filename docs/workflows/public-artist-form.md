@@ -12,8 +12,8 @@ The public artist form allows festival artists to submit their technical require
 |----------|------|
 | **Public route** | `/festival/artist-form/{token}` (no auth required) |
 | **Form component** | `src/components/festival/ArtistForm.tsx` |
-| **Link generation** | `src/components/festival/ArtistFormLinkDialog.tsx` |
-| **Batch links** | `src/components/festival/ArtistFormLinksDialog.tsx` |
+| **Send + token issuance** | `src/components/festival/ArtistFormLinkDialog.tsx`, `src/features/festival-forms/formTokens.ts` |
+| **Active-link overview** | `src/components/festival/ArtistFormLinksDialog.tsx` |
 | **View submission** | `src/components/festival/ArtistFormSubmissionDialog.tsx` |
 | **Requirements form** | `src/components/festival/ArtistRequirementsForm.tsx` |
 | **Submit edge fn** | `supabase/functions/submit-public-artist-form/index.ts` |
@@ -35,13 +35,17 @@ The public artist form allows festival artists to submit their technical require
 ## Token Lifecycle
 
 ```text
-1. GENERATE → Create festival_artist_forms row with UUID token, 7-day expiry, 'pending' status
-2. ROTATE → Mark existing pending forms for same artist as 'expired'
-3. DISTRIBUTE → Send link via email/QR code (URL: /festival/artist-form/{token}?lang=es|en)
+1. SEND → The explicit email action calls `get_or_create_festival_artist_form_for_send`
+2. ISSUE → Reuse the artist's active token or create one with a 7-day expiry and `pending` status
+3. DISTRIBUTE → Send the link and QR code (URL: /festival/artist-form/{token}?lang=es|en)
 4. VALIDATE → On access, check: token exists, status = 'pending', expires_at > now
 5. SUBMIT → Mark form as 'submitted', insert to festival_artist_form_submissions
 6. EXPIRE → Auto-expire past expiry date; prevent resubmission (409 if already submitted)
 ```
+
+Missing-rider reports and festival PDF bundles only reuse an active token that
+was issued by the send action. Generating or downloading a report never creates
+a public bearer credential.
 
 ## Form Sections
 
@@ -60,7 +64,8 @@ The public artist form allows festival artists to submit their technical require
 ## Workflow
 
 ```text
-1. MANAGEMENT generates token via ArtistFormLinkDialog
+1. MANAGEMENT sends the form via ArtistFormLinkDialog
+   - A token is minted only as part of this explicit send action
    - 7-day expiry
    - Supports email sending with QR code
    - Printable blank template (PDF with QR)
@@ -100,7 +105,8 @@ The public artist form allows festival artists to submit their technical require
 - **Token-based**: No user session needed — UUID token is the auth mechanism
 - **Time-limited**: 7-day default expiry
 - **Single-use**: Cannot resubmit after submission (409 error)
-- **Token rotation**: Generating a new token expires old ones
+- **No automatic issuance**: `rider_missing` changes do not create bearer tokens
+- **Single active token**: The send RPC and a partial unique index prevent duplicate pending credentials
 - **File validation**: Size limits, type whitelist applied by edge function
 
 ## Integration Points

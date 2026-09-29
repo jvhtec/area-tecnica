@@ -13000,6 +13000,15 @@ export type Database = {
         Args: { p_from?: string; p_to?: string }
         Returns: Json
       }
+      get_or_create_festival_artist_form_for_send: {
+        Args: { p_artist_id: string }
+        Returns: {
+          created: boolean
+          expires_at: string
+          form_id: string
+          token: string
+        }[]
+      }
       get_profile_directory: {
         Args: { p_profile_ids?: string[] }
         Returns: {

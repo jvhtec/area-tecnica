@@ -5,9 +5,9 @@ import { Loading } from "@/components/ui/loading";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { Loader2, Copy, RefreshCcw, Printer } from "lucide-react";
+import { Copy, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { addDays, isAfter } from "date-fns";
+import { isAfter } from "date-fns";
 import { formatFestivalDayKey, formatFestivalInstant } from "@/features/festival-management/dateFormatting";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
@@ -48,7 +48,6 @@ export const ArtistFormLinksDialog = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [artistLinks, setArtistLinks] = useState<ArtistLinkData[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
   const [dateFilter, setDateFilter] = useState<string>(selectedDate || ALL_DATES_VALUE);
 
@@ -71,16 +70,18 @@ export const ArtistFormLinksDialog = ({
       }
 
       const artistIds = artistsData.map((artist) => artist.id);
+      const now = new Date();
 
       const { data: formsData, error: formsError } = await dataLayerClient.from('festival_artist_forms')
         .select('artist_id, token, expires_at, status, updated_at, created_at')
         .in('artist_id', artistIds)
+        .eq('status', 'pending')
+        .gt('expires_at', now.toISOString())
         .order('updated_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false, nullsFirst: false });
 
       if (formsError) throw formsError;
 
-      const now = new Date();
       // Mirrors the selected `festival_artist_forms` columns, which are all nullable.
       const formByArtistId = new Map<
         string,
@@ -94,22 +95,7 @@ export const ArtistFormLinksDialog = ({
       >();
 
       (formsData || []).forEach((form) => {
-        if (!form.artist_id) return;
-
-        const current = formByArtistId.get(form.artist_id);
-        const isFormActive = form.status === 'pending' && !!form.expires_at && isAfter(new Date(form.expires_at), now);
-
-        if (!current) {
-          formByArtistId.set(form.artist_id, form);
-          return;
-        }
-
-        const isCurrentActive =
-          current.status === 'pending' &&
-          !!current.expires_at &&
-          isAfter(new Date(current.expires_at), now);
-
-        if (isFormActive && !isCurrentActive) {
+        if (form.artist_id && !formByArtistId.has(form.artist_id)) {
           formByArtistId.set(form.artist_id, form);
         }
       });
@@ -164,50 +150,6 @@ export const ArtistFormLinksDialog = ({
   const availableDates = [...new Set(artistLinks.map((artist) => artist.date).filter(Boolean) as string[])].sort(
     (a, b) => new Date(a).getTime() - new Date(b).getTime(),
   );
-
-  const generateLinks = async () => {
-    setIsGenerating(true);
-    try {
-      for (const artist of filteredArtistLinks) {
-        if (!artist.token || 
-            (artist.expires_at && !isAfter(new Date(artist.expires_at), new Date()))) {
-          await dataLayerClient.from('festival_artist_forms')
-            .update({
-              status: 'expired',
-              expires_at: new Date().toISOString()
-            })
-            .eq('artist_id', artist.artistId)
-            .eq('status', 'pending');
-
-          const expiresAt = addDays(new Date(), 7);
-          await dataLayerClient.from('festival_artist_forms')
-            .insert({
-              artist_id: artist.artistId,
-              expires_at: expiresAt.toISOString(),
-              status: 'pending'
-            });
-        }
-      }
-
-      await fetchArtistLinks();
-      toast({
-        title: "Éxito",
-        description:
-          dateFilter === ALL_DATES_VALUE
-            ? "Enlaces faltantes generados correctamente para todas las fechas"
-            : "Enlaces faltantes generados correctamente para la fecha seleccionada",
-      });
-    } catch (error) {
-      console.error('Error generating links:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron generar los enlaces",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const copyAllLinks = () => {
     const buildLink = (artist: ArtistLinkData) =>
@@ -383,7 +325,7 @@ export const ArtistFormLinksDialog = ({
 
         <div className="space-y-6">
           <div className="rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
-            Los enlaces públicos expiran en 7 días. Puedes filtrar por fecha o ver todas las fechas del festival.
+            Los enlaces públicos se crean al enviar cada formulario y expiran en 7 días. Puedes filtrar por fecha o ver todas las fechas del trabajo.
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Fecha:</span>
@@ -401,11 +343,7 @@ export const ArtistFormLinksDialog = ({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-between items-center">
-            <Button onClick={generateLinks} disabled={isGenerating || filteredArtistLinks.length === 0}>
-              <RefreshCcw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-              {dateFilter === ALL_DATES_VALUE ? "Generar Enlaces Faltantes (Todas)" : "Generar Enlaces Faltantes"}
-            </Button>
+          <div className="flex justify-end items-center">
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

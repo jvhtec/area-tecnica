@@ -10,7 +10,7 @@ import { mergePDFs } from './pdfMerge';
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
-import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
+import { getActivePublicArtistFormLinks } from '../publicArtistFormLinks';
 import { buildReadableFilename } from '@/utils/fileName';
 import { combineWavesDisplay } from '@/constants/wavesModels';
 import { getArtistRiderStatus } from '@/features/festival-management/selectors';
@@ -549,7 +549,7 @@ export const generateAndMergeFestivalPDFs = async (
         
         // Use chronological sorting for Missing Rider Report as well
         const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists, dayStartTime);
-        const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
+        const publicFormLinksByArtistId = await getActivePublicArtistFormLinks(
           sortedMissingRiderArtists.map((artist) => ({
             id: artist.id,
             form_language: artist.form_language,

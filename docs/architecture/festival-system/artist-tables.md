@@ -23,9 +23,13 @@ Stores the public-form token lifecycle for an artist form request.
 
 Typical responsibilities:
 
-- Token creation + expiry.
+- Send-owned token creation + expiry through `get_or_create_festival_artist_form_for_send`.
 - Pending/submitted/expired lifecycle tracking.
 - Traceability per artist.
+
+Changing `festival_artists.rider_missing` never creates a token. The explicit
+management send action is the only application path that issues one, and there
+can be at most one pending token per artist.
 
 ### `festival_artist_form_submissions` (submitted payload)
 
@@ -55,8 +59,8 @@ Stores rider and supplemental file metadata (name/path/type/size/upload provenan
 ## 3) Public form workflow (end-to-end)
 
 ```text
-Manager creates/refreshes token
-  → Artist receives tokenized URL
+Manager sends the form (issuing or reusing its active token)
+  → Artist receives the tokenized URL
     → Artist opens public form (no login)
       → Artist completes requirements + uploads rider files
         → Submission is persisted and linked to artist/form
