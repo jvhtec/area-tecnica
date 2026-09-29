@@ -7,8 +7,9 @@ import type { Job, JobType } from "@/types/job";
 const FESTIVAL_JOB_TYPES = ["festival", "ciclo"] as const;
 
 export const festivalJobKeys = {
+  all: () => ["jobs", "festival-list"] as const,
   list: (showCompleted: boolean) =>
-    ["festival-jobs", showCompleted ? "all" : "active"] as const,
+    [...festivalJobKeys.all(), showCompleted ? "all" : "active"] as const,
 };
 
 const isFestivalJobType = (
@@ -57,7 +58,9 @@ export async function fetchFestivalJobs(
 
 export function useFestivalJobs(showCompleted: boolean) {
   const queryKey = festivalJobKeys.list(showCompleted);
-  useOptimizedRealtime("jobs", [...queryKey], { priority: "high" });
+  useOptimizedRealtime("jobs", [...festivalJobKeys.all()], {
+    priority: "high",
+  });
 
   return useQuery({
     queryKey,

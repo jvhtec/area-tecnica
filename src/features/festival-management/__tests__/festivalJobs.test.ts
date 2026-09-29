@@ -97,11 +97,13 @@ describe("fetchFestivalJobs", () => {
 
     expect(useOptimizedRealtimeMock).toHaveBeenCalledWith(
       "jobs",
-      ["festival-jobs", "active"],
+      ["jobs", "festival-list"],
       { priority: "high" },
     );
     expect(useQueryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ["festival-jobs", "active"] }),
+      expect.objectContaining({
+        queryKey: ["jobs", "festival-list", "active"],
+      }),
     );
   });
 });
