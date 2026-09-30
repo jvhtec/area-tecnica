@@ -7,13 +7,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { deleteFestivalShift } from "@/features/festival-scheduling/api";
+import { festivalShiftKeys } from "@/features/festival-scheduling/keys";
+import type { Tables } from "@/integrations/supabase/types";
+import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useFestivalShifts } from "@/features/festival-scheduling/hooks/useFestivalShifts";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { ShiftsList } from "./ShiftsList";
 import { ShiftSheet, type ShiftSheetTarget } from "./ShiftSheet";
 import { ShiftsTable } from "./ShiftsTable";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -54,6 +57,7 @@ export const FestivalScheduling = ({
   const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
   const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const formatDateToString = useCallback((date: Date): string => {
     try {
@@ -121,7 +125,7 @@ export const FestivalScheduling = ({
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  const { shifts, isLoading, error: shiftsError, retry: retryShifts, invalidate: refreshShifts } = useFestivalShifts({
+  const { shifts, isLoading, isFetching, error: shiftsError, retry: retryShifts, invalidate: refreshShifts } = useFestivalShifts({
     jobId,
     selectedDate,
   });
@@ -131,9 +135,14 @@ export const FestivalScheduling = ({
   }, [shiftsError, jobId]);
 
   // A new shift keeps the sheet open, switched to that shift, so its crew can be added right away.
-  const handleShiftCreated = async (shiftId: string) => {
-    await refreshShifts();
-    setSheetTarget({ kind: "edit", shiftId });
+  // It goes into the day's list at once instead of waiting for a refetch: the sheet reads its shift
+  // from that list, and a slow or failed refetch must not make a shift that was just saved look gone.
+  const handleShiftCreated = async (created: Tables<"festival_shifts">) => {
+    queryClient.setQueryData<ShiftWithAssignments[]>(festivalShiftKeys.day(jobId, created.date), (current = []) =>
+      current.some((shift) => shift.id === created.id) ? current : [...current, { ...created, assignments: [] }],
+    );
+    setSheetTarget({ kind: "edit", shiftId: created.id });
+    void refreshShifts();
   };
 
   // The copy dialog awaits every write before calling back.
@@ -319,7 +328,7 @@ export const FestivalScheduling = ({
         jobId={jobId}
         date={selectedDate}
         shifts={shifts}
-        isLoadingShifts={isLoading}
+        isShiftListUnsettled={isLoading || isFetching || Boolean(shiftsError)}
         stageOptions={stageOptions}
         dayStartTime={resolvedDayStartTime}
         isViewOnly={isViewOnly}

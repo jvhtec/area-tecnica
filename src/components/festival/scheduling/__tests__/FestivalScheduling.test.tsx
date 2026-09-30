@@ -33,14 +33,30 @@ vi.mock("@/components/ui/subscription-indicator", () => ({
 vi.mock("../ShiftSheet", () => ({
   ShiftSheet: ({
     target,
+    shifts,
+    isShiftListUnsettled,
     onCreated,
   }: {
     target: { kind: string; shiftId?: string } | null;
-    onCreated: (shiftId: string) => Promise<void>;
+    shifts: Array<{ id: string }>;
+    isShiftListUnsettled: boolean;
+    onCreated: (created: Record<string, unknown>) => Promise<void>;
   }) =>
     target ? (
-      <div data-testid="shift-sheet" data-kind={target.kind} data-shift-id={target.shiftId ?? ""}>
-        <button onClick={() => void onCreated("new-shift")}>Simular creación</button>
+      <div
+        data-testid="shift-sheet"
+        data-kind={target.kind}
+        data-shift-id={target.shiftId ?? ""}
+        data-shifts={shifts.map((shift) => shift.id).join(",")}
+        data-unsettled={String(isShiftListUnsettled)}
+      >
+        <button
+          onClick={() =>
+            void onCreated({ id: "new-shift", job_id: "job-1", date: "2026-07-01", name: "Nuevo", start_time: "09:00", end_time: "10:00" })
+          }
+        >
+          Simular creación
+        </button>
       </div>
     ) : null,
 }));
@@ -133,9 +149,22 @@ describe("FestivalScheduling", () => {
     fireEvent.click(screen.getByRole("button", { name: "Simular creación" }));
     await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "edit"));
     expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "new-shift");
-    // The day was refreshed before the sheet switched, so the new shift is in the list it reads.
-    expect(mocks.fetchShiftsForDate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("puts a just-created shift in the day's list straight away, so a failed refresh cannot make it look gone", async () => {
+    renderScheduling();
+    await screen.findByRole("button", { name: "Borrar Montaje" });
+    fireEvent.click(screen.getByRole("button", { name: "Crear turno" }));
+
+    // The refresh that follows the save fails.
+    mocks.fetchShiftsForDate.mockRejectedValue(new Error("offline"));
+    fireEvent.click(screen.getByRole("button", { name: "Simular creación" }));
+
+    await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "new-shift"));
+    expect(screen.getByTestId("shift-sheet").getAttribute("data-shifts")).toContain("new-shift");
+    // While the list refreshes or has failed to, the sheet is told not to treat a missing shift as deleted.
+    await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-unsettled", "true"));
+  }, 15000);
 
   it("opens an existing shift in the sheet from the list", async () => {
     renderScheduling();
