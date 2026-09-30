@@ -172,7 +172,12 @@ export const FestivalScheduling = ({
     [],
   );
   const openShift = useCallback((shiftId: string) => setSheetTarget({ kind: "edit", shiftId }), []);
-  const handleDeleteShift = (shiftId: string) => deleteShiftMutation.mutateAsync(shiftId).catch(() => undefined);
+  // Whether the shift is really gone: the sheet stays open on a failed delete so it can be retried.
+  const handleDeleteShift = (shiftId: string) =>
+    deleteShiftMutation.mutateAsync(shiftId).then(
+      () => true,
+      () => false,
+    );
 
   if (!jobDates || jobDates.length === 0) {
     return (

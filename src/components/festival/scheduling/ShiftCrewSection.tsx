@@ -47,6 +47,40 @@ interface ShiftCrewSectionProps {
   onChanged?: () => void;
 }
 
+/** Role of someone on a shift whose department has no role list (logistics, no department): typed, saved on leaving the field. */
+const FreeTextRole = ({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  onCommit: (value: string) => void;
+}) => {
+  const [draft, setDraft] = useState(value);
+  const commit = () => {
+    const next = draft.trim();
+    // A role is required: an empty field goes back to what is stored.
+    if (!next) setDraft(value);
+    else if (next !== value) onCommit(next);
+  };
+  return (
+    <Input
+      aria-label={label}
+      className="h-8 w-56 max-w-full"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+};
+
 const assignmentName = (assignment: ShiftAssignment) =>
   assignment.external_technician_name || crewDisplayName(assignment.profiles);
 
@@ -249,7 +283,13 @@ export const ShiftCrewSection = ({ shift, isViewOnly = false, onChanged }: Shift
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span className="text-sm text-muted-foreground">{assignment.role}</span>
+                      <FreeTextRole
+                        // Remount when the saved role changes, so the field always shows what is stored.
+                        key={assignment.role}
+                        label={`Función de ${name}`}
+                        value={assignment.role}
+                        onCommit={(value) => roleMutation.mutate({ id: assignment.id, value })}
+                      />
                     )}
                     <Button
                       type="button"

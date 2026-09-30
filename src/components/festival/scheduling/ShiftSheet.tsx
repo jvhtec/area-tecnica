@@ -55,7 +55,8 @@ interface ShiftSheetProps {
   /** A new shift was saved: refresh the day, then switch the sheet to it (returns once the list has it). */
   onCreated: (shiftId: string) => Promise<void> | void;
   onSaved: () => Promise<void> | void;
-  onDelete: (shiftId: string) => Promise<void> | void;
+  /** Resolves true once the shift is deleted; false (after telling the user) when it could not be. */
+  onDelete: (shiftId: string) => Promise<boolean>;
 }
 
 const DEFAULT_STAGE_OPTIONS = buildFallbackStageOptions(1);
@@ -179,8 +180,7 @@ const ShiftSheetBody = ({
       destructive: true,
     });
     if (!confirmed) return;
-    await onDelete(shift.id);
-    onClose();
+    if (await onDelete(shift.id)) onClose();
   };
 
   const watchedStage = form.watch("stage");
@@ -231,7 +231,14 @@ const ShiftSheetBody = ({
       )}
 
       {shift ? (
-        <ShiftCrewSection shift={shift} isViewOnly={isViewOnly} onChanged={() => void onSaved()} />
+        // Keyed by department: another department has other roles, so the role picked for new people
+        // (and the picks made under the old one) must not carry over.
+        <ShiftCrewSection
+          key={`${shift.id}:${shift.department ?? ""}`}
+          shift={shift}
+          isViewOnly={isViewOnly}
+          onChanged={() => void onSaved()}
+        />
       ) : isCreating ? (
         <p className="text-sm text-muted-foreground">Crea el turno para poder asignarle personal.</p>
       ) : null}
