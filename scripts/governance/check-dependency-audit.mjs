@@ -251,6 +251,7 @@ function writeSummary(snapshot, failures = { newAdvisoryIds: [], increasedSeveri
 }
 
 const snapshot = collectAuditSnapshot(runAudit());
+console.log("AUDIT_PACKAGE_DETAILS", JSON.stringify(snapshot.packages));
 
 if (shouldWriteBaseline) {
   mkdirSync(dirname(baselinePath), { recursive: true });
