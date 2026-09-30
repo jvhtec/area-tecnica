@@ -96,7 +96,7 @@ const renderSheet = (
     onClose?: () => void;
     onCreated?: (id: string) => Promise<void>;
     onSaved?: () => void;
-    onDelete?: (id: string) => Promise<void>;
+    onDelete?: (id: string) => Promise<boolean>;
   } = {},
 ) => {
   const props = {
@@ -105,7 +105,7 @@ const renderSheet = (
     onClose: noop,
     onCreated: vi.fn().mockResolvedValue(undefined),
     onSaved: noop,
-    onDelete: vi.fn().mockResolvedValue(undefined),
+    onDelete: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
   const ui = (next: typeof props) => (
@@ -237,6 +237,19 @@ describe("ShiftSheet", () => {
     });
   });
 
+  describe("deleting", () => {
+    it("stays open when the delete failed, so it can be retried", async () => {
+      const { props } = renderSheet({ onDelete: vi.fn().mockResolvedValue(false) });
+
+      fireEvent.click(screen.getByRole("button", { name: "Eliminar turno" }));
+      fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Eliminar" }));
+
+      await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith("shift-1"));
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Eliminar turno" })).toBeInTheDocument();
+    });
+  });
+
   describe("crew", () => {
     it("adds several people in one go: each keeps their job role, the rest get the chosen one", async () => {
       renderSheet();
@@ -338,6 +351,47 @@ describe("ShiftSheet", () => {
           expect.objectContaining({ description: "Este técnico ya está asignado al turno.", variant: "destructive" }),
         ),
       );
+    });
+
+    it("does not carry the role picked for one department over to another", async () => {
+      const { rerenderWith } = renderSheet();
+      await screen.findByRole("checkbox", { name: /Rita Rol/ });
+      fireEvent.click(screen.getByRole("button", { name: lightsRoles[2].label }));
+
+      // The shift is moved to sound (saved by a colleague, say) while the sheet is open.
+      rerenderWith({ shifts: [{ ...baseShift, department: "sound" }] });
+      fireEvent.click(await screen.findByRole("checkbox", { name: /Rita Rol/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Añadir al turno (1)" }));
+
+      await waitFor(() => expect(api.addShiftAssignments).toHaveBeenCalledTimes(1));
+      const [row] = api.addShiftAssignments.mock.calls[0][0];
+      expect(row.role).toBe(shiftRoleOptions("sound")[0].code);
+      expect(row.role).not.toBe(lightsRoles[2].code);
+    });
+
+    it("lets a free-text role be corrected in place, and never saves an empty one", async () => {
+      renderSheet({
+        shifts: [
+          {
+            ...baseShift,
+            department: "logistics",
+            assignments: [{ ...cruzAssignment, role: "runner" }],
+          },
+        ],
+      });
+
+      const field = screen.getByRole("textbox", { name: "Función de Cruz Cruzado" });
+      expect(field).toHaveValue("runner");
+
+      fireEvent.change(field, { target: { value: "  carga y descarga " } });
+      fireEvent.blur(field);
+      await waitFor(() => expect(api.updateShiftAssignmentRole).toHaveBeenCalledWith("a-cruz", "carga y descarga"));
+
+      api.updateShiftAssignmentRole.mockClear();
+      fireEvent.change(field, { target: { value: "   " } });
+      fireEvent.blur(field);
+      expect(api.updateShiftAssignmentRole).not.toHaveBeenCalled();
+      expect(field).toHaveValue("runner");
     });
 
     it("lets logistics shifts take a free-text role", async () => {
