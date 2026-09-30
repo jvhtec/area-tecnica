@@ -10,9 +10,10 @@ describe("computeLockedFields", () => {
 
   it("locks a console together with who provides it, and monitors the same way", () => {
     const locked = computeLockedFields({ foh_console: "SSL L500", mon_console: "DiGiCo SD12" });
-    expect(locked).toEqual(
-      expect.objectContaining(new Set(["foh_console", "foh_console_provided_by", "mon_console", "mon_console_provided_by"])),
-    );
+    expect(locked.has("foh_console")).toBe(true);
+    expect(locked.has("foh_console_provided_by")).toBe(true);
+    expect(locked.has("mon_console")).toBe(true);
+    expect(locked.has("mon_console_provided_by")).toBe(true);
   });
 
   it("locks Waves by either models or an outboard note", () => {
