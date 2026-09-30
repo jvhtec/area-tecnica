@@ -198,6 +198,10 @@ const ROLE_COLUMN_BY_DEPARTMENT: Record<string, keyof JobCrewAssignment> = {
   production: "production_role",
 };
 
+/** The first role a person holds on the job, in any department (sound, lights, video, production). */
+const firstJobRole = (assignment: JobCrewAssignment): string | null =>
+  assignment.sound_role || assignment.lights_role || assignment.video_role || assignment.production_role || null;
+
 export const crewDisplayName = (entry: CrewDirectoryEntry | null | undefined, fallback = "Sin nombre"): string => {
   if (!entry) return fallback;
   const fullName = [entry.first_name, entry.last_name].filter(Boolean).join(" ").trim();
@@ -242,7 +246,14 @@ export const buildShiftCrewCandidates = ({
     if (excluded.has(id)) continue;
     const profile = directoryById.get(id);
     const assignment = assignmentById.get(id);
-    const jobRoleValue = roleColumn && assignment ? (assignment[roleColumn] as string | null | undefined) : null;
+    // Without a department on the shift, the role they hold on the job (in whichever department) is the default.
+    const jobRoleValue = !assignment
+      ? null
+      : roleColumn
+        ? (assignment[roleColumn] as string | null | undefined)
+        : department
+          ? null
+          : firstJobRole(assignment);
     const inShiftDepartment = !department
       ? true
       : Boolean(jobRoleValue) ||
@@ -291,9 +302,114 @@ export const defaultShiftRole = (
   currentRole: string,
 ): string => {
   const options = shiftRoleOptions(shiftDepartment);
-  if (candidate?.jobRole && options.some((option) => option.code === candidate.jobRole)) {
-    return candidate.jobRole;
+  if (candidate?.jobRole) {
+    // A shift without a department accepts whatever role the person holds; one with a department
+    // only the roles that department offers.
+    if (!normalizeShiftDepartment(shiftDepartment) || options.some((option) => option.code === candidate.jobRole)) {
+      return candidate.jobRole;
+    }
   }
   if (currentRole) return currentRole;
   return options[0]?.code ?? "";
+};
+
+// ---------------------------------------------------------------------------
+// Crew picker of the shift sheet
+// ---------------------------------------------------------------------------
+
+/** Lower-case, accent-free text for searching names ("Sánchez" matches "sanchez"). */
+export const normalizeSearchText = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+export const filterByName = <T extends { name: string }>(items: readonly T[], query: string): T[] => {
+  const needle = normalizeSearchText(query);
+  if (!needle) return [...items];
+  return items.filter((item) => normalizeSearchText(item.name).includes(needle));
+};
+
+export type CrewPickerGroup = { key: "department" | "rest"; label: string; candidates: ShiftCrewCandidate[] };
+
+/**
+ * The picker's sections: the people who work the shift's department on this job, then the rest of
+ * the team. Without a department everyone is one section. Empty sections are left out.
+ */
+export const groupCrewCandidates = (
+  candidates: readonly ShiftCrewCandidate[],
+  shiftDepartment: string | null | undefined,
+): CrewPickerGroup[] => {
+  const department = normalizeShiftDepartment(shiftDepartment);
+  if (!department) {
+    return candidates.length ? [{ key: "rest", label: "Equipo del trabajo", candidates: [...candidates] }] : [];
+  }
+  const inDepartment = candidates.filter((candidate) => candidate.inShiftDepartment);
+  const rest = candidates.filter((candidate) => !candidate.inShiftDepartment);
+  const groups: CrewPickerGroup[] = [];
+  if (inDepartment.length) {
+    groups.push({ key: "department", label: `${shiftDepartmentLabel(department)} en este trabajo`, candidates: inDepartment });
+  }
+  if (rest.length) groups.push({ key: "rest", label: "Resto del equipo", candidates: rest });
+  return groups;
+};
+
+/** External names used on this festival that are not already on the shift, matching what is typed. */
+export const suggestExternalNames = (
+  externalNames: readonly string[],
+  onShift: readonly string[],
+  query: string,
+): string[] => {
+  const taken = new Set(onShift.map(normalizeSearchText));
+  return filterByName(
+    externalNames.filter((name) => !taken.has(normalizeSearchText(name))).map((name) => ({ name })),
+    query,
+  ).map((item) => item.name);
+};
+
+export type NewShiftAssignment = {
+  shift_id: string;
+  role: string;
+  technician_id?: string;
+  external_technician_name?: string;
+};
+
+/**
+ * The rows to insert for the people chosen in the picker. Each person keeps the role they hold on
+ * the job when it is one the shift's department offers; everyone else gets `fallbackRole`.
+ */
+export const buildNewAssignments = ({
+  shiftId,
+  shiftDepartment,
+  technicianIds,
+  externalNames,
+  candidates,
+  fallbackRole,
+}: {
+  shiftId: string;
+  shiftDepartment: string | null | undefined;
+  technicianIds: readonly string[];
+  externalNames: readonly string[];
+  candidates: readonly ShiftCrewCandidate[];
+  fallbackRole: string;
+}): NewShiftAssignment[] => {
+  const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const rows: NewShiftAssignment[] = [];
+  for (const id of technicianIds) {
+    rows.push({
+      shift_id: shiftId,
+      technician_id: id,
+      role: defaultShiftRole(byId.get(id), shiftDepartment, fallbackRole),
+    });
+  }
+  const seen = new Set<string>();
+  for (const raw of externalNames) {
+    const name = raw.trim();
+    const key = normalizeSearchText(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ shift_id: shiftId, external_technician_name: name, role: fallbackRole });
+  }
+  return rows.filter((row) => row.role.trim() !== "");
 };

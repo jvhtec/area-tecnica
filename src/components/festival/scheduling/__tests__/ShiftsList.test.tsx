@@ -32,14 +32,14 @@ const shift = (id: string, name: string, start_time: string, end_time: string): 
   ],
 });
 
-const renderList = (onDeleteShift = vi.fn()) =>
+const renderList = (onDeleteShift = vi.fn(), onOpenShift = vi.fn()) =>
   renderWithProviders(
     <ConfirmDialogProvider>
       <ShiftsList
         dayStartTime="07:00"
         shifts={[shift("night", "Noche", "22:00", "06:00"), shift("morning", "Mañana", "09:00", "15:00")]}
         onDeleteShift={onDeleteShift}
-        onShiftUpdated={() => {}}
+        onOpenShift={onOpenShift}
         jobId="job-1"
         jobDates={[new Date("2031-07-10"), new Date("2031-07-11")]}
         selectedDate="2031-07-10"
@@ -62,6 +62,15 @@ describe("ShiftsList", () => {
     expect(screen.getByText("+1 día")).toBeInTheDocument();
     expect(screen.getByText("8 h")).toBeInTheDocument();
     expect(screen.getAllByText(/Sonia Sonido \(FOH — Responsable\)/)).toHaveLength(2);
+  });
+
+  it("opens the shift sheet (details and crew together) from one button", () => {
+    const onOpenShift = vi.fn();
+    renderList(vi.fn(), onOpenShift);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Editar y personal" })[0]);
+    expect(onOpenShift).toHaveBeenCalledWith("morning");
+    expect(screen.queryByRole("button", { name: "Gestionar personal" })).not.toBeInTheDocument();
   });
 
   it("asks for confirmation before deleting a shift", async () => {

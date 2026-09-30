@@ -11,7 +11,7 @@ import { useFestivalShifts } from "@/features/festival-scheduling/hooks/useFesti
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { ShiftsList } from "./ShiftsList";
-import { CreateShiftDialog } from "./CreateShiftDialog";
+import { ShiftSheet, type ShiftSheetTarget } from "./ShiftSheet";
 import { ShiftsTable } from "./ShiftsTable";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -47,7 +47,8 @@ export const FestivalScheduling = ({
   onOpenRiderLibrary,
 }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
+  const [sheetTarget, setSheetTarget] = useState<ShiftSheetTarget | null>(null);
+  const closeSheet = useCallback(() => setSheetTarget(null), []);
   // The six-column table is cramped on a phone; start phones on the list view.
   const isMobile = useIsMobile();
   const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
@@ -129,9 +130,10 @@ export const FestivalScheduling = ({
     if (shiftsError) void trackError(shiftsError, { system: "festivals", operation: "load-festival-shifts", jobId });
   }, [shiftsError, jobId]);
 
-  const handleShiftCreated = async () => {
+  // A new shift keeps the sheet open, switched to that shift, so its crew can be added right away.
+  const handleShiftCreated = async (shiftId: string) => {
     await refreshShifts();
-    setIsCreateShiftOpen(false);
+    setSheetTarget({ kind: "edit", shiftId });
   };
 
   // The copy dialog awaits every write before calling back.
@@ -156,6 +158,7 @@ export const FestivalScheduling = ({
       });
     },
   });
+  const openShift = useCallback((shiftId: string) => setSheetTarget({ kind: "edit", shiftId }), []);
   const handleDeleteShift = (shiftId: string) => deleteShiftMutation.mutateAsync(shiftId).catch(() => undefined);
 
   if (!jobDates || jobDates.length === 0) {
@@ -204,7 +207,7 @@ export const FestivalScheduling = ({
             {!isViewOnly && (
               <Button
                 size="sm"
-                onClick={() => setIsCreateShiftOpen(true)}
+                onClick={() => setSheetTarget({ kind: "create" })}
                 className="flex items-center gap-1"
                 aria-label="Crear turno"
               >
@@ -280,7 +283,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift}
-                onShiftUpdated={refreshShifts}
+                onOpenShift={openShift}
                 date={selectedDate}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
@@ -293,7 +296,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift} 
-                onShiftUpdated={refreshShifts}
+                onOpenShift={openShift}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
                 jobDates={jobDates}
@@ -305,16 +308,20 @@ export const FestivalScheduling = ({
         </div>
       </CardContent>
 
-      {!isViewOnly && (
-        <CreateShiftDialog
-          open={isCreateShiftOpen}
-          onOpenChange={setIsCreateShiftOpen}
-          jobId={jobId}
-          onShiftCreated={handleShiftCreated}
-          date={selectedDate}
-          stageOptions={stageOptions}
-        />
-      )}
+      <ShiftSheet
+        target={sheetTarget}
+        onClose={closeSheet}
+        jobId={jobId}
+        date={selectedDate}
+        shifts={shifts}
+        isLoadingShifts={isLoading}
+        stageOptions={stageOptions}
+        dayStartTime={resolvedDayStartTime}
+        isViewOnly={isViewOnly}
+        onCreated={handleShiftCreated}
+        onSaved={refreshShifts}
+        onDelete={handleDeleteShift}
+      />
     </Card>
   );
 };

@@ -198,14 +198,16 @@ The "Planificación" tab (`src/components/festival/scheduling/`, about 2,100 LOC
   - The realtime subscription for crew changes invalidated a cache key no query used, so crew changes made elsewhere never showed up live. It now targets the shifts query.
   - Logistics shifts couldn't get anyone assigned, because that department has no role catalogue and the role was mandatory. They now take a free-text role.
 - **Also:** phones open the list view by default; external names are suggested from earlier shifts of the job; the PDF branding loads only on export.
-- **Still open for SCH-C:** SCH-03, the rest of SCH-11 (the date-navigation empty state overflows on phones), and SCH-12.
+- **Still open for SCH-C:** the rest of SCH-11 (the date-navigation empty state overflows on phones) and SCH-12.
+
+**Status (2026-09-30): SCH-C1 done** (the shift sheet, stacked on SCH-B). `ShiftSheet` replaces `CreateShiftDialog`, `EditShiftDialog` and `ManageAssignmentsDialog` (SCH-03): details and crew live in one right-hand sheet (bottom sheet on phones) that stays open after *Crear turno*, so a shift is created and staffed without leaving it. Crew changes save immediately and follow the live shift (the sheet reads it by id from the day's query); the shift's own fields save with *Guardar cambios*, enabled only once something changed, and a refetch never overwrites what is being typed. The crew picker is multi-select with accent-insensitive search, groups by the role held on this job, suggests earlier external names, inserts everyone in one statement, and keeps each person's own job role (a shift without a department now accepts whatever role the person holds, instead of leaving *Añadir* disabled with no explanation). Roles change in place; removing someone offers *Deshacer*. New: `e2e` create → staff → edit → delete on desktop and iPhone viewports. Still open: the day board and mobile agenda (SCH-C2), then SCH-D and SCH-E.
 
 
 | Step | Scope | Size | Depends on | Done when |
 | --- | --- | --- | --- | --- |
 | ~~**SCH-A. Quick fixes**~~ **Done** (PR #963) | SCH-01 (keep the role, control the Select, bulk add stays for step B); SCH-02 (dialog reads the live shift from the query by id); SCH-04 (stage names from `buildFestivalStageOptions`, production department, Spanish labels); SCH-05 (candidates by job role, plus shift crew, plus production); SCH-06 (`get_profile_directory`); SCH-07 (sort from festival day start, duration and "+1 día" marker, reject `end == start`); SCH-08 (`useConfirm` everywhere, single delete); SCH-13 labels and locale | S–M | Phase 0 merged | Component tests for each fix; overnight sorting has a unit test; e2e adds "create shift, add two people without re-picking the role" |
 | ~~**SCH-B. Data layer**~~ **Done** (see the status note) | `features/festival-scheduling/api.ts` (queries and mutations, `festivalKeys`); `copy_festival_shifts` RPC (FEST-DATA-01); assignment constraints (FEST-DATA-02); remove the refetch timeouts and the manual refresh button | M | = Phase 1.2 + 2.4 | Source-boundary exemptions for `scheduling/*` removed; RPC pgTAP |
-| **SCH-C. Day board + shift sheet** | Timeline board (stage or department lanes, overnight aware), unified shift sheet with the multi-select picker and external suggestions, mobile agenda; retire `ShiftsList`/`ShiftsTable` as primary views (the table stays for print) | L | SCH-B; ENH-05 is *nice to have* (works with the current stage numbers + names) | Usability check with 2–3 real planners; `/ui-check` desktop + mobile; e2e for create, edit, assign and delete on both viewports |
+| **SCH-C. Day board + shift sheet** (sheet done as C1, board and agenda are C2) | Timeline board (stage or department lanes, overnight aware), unified shift sheet with the multi-select picker and external suggestions, mobile agenda; retire `ShiftsList`/`ShiftsTable` as primary views (the table stays for print) | L | SCH-B; ENH-05 is *nice to have* (works with the current stage numbers + names) | Usability check with 2–3 real planners; `/ui-check` desktop + mobile; e2e for create, edit, assign and delete on both viewports |
 | **SCH-D. Patterns** | Day templates (small table `festival_shift_templates`), copy day with options, "generate from artist schedule" drafts | M | SCH-C | Creating a typical three-shift day for a new date takes one action |
 | **SCH-E. Crew view + conflicts** | "Por persona" view, hours per person, overlap and rest warnings (reusing the matrix conflict helpers), coverage counts; then ENH-03 (link to `job_assignments`, optional timesheet pre-fill; `compute_timesheet_hours` stays authoritative) | L | SCH-C, 1.2 | Conflicts pinned by tests; timesheet pre-fill behind a flag first |
 
@@ -304,16 +306,25 @@ Suggested order, by value and dependency: **ENH-01** (labels and defaults; modul
 
 When each phase lands, lower the baselines with `--write-baseline` so the gains are locked in.
 
-| Metric | Now | After Phase 2 |
-| --- | --- | --- |
-| Festival-scope lint warnings | 58 | ≤ 5 |
-| Source-boundary exemptions in festival files | 26 | 0 |
-| Files querying `festival_*` outside `features/festival-*` | 56 | ≤ 10 (PDF context, offline snapshot, technician app) |
-| Files ≥ 740 LOC | 9 | 0 |
-| `as any` + `as unknown as` | 44 | ≤ 10 |
-| `console.log` | 194 | 0 (keep `console.error` only where `errorTracking` also reports) |
-| Festival tables with pgTAP policy tests | ~4 of 13 (artists, files, stages, push) | 13 of 13 |
-| Realtime mechanisms | 3 | 1 |
+**Measured 2026-09-30**, on `main` plus the open Phase 2.8 and SCH-B PRs (the last two Phase 2 increments). "Baseline" is the 2026-09-28 audit snapshot.
+
+| Metric | Baseline | Measured 2026-09-30 | After Phase 2 target |
+| --- | --- | --- | --- |
+| Festival-scope lint warnings | 58 | **6** (3 `exhaustive-deps`, 3 `no-explicit-any` in one test file) | ≤ 5 |
+| Source-boundary exemptions in festival files | 26 | **1** (`ArtistRequirementsForm.tsx` imports `dataLayerClient`) | 0 |
+| Files querying `festival_*` outside `features/festival-*` | 56 | **29** (of 39 in all of `src`, excluding tests) | ≤ 10 (PDF context, offline snapshot, technician app) |
+| Files ≥ 740 LOC | 9 | **1** (`ArtistRequirementsForm.tsx` 759; the next is 530) | 0 |
+| Files ≥ 600 LOC | 13 | **1** | – |
+| Source files / LOC (festival paths, excluding tests) | 127 / 30,646 | 203 / 31,152 (more, smaller files: LOC +1.7%) | – |
+| `as any` + `as unknown as` | 44 | **13** (0 + 13) | ≤ 10 |
+| `console.log` | 194 | **32** (`console.*` 420 → 126) | 0 (keep `console.error` only where `errorTracking` also reports) |
+| Mobile type-floor entries in festival files | 31 in 9 files | **30 in 8 files** (`ArtistTableRow` 14, `MobileArtistCard` 10) | – |
+| Components fetching in `useEffect` (rough grep) | 19 | **~1** | 0 |
+| Festival unit/component test files | 18 | **59** | – |
+| Festival tables with pgTAP policy tests | ~4 of 13 | 8 suites (artists, soundcheck date, form tokens, gear/stage RPCs, push feed, shift integrity, stages, workspace read scope) | 13 of 13 |
+| Realtime mechanisms in festival code | 3 | **1** (`useRealtimeSubscription`; no raw `supabase.channel`, no `useTableSubscription`) | 1 |
+
+Not yet at target: the last `dataLayerClient` import and the last file over 740 lines are the same file (`ArtistRequirementsForm.tsx`, the public artist form), the 3 test-file `any`s, 13 `as unknown as`, and the 29 files that still read `festival_*` tables directly (mostly the technician app, offline snapshot and PDF context, which the target allows up to 10 of; the rest need a look).
 
 Consider a module-scoped gate, `governance:festival`, that fails when a new file under `src/components/festival/` imports `dataLayerClient`. The global source-boundary check already does this, so the gate would only mean zeroing the festival entries and not granting new exemptions.
 

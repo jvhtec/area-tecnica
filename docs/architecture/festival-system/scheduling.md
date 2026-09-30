@@ -32,13 +32,13 @@ An internal technician can appear only once per shift.
 
 - Scheduling container:
   - `src/components/festival/scheduling/FestivalScheduling.tsx`
-- Shift CRUD:
-  - `src/components/festival/scheduling/CreateShiftDialog.tsx`
-  - `src/components/festival/scheduling/EditShiftDialog.tsx`
+- Shift sheet (one place for a shift's details and crew; it stays open after creating a shift):
+  - `src/components/festival/scheduling/ShiftSheet.tsx` (times, stage, department, notes; create and edit)
+  - `src/components/festival/scheduling/ShiftCrewSection.tsx` (assigned crew with in-place role change and undoable removal; multi-select picker with search, external suggestions)
+- Views of the day:
   - `src/components/festival/scheduling/ShiftsTable.tsx`
   - `src/components/festival/scheduling/ShiftsList.tsx`
-- Assignment operations:
-  - `src/components/festival/scheduling/ManageAssignmentsDialog.tsx`
+- Other operations:
   - `src/components/festival/scheduling/CopyShiftsDialog.tsx`
   - `src/components/festival/scheduling/ShiftTimeCalculator.tsx`
 - Scheduling data commands:

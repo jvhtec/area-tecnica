@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Edit, FileDown, Trash2, Users } from "lucide-react";
+import { Copy, FileDown, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,6 @@ import { labelForCode } from "@/utils/roles";
 import { exportShiftsTablePDF, type ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
-import { EditShiftDialog } from "./EditShiftDialog";
-import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import {
   crewDisplayName,
   formatShiftDuration,
@@ -31,7 +29,8 @@ import {
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
-  onShiftUpdated: () => void;
+  /** Opens the shift sheet (details and crew) on this shift. */
+  onOpenShift: (shiftId: string) => void;
   date: string;
   jobId: string;
   isViewOnly?: boolean;
@@ -46,7 +45,7 @@ const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
 export const ShiftsTable = ({
   shifts,
   onDeleteShift,
-  onShiftUpdated,
+  onOpenShift,
   date,
   jobId,
   isViewOnly = false,
@@ -57,15 +56,10 @@ export const ShiftsTable = ({
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-  const [managingShiftId, setManagingShiftId] = useState<string | null>(null);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const sortedShifts = sortShiftsForFestivalDay(shifts, dayStartTime);
-  // Dialogs read the shift from the live list so their contents follow refetches.
-  const editingShift = shifts.find((shift) => shift.id === editingShiftId) ?? null;
-  const managingShift = shifts.find((shift) => shift.id === managingShiftId) ?? null;
 
   const formattedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
     ? formatFestivalDayKey(date, "EEEE, d 'de' MMMM 'de' yyyy", date)
@@ -194,22 +188,12 @@ export const ShiftsTable = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setEditingShiftId(shift.id)}
+                          onClick={() => onOpenShift(shift.id)}
                           className="h-8 w-8"
                           aria-label={`Editar turno ${shift.name}`}
-                          title="Editar turno"
+                          title="Editar turno y personal"
                         >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setManagingShiftId(shift.id)}
-                          className="h-8 w-8"
-                          aria-label={`Gestionar personal de ${shift.name}`}
-                          title="Gestionar personal"
-                        >
-                          <Users className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -230,29 +214,6 @@ export const ShiftsTable = ({
           </TableBody>
         </Table>
       </div>
-
-      {editingShift && (
-        <EditShiftDialog
-          open
-          onOpenChange={(open) => !open && setEditingShiftId(null)}
-          shift={editingShift}
-          stageOptions={stageOptions}
-          onShiftUpdated={() => {
-            onShiftUpdated();
-            setEditingShiftId(null);
-          }}
-        />
-      )}
-
-      {managingShift && (
-        <ManageAssignmentsDialog
-          open
-          onOpenChange={(open) => !open && setManagingShiftId(null)}
-          shift={managingShift}
-          onAssignmentsUpdated={onShiftUpdated}
-          isViewOnly={isViewOnly}
-        />
-      )}
 
       {isCopyDialogOpen && (
         <CopyShiftsDialog

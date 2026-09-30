@@ -11,7 +11,7 @@ vi.mock("@/services/dataLayerClient", () => ({
     from: (table: string) => {
       const result = () => mocks.tables[table] ?? { data: [], error: null };
       const builder: Record<string, unknown> = {};
-      for (const op of ["select", "eq", "in", "order", "insert", "update", "delete"]) {
+      for (const op of ["select", "eq", "in", "order", "insert", "update", "delete", "single"]) {
         builder[op] = (...args: unknown[]) => {
           mocks.calls.push({ table, op, args });
           return builder;
@@ -26,10 +26,13 @@ vi.mock("@/services/dataLayerClient", () => ({
 
 import {
   addShiftAssignment,
+  addShiftAssignments,
+  createFestivalShift,
   deleteFestivalShift,
   fetchJobCrew,
   fetchShiftsForDate,
   removeShiftAssignment,
+  updateShiftAssignmentRole,
 } from "../api";
 
 const shift = (id: string, start: string) => ({ id, job_id: "job-1", date: "2026-07-01", start_time: start, end_time: "23:00", name: id });
@@ -99,6 +102,41 @@ describe("festival scheduling api", () => {
       await expect(deleteFestivalShift("s1")).rejects.toThrow("nope");
       await expect(addShiftAssignment({ shift_id: "s1", role: "runner" })).rejects.toThrow("dup");
       await expect(removeShiftAssignment("a1")).rejects.toThrow("dup");
+    });
+
+    it("create a shift and return the saved row so the caller can keep working on it", async () => {
+      mocks.tables.festival_shifts = { data: { id: "new", name: "Montaje" }, error: null };
+
+      const created = await createFestivalShift({ job_id: "job-1", date: "2026-07-01", name: "Montaje", start_time: "09:00", end_time: "17:00" });
+
+      expect(created).toEqual({ id: "new", name: "Montaje" });
+      expect(mocks.calls.map((call) => call.op)).toEqual(expect.arrayContaining(["insert", "select", "single"]));
+
+      mocks.tables.festival_shifts = { data: null, error: new Error("denied") };
+      await expect(createFestivalShift({ job_id: "job-1", date: "2026-07-01", name: "x", start_time: "09:00", end_time: "17:00" })).rejects.toThrow("denied");
+    });
+
+    it("add several people in one statement, and nothing at all for an empty list", async () => {
+      const rows = [
+        { shift_id: "s1", technician_id: "t1", role: "runner" },
+        { shift_id: "s1", external_technician_name: "Ana", role: "runner" },
+      ];
+      await addShiftAssignments(rows);
+      const inserts = mocks.calls.filter((call) => call.table === "festival_shift_assignments" && call.op === "insert");
+      expect(inserts).toEqual([{ table: "festival_shift_assignments", op: "insert", args: [rows] }]);
+
+      mocks.calls.length = 0;
+      await addShiftAssignments([]);
+      expect(mocks.calls).toEqual([]);
+
+      mocks.tables.festival_shift_assignments = { data: null, error: new Error("dup") };
+      await expect(addShiftAssignments(rows)).rejects.toThrow("dup");
+    });
+
+    it("change a person's role by assignment id", async () => {
+      await updateShiftAssignmentRole("a1", "SND-FOH-R");
+      expect(mocks.calls).toContainEqual({ table: "festival_shift_assignments", op: "update", args: [{ role: "SND-FOH-R" }] });
+      expect(mocks.calls).toContainEqual({ table: "festival_shift_assignments", op: "eq", args: ["id", "a1"] });
     });
 
     it("delete the shift by id", async () => {
