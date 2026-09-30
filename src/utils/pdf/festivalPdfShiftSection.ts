@@ -9,7 +9,7 @@ import {
   runWithConcurrency,
   type FestivalPdfProgress,
 } from "@/utils/pdf/festivalPdfSupport";
-import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import type { PrintOptions } from "@/features/festival-print/model";
 
 type Options = {
   jobId: string;

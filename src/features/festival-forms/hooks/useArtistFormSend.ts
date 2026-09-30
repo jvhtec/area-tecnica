@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { trackError } from "@/lib/errorTracking";
 import { downloadBlobInBrowser } from "@/features/festival-management/commands";
+import { blobToBase64 } from "@/utils/blobToBase64";
 import { generateQRCode } from "@/utils/qrcode";
 import { fetchArtistFormLanguage, fetchPendingArtistForm, saveArtistFormLanguage, sendCorporateEmail } from "../api";
 import { buildArtistBlankTemplatePdf } from "../blankTemplatePdf";
@@ -20,22 +21,6 @@ interface UseArtistFormSendOptions {
 }
 
 const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;
-
-const blobToBase64 = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = String(reader.result || "");
-      const base64 = result.includes(",") ? result.split(",")[1] : result;
-      if (!base64) {
-        reject(new Error("No se pudo convertir la plantilla PDF"));
-        return;
-      }
-      resolve(base64);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer la plantilla PDF"));
-    reader.readAsDataURL(blob);
-  });
 
 /**
  * The "send form to artist" flow: shows the artist's active link (if one was already sent),

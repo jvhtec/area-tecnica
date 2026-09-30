@@ -2,6 +2,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import type { FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { resolveFestivalLogoUrl, resolveTourLogoUrl } from "@/utils/pdf/logoUtils";
 import { fetchWithOfflineFallback, getOfflineFestivalContext } from "@/lib/offline";
 
 /** Stage number → display name, from `festival_stages` (offline snapshot when unreachable). */
@@ -36,8 +37,9 @@ const isReachable = async (url: string): Promise<boolean> => {
 };
 
 /**
- * Public URL of the festival's logo, falling back to its tour's logo. A URL is only returned
- * when the file is actually reachable, so PDFs never embed a broken image.
+ * Display URL of the festival's logo, falling back to its tour's logo. The logo buckets are
+ * private, so the URL is signed (`resolveFestivalLogoUrl` / `resolveTourLogoUrl`). It is only
+ * returned when the file is actually reachable, so PDFs never embed a broken image.
  */
 export async function fetchFestivalLogoUrl(jobId: string): Promise<string | null> {
   const { data: festivalLogo, error: festivalError } = await dataLayerClient
@@ -48,8 +50,8 @@ export async function fetchFestivalLogoUrl(jobId: string): Promise<string | null
   if (festivalError) throw festivalError;
 
   if (festivalLogo?.file_path) {
-    const { data } = dataLayerClient.storage.from("festival-logos").getPublicUrl(festivalLogo.file_path);
-    if (data?.publicUrl && (await isReachable(data.publicUrl))) return data.publicUrl;
+    const url = await resolveFestivalLogoUrl(festivalLogo.file_path);
+    if (url && (await isReachable(url))) return url;
   }
 
   const { data: job, error: jobError } = await dataLayerClient
@@ -68,8 +70,8 @@ export async function fetchFestivalLogoUrl(jobId: string): Promise<string | null
   if (tourLogoError) throw tourLogoError;
 
   if (tourLogo?.file_path) {
-    const { data } = dataLayerClient.storage.from("tour-logos").getPublicUrl(tourLogo.file_path);
-    if (data?.publicUrl && (await isReachable(data.publicUrl))) return data.publicUrl;
+    const url = await resolveTourLogoUrl(tourLogo.file_path);
+    if (url && (await isReachable(url))) return url;
   }
   return null;
 }

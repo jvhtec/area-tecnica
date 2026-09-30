@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { generateAndMergeFestivalPDFs } from './festivalPdfGenerator';
-import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import type { PrintOptions } from "@/features/festival-print/model";
 import { buildReadableFilename } from "@/utils/fileName";
 
 interface IndividualStagePDFResult {

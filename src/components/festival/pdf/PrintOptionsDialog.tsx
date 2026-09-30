@@ -1,35 +1,23 @@
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
-import { Download, Loader2, Mail } from "lucide-react";
-import { buildReadableFilename } from "@/utils/fileName";
+import {
+  PRINT_SECTIONS,
+  defaultPrintOptions,
+  printFilename,
+  setAllStages,
+  toggleStage,
+  type PrintOptions,
+} from "@/features/festival-print/model";
+import { usePrintOptionDownloads } from "@/features/festival-print/hooks/usePrintOptionDownloads";
 import type { FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
-import { usePrintOptionDownloads } from "@/hooks/festival/usePrintOptionDownloads";
-
-export interface PrintOptions {
-  includeGearSetup: boolean;
-  gearSetupStages: number[];
-  includeShiftSchedules: boolean;
-  shiftScheduleStages: number[];
-  includeArtistTables: boolean;
-  artistTableStages: number[];
-  includeArtistRequirements: boolean;
-  artistRequirementStages: number[];
-  includeRfIemTable: boolean;
-  rfIemTableStages: number[];
-  includeInfrastructureTable: boolean;
-  infrastructureTableStages: number[];
-  includeMissingRiderReport: boolean;
-  includeWiredMicNeeds: boolean;
-  wiredMicNeedsStages: number[];
-  includeWeatherPrediction: boolean;
-  generateIndividualStagePDFs: boolean;
-}
+import { MissingRiderEmailForm } from "./MissingRiderEmailForm";
+import { PrintSectionRow } from "./PrintSectionRow";
 
 interface PrintOptionsDialogProps {
   open: boolean;
@@ -43,9 +31,9 @@ interface PrintOptionsDialogProps {
   progress?: FestivalPdfProgress | null;
 }
 
-export const PrintOptionsDialog = ({ 
-  open, 
-  onOpenChange, 
+export const PrintOptionsDialog = ({
+  open,
+  onOpenChange,
   onConfirm,
   maxStages,
   jobTitle,
@@ -54,162 +42,18 @@ export const PrintOptionsDialog = ({
   isGenerating = false,
   progress = null,
 }: PrintOptionsDialogProps) => {
-  const [options, setOptions] = useState<PrintOptions>({
-    includeGearSetup: true,
-    gearSetupStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeShiftSchedules: true,
-    shiftScheduleStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeArtistTables: true,
-    artistTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeArtistRequirements: true,
-    artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeRfIemTable: true,
-    rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeInfrastructureTable: true,
-    infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeMissingRiderReport: true,
-    includeWiredMicNeeds: true,
-    wiredMicNeedsStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeWeatherPrediction: true,
-    generateIndividualStagePDFs: false
-  });
+  const [options, setOptions] = useState<PrintOptions>(() => defaultPrintOptions(maxStages));
+  const downloads = usePrintOptionDownloads({ jobId, jobTitle, options });
 
-  const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
-    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
-        section === 'artistTableStages' || section === 'artistRequirementStages' || 
-        section === 'rfIemTableStages' || section === 'infrastructureTableStages' ||
-        section === 'wiredMicNeedsStages') {
-      setOptions(prev => ({
-        ...prev,
-        [section]: checked 
-          ? [...prev[section], stageNumber].sort((a, b) => a - b)
-          : prev[section].filter(s => s !== stageNumber)
-      }));
-    }
-  };
-
-  const handleSelectAllStages = () => {
-    const allStages = Array.from({ length: maxStages }, (_, i) => i + 1);
-    setOptions(prev => ({
-      ...prev,
-      gearSetupStages: allStages,
-      shiftScheduleStages: allStages,
-      artistTableStages: allStages,
-      artistRequirementStages: allStages,
-      rfIemTableStages: allStages,
-      infrastructureTableStages: allStages,
-      wiredMicNeedsStages: allStages
-    }));
-  };
-
-  const handleDeselectAllStages = () => {
-    setOptions(prev => ({
-      ...prev,
-      gearSetupStages: [],
-      shiftScheduleStages: [],
-      artistTableStages: [],
-      artistRequirementStages: [],
-      rfIemTableStages: [],
-      infrastructureTableStages: [],
-      wiredMicNeedsStages: []
-    }));
-  };
-
-  const generateFilename = (): string => {
-    const baseTitle = jobTitle || "Festival";
-
-    if (options.generateIndividualStagePDFs) {
-      return buildReadableFilename([baseTitle, "Documentación por escenario"], "zip");
-    }
-
-    const sectionLabels: string[] = [];
-    if (options.includeShiftSchedules) sectionLabels.push("Horarios de turnos");
-    if (options.includeGearSetup) sectionLabels.push("Dotación técnica");
-    if (options.includeArtistTables) sectionLabels.push("Cronograma artistas");
-    if (options.includeRfIemTable) sectionLabels.push("Tabla RF IEM");
-    if (options.includeInfrastructureTable) sectionLabels.push("Tabla infraestructura");
-    if (options.includeMissingRiderReport) sectionLabels.push("Riders faltantes");
-    if (options.includeArtistRequirements) sectionLabels.push("Fichas individuales artistas");
-    if (options.includeWiredMicNeeds) sectionLabels.push("Micrófonos cableados");
-    if (options.includeWeatherPrediction) sectionLabels.push("Predicción meteorológica");
-
-    const allSelectedStages = new Set([
-      ...(options.includeGearSetup ? options.gearSetupStages : []),
-      ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
-      ...(options.includeArtistTables ? options.artistTableStages : []),
-      ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
-      ...(options.includeRfIemTable ? options.rfIemTableStages : []),
-      ...(options.includeInfrastructureTable ? options.infrastructureTableStages : []),
-      ...(options.includeWiredMicNeeds ? options.wiredMicNeedsStages : [])
-    ]);
-    const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
-    const stageLabel =
-      sortedStages.length > 0 && sortedStages.length < maxStages
-        ? sortedStages.length === 1
-          ? `Escenario ${sortedStages[0]}`
-          : `Escenarios ${sortedStages.join(", ")}`
-        : "";
-
-    if (sectionLabels.length === 1) {
-      return buildReadableFilename([baseTitle, stageLabel, sectionLabels[0]]);
-    }
-
-    return buildReadableFilename([baseTitle, stageLabel, "Documentación completa"]);
-  };
-
-  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages' | 'wiredMicNeedsStages') => {
-    return (
-      <div className="pl-4 sm:pl-6 space-y-2">
-        <p className="text-xs sm:text-sm text-muted-foreground">Select stages:</p>
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2">
-          {Array.from({ length: maxStages }, (_, i) => i + 1).map((stageNum) => (
-            <div key={stageNum} className="flex items-center space-x-2">
-              <Checkbox
-                id={`${section}-${stageNum}`}
-                checked={options[section].includes(stageNum)}
-                onCheckedChange={(checked) => 
-                  handleStageChange(section, stageNum, checked as boolean)
-                }
-                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-              />
-              <Label 
-                htmlFor={`${section}-${stageNum}`}
-                className="text-xs sm:text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-              >
-                Stage {stageNum}
-              </Label>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const filename = printFilename(options, jobTitle, maxStages);
+  const perStage = options.generateIndividualStagePDFs;
+  const progressValue =
+    progress && progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : undefined;
 
   const handleConfirm = () => {
-    const filename = generateFilename();
     onConfirm(options, filename);
-    if (closeOnConfirm) {
-      onOpenChange(false);
-    }
+    if (closeOnConfirm) onOpenChange(false);
   };
-
-  const progressValue = progress && progress.total > 0
-    ? Math.round((progress.completed / progress.total) * 100)
-    : undefined;
-
-  const {
-    handleDownloadArtistTables,
-    handleDownloadGearSetup,
-    handleDownloadInfrastructureTable,
-    handleDownloadMissingRiderReport,
-    handleDownloadRfIemTable,
-    handleDownloadShiftSchedules,
-    handleDownloadWiredMicNeeds,
-    handleSendMissingRiderReport,
-    isSendingMissingRiderEmail,
-    missingRiderRecipientEmails,
-    setMissingRiderRecipientEmails,
-  } = usePrintOptionDownloads({ jobId, jobTitle, options });
 
   return (
     <Dialog
@@ -228,9 +72,9 @@ export const PrintOptionsDialog = ({
             <div className="flex items-center space-x-2 mb-2">
               <Checkbox
                 id="individual-stage-pdfs"
-                checked={options.generateIndividualStagePDFs}
+                checked={perStage}
                 onCheckedChange={(checked) =>
-                  setOptions(prev => ({ ...prev, generateIndividualStagePDFs: checked as boolean }))
+                  setOptions((prev) => ({ ...prev, generateIndividualStagePDFs: checked === true }))
                 }
                 className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
               />
@@ -242,10 +86,9 @@ export const PrintOptionsDialog = ({
               </Label>
             </div>
             <p className="text-sm text-muted-foreground pl-6 dark:text-gray-300">
-              {options.generateIndividualStagePDFs
+              {perStage
                 ? "Crea documentos PDF separados para cada stage conteniendo los tipos de documentos seleccionados. Se descarga como un archivo ZIP con PDFs individuales para cada stage."
-                : "Crear un único PDF combinado con los tipos de documentos y stages seleccionados. Usa las selecciones de stage abajo para elegir qué stages incluir para cada tipo de documento."
-              }
+                : "Crear un único PDF combinado con los tipos de documentos y stages seleccionados. Usa las selecciones de stage abajo para elegir qué stages incluir para cada tipo de documento."}
             </p>
           </div>
 
@@ -256,7 +99,7 @@ export const PrintOptionsDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSelectAllStages}
+                  onClick={() => setOptions((prev) => setAllStages(prev, maxStages, true))}
                   className="w-full sm:w-auto"
                 >
                   Seleccionar Todos los Stages
@@ -264,329 +107,55 @@ export const PrintOptionsDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDeselectAllStages}
+                  onClick={() => setOptions((prev) => setAllStages(prev, maxStages, false))}
                   className="w-full sm:w-auto"
                 >
                   Deseleccionar Todos los Stages
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2 dark:text-gray-400">
-                {options.generateIndividualStagePDFs
+                {perStage
                   ? "Estos controles aplican a todas las secciones. Se generarán PDFs individuales para stages que tengan contenido en cada tipo de documento seleccionado."
-                  : "Estos controles aplican a todas las secciones que tienen selecciones de stage."
-                }
+                  : "Estos controles aplican a todas las secciones que tienen selecciones de stage."}
               </p>
             </div>
           )}
 
           <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="gear-setup"
-                    checked={options.includeGearSetup}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeGearSetup: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
+            {PRINT_SECTIONS.map((section) => (
+              <PrintSectionRow
+                key={section.id}
+                section={section}
+                options={options}
+                maxStages={maxStages}
+                canDownload={Boolean(jobId)}
+                onIncludeChange={(checked) => setOptions((prev) => ({ ...prev, [section.include]: checked }))}
+                onStageChange={(stageNumber, checked) => {
+                  const stages = section.stages;
+                  if (stages) setOptions((prev) => toggleStage(prev, stages, stageNumber, checked));
+                }}
+                onDownload={() => {
+                  if (section.download) void downloads.download(section.download);
+                }}
+              >
+                {section.download === "missingRiderReport" && jobId && (
+                  <MissingRiderEmailForm
+                    recipients={downloads.recipientEmails}
+                    onRecipientsChange={downloads.setRecipientEmails}
+                    isSending={downloads.isSending}
+                    onSend={() => void downloads.sendMissingRiders()}
                   />
-                  <Label
-                    htmlFor="gear-setup"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Configuración de Equipamiento por Stage
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadGearSetup}
-                    className="h-8 px-2"
-                    title="Download Gear Setup only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
                 )}
-              </div>
-              {options.includeGearSetup && maxStages > 1 && renderStageSelections('gearSetupStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="shift-schedules"
-                    checked={options.includeShiftSchedules}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeShiftSchedules: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="shift-schedules"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Horarios de Turnos de Personal
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadShiftSchedules}
-                    className="h-8 px-2"
-                    title="Download Shift Schedules only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="artist-tables"
-                    checked={options.includeArtistTables}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeArtistTables: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="artist-tables"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Tablas de Programación de Artistas
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadArtistTables}
-                    className="h-8 px-2"
-                    title="Download Artist Tables only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="artist-requirements"
-                  checked={options.includeArtistRequirements}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
-                  }
-                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                />
-                <Label
-                  htmlFor="artist-requirements"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                >
-                  Requerimientos Individuales de Artistas
-                </Label>
-              </div>
-              {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="rf-iem-table"
-                    checked={options.includeRfIemTable}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeRfIemTable: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="rf-iem-table"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Resumen de RF e IEM de Artistas
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadRfIemTable}
-                    className="h-8 px-2"
-                    title="Download RF/IEM Table only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="infrastructure-table"
-                    checked={options.includeInfrastructureTable}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeInfrastructureTable: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="infrastructure-table"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Resumen de Necesidades de Infraestructura
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadInfrastructureTable}
-                    className="h-8 px-2"
-                    title="Download Infrastructure Table only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="wired-mic-needs"
-                    checked={options.includeWiredMicNeeds}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeWiredMicNeeds: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="wired-mic-needs"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Requerimientos de Micrófonos Cableados
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadWiredMicNeeds}
-                    className="h-8 px-2"
-                    title="Download Wired Microphone Needs only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
-              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Requerimientos detallados de inventario de micrófonos y análisis de uso pico
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="weather-prediction"
-                  checked={options.includeWeatherPrediction}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, includeWeatherPrediction: checked as boolean }))
-                  }
-                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                />
-                <Label
-                  htmlFor="weather-prediction"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                >
-                  Incluir Pronóstico del Tiempo
-                </Label>
-              </div>
-              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Pronóstico del tiempo para las fechas del festival de Open-Meteo
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="missing-rider-report"
-                    checked={options.includeMissingRiderReport}
-                    onCheckedChange={(checked) => 
-                      setOptions(prev => ({ ...prev, includeMissingRiderReport: checked as boolean }))
-                    }
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                  />
-                  <Label
-                    htmlFor="missing-rider-report"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                  >
-                    Reporte de Riders Faltantes
-                  </Label>
-                </div>
-                {jobId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadMissingRiderReport}
-                    className="h-8 px-2"
-                    title="Download Missing Rider Report only"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
-                Resumen de todos los artistas con riders técnicos faltantes
-              </div>
-              {jobId && (
-                <div className="pl-6 mt-3 space-y-2">
-                  <Label htmlFor="missing-rider-recipient-emails" className="text-sm font-medium dark:text-gray-200">
-                    Enviar reporte por email (externo)
-                  </Label>
-                  <Textarea
-                    id="missing-rider-recipient-emails"
-                    value={missingRiderRecipientEmails}
-                    onChange={(event) => setMissingRiderRecipientEmails(event.target.value)}
-                    placeholder="correo1@dominio.com, correo2@dominio.com"
-                    rows={3}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleSendMissingRiderReport}
-                    disabled={isSendingMissingRiderEmail}
-                    className="w-full sm:w-auto"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    {isSendingMissingRiderEmail ? "Enviando reporte..." : "Enviar Reporte por Email"}
-                  </Button>
-                </div>
-              )}
-            </div>
+              </PrintSectionRow>
+            ))}
           </div>
 
           <div className="border-t pt-4">
             <div className="bg-muted/50 p-3 rounded-md dark:bg-muted/20">
               <h4 className="text-xs sm:text-sm font-medium mb-1 dark:text-gray-200">Nombre de archivo generado:</h4>
-              <p className="text-xs sm:text-sm text-muted-foreground font-mono dark:text-gray-300 break-all">{generateFilename()}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground font-mono dark:text-gray-300 break-all">
+                {filename}
+              </p>
             </div>
           </div>
 
@@ -611,7 +180,7 @@ export const PrintOptionsDialog = ({
           <Button onClick={handleConfirm} disabled={isGenerating} className="w-full sm:w-auto">
             {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             <span className="hidden sm:inline">
-              {isGenerating ? "Generando..." : `Generar ${options.generateIndividualStagePDFs ? 'PDFs Individuales por Stage' : 'PDF'}`}
+              {isGenerating ? "Generando..." : `Generar ${perStage ? "PDFs Individuales por Stage" : "PDF"}`}
             </span>
             <span className="sm:hidden">{isGenerating ? "Generando..." : "Generar"}</span>
           </Button>
