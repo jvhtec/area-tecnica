@@ -563,15 +563,31 @@ describe("Assignments Critical Paths", () => {
       });
     });
 
-    it("preserves the committed base assignment when the first timesheet write fails", async () => {
+    it("preserves the committed base assignment and still attempts every date when one timesheet write fails", async () => {
       const { insertMock, deleteMock } = configureDialogSupabase();
-      toggleTimesheetDayMock.mockRejectedValueOnce(new Error("timesheet write failed"));
+      toggleTimesheetDayMock
+        .mockRejectedValueOnce(new Error("first date failed"))
+        .mockResolvedValueOnce(undefined);
 
       await renderAssignmentDialog();
 
       await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2));
 
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-01",
+        present: true,
+        source: "assignment-dialog",
+      });
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-02",
+        present: true,
+        source: "assignment-dialog",
+      });
       expect(deleteMock).not.toHaveBeenCalled();
       expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
     });
