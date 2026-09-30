@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { queryKeys } from "@/lib/react-query";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { addShiftAssignment, fetchJobCrew, removeShiftAssignment, type JobCrewData } from "@/features/festival-scheduling/api";
+import { festivalShiftKeys } from "@/features/festival-scheduling/keys";
 import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { labelForCode } from "@/utils/roles";
@@ -50,51 +50,7 @@ interface ManageAssignmentsDialogProps {
   isViewOnly?: boolean;
 }
 
-type JobCrewData = {
-  jobAssignments: JobCrewAssignment[];
-  directory: CrewDirectoryEntry[];
-  externalNames: string[];
-};
-
 const EMPTY_CREW: JobCrewData = { jobAssignments: [], directory: [], externalNames: [] };
-
-const fetchJobCrew = async (jobId: string): Promise<JobCrewData> => {
-  const [assignmentsResult, shiftCrewResult] = await Promise.all([
-    dataLayerClient
-      .from("job_assignments")
-      .select("technician_id, status, sound_role, lights_role, video_role, production_role")
-      .eq("job_id", jobId),
-    dataLayerClient
-      .from("festival_shift_assignments")
-      .select("external_technician_name, festival_shifts!inner(job_id)")
-      .eq("festival_shifts.job_id", jobId),
-  ]);
-
-  if (assignmentsResult.error) throw assignmentsResult.error;
-  if (shiftCrewResult.error) throw shiftCrewResult.error;
-
-  const jobAssignments: JobCrewAssignment[] = assignmentsResult.data ?? [];
-  const shiftRows = shiftCrewResult.data ?? [];
-  const externalNames = Array.from(
-    new Set(
-      shiftRows
-        .map((row) => row.external_technician_name?.trim())
-        .filter((name): name is string => Boolean(name)),
-    ),
-  ).sort((a, b) => a.localeCompare(b, "es"));
-
-  const ids = Array.from(new Set(jobAssignments.map((row) => row.technician_id)));
-  if (ids.length === 0) return { ...EMPTY_CREW, externalNames };
-
-  // Display names come from the safe directory: direct `profiles` reads are
-  // row-scoped and hide crew the viewer does not share an assignment with.
-  const { data: directory, error: directoryError } = await dataLayerClient.rpc("get_profile_directory", {
-    p_profile_ids: ids,
-  });
-  if (directoryError) throw directoryError;
-
-  return { jobAssignments, directory: directory ?? [], externalNames };
-};
 
 export const ManageAssignmentsDialog = ({
   open,
@@ -114,7 +70,7 @@ export const ManageAssignmentsDialog = ({
   const hasRoleCatalogue = roleOptions.length > 0;
 
   const { data: crew = EMPTY_CREW, isLoading: isLoadingCrew } = useQuery({
-    queryKey: queryKeys.scope("festival_shift_crew", shift.job_id ?? "none"),
+    queryKey: festivalShiftKeys.crew(shift.job_id ?? "none"),
     queryFn: () => (shift.job_id ? fetchJobCrew(shift.job_id) : Promise.resolve(EMPTY_CREW)),
     enabled: open && !isViewOnly && Boolean(shift.job_id),
   });
@@ -148,20 +104,12 @@ export const ManageAssignmentsDialog = ({
 
   const invalidateShifts = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festival_shifts") }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festival_shift_crew") }),
+      queryClient.invalidateQueries({ queryKey: festivalShiftKeys.all() }),
+      queryClient.invalidateQueries({ queryKey: festivalShiftKeys.allCrew() }),
     ]);
 
   const addAssignmentMutation = useMutation({
-    mutationFn: async (assignment: {
-      shift_id: string;
-      technician_id?: string;
-      external_technician_name?: string;
-      role: string;
-    }) => {
-      const { error } = await dataLayerClient.from("festival_shift_assignments").insert([assignment]);
-      if (error) throw error;
-    },
+    mutationFn: addShiftAssignment,
     onSuccess: async () => {
       await invalidateShifts();
       onAssignmentsUpdated();
@@ -179,10 +127,7 @@ export const ManageAssignmentsDialog = ({
   });
 
   const removeAssignmentMutation = useMutation({
-    mutationFn: async (assignmentId: string) => {
-      const { error } = await dataLayerClient.from("festival_shift_assignments").delete().eq("id", assignmentId);
-      if (error) throw error;
-    },
+    mutationFn: removeShiftAssignment,
     onSuccess: async () => {
       await invalidateShifts();
       onAssignmentsUpdated();

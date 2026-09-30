@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatFestivalDayKey } from "@/features/festival-management/dateFormatting";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { fetchShiftsPdfBranding } from "@/features/festival-scheduling/api";
 import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { labelForCode } from "@/utils/roles";
@@ -42,29 +42,6 @@ interface ShiftsTableProps {
 }
 
 const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
-
-/** Job title and logo for the PDF, loaded only when the user exports. */
-const loadPdfBranding = async (jobId: string): Promise<{ jobTitle: string; logoUrl?: string }> => {
-  const [{ data: job }, { data: logo }] = await Promise.all([
-    dataLayerClient.from("jobs").select("title").eq("id", jobId).maybeSingle(),
-    dataLayerClient.from("festival_logos").select("file_path").eq("job_id", jobId).maybeSingle(),
-  ]);
-  const jobTitle = job?.title ?? "";
-  const logoPath = logo?.file_path;
-  if (!logoPath) return { jobTitle };
-  if (logoPath.startsWith("http")) return { jobTitle, logoUrl: logoPath };
-
-  let bucket = "festival-logos";
-  let path = logoPath;
-  if (logoPath.includes("/")) {
-    [bucket] = logoPath.split("/", 1);
-    path = logoPath.substring(bucket.length + 1);
-  }
-  const { data: signed } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 60 * 60);
-  if (signed?.signedUrl) return { jobTitle, logoUrl: signed.signedUrl };
-  const { data: publicUrl } = dataLayerClient.storage.from(bucket).getPublicUrl(path);
-  return { jobTitle, logoUrl: publicUrl?.publicUrl };
-};
 
 export const ShiftsTable = ({
   shifts,
@@ -107,7 +84,7 @@ export const ShiftsTable = ({
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      const { jobTitle, logoUrl } = await loadPdfBranding(jobId);
+      const { jobTitle, logoUrl } = await fetchShiftsPdfBranding(jobId);
       const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,

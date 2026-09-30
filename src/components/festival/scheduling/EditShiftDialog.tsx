@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { buildFallbackStageOptions } from "@/features/festival-management/selectors";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { updateFestivalShift } from "@/features/festival-scheduling/api";
 import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { getErrorMessage } from "@/utils/errorMessage";
 
@@ -51,12 +51,7 @@ export const EditShiftDialog = ({
   const handleSubmit = async (values: ShiftFormValues) => {
     setIsSubmitting(true);
     try {
-      const { error } = await dataLayerClient
-        .from("festival_shifts")
-        .update(shiftFormToRow(values))
-        .eq("id", shift.id);
-
-      if (error) throw error;
+      await updateFestivalShift(shift.id, shiftFormToRow(values));
 
       onShiftUpdated();
       onOpenChange(false);

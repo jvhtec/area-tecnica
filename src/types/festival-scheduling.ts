@@ -7,20 +7,21 @@ export interface FestivalShift {
   start_time: string;
   end_time: string;
   name: string; // e.g. "Morning Shift", "Sound Check", etc.
-  notes?: string;
-  stage?: number;
-  department?: string;
-  created_at?: string;
-  updated_at?: string;
+  // The optional columns are nullable in the database.
+  notes?: string | null;
+  stage?: number | null;
+  department?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface ShiftAssignment {
   id: string;
   shift_id: string;
-  technician_id?: string;
-  external_technician_name?: string;
+  technician_id?: string | null;
+  external_technician_name?: string | null;
   role: string;
-  created_at?: string;
+  created_at?: string | null;
   /** Display fields from `get_profile_directory` (no contact details). */
   profiles?: {
     id: string;
