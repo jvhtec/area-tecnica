@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, FileDown, Pencil, Trash2 } from "lucide-react";
+import { FileDown, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { labelForCode } from "@/utils/roles";
 import { exportShiftsTablePDF, type ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 
-import { CopyShiftsDialog } from "./CopyShiftsDialog";
 import {
   crewDisplayName,
   formatShiftDuration,
@@ -34,8 +33,6 @@ interface ShiftsTableProps {
   date: string;
   jobId: string;
   isViewOnly?: boolean;
-  jobDates?: Date[];
-  onShiftsCopied?: () => void;
   stageOptions?: readonly FestivalStageOption[];
   dayStartTime: string;
 }
@@ -49,14 +46,11 @@ export const ShiftsTable = ({
   date,
   jobId,
   isViewOnly = false,
-  jobDates = [],
-  onShiftsCopied,
   stageOptions = EMPTY_STAGE_OPTIONS,
   dayStartTime,
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const sortedShifts = sortShiftsForFestivalDay(shifts, dayStartTime);
@@ -112,12 +106,6 @@ export const ShiftsTable = ({
           <p className="text-center text-muted-foreground">{formattedDate}</p>
         </div>
         <div className="flex gap-2 ml-auto mb-2 print:hidden">
-          {!isViewOnly && sortedShifts.length > 0 && jobDates.length > 1 && (
-            <Button variant="outline" size="sm" onClick={() => setIsCopyDialogOpen(true)}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar turnos
-            </Button>
-          )}
           <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isExporting}>
             <FileDown className="h-4 w-4 mr-2" />
             {isExporting ? "Generando…" : "Exportar a PDF"}
@@ -215,19 +203,6 @@ export const ShiftsTable = ({
         </Table>
       </div>
 
-      {isCopyDialogOpen && (
-        <CopyShiftsDialog
-          open={isCopyDialogOpen}
-          onOpenChange={setIsCopyDialogOpen}
-          sourceDate={date}
-          jobDates={jobDates}
-          jobId={jobId}
-          onShiftsCopied={() => {
-            onShiftsCopied?.();
-            setIsCopyDialogOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 };

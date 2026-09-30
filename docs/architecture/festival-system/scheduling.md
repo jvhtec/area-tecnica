@@ -35,9 +35,11 @@ An internal technician can appear only once per shift.
 - Shift sheet (one place for a shift's details and crew; it stays open after creating a shift):
   - `src/components/festival/scheduling/ShiftSheet.tsx` (times, stage, department, notes; create and edit)
   - `src/components/festival/scheduling/ShiftCrewSection.tsx` (assigned crew with in-place role change and undoable removal; multi-select picker with search, external suggestions)
-- Views of the day:
-  - `src/components/festival/scheduling/ShiftsTable.tsx`
-  - `src/components/festival/scheduling/ShiftsList.tsx`
+- Views of the day (the planner opens on the board; the choice and the grouping are remembered per browser):
+  - `src/components/festival/scheduling/ShiftBoard.tsx`: desktop timeline, one column per stage or department, hours from the festival day start, overnight shifts as one block; a lane's add button or a click on an empty spot starts a shift there
+  - `src/components/festival/scheduling/ShiftAgenda.tsx`: the same lanes as sections on a phone
+  - `src/components/festival/scheduling/ShiftsTable.tsx`: table for print and PDF export
+  - `src/components/festival/scheduling/boardModel.ts`: pure lane, position and overlap rules
 - Other operations:
   - `src/components/festival/scheduling/CopyShiftsDialog.tsx`
   - `src/components/festival/scheduling/ShiftTimeCalculator.tsx`
