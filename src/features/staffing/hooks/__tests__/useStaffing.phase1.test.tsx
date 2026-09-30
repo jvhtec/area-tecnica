@@ -76,6 +76,19 @@ const makeThenableBuilder = (result: BuilderResult) => {
   return builder;
 };
 
+const runMutation = async <T,>(mutation: () => Promise<T>) => {
+  let value: T | undefined;
+  let error: unknown;
+  await act(async () => {
+    try {
+      value = await mutation();
+    } catch (caught) {
+      error = caught;
+    }
+  });
+  return { value, error };
+};
+
 const createHarness = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -94,6 +107,7 @@ const createHarness = () => {
 };
 
 beforeEach(() => {
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
   getSessionMock.mockResolvedValue({
     data: { session: { access_token: "session-token" } },
@@ -292,15 +306,15 @@ describe("staffing hooks Phase 1 characterization", () => {
       const { wrapper } = createHarness();
       const { result } = renderHook(() => useSendStaffingEmail(), { wrapper });
 
-      await expect(
-        act(async () =>
-          result.current.mutateAsync({
-            job_id: "job-1",
-            profile_id: "tech-1",
-            phase: "offer",
-          }),
-        ),
-      ).rejects.toThrow("Conflict");
+      const outcome = await runMutation(() =>
+        result.current.mutateAsync({
+          job_id: "job-1",
+          profile_id: "tech-1",
+          phase: "offer",
+        }),
+      );
+      expect(outcome.error).toBeInstanceOf(Error);
+      expect((outcome.error as Error).message).toBe("Conflict");
     });
 
     it("treats a 200 response carrying an API error as a failure", async () => {
@@ -317,15 +331,15 @@ describe("staffing hooks Phase 1 characterization", () => {
       const { wrapper } = createHarness();
       const { result } = renderHook(() => useSendStaffingEmail(), { wrapper });
 
-      await expect(
-        act(async () =>
-          result.current.mutateAsync({
-            job_id: "job-1",
-            profile_id: "tech-1",
-            phase: "availability",
-          }),
-        ),
-      ).rejects.toThrow("Logical failure");
+      const outcome = await runMutation(() =>
+        result.current.mutateAsync({
+          job_id: "job-1",
+          profile_id: "tech-1",
+          phase: "availability",
+        }),
+      );
+      expect(outcome.error).toBeInstanceOf(Error);
+      expect((outcome.error as Error).message).toBe("Logical failure");
     });
 
     it("invalidates all staffing/assignment caches and dispatches staffing-updated on success", async () => {
@@ -421,15 +435,15 @@ describe("staffing hooks Phase 1 characterization", () => {
       const { wrapper } = createHarness();
       const { result } = renderHook(() => useCancelStaffingRequest(), { wrapper });
 
-      await expect(
-        act(async () =>
-          result.current.mutateAsync({
-            job_id: "job-1",
-            profile_id: "tech-1",
-            phase: "availability",
-          }),
-        ),
-      ).resolves.toEqual({ success: true, rowsAffected: 0 });
+      const outcome = await runMutation(() =>
+        result.current.mutateAsync({
+          job_id: "job-1",
+          profile_id: "tech-1",
+          phase: "availability",
+        }),
+      );
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.value).toEqual({ success: true, rowsAffected: 0 });
     });
 
     it("propagates the staffing-request update error and does not send cancellation notification", async () => {
@@ -445,16 +459,15 @@ describe("staffing hooks Phase 1 characterization", () => {
       const { wrapper } = createHarness();
       const { result } = renderHook(() => useCancelStaffingRequest(), { wrapper });
 
-      await expect(
-        act(async () =>
-          result.current.mutateAsync({
-            job_id: "job-1",
-            profile_id: "tech-1",
-            phase: "offer",
-          }),
-        ),
-      ).rejects.toThrow("update failed");
-
+      const outcome = await runMutation(() =>
+        result.current.mutateAsync({
+          job_id: "job-1",
+          profile_id: "tech-1",
+          phase: "offer",
+        }),
+      );
+      expect(outcome.error).toBeInstanceOf(Error);
+      expect((outcome.error as Error).message).toBe("update failed");
       expect(invokeMock).not.toHaveBeenCalled();
     });
 
@@ -472,15 +485,15 @@ describe("staffing hooks Phase 1 characterization", () => {
       const { wrapper } = createHarness();
       const { result } = renderHook(() => useCancelStaffingRequest(), { wrapper });
 
-      await expect(
-        act(async () =>
-          result.current.mutateAsync({
-            job_id: "job-1",
-            profile_id: "tech-1",
-            phase: "offer",
-          }),
-        ),
-      ).resolves.toEqual({ success: true, rowsAffected: 1 });
+      const outcome = await runMutation(() =>
+        result.current.mutateAsync({
+          job_id: "job-1",
+          profile_id: "tech-1",
+          phase: "offer",
+        }),
+      );
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.value).toEqual({ success: true, rowsAffected: 1 });
     });
 
     it("invalidates/refetches staffing caches and emits both cancellation notification and push on success", async () => {
