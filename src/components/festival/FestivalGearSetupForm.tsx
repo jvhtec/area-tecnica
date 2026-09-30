@@ -93,7 +93,7 @@ export const FestivalGearSetupForm = ({
             className="flex-1"
           >
             <Upload className="h-4 w-4 mr-2" />
-            Push to Flex Pullsheet
+            Enviar a pullsheet de Flex
           </Button>
 
           <Button type="submit" disabled={isLoading} className="flex-1">

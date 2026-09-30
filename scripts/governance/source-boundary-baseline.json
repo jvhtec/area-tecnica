@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-29T20:46:55.441Z",
+  "generatedAt": "2026-09-29T21:18:40.976Z",
   "note": "Generated from current legacy debt. CI fails when current matches exceed these fingerprints.",
   "rules": {
     "pages-supabase-client-import": {
@@ -34,7 +34,6 @@
         "src/components/expenses/ExpenseList.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/expenses/PendingExpensesSummary.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/festival/ArtistRequirementsForm.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/PushToFlexPullsheetDialog.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/festival/scheduling/CreateShiftDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/festival/scheduling/EditShiftDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/festival/scheduling/FestivalScheduling.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
