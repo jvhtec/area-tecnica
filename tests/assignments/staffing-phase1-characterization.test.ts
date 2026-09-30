@@ -391,4 +391,68 @@ describe("Staffing Phase 1 characterization", () => {
       );
     });
   });
+
+  describe("public staffing-link security ordering", () => {
+    it("handles HEAD previews before validating or consuming the signed link", () => {
+      expectOrdered(
+        staffingClick,
+        "if (req.method === 'HEAD')",
+        "if (!rid || !action || !t || (urlStyle === 'legacy' && !exp))",
+      );
+    });
+
+    it("applies both ingress and per-link rate limits before reading the staffing request", () => {
+      const ingress = indexOrFail(staffingClick, 'scope: "staffing-click.ingress"');
+      const perLink = indexOrFail(staffingClick, 'scope: "staffing-click"');
+      const requestRead = indexOrFail(
+        staffingClick,
+        'supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle()',
+      );
+
+      expect(ingress).toBeLessThan(perLink);
+      expect(perLink).toBeLessThan(requestRead);
+    });
+
+    it("validates expiry before cryptographic token validation", () => {
+      expectOrdered(
+        staffingClick,
+        "const expTime = new Date(effectiveExp).getTime()",
+        "staffing_click.token_validation_started",
+      );
+      expectOrdered(
+        staffingClick,
+        "staffing_click.link_expired",
+        "crypto.subtle.importKey",
+      );
+    });
+
+    it("validates the token before checking whether the request was already answered", () => {
+      expectOrdered(
+        staffingClick,
+        "staffing_click.token_validated",
+        "if (row.status !== 'pending')",
+      );
+    });
+
+    it("checks pending status before any response mutation", () => {
+      expectOrdered(
+        staffingClick,
+        "if (row.status !== 'pending')",
+        ".update({ status: newStatus })",
+      );
+    });
+
+    it("keeps defense-in-depth token compatibility with either expected HMAC or provided token hash", () => {
+      expect(staffingClick).toContain(
+        "if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash)",
+      );
+      expect(staffingClick).toContain(
+        "new TextEncoder().encode(`${rid}:${row.phase}:${effectiveExp}`)",
+      );
+      expect(staffingClick).toContain(
+        "crypto.subtle.digest(\"SHA-256\", b64uToU8(t))",
+      );
+    });
+  });
+
 });
