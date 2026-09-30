@@ -6,9 +6,15 @@ const mocks = vi.hoisted(() => ({
   exportArtistPDF: vi.fn(),
   getPdfPageCount: vi.fn(),
   trackError: vi.fn(),
+  exportRfIemTablePDF: vi.fn(),
+  NoGearSetupError: class NoGearSetupError extends Error {},
 }));
 
-vi.mock("@/utils/gearSetupPdfExport", () => ({ generateStageGearPDF: mocks.generateStageGearPDF }));
+vi.mock("@/utils/gearSetupPdfExport", () => ({
+  generateStageGearPDF: mocks.generateStageGearPDF,
+  NoGearSetupError: mocks.NoGearSetupError,
+}));
+vi.mock("@/utils/rfIemTablePdfExport", () => ({ exportRfIemTablePDF: mocks.exportRfIemTablePDF }));
 vi.mock("@/utils/artistTablePdfExport", () => ({ exportArtistTablePDF: mocks.exportArtistTablePDF }));
 vi.mock("@/utils/artistPdfExport", () => ({ exportArtistPDF: mocks.exportArtistPDF }));
 vi.mock("@/lib/errorTracking", () => ({ trackError: mocks.trackError }));
@@ -24,6 +30,7 @@ import { generateArtistTablesSection } from "../artistTablesSection";
 import { buildBundleSections } from "../bundleSections";
 import type { FestivalSectionContext } from "../context";
 import { generateGearSection } from "../gearSection";
+import { generateRfIemSection } from "../tableSections";
 
 const pdf = (size = 5) => new Blob(["x".repeat(size)]);
 
@@ -74,10 +81,42 @@ describe("festival bundle sections", () => {
       expect(mocks.trackError).toHaveBeenCalledTimes(1);
     });
 
+    it("leaves gear out without reporting an error when the festival has no gear setup", async () => {
+      mocks.generateStageGearPDF.mockRejectedValue(new mocks.NoGearSetupError("No gear setup found for festival"));
+
+      const section = await generateGearSection(context());
+
+      expect(section).toEqual({ pdfs: [], stages: [] });
+      expect(mocks.trackError).not.toHaveBeenCalled();
+    });
+
     it("does nothing when it is switched off", async () => {
       const options = { ...defaultPrintOptions(3), includeGearSetup: false };
       expect(await generateGearSection(context({ options }))).toEqual({ pdfs: [], stages: [] });
       expect(mocks.generateStageGearPDF).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("RF/IEM section", () => {
+    it("is left out, without calling the exporter or reporting an error, when nobody has RF or IEM", async () => {
+      const section = await generateRfIemSection(context({ artists: [artist("a", 1, "2026-07-01", "20:00")] }));
+
+      expect(section).toBeNull();
+      expect(mocks.exportRfIemTablePDF).not.toHaveBeenCalled();
+      expect(mocks.trackError).not.toHaveBeenCalled();
+    });
+
+    it("is made when an artist has a wireless system", async () => {
+      mocks.exportRfIemTablePDF.mockResolvedValue(pdf());
+      const withRf = {
+        ...artist("a", 1, "2026-07-01", "20:00"),
+        wireless_systems: [{ model: "AD4Q", quantity_ch: 4 }],
+      } as FestivalArtistRow;
+
+      const section = await generateRfIemSection(context({ artists: [withRf] }));
+
+      expect(section).not.toBeNull();
+      expect(mocks.exportRfIemTablePDF.mock.calls[0][0].artists).toHaveLength(1);
     });
   });
 

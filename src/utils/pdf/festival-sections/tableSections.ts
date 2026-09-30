@@ -11,6 +11,7 @@ import {
 import {
   buildInfrastructureArtists,
   buildRfIemArtists,
+  hasRfIemSystems,
   sortArtistsChronologically,
 } from "@/utils/pdf/festivalPdfSectionBuilders";
 import { attemptSection, type FestivalSectionContext } from "./context";
@@ -28,15 +29,11 @@ export const generateRfIemSection = (context: FestivalSectionContext): Promise<B
     if (!options.includeRfIemTable || context.artists.length === 0) return null;
 
     const artists = artistsOnStages(context, options.rfIemTableStages);
-    if (artists.length === 0) return null;
+    // The exporter throws when nobody has RF/IEM; that is "nothing to include", not a failure.
+    const withRfIem = buildRfIemArtists(artists, dayStartTime).filter(hasRfIemSystems);
+    if (withRfIem.length === 0) return null;
 
-    return exportRfIemTablePDF({
-      jobTitle,
-      dayStartTime,
-      logoUrl,
-      artists: buildRfIemArtists(artists, dayStartTime),
-      paginate: false,
-    });
+    return exportRfIemTablePDF({ jobTitle, dayStartTime, logoUrl, artists: withRfIem, paginate: false });
   });
 
 export const generateInfrastructureSection = (context: FestivalSectionContext): Promise<Blob | null> =>

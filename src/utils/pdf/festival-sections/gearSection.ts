@@ -1,4 +1,4 @@
-import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
+import { NoGearSetupError, generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { isNonEmptyBlob } from "@/utils/pdf/festivalPdfSupport";
 import { runProgressJobs, type FestivalSectionContext } from "./context";
 
@@ -18,10 +18,16 @@ export async function generateGearSection(context: FestivalSectionContext): Prom
     { preparing: "Preparando dotacion tecnica", running: "Generando dotacion tecnica" },
     options.gearSetupStages,
     async (stageNumber) => {
-      const pdf = await generateStageGearPDF(jobId, stageNumber, getStageNameByNumber(stageNumber), logoUrl, {
-        paginate: false,
-      });
-      return isNonEmptyBlob(pdf) ? pdf : null;
+      try {
+        const pdf = await generateStageGearPDF(jobId, stageNumber, getStageNameByNumber(stageNumber), logoUrl, {
+          paginate: false,
+        });
+        return isNonEmptyBlob(pdf) ? pdf : null;
+      } catch (error) {
+        // A festival without a gear setup simply has no gear pages; that is not a failure to track.
+        if (error instanceof NoGearSetupError) return null;
+        throw error;
+      }
     },
   );
 

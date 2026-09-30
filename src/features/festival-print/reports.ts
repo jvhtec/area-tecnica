@@ -6,7 +6,7 @@ import { exportInfrastructureTablePDF } from "@/utils/infrastructureTablePdfExpo
 import { exportMissingRiderReportPDF } from "@/utils/missingRiderReportPdfExport";
 import { exportRfIemTablePDF } from "@/utils/rfIemTablePdfExport";
 import { exportShiftsTablePDF } from "@/utils/shiftsTablePdfExport";
-import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
+import { NoGearSetupError, generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { organizeArtistsByDateAndStage, exportWiredMicrophoneMatrixPDF } from "@/utils/wiredMicrophoneNeedsPdfExport";
 import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { fetchPreparedFestivalLogo } from "@/utils/pdf/logoOptimization";
@@ -72,12 +72,22 @@ const nonEmpty = (pdfs: Blob[]) => pdfs.filter((pdf) => pdf.size > 0);
 export async function buildGearSetupReport(context: ReportContext): Promise<PrintReport> {
   const jobId = requireJobId(context.jobId, "el reporte de equipamiento");
   const { gearSetupStages } = context.options;
+  if (gearSetupStages.length === 0) {
+    throw new NothingToPrintError("No hay escenarios seleccionados para el equipamiento.");
+  }
   const logoUrl = await fetchPreparedFestivalLogo(jobId);
 
-  const blobs = await Promise.all(
-    gearSetupStages.map((stageNumber) => generateStageGearPDF(jobId, stageNumber, undefined, logoUrl)),
-  );
-  if (blobs.length === 0) throw new Error("No se pudo generar ningún PDF de equipamiento.");
+  let blobs: Blob[];
+  try {
+    blobs = await Promise.all(
+      gearSetupStages.map((stageNumber) => generateStageGearPDF(jobId, stageNumber, undefined, logoUrl)),
+    );
+  } catch (error) {
+    if (error instanceof NoGearSetupError) {
+      throw new NothingToPrintError("Este festival aún no tiene configuración de equipamiento.");
+    }
+    throw error;
+  }
 
   if (blobs.length === 1) {
     return {
