@@ -1,4 +1,4 @@
-import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import type { PrintOptions } from "@/features/festival-print/model";
 import type {
   ArtistRiderFile,
   FestivalArchiveMode,

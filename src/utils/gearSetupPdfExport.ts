@@ -21,6 +21,14 @@ import {
   type FestivalGeometry,
 } from '@/utils/pdf/festival-report';
 
+/** The festival has no gear setup at all: there is nothing to print, which is not a failure. */
+export class NoGearSetupError extends Error {
+  constructor() {
+    super('No gear setup found for festival');
+    this.name = 'NoGearSetupError';
+  }
+}
+
 const yesNo = (value: unknown): string => (value ? 'Sí' : 'No');
 
 export const generateStageGearPDF = async (
@@ -85,7 +93,7 @@ export const generateStageGearPDF = async (
 
       if (!gearSetup) {
         console.log(`No gear setup found for job ${jobId}`);
-        reject(new Error(`No gear setup found for festival`));
+        reject(new NoGearSetupError());
         return;
       }
 

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import type { PrintOptions } from "@/features/festival-print/model";
 import { downloadBlobInBrowser, generateFestivalDocumentation } from "@/features/festival-management/commands";
 import type { FestivalPdfProgress } from "@/utils/pdf/festivalPdfGenerator";
 import { getErrorMessage } from '@/utils/errorMessage';

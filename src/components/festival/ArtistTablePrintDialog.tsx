@@ -1,28 +1,13 @@
-import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
+
+import type { Artist } from "@/components/festival/artistTableTypes";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
-import { sortArtistsChronologically } from "@/utils/artistSorting";
-import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gearComparisonService";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
-import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
-import { Checkbox } from "@/components/ui/checkbox";
-import { buildReadableFilename } from "@/utils/fileName";
-import { combineWavesDisplay } from "@/constants/wavesModels";
-import { getErrorStack } from '@/utils/errorMessage';
-import type { Artist } from '@/components/festival/artistTableTypes';
+import { useArtistTablePrint } from "@/features/festival-artists/hooks/useArtistTablePrint";
 
 interface ArtistTablePrintDialogProps {
   artists: Artist[];
@@ -51,280 +36,24 @@ export const ArtistTablePrintDialog = ({
   stageNames,
   open,
   onOpenChange,
-  jobDates,
-  onDateChange,
-  onStageChange,
-  onPrint,
-  isLoading
+  isLoading,
 }: ArtistTablePrintDialogProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
-  const [includeGearConflicts, setIncludeGearConflicts] = useState(false);
 
   // Use external open state if provided, otherwise use internal state
   const dialogOpen = open !== undefined ? open : isDialogOpen;
   const setDialogOpen = onOpenChange || setIsDialogOpen;
 
-  useEffect(() => {
-    const fetchLogo = async () => {
-      if (jobId) {
-        try {
-          const url = await fetchJobLogo(jobId);
-          setLogoUrl(url);
-        } catch (error) {
-          console.error('Error fetching logo:', error);
-        }
-      }
-    };
-
-    fetchLogo();
-  }, [jobId]);
-
-  const handleTablePrint = async () => {
-    console.log('ArtistTablePrintDialog handleTablePrint called');
-    console.log('Artists received:', artists.length);
-    console.log('Selected date:', selectedDate);
-    console.log('Stage filter:', stageFilter);
-    console.log('Include gear conflicts:', includeGearConflicts);
-    
-    setIsGenerating(true);
-    
-    try {
-      // Filter artists based on selected criteria
-      // Since artists are already filtered by date in the parent component,
-      // we mainly need to filter by stage
-      const filteredArtists = artists.filter(artist => {
-        const matchesStage = stageFilter === 'all' || !stageFilter || artist.stage?.toString() === stageFilter;
-        console.log(`Artist ${artist.name}: stage=${artist.stage}, filter=${stageFilter}, matches=${matchesStage}`);
-        return matchesStage;
-      });
-
-      // Sort artists chronologically using the shared utility
-      const sortedArtists = sortArtistsChronologically(filteredArtists, dayStartTime) as Artist[];
-
-      console.log('Filtered artists count:', filteredArtists.length);
-      
-      if (filteredArtists.length === 0) {
-        console.warn('No artists match the filter criteria');
-        toast.error('No se encontraron artistas para los criterios seleccionados');
-        return;
-      }
-
-      console.log('Sample filtered artist:', filteredArtists[0]);
-
-      // Fetch gear setup data for comparison
-      let festivalGearSetup: FestivalGearSetup | null = null;
-      const stageGearSetups: Record<number, StageGearSetup> = {};
-
-      if (jobId) {
-        try {
-          const { data: mainSetup, error: mainError } = await dataLayerClient.from('festival_gear_setups')
-            .select('*')
-            .eq('job_id', jobId)
-            .single();
-
-          if (mainError && mainError.code !== 'PGRST116') {
-            console.error('Error fetching festival gear setup:', mainError);
-          } else {
-            festivalGearSetup = mapFestivalGearSetup(mainSetup);
-
-            if (mainSetup) {
-              const { data: stageSetups, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
-                .select('*')
-                .eq('gear_setup_id', mainSetup.id);
-
-              if (stageError) {
-                console.error('Error fetching stage gear setups:', stageError);
-              } else {
-                Object.assign(stageGearSetups, mapStageGearSetups(stageSetups));
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching gear setups:', error);
-        }
-      }
-
-      // Transform artists data for PDF
-      const transformedArtists = sortedArtists.map(artist => {
-        console.log(`Transforming artist: ${artist.name}`, {
-          micKit: artist.mic_kit,
-          wiredMics: artist.wired_mics?.length || 0,
-          infrastructure: {
-            cat6: artist.infra_cat6,
-            hma: artist.infra_hma,
-            coax: artist.infra_coax,
-            opticalcon: artist.infra_opticalcon_duo,
-            analog: artist.infra_analog
-          },
-          riderMissing: artist.rider_missing
-        });
-
-        // Run gear comparison for this artist
-        const stageSetup = stageGearSetups[artist.stage] || null;
-        
-        // Transform artist to match ArtistRequirements interface with proper type casting
-        const artistRequirements = {
-          name: artist.name,
-          stage: artist.stage,
-          foh_console: artist.foh_console,
-          foh_console_provided_by: (artist.foh_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
-          mon_console: artist.mon_console,
-          mon_console_provided_by: (artist.mon_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
-          monitors_from_foh: artist.monitors_from_foh || false,
-          foh_waves_models: artist.foh_waves_models || [],
-          foh_outboard: artist.foh_outboard || "",
-          foh_waves_provided_by: artist.foh_waves_provided_by || 'festival',
-          mon_waves_models: artist.mon_waves_models || [],
-          mon_outboard: artist.mon_outboard || "",
-          mon_waves_provided_by: artist.mon_waves_provided_by || 'festival',
-          wireless_systems: artist.wireless_systems || [],
-          wireless_provided_by: (artist.wireless_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
-          iem_systems: artist.iem_systems || [],
-          iem_provided_by: (artist.iem_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
-          monitors_enabled: artist.monitors_enabled,
-          monitors_quantity: artist.monitors_quantity,
-          extras_sf: artist.extras_sf,
-          extras_df: artist.extras_df,
-          extras_djbooth: artist.extras_djbooth,
-          infra_cat6: artist.infra_cat6 || false,
-          infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-          infra_hma: artist.infra_hma || false,
-          infra_hma_quantity: artist.infra_hma_quantity || 0,
-          infra_coax: artist.infra_coax || false,
-          infra_coax_quantity: artist.infra_coax_quantity || 0,
-          infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-          infra_analog: artist.infra_analog || 0,
-          infrastructure_provided_by: (artist.infrastructure_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
-          mic_kit: artist.mic_kit || 'band',
-          wired_mics: artist.wired_mics || []
-        };
-        
-        const gearComparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
-
-        return {
-          name: artist.name,
-          stage: artist.stage,
-          loadInTime: artist.load_in_time || undefined,
-          showTime: {
-            start: artist.show_start,
-            end: artist.show_end
-          },
-          soundcheck: artist.soundcheck ? {
-            date: artist.soundcheck_date || artist.date,
-            start: artist.soundcheck_start || '',
-            end: artist.soundcheck_end || ''
-          } : undefined,
-          lineCheck: artist.line_check ? {
-            start: artist.line_check_start || '',
-            end: artist.line_check_end || ''
-          } : undefined,
-          technical: {
-            fohTech: artist.foh_tech || false,
-            monTech: artist.mon_tech || false,
-            fohConsole: {
-              model: artist.foh_console,
-              providedBy: artist.foh_console_provided_by || 'festival'
-            },
-            monConsole: {
-              model: artist.mon_console,
-              providedBy: artist.mon_console_provided_by || 'festival'
-            },
-            monitorsFromFoh: artist.monitors_from_foh || false,
-            fohWavesOutboard: combineWavesDisplay(artist.foh_waves_models, artist.foh_outboard),
-            monWavesOutboard: combineWavesDisplay(artist.mon_waves_models, artist.mon_outboard),
-            wireless: {
-              systems: artist.wireless_systems || [],
-              providedBy: artist.wireless_provided_by || 'festival'
-            },
-            iem: {
-              systems: artist.iem_systems || [],
-              providedBy: artist.iem_provided_by || 'festival'
-            },
-            monitors: {
-              enabled: artist.monitors_enabled,
-              quantity: artist.monitors_quantity
-            }
-          },
-          extras: {
-            sideFill: artist.extras_sf,
-            drumFill: artist.extras_df,
-            djBooth: artist.extras_djbooth
-          },
-          notes: artist.notes,
-          micKit: artist.mic_kit || 'band',
-          wiredMics: artist.wired_mics || [],
-          infrastructure: {
-            infra_cat6: artist.infra_cat6,
-            infra_cat6_quantity: artist.infra_cat6_quantity,
-            infra_hma: artist.infra_hma,
-            infra_hma_quantity: artist.infra_hma_quantity,
-            infra_coax: artist.infra_coax,
-            infra_coax_quantity: artist.infra_coax_quantity,
-            infra_opticalcon_duo: artist.infra_opticalcon_duo,
-            infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-            infra_analog: artist.infra_analog,
-            other_infrastructure: artist.other_infrastructure,
-            infrastructure_provided_by: artist.infrastructure_provided_by
-          },
-          riderMissing: artist.rider_missing || false,
-          gearMismatches: gearComparison.mismatches
-        };
-      });
-
-      const pdfData: ArtistTablePdfData = {
-        jobTitle: jobTitle || 'Cronograma del festival',
-        date: selectedDate,
-        stage: stageFilter !== 'all' ? stageFilter : undefined,
-        stageNames: stageNames,
-        artists: transformedArtists,
-        dayStartTime,
-        logoUrl: logoUrl,
-        includeGearConflicts: includeGearConflicts
-      };
-
-      console.log('PDF data structure:', {
-        jobTitle: pdfData.jobTitle,
-        date: pdfData.date,
-        stage: pdfData.stage,
-        artistCount: pdfData.artists.length,
-        logoUrl: !!pdfData.logoUrl,
-        sampleArtist: pdfData.artists[0],
-        artistsWithGearIssues: pdfData.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0).length,
-        includeGearConflicts: pdfData.includeGearConflicts
-      });
-
-      console.log('Calling exportArtistTablePDF...');
-      const blob = await exportArtistTablePDF(pdfData);
-      console.log('PDF blob generated successfully, size:', blob.size);
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const stageName =
-        stageFilter && stageFilter !== 'all'
-          ? (stageNames?.[parseInt(stageFilter)] || `Escenario ${stageFilter}`)
-          : '';
-      a.download = buildReadableFilename(["Cronograma artistas", selectedDate, stageName]);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-
-      toast.success('PDF del cronograma de artistas generado exitosamente');
-      setDialogOpen(false);
-    } catch (error) {
-      console.error('Error generating artist schedule PDF:', error);
-      console.error('Error stack:', getErrorStack(error));
-      toast.error('Error al generar PDF');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  const { includeGearConflicts, setIncludeGearConflicts, isGenerating, print } = useArtistTablePrint({
+    artists,
+    jobId,
+    jobTitle,
+    selectedDate,
+    stageFilter,
+    dayStartTime,
+    stageNames,
+    onPrinted: () => setDialogOpen(false),
+  });
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -362,7 +91,7 @@ export const ArtistTablePrintDialog = ({
             </Label>
           </div>
         </div>
-        <Button onClick={handleTablePrint} disabled={isGenerating || isLoading} className="w-full">
+        <Button onClick={() => void print()} disabled={isGenerating || isLoading} className="w-full">
           {(isGenerating || isLoading) ? (
             <>
               Generando <Loader2 className="ml-2 h-4 w-4 animate-spin" />
