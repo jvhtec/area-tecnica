@@ -35,31 +35,36 @@ vi.mock("sonner", () => ({
 
 import { useMatrixCellAssignmentRemoval } from "../useMatrixCellAssignmentRemoval";
 
-const makeBuilder = (result: { data?: unknown; error?: unknown }) => {
+type BuilderResult = { data?: unknown; error?: unknown };
+type QueryBuilder = PromiseLike<BuilderResult> & {
+  calls: Array<[string, ...unknown[]]>;
+  select: (...args: unknown[]) => QueryBuilder;
+  delete: (...args: unknown[]) => QueryBuilder;
+  eq: (...args: unknown[]) => QueryBuilder;
+  neq: (...args: unknown[]) => QueryBuilder;
+};
+
+const makeBuilder = (result: BuilderResult): QueryBuilder => {
   const calls: Array<[string, ...unknown[]]> = [];
-  const builder: any = {
-    calls,
-    select: vi.fn((...args: unknown[]) => {
-      calls.push(["select", ...args]);
-      return builder;
-    }),
-    delete: vi.fn((...args: unknown[]) => {
-      calls.push(["delete", ...args]);
-      return builder;
-    }),
-    eq: vi.fn((...args: unknown[]) => {
-      calls.push(["eq", ...args]);
-      return builder;
-    }),
-    neq: vi.fn((...args: unknown[]) => {
-      calls.push(["neq", ...args]);
-      return builder;
-    }),
-    then: (
-      resolve: (value: { data?: unknown; error?: unknown }) => unknown,
-      reject?: (reason: unknown) => unknown,
-    ) => Promise.resolve(result).then(resolve, reject),
-  };
+  const builder = {} as QueryBuilder;
+  builder.calls = calls;
+  builder.select = vi.fn((...args: unknown[]) => {
+    calls.push(["select", ...args]);
+    return builder;
+  });
+  builder.delete = vi.fn((...args: unknown[]) => {
+    calls.push(["delete", ...args]);
+    return builder;
+  });
+  builder.eq = vi.fn((...args: unknown[]) => {
+    calls.push(["eq", ...args]);
+    return builder;
+  });
+  builder.neq = vi.fn((...args: unknown[]) => {
+    calls.push(["neq", ...args]);
+    return builder;
+  });
+  builder.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
   return builder;
 };
 
@@ -191,7 +196,10 @@ describe("matrix assignment removal Phase 1 characterization", () => {
   });
 
   it("keeps successful removal successful when one Flex department fails", async () => {
-    invokeMock.mockImplementation((name: string, args: any) => {
+    invokeMock.mockImplementation((
+      name: string,
+      args?: { body?: { department?: string } },
+    ) => {
       if (
         name === "manage-flex-crew-assignments"
         && args?.body?.department === "lights"
