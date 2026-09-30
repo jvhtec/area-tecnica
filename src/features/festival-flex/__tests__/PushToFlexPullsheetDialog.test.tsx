@@ -163,6 +163,53 @@ describe("PushToFlexPullsheetDialog", () => {
     expect(await screen.findByRole("button", { name: /Enviar artículos/ })).toBeDisabled();
   });
 
+  it("does not push cached data when refreshing the pullsheets failed after a reopen", async () => {
+    const queryClient = createTestQueryClient();
+    const tree = (open: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <PushToFlexPullsheetDialog open={open} onOpenChange={vi.fn()} gearSetup={gearSetup} jobId="job-1" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(true));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Enviar artículos/ })).toBeEnabled());
+
+    rerender(tree(false));
+    mocks.getJobPullsheetsWithFlexApi.mockRejectedValue(new Error("flex down"));
+    rerender(tree(true));
+
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" })));
+    expect(screen.getByRole("button", { name: /Enviar artículos/ })).toBeDisabled();
+  });
+
+  it("does not push cached equipment when refreshing the Flex resources failed after a reopen", async () => {
+    const queryClient = createTestQueryClient();
+    const tree = (open: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <PushToFlexPullsheetDialog open={open} onOpenChange={vi.fn()} gearSetup={gearSetup} jobId="job-1" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(true));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Enviar artículos/ })).toBeEnabled());
+
+    rerender(tree(false));
+    mocks.api.fetchFlexResourceIdsByName.mockRejectedValue(new Error("db down"));
+    rerender(tree(true));
+
+    await waitFor(() => expect(mocks.api.fetchFlexResourceIdsByName).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" })));
+    expect(screen.getByRole("button", { name: /Enviar artículos/ })).toBeDisabled();
+  });
+
+  it("does not let a failed pullsheet list block pushing to a URL", async () => {
+    mocks.getJobPullsheetsWithFlexApi.mockRejectedValue(new Error("flex down"));
+    renderDialog();
+
+    const input = await screen.findByPlaceholderText(/Pega aquí la URL/);
+    fireEvent.change(input, { target: { value: "https://flex.example.com/app/element/3f2a1b4c-1111-2222-3333-444455556666" } });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Enviar artículos/ })).toBeEnabled());
+  });
+
   it("reports items Flex refused", async () => {
     mocks.pushEquipmentToPullsheet.mockResolvedValue({ succeeded: 1, failed: [{ name: "SM58", error: "cantidad no válida" }] });
     renderDialog();

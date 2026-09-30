@@ -163,12 +163,20 @@ export function usePushToFlexPullsheet({ open, onOpenChange, gearSetup, jobId }:
   // Cached results are shown while they refresh; pushing waits until the target and the Flex
   // resources it is built from are fresh.
   const isRefreshing = pullsheetsQuery.isFetching || resourcesQuery.isFetching || presetItemsQuery.isFetching;
+  // A refetch that fails leaves the previous (cached) data in place, so "not fetching" is not "fresh":
+  // block on a failed load of anything the push is built from. The pullsheet list only matters when
+  // the target is picked from it, and the preset items only when the preset is included.
+  const hasRequiredLoadError =
+    (mode === "select" && pullsheetsQuery.isError) ||
+    resourcesQuery.isError ||
+    (includePaPreset && presetItemsQuery.isError);
 
   const canPush =
     !!elementId &&
     equipmentToPush.length > 0 &&
     !isPushing &&
     !isRefreshing &&
+    !hasRequiredLoadError &&
     (mode === "select" ? !!selectedPullsheetId : isValidUrl);
 
   const push = async () => {
