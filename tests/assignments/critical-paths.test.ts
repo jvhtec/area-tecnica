@@ -561,6 +561,7 @@ describe("Assignments Critical Paths", () => {
         present: true,
         source: "assignment-dialog",
       });
+    });
 
     it("preserves the committed base assignment when the first timesheet write fails", async () => {
       const { insertMock, deleteMock } = configureDialogSupabase();
@@ -602,8 +603,6 @@ describe("Assignments Critical Paths", () => {
       });
       expect(deleteMock).not.toHaveBeenCalled();
       expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
-    });
-
     });
   });
 });
