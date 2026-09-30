@@ -7,13 +7,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { deleteFestivalShift } from "@/features/festival-scheduling/api";
+import { festivalShiftKeys } from "@/features/festival-scheduling/keys";
+import type { Tables } from "@/integrations/supabase/types";
+import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useFestivalShifts } from "@/features/festival-scheduling/hooks/useFestivalShifts";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { ShiftsList } from "./ShiftsList";
-import { CreateShiftDialog } from "./CreateShiftDialog";
+import { ShiftSheet, type ShiftSheetTarget } from "./ShiftSheet";
 import { ShiftsTable } from "./ShiftsTable";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -47,12 +50,14 @@ export const FestivalScheduling = ({
   onOpenRiderLibrary,
 }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
+  const [sheetTarget, setSheetTarget] = useState<ShiftSheetTarget | null>(null);
+  const closeSheet = useCallback(() => setSheetTarget(null), []);
   // The six-column table is cramped on a phone; start phones on the list view.
   const isMobile = useIsMobile();
   const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
   const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const formatDateToString = useCallback((date: Date): string => {
     try {
@@ -120,7 +125,7 @@ export const FestivalScheduling = ({
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  const { shifts, isLoading, error: shiftsError, retry: retryShifts, invalidate: refreshShifts } = useFestivalShifts({
+  const { shifts, isLoading, isFetching, error: shiftsError, retry: retryShifts, invalidate: refreshShifts } = useFestivalShifts({
     jobId,
     selectedDate,
   });
@@ -129,9 +134,15 @@ export const FestivalScheduling = ({
     if (shiftsError) void trackError(shiftsError, { system: "festivals", operation: "load-festival-shifts", jobId });
   }, [shiftsError, jobId]);
 
-  const handleShiftCreated = async () => {
-    await refreshShifts();
-    setIsCreateShiftOpen(false);
+  // A new shift keeps the sheet open, switched to that shift, so its crew can be added right away.
+  // It goes into the day's list at once instead of waiting for a refetch: the sheet reads its shift
+  // from that list, and a slow or failed refetch must not make a shift that was just saved look gone.
+  const handleShiftCreated = async (created: Tables<"festival_shifts">) => {
+    queryClient.setQueryData<ShiftWithAssignments[]>(festivalShiftKeys.day(jobId, created.date), (current = []) =>
+      current.some((shift) => shift.id === created.id) ? current : [...current, { ...created, assignments: [] }],
+    );
+    setSheetTarget({ kind: "edit", shiftId: created.id });
+    void refreshShifts();
   };
 
   // The copy dialog awaits every write before calling back.
@@ -156,7 +167,13 @@ export const FestivalScheduling = ({
       });
     },
   });
-  const handleDeleteShift = (shiftId: string) => deleteShiftMutation.mutateAsync(shiftId).catch(() => undefined);
+  const openShift = useCallback((shiftId: string) => setSheetTarget({ kind: "edit", shiftId }), []);
+  // Whether the shift is really gone: the sheet stays open on a failed delete so it can be retried.
+  const handleDeleteShift = (shiftId: string) =>
+    deleteShiftMutation.mutateAsync(shiftId).then(
+      () => true,
+      () => false,
+    );
 
   if (!jobDates || jobDates.length === 0) {
     return (
@@ -204,7 +221,7 @@ export const FestivalScheduling = ({
             {!isViewOnly && (
               <Button
                 size="sm"
-                onClick={() => setIsCreateShiftOpen(true)}
+                onClick={() => setSheetTarget({ kind: "create" })}
                 className="flex items-center gap-1"
                 aria-label="Crear turno"
               >
@@ -280,7 +297,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift}
-                onShiftUpdated={refreshShifts}
+                onOpenShift={openShift}
                 date={selectedDate}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
@@ -293,7 +310,7 @@ export const FestivalScheduling = ({
                 stageOptions={stageOptions}
                 dayStartTime={resolvedDayStartTime}
                 onDeleteShift={handleDeleteShift} 
-                onShiftUpdated={refreshShifts}
+                onOpenShift={openShift}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
                 jobDates={jobDates}
@@ -305,16 +322,20 @@ export const FestivalScheduling = ({
         </div>
       </CardContent>
 
-      {!isViewOnly && (
-        <CreateShiftDialog
-          open={isCreateShiftOpen}
-          onOpenChange={setIsCreateShiftOpen}
-          jobId={jobId}
-          onShiftCreated={handleShiftCreated}
-          date={selectedDate}
-          stageOptions={stageOptions}
-        />
-      )}
+      <ShiftSheet
+        target={sheetTarget}
+        onClose={closeSheet}
+        jobId={jobId}
+        date={selectedDate}
+        shifts={shifts}
+        isShiftListUnsettled={isLoading || isFetching || Boolean(shiftsError)}
+        stageOptions={stageOptions}
+        dayStartTime={resolvedDayStartTime}
+        isViewOnly={isViewOnly}
+        onCreated={handleShiftCreated}
+        onSaved={refreshShifts}
+        onDelete={handleDeleteShift}
+      />
     </Card>
   );
 };

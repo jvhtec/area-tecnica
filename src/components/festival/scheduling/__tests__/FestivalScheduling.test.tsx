@@ -30,15 +30,53 @@ vi.mock("@/components/ui/subscription-indicator", () => ({
     <div data-testid="subscription-indicator" data-refresh={String("showRefreshButton" in props)} />
   ),
 }));
-vi.mock("../CreateShiftDialog", () => ({ CreateShiftDialog: (): null => null }));
+vi.mock("../ShiftSheet", () => ({
+  ShiftSheet: ({
+    target,
+    shifts,
+    isShiftListUnsettled,
+    onCreated,
+  }: {
+    target: { kind: string; shiftId?: string } | null;
+    shifts: Array<{ id: string }>;
+    isShiftListUnsettled: boolean;
+    onCreated: (created: Record<string, unknown>) => Promise<void>;
+  }) =>
+    target ? (
+      <div
+        data-testid="shift-sheet"
+        data-kind={target.kind}
+        data-shift-id={target.shiftId ?? ""}
+        data-shifts={shifts.map((shift) => shift.id).join(",")}
+        data-unsettled={String(isShiftListUnsettled)}
+      >
+        <button
+          onClick={() =>
+            void onCreated({ id: "new-shift", job_id: "job-1", date: "2026-07-01", name: "Nuevo", start_time: "09:00", end_time: "10:00" })
+          }
+        >
+          Simular creación
+        </button>
+      </div>
+    ) : null,
+}));
 vi.mock("../ShiftsList", () => ({ ShiftsList: (): null => null }));
 vi.mock("../ShiftsTable", () => ({
-  ShiftsTable: ({ shifts, onDeleteShift }: { shifts: Array<{ id: string; name: string }>; onDeleteShift: (id: string) => void }) => (
+  ShiftsTable: ({
+    shifts,
+    onDeleteShift,
+    onOpenShift,
+  }: {
+    shifts: Array<{ id: string; name: string }>;
+    onDeleteShift: (id: string) => void;
+    onOpenShift: (id: string) => void;
+  }) => (
     <div>
       {shifts.map((shift) => (
-        <button key={shift.id} onClick={() => onDeleteShift(shift.id)}>
-          Borrar {shift.name}
-        </button>
+        <div key={shift.id}>
+          <button onClick={() => onDeleteShift(shift.id)}>Borrar {shift.name}</button>
+          <button onClick={() => onOpenShift(shift.id)}>Abrir {shift.name}</button>
+        </div>
       ))}
     </div>
   ),
@@ -100,4 +138,39 @@ describe("FestivalScheduling", () => {
 
     expect(await screen.findByRole("button", { name: "Borrar Montaje" })).toBeInTheDocument();
   }, 15000);
+
+  it("opens the shift sheet to create, and keeps it open on the shift it just created", async () => {
+    renderScheduling();
+    await screen.findByRole("button", { name: "Borrar Montaje" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear turno" }));
+    expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "create");
+
+    fireEvent.click(screen.getByRole("button", { name: "Simular creación" }));
+    await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "edit"));
+    expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "new-shift");
+  });
+
+  it("puts a just-created shift in the day's list straight away, so a failed refresh cannot make it look gone", async () => {
+    renderScheduling();
+    await screen.findByRole("button", { name: "Borrar Montaje" });
+    fireEvent.click(screen.getByRole("button", { name: "Crear turno" }));
+
+    // The refresh that follows the save fails.
+    mocks.fetchShiftsForDate.mockRejectedValue(new Error("offline"));
+    fireEvent.click(screen.getByRole("button", { name: "Simular creación" }));
+
+    await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "new-shift"));
+    expect(screen.getByTestId("shift-sheet").getAttribute("data-shifts")).toContain("new-shift");
+    // While the list refreshes or has failed to, the sheet is told not to treat a missing shift as deleted.
+    await waitFor(() => expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-unsettled", "true"));
+  }, 15000);
+
+  it("opens an existing shift in the sheet from the list", async () => {
+    renderScheduling();
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir Montaje" }));
+
+    expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "edit");
+    expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "s1");
+  });
 });

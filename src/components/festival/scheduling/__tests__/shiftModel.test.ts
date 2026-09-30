@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildNewAssignments,
   buildShiftCrewCandidates,
   defaultShiftRole,
   festivalAssignmentErrorMessage,
+  filterByName,
   formatShiftDuration,
+  groupCrewCandidates,
   isOvernightShift,
+  normalizeSearchText,
   normalizeShiftDepartment,
   shiftDepartmentLabel,
   shiftDurationMinutes,
@@ -14,6 +18,8 @@ import {
   shiftStageChoices,
   shiftStageLabel,
   sortShiftsForFestivalDay,
+  suggestExternalNames,
+  type ShiftCrewCandidate,
 } from "../shiftModel";
 
 const shift = (name: string, start_time: string, end_time: string) => ({ name, start_time, end_time });
@@ -142,5 +148,107 @@ describe("crew candidates", () => {
     expect(defaultShiftRole(withoutRole, "lights", "LGT-PA-T")).toBe("LGT-PA-T");
     expect(defaultShiftRole(withoutRole, "lights", "")).toBe("LGT-BRD-R");
     expect(defaultShiftRole(undefined, "logistics", "")).toBe("");
+  });
+});
+
+describe("crew picker", () => {
+  const candidate = (id: string, name: string, extra: Partial<ShiftCrewCandidate> = {}): ShiftCrewCandidate => ({
+    id,
+    name,
+    isHouseTech: false,
+    inShiftDepartment: true,
+    jobRole: null,
+    ...extra,
+  });
+
+  it("searches names without caring for case or accents", () => {
+    expect(normalizeSearchText("  Sánchez ")).toBe("sanchez");
+    const people = [{ name: "José Sánchez" }, { name: "Ana Ruiz" }];
+    expect(filterByName(people, "sanchez")).toEqual([{ name: "José Sánchez" }]);
+    expect(filterByName(people, "  ")).toEqual(people);
+    expect(filterByName(people, "zzz")).toEqual([]);
+  });
+
+  it("groups the shift's department first and leaves empty groups out", () => {
+    const list = [candidate("a", "A"), candidate("b", "B", { inShiftDepartment: false })];
+    expect(groupCrewCandidates(list, "lights").map((group) => [group.key, group.label, group.candidates.map((c) => c.id)])).toEqual([
+      ["department", "Luces en este trabajo", ["a"]],
+      ["rest", "Resto del equipo", ["b"]],
+    ]);
+    expect(groupCrewCandidates([list[0]], "lights").map((group) => group.key)).toEqual(["department"]);
+    expect(groupCrewCandidates(list, null).map((group) => [group.key, group.candidates.length])).toEqual([["rest", 2]]);
+    expect(groupCrewCandidates([], "lights")).toEqual([]);
+  });
+
+  it("suggests earlier external names that are not already on the shift or picked", () => {
+    const names = ["Ana Ruiz", "Zoe Gil", "Álvaro Paz"];
+    expect(suggestExternalNames(names, ["ana ruiz"], "")).toEqual(["Zoe Gil", "Álvaro Paz"]);
+    expect(suggestExternalNames(names, [], "alvaro")).toEqual(["Álvaro Paz"]);
+  });
+
+  it("builds one row per chosen person: job role when known, the chosen role otherwise, externals once", () => {
+    const rows = buildNewAssignments({
+      shiftId: "s1",
+      shiftDepartment: "lights",
+      technicianIds: ["cruz", "rita"],
+      externalNames: [" Pepe ", "pepe", ""],
+      candidates: [candidate("cruz", "Cruz", { jobRole: "LGT-BRD-E" }), candidate("rita", "Rita")],
+      fallbackRole: "LGT-SYS-R",
+    });
+    expect(rows).toEqual([
+      { shift_id: "s1", technician_id: "cruz", role: "LGT-BRD-E" },
+      { shift_id: "s1", technician_id: "rita", role: "LGT-SYS-R" },
+      { shift_id: "s1", external_technician_name: "Pepe", role: "LGT-SYS-R" },
+    ]);
+  });
+
+  it("on a shift without a department, people keep whatever role they hold on the job", () => {
+    const candidates = buildShiftCrewCandidates({
+      jobAssignments: [
+        { technician_id: "a", lights_role: "LGT-BRD-E" },
+        { technician_id: "b", sound_role: "SND-FOH-R", lights_role: "LGT-SYS-E" },
+        { technician_id: "c" },
+      ],
+      directory: [],
+      shiftDepartment: null,
+      excludeIds: [],
+    });
+    expect(Object.fromEntries(candidates.map((c) => [c.id, c.jobRole]))).toEqual({ a: "LGT-BRD-E", b: "SND-FOH-R", c: null });
+
+    const rows = buildNewAssignments({
+      shiftId: "s1",
+      shiftDepartment: null,
+      technicianIds: ["a", "b", "c"],
+      externalNames: [],
+      candidates,
+      fallbackRole: "",
+    });
+    // Nobody can be added without a role: the caller sees fewer rows than people and asks for one.
+    expect(rows.map((row) => row.technician_id)).toEqual(["a", "b"]);
+    expect(defaultShiftRole(candidates[0], null, "")).toBe("LGT-BRD-E");
+  });
+
+  it("with a department, a role from another department is not carried over", () => {
+    const [candidate] = buildShiftCrewCandidates({
+      jobAssignments: [{ technician_id: "a", sound_role: "SND-FOH-R", lights_role: "LGT-BRD-E" }],
+      directory: [],
+      shiftDepartment: "lights",
+      excludeIds: [],
+    });
+    expect(candidate.jobRole).toBe("LGT-BRD-E");
+    expect(defaultShiftRole({ ...candidate, jobRole: "SND-FOH-R" }, "lights", "LGT-SYS-E")).toBe("LGT-SYS-E");
+  });
+
+  it("adds nobody when there is no role to give them", () => {
+    expect(
+      buildNewAssignments({
+        shiftId: "s1",
+        shiftDepartment: "logistics",
+        technicianIds: ["a"],
+        externalNames: ["Pepe"],
+        candidates: [candidate("a", "A")],
+        fallbackRole: "",
+      }),
+    ).toEqual([]);
   });
 });

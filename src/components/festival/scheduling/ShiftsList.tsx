@@ -9,8 +9,6 @@ import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { labelForCode } from "@/utils/roles";
 
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
-import { EditShiftDialog } from "./EditShiftDialog";
-import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import {
   crewDisplayName,
   formatShiftDuration,
@@ -25,7 +23,8 @@ import {
 interface ShiftsListProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
-  onShiftUpdated: () => void;
+  /** Opens the shift sheet (details and crew) on this shift. */
+  onOpenShift: (shiftId: string) => void;
   jobId: string;
   isViewOnly?: boolean;
   jobDates: Date[];
@@ -40,7 +39,7 @@ const EMPTY_STAGE_OPTIONS: readonly FestivalStageOption[] = [];
 export const ShiftsList = ({
   shifts,
   onDeleteShift,
-  onShiftUpdated,
+  onOpenShift,
   jobId,
   isViewOnly = false,
   jobDates,
@@ -50,14 +49,9 @@ export const ShiftsList = ({
   dayStartTime,
 }: ShiftsListProps) => {
   const confirm = useConfirm();
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-  const [managingShiftId, setManagingShiftId] = useState<string | null>(null);
   const [copyShiftsOpen, setCopyShiftsOpen] = useState(false);
 
   const sortedShifts = sortShiftsForFestivalDay(shifts, dayStartTime);
-  // Dialogs read the shift from the live list so their contents follow refetches.
-  const editingShift = shifts.find((shift) => shift.id === editingShiftId) ?? null;
-  const managingShift = shifts.find((shift) => shift.id === managingShiftId) ?? null;
 
   const handleDelete = async (shift: ShiftWithAssignments) => {
     const confirmed = await confirm({
@@ -85,19 +79,14 @@ export const ShiftsList = ({
             <div className="flex flex-wrap justify-between items-center gap-2">
               <CardTitle className="text-base">{shift.name}</CardTitle>
               <div className="flex flex-wrap gap-2">
-                {!isViewOnly && (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => setEditingShiftId(shift.id)}>
-                      Editar
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => void handleDelete(shift)}>
-                      Eliminar
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setManagingShiftId(shift.id)}>
-                  {isViewOnly ? "Ver personal" : "Gestionar personal"}
+                <Button variant="ghost" size="sm" onClick={() => onOpenShift(shift.id)}>
+                  {isViewOnly ? "Ver personal" : "Editar y personal"}
                 </Button>
+                {!isViewOnly && (
+                  <Button variant="ghost" size="sm" onClick={() => void handleDelete(shift)}>
+                    Eliminar
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -140,29 +129,6 @@ export const ShiftsList = ({
           </CardContent>
         </Card>
       ))}
-
-      {editingShift && (
-        <EditShiftDialog
-          open
-          onOpenChange={(open) => !open && setEditingShiftId(null)}
-          shift={editingShift}
-          stageOptions={stageOptions}
-          onShiftUpdated={() => {
-            onShiftUpdated();
-            setEditingShiftId(null);
-          }}
-        />
-      )}
-
-      {managingShift && (
-        <ManageAssignmentsDialog
-          open
-          onOpenChange={(open) => !open && setManagingShiftId(null)}
-          shift={managingShift}
-          onAssignmentsUpdated={onShiftUpdated}
-          isViewOnly={isViewOnly}
-        />
-      )}
 
       {copyShiftsOpen && (
         <CopyShiftsDialog

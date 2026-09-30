@@ -1,4 +1,4 @@
-import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { ShiftWithAssignments } from "@/types/festival-scheduling";
 import type { CrewDirectoryEntry, JobCrewAssignment } from "@/components/festival/scheduling/shiftModel";
@@ -92,9 +92,11 @@ export async function fetchShiftsForDate(jobId: string, date: string): Promise<S
 
 // --- Shift writes ----------------------------------------------------------------------------
 
-export async function createFestivalShift(row: TablesInsert<"festival_shifts">): Promise<void> {
-  const { error } = await dataLayerClient.from("festival_shifts").insert(row);
+/** Creates a shift and returns it, so the caller can keep working on it (add its crew). */
+export async function createFestivalShift(row: TablesInsert<"festival_shifts">): Promise<Tables<"festival_shifts">> {
+  const { data, error } = await dataLayerClient.from("festival_shifts").insert(row).select().single();
   if (error) throw error;
+  return data;
 }
 
 export async function updateFestivalShift(shiftId: string, patch: TablesUpdate<"festival_shifts">): Promise<void> {
@@ -110,6 +112,18 @@ export async function deleteFestivalShift(shiftId: string): Promise<void> {
 
 export async function addShiftAssignment(row: TablesInsert<"festival_shift_assignments">): Promise<void> {
   const { error } = await dataLayerClient.from("festival_shift_assignments").insert([row]);
+  if (error) throw error;
+}
+
+/** Puts several people on a shift in one statement: either all of them are added or none. */
+export async function addShiftAssignments(rows: TablesInsert<"festival_shift_assignments">[]): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await dataLayerClient.from("festival_shift_assignments").insert(rows);
+  if (error) throw error;
+}
+
+export async function updateShiftAssignmentRole(assignmentId: string, role: string): Promise<void> {
+  const { error } = await dataLayerClient.from("festival_shift_assignments").update({ role }).eq("id", assignmentId);
   if (error) throw error;
 }
 
