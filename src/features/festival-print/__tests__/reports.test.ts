@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   generateStageGearPDF: vi.fn(),
   mergePDFs: vi.fn(),
   getActivePublicArtistFormLinks: vi.fn(),
+  NoGearSetupError: class NoGearSetupError extends Error {},
 }));
 
 vi.mock("../api", () => mocks.api);
@@ -29,7 +30,10 @@ vi.mock("@/utils/wiredMicrophoneNeedsPdfExport", () => ({
   exportWiredMicrophoneMatrixPDF: mocks.exportWiredMicrophoneMatrixPDF,
   organizeArtistsByDateAndStage: (artists: unknown[]) => artists,
 }));
-vi.mock("@/utils/gearSetupPdfExport", () => ({ generateStageGearPDF: mocks.generateStageGearPDF }));
+vi.mock("@/utils/gearSetupPdfExport", () => ({
+  generateStageGearPDF: mocks.generateStageGearPDF,
+  NoGearSetupError: mocks.NoGearSetupError,
+}));
 vi.mock("@/utils/pdf/pdfMerge", () => ({ mergePDFs: mocks.mergePDFs }));
 vi.mock("@/utils/pdf/logoOptimization", () => ({ fetchPreparedFestivalLogo: vi.fn().mockResolvedValue("logo.png") }));
 vi.mock("@/utils/publicArtistFormLinks", () => ({ getActivePublicArtistFormLinks: mocks.getActivePublicArtistFormLinks }));
@@ -92,10 +96,23 @@ describe("festival print reports", () => {
       expect(report.filenameParts).toEqual(["Sonorama", "Dotación técnica"]);
     });
 
-    it("has nothing to make without stages", async () => {
-      await expect(
-        buildGearSetupReport(context({ options: { ...defaultPrintOptions(2), gearSetupStages: [] } })),
-      ).rejects.toThrow("No se pudo generar ningún PDF de equipamiento.");
+    it("says so, before doing any work, when no stage is selected", async () => {
+      const report = buildGearSetupReport(context({ options: { ...defaultPrintOptions(2), gearSetupStages: [] } }));
+      await expect(report).rejects.toBeInstanceOf(NothingToPrintError);
+      await expect(report).rejects.toThrow("No hay escenarios seleccionados para el equipamiento.");
+      expect(mocks.generateStageGearPDF).not.toHaveBeenCalled();
+    });
+
+    it("says so when the festival has no gear setup at all, instead of failing", async () => {
+      mocks.generateStageGearPDF.mockRejectedValue(new mocks.NoGearSetupError("No gear setup found for festival"));
+      const report = buildGearSetupReport(context());
+      await expect(report).rejects.toBeInstanceOf(NothingToPrintError);
+      await expect(report).rejects.toThrow("Este festival aún no tiene configuración de equipamiento.");
+    });
+
+    it("still fails on a real error", async () => {
+      mocks.generateStageGearPDF.mockRejectedValue(new Error("db down"));
+      await expect(buildGearSetupReport(context())).rejects.toThrow("db down");
     });
   });
 
