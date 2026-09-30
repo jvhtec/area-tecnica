@@ -1,4 +1,5 @@
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { normalizeFestivalLogoPath, type PublicFormContextResponse } from "@/components/festival/artistRequirementsFormModel";
 import type { ArtistLinkRow } from "./links";
 import { toFormLanguage, type FormLanguage } from "./links";
 
@@ -121,4 +122,53 @@ export async function sendCorporateEmail(request: CorporateEmailRequest) {
   if (!data?.success) {
     throw new Error(data?.error || "No se pudo enviar el correo");
   }
+}
+
+// --- Public artist form (unauthenticated, token or blank-template mode) ---
+
+export async function fetchPublicArtistFormContext(token: string): Promise<PublicFormContextResponse> {
+  const { data, error } = await dataLayerClient.rpc("get_public_artist_form_context", { p_token: token });
+  if (error) throw error;
+  return data as unknown as PublicFormContextResponse;
+}
+
+export async function fetchJobStageNames(jobId: string) {
+  const { data } = await dataLayerClient.from("festival_stages").select("number, name").eq("job_id", jobId);
+  return data ?? [];
+}
+
+/** What the blank form shows for a festival: its gear setup, stage names and logo path. */
+export async function fetchBlankFormContext(jobId: string) {
+  const { data: gearData } = await dataLayerClient
+    .from("festival_gear_setups")
+    .select("*")
+    .eq("job_id", jobId)
+    .maybeSingle();
+  const stages = await fetchJobStageNames(jobId);
+  const { data: logoData } = await dataLayerClient
+    .from("festival_logos")
+    .select("file_path")
+    .eq("job_id", jobId)
+    .maybeSingle();
+  return { gearData, stages, logoPath: logoData?.file_path ?? null };
+}
+
+/** A displayable URL for a festival logo: already-absolute, signed (1 h), or the public URL as a last resort. */
+export async function resolveFestivalLogoUrl(rawFilePath: string | null | undefined): Promise<string | null> {
+  if (!rawFilePath) return null;
+  const normalizedPath = normalizeFestivalLogoPath(rawFilePath);
+  if (!normalizedPath) return null;
+  if (normalizedPath.startsWith("http")) return normalizedPath;
+
+  try {
+    const { data: signedData, error: signedError } = await dataLayerClient.storage
+      .from("festival-logos")
+      .createSignedUrl(normalizedPath, 60 * 60);
+    if (!signedError && signedData?.signedUrl) return signedData.signedUrl;
+  } catch (error) {
+    console.warn("Could not create signed logo URL:", error);
+  }
+
+  const { data } = dataLayerClient.storage.from("festival-logos").getPublicUrl(normalizedPath);
+  return data?.publicUrl || null;
 }
