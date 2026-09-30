@@ -92,9 +92,9 @@ const renderSheet = (
     target?: ShiftSheetTarget | null;
     shifts?: ShiftWithAssignments[];
     isViewOnly?: boolean;
-    isLoadingShifts?: boolean;
+    isShiftListUnsettled?: boolean;
     onClose?: () => void;
-    onCreated?: (id: string) => Promise<void>;
+    onCreated?: (created: { id: string }) => Promise<void>;
     onSaved?: () => void;
     onDelete?: (id: string) => Promise<boolean>;
   } = {},
@@ -102,6 +102,7 @@ const renderSheet = (
   const props = {
     target: { kind: "edit", shiftId: "shift-1" } as ShiftSheetTarget | null,
     shifts: [baseShift],
+    isShiftListUnsettled: overrides.isShiftListUnsettled ?? false,
     onClose: noop,
     onCreated: vi.fn().mockResolvedValue(undefined),
     onSaved: noop,
@@ -116,7 +117,7 @@ const renderSheet = (
         jobId="job-1"
         date="2031-07-10"
         shifts={next.shifts}
-        isLoadingShifts={overrides.isLoadingShifts}
+        isShiftListUnsettled={next.isShiftListUnsettled}
         dayStartTime="07:00"
         isViewOnly={overrides.isViewOnly}
         onCreated={next.onCreated}
@@ -157,7 +158,7 @@ describe("ShiftSheet", () => {
       fireEvent.change(screen.getByLabelText("Nombre del turno"), { target: { value: "  Montaje  " } });
       fireEvent.click(screen.getByRole("button", { name: "Crear turno" }));
 
-      await waitFor(() => expect(props.onCreated).toHaveBeenCalledWith("new-shift"));
+      await waitFor(() => expect(props.onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: "new-shift" })));
       expect(api.createFestivalShift).toHaveBeenCalledWith(
         expect.objectContaining({ job_id: "job-1", date: "2031-07-10", name: "Montaje", start_time: "09:00", end_time: "18:00" }),
       );
@@ -217,11 +218,17 @@ describe("ShiftSheet", () => {
       expect(api.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Turno no disponible" }));
     });
 
-    it("waits, without closing, while the day is still loading", () => {
-      const { props } = renderSheet({ shifts: [], isLoadingShifts: true });
+    it("does not conclude the shift is gone while the day is loading, refreshing or failed to refresh", async () => {
+      const { props, rerenderWith } = renderSheet({ shifts: [], isShiftListUnsettled: true });
 
       expect(screen.getByText("Cargando turno…")).toBeInTheDocument();
       expect(props.onClose).not.toHaveBeenCalled();
+      expect(api.toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Turno no disponible" }));
+
+      // Only once the list has settled and still lacks the shift is it really gone.
+      rerenderWith({ isShiftListUnsettled: false });
+      await waitFor(() => expect(props.onClose).toHaveBeenCalled());
+      expect(api.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Turno no disponible" }));
     });
 
     it("asks before deleting the shift and closes after", async () => {

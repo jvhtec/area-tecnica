@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { SubmitButton } from "@/components/ui/submit-button";
 import { createFestivalShift, updateFestivalShift } from "@/features/festival-scheduling/api";
 import { buildFallbackStageOptions } from "@/features/festival-management/selectors";
+import type { Tables } from "@/integrations/supabase/types";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
@@ -48,12 +49,16 @@ interface ShiftSheetProps {
   date: string;
   /** The day's shifts from the live query: the sheet reads its shift from here so the crew is never a snapshot. */
   shifts: readonly ShiftWithAssignments[];
-  isLoadingShifts?: boolean;
+  /**
+   * True while the day's shifts are loading or refreshing, or the last refresh failed: the sheet then
+   * does not conclude that its shift is gone, only that it cannot tell yet.
+   */
+  isShiftListUnsettled?: boolean;
   stageOptions?: readonly FestivalStageOption[];
   dayStartTime: string;
   isViewOnly?: boolean;
-  /** A new shift was saved: refresh the day, then switch the sheet to it (returns once the list has it). */
-  onCreated: (shiftId: string) => Promise<void> | void;
+  /** A new shift was saved: put it in the day's list and switch the sheet to it. */
+  onCreated: (created: Tables<"festival_shifts">) => Promise<void> | void;
   onSaved: () => Promise<void> | void;
   /** Resolves true once the shift is deleted; false (after telling the user) when it could not be. */
   onDelete: (shiftId: string) => Promise<boolean>;
@@ -65,7 +70,7 @@ const DEFAULT_STAGE_OPTIONS = buildFallbackStageOptions(1);
  * One place for a shift: its times, stage and department together with its crew. It stays open
  * after creating a shift, so a staffed shift takes one sheet instead of two dialogs.
  */
-export const ShiftSheet = ({ target, onClose, shifts, isLoadingShifts = false, isViewOnly = false, ...rest }: ShiftSheetProps) => {
+export const ShiftSheet = ({ target, onClose, shifts, isShiftListUnsettled = false, isViewOnly = false, ...rest }: ShiftSheetProps) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -73,11 +78,11 @@ export const ShiftSheet = ({ target, onClose, shifts, isLoadingShifts = false, i
 
   // A shift removed elsewhere while its sheet was open: close rather than show a ghost.
   useEffect(() => {
-    if (target?.kind === "edit" && !shift && !isLoadingShifts) {
+    if (target?.kind === "edit" && !shift && !isShiftListUnsettled) {
       toast({ title: "Turno no disponible", description: "Este turno ya no existe.", variant: "destructive" });
       onClose();
     }
-  }, [target, shift, isLoadingShifts, onClose, toast]);
+  }, [target, shift, isShiftListUnsettled, onClose, toast]);
 
   const isCreating = target?.kind === "create";
   const title = isCreating ? "Crear turno" : isViewOnly ? (shift?.name ?? "Turno") : "Editar turno";
@@ -114,7 +119,7 @@ export const ShiftSheet = ({ target, onClose, shifts, isLoadingShifts = false, i
   );
 };
 
-type ShiftSheetBodyProps = Omit<ShiftSheetProps, "shifts" | "isLoadingShifts"> & {
+type ShiftSheetBodyProps = Omit<ShiftSheetProps, "shifts" | "isShiftListUnsettled"> & {
   target: ShiftSheetTarget;
   shift: ShiftWithAssignments | null;
 };
@@ -153,7 +158,7 @@ const ShiftSheetBody = ({
       if (isCreating) {
         const created = await createFestivalShift({ job_id: jobId, date, ...shiftFormToRow(values) });
         toast({ title: "Turno creado", description: `${values.name.trim()} se ha añadido. Ya puedes asignar personal.` });
-        await onCreated(created.id);
+        await onCreated(created);
       } else if (shift) {
         await updateFestivalShift(shift.id, shiftFormToRow(values));
         toast({ title: "Turno actualizado", description: `${values.name.trim()} se ha guardado.` });

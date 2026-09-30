@@ -50,6 +50,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   return {
     shifts: query.data ?? NO_SHIFTS,
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     error: query.error,
     retry: query.refetch,
     invalidate,
