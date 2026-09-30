@@ -296,4 +296,301 @@ describe('useStaffingMatrixStatuses', () => {
     // The following Madrid day is outside the job span and must stay empty.
     expect(result.current.data?.byDate.get('tech-1-2026-04-11')).toBeUndefined()
   })
+
+  it('returns empty maps without touching Supabase when any input dimension is empty', async () => {
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses([], [], []),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.byJob.size).toBe(0)
+    expect(result.current.data?.byDate.size).toBe(0)
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  it('maps job-level pending states and clears expired states', async () => {
+    rpcMock.mockImplementation((fn: string) => {
+      if (fn === 'get_assignment_matrix_staffing_filtered') {
+        return Promise.resolve({
+          data: [
+            {
+              job_id: 'job-1',
+              profile_id: 'tech-1',
+              availability_status: 'pending',
+              offer_status: 'expired',
+            },
+            {
+              job_id: 'job-2',
+              profile_id: 'tech-1',
+              availability_status: 'expired',
+              offer_status: 'pending',
+            },
+            {
+              job_id: 'job-3',
+              profile_id: 'tech-1',
+              availability_status: 'unexpected',
+              offer_status: null,
+            },
+          ],
+          error: null,
+        })
+      }
+      return Promise.resolve({ data: [], error: null })
+    })
+    fromMock.mockReturnValue(createQueryBuilder({ data: [], error: null }))
+
+    const jobs = ['job-1', 'job-2', 'job-3'].map((id) => ({
+      id,
+      title: id,
+      start_time: '2026-04-10T06:00:00.000Z',
+      end_time: '2026-04-10T18:00:00.000Z',
+    }))
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        jobs,
+        [new Date('2026-04-10T12:00:00.000Z')],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.byJob.get('job-1-tech-1')).toEqual({
+      availability_status: 'requested',
+      offer_status: null,
+    })
+    expect(result.current.data?.byJob.get('job-2-tech-1')).toEqual({
+      availability_status: null,
+      offer_status: 'sent',
+    })
+    expect(result.current.data?.byJob.has('job-3-tech-1')).toBe(false)
+  })
+
+  it('lets the newest expired request clear an older visible request on the same date', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'staffing_requests') {
+        return createQueryBuilder({
+          data: [
+            {
+              id: 'req-new-expired',
+              job_id: 'job-1',
+              profile_id: 'tech-1',
+              phase: 'availability',
+              status: 'expired',
+              updated_at: '2026-04-10T10:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T09:59:00.000Z',
+              requested_by: 'manager-1',
+            },
+            {
+              id: 'req-old-pending',
+              job_id: 'job-1',
+              profile_id: 'tech-1',
+              phase: 'availability',
+              status: 'pending',
+              updated_at: '2026-04-10T08:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T07:59:00.000Z',
+              requested_by: 'manager-1',
+            },
+          ],
+          error: null,
+        })
+      }
+      return createQueryBuilder({ data: [], error: null })
+    })
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        [{
+          id: 'job-1',
+          title: 'Cleared Show',
+          start_time: '2026-04-10T06:00:00.000Z',
+          end_time: '2026-04-10T18:00:00.000Z',
+        }],
+        [new Date('2026-04-10T12:00:00.000Z')],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.byDate.get('tech-1-2026-04-10')).toBeUndefined()
+  })
+
+  it('keeps single-day requests pinned to target_date even if the job span moves', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'staffing_requests') {
+        return createQueryBuilder({
+          data: [{
+            id: 'req-single',
+            job_id: 'job-1',
+            profile_id: 'tech-1',
+            phase: 'offer',
+            status: 'pending',
+            updated_at: '2026-04-10T08:00:00.000Z',
+            single_day: true,
+            target_date: '2026-04-10',
+            created_at: '2026-04-10T07:55:00.000Z',
+            requested_by: 'manager-1',
+          }],
+          error: null,
+        })
+      }
+      return createQueryBuilder({ data: [], error: null })
+    })
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        [{
+          id: 'job-1',
+          title: 'Rescheduled Show',
+          start_time: '2026-04-11T06:00:00.000Z',
+          end_time: '2026-04-11T18:00:00.000Z',
+        }],
+        [
+          new Date('2026-04-10T12:00:00.000Z'),
+          new Date('2026-04-11T12:00:00.000Z'),
+        ],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.byDate.get('tech-1-2026-04-10')).toMatchObject({
+      offer_status: 'sent',
+      offer_job_id: 'job-1',
+    })
+    expect(result.current.data?.byDate.get('tech-1-2026-04-11')).toBeUndefined()
+  })
+
+  it('selects the latest availability and latest offer independently across visible jobs', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'staffing_requests') {
+        return createQueryBuilder({
+          data: [
+            {
+              id: 'avail-new',
+              job_id: 'job-a',
+              profile_id: 'tech-1',
+              phase: 'availability',
+              status: 'confirmed',
+              updated_at: '2026-04-10T09:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T08:50:00.000Z',
+              requested_by: 'manager-a',
+            },
+            {
+              id: 'offer-new',
+              job_id: 'job-b',
+              profile_id: 'tech-1',
+              phase: 'offer',
+              status: 'declined',
+              updated_at: '2026-04-10T10:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T09:50:00.000Z',
+              requested_by: 'manager-b',
+            },
+            {
+              id: 'offer-old',
+              job_id: 'job-a',
+              profile_id: 'tech-1',
+              phase: 'offer',
+              status: 'pending',
+              updated_at: '2026-04-10T08:30:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T08:20:00.000Z',
+              requested_by: 'manager-a',
+            },
+          ],
+          error: null,
+        })
+      }
+      return createQueryBuilder({ data: [], error: null })
+    })
+
+    const jobs = [
+      {
+        id: 'job-a',
+        title: 'A Stage',
+        start_time: '2026-04-10T06:00:00.000Z',
+        end_time: '2026-04-10T18:00:00.000Z',
+      },
+      {
+        id: 'job-b',
+        title: 'B Stage',
+        start_time: '2026-04-10T07:00:00.000Z',
+        end_time: '2026-04-10T19:00:00.000Z',
+      },
+    ]
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        jobs,
+        [new Date('2026-04-10T12:00:00.000Z')],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.byDate.get('tech-1-2026-04-10')).toMatchObject({
+      availability_status: 'confirmed',
+      availability_job_id: 'job-a',
+      availability_job_title: 'A Stage',
+      offer_status: 'declined',
+      offer_job_id: 'job-b',
+      offer_job_title: 'B Stage',
+    })
+  })
+
+  it('chunks large matrix status RPC requests at 100 technicians by 100 jobs', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockReturnValue(createQueryBuilder({ data: [], error: null }))
+
+    const technicianIds = Array.from({ length: 101 }, (_, index) => `tech-${index}`)
+    const jobs = Array.from({ length: 101 }, (_, index) => ({
+      id: `job-${index}`,
+      title: `Job ${index}`,
+      start_time: '2026-04-10T06:00:00.000Z',
+      end_time: '2026-04-10T18:00:00.000Z',
+    }))
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        technicianIds,
+        jobs,
+        [new Date('2026-04-10T12:00:00.000Z')],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const statusCalls = rpcMock.mock.calls.filter(
+      ([fn]) => fn === 'get_assignment_matrix_staffing_filtered',
+    )
+    expect(statusCalls).toHaveLength(4)
+    expect(statusCalls.map(([, args]) => [
+      args.p_profile_ids.length,
+      args.p_job_ids.length,
+    ])).toEqual(expect.arrayContaining([
+      [100, 100],
+      [100, 1],
+      [1, 100],
+      [1, 1],
+    ]))
+  })
+
 })
