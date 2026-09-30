@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { CalendarX, Library, MessageCircle, Plus } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CalendarX, Copy, Library, MessageCircle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/loading";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
@@ -10,7 +11,11 @@ import { deleteFestivalShift } from "@/features/festival-scheduling/api";
 import { useFestivalShifts } from "@/features/festival-scheduling/hooks/useFestivalShifts";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
-import { ShiftsList } from "./ShiftsList";
+import { CopyShiftsDialog } from "./CopyShiftsDialog";
+import { ShiftAgenda } from "./ShiftAgenda";
+import { ShiftBoard } from "./ShiftBoard";
+import { useSchedulingViewPrefs } from "./useSchedulingViewPrefs";
+import type { ShiftFormValues } from "./shiftModel";
 import { ShiftSheet, type ShiftSheetTarget } from "./ShiftSheet";
 import { ShiftsTable } from "./ShiftsTable";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -18,6 +23,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
 import { useIsMobile } from "@/hooks/use-mobile";
+import { buildFallbackStageOptions } from "@/features/festival-management/selectors";
 import type { FestivalStageOption } from "@/features/festival-management/types";
 import { formatMadridDateKey, getMadridTodayKey } from "@/utils/timezoneUtils";
 import {
@@ -26,6 +32,9 @@ import {
 import { useFestivalDayStart } from "@/features/festival-management/useFestivalDayStart";
 import { DEFAULT_FESTIVAL_DAY_START_TIME } from "@/features/festival-management/dayStart";
 import { trackError } from "@/lib/errorTracking";
+// Until the festival's stages are known the planner offers one stage, as the shift pickers always did.
+const DEFAULT_STAGE_OPTIONS = buildFallbackStageOptions(1);
+
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
@@ -41,7 +50,7 @@ export const FestivalScheduling = ({
   jobId,
   jobDates,
   title = "Planificación del trabajo",
-  stageOptions,
+  stageOptions = DEFAULT_STAGE_OPTIONS,
   isViewOnly = false,
   onCreateWhatsappGroup,
   onOpenRiderLibrary,
@@ -49,10 +58,10 @@ export const FestivalScheduling = ({
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [sheetTarget, setSheetTarget] = useState<ShiftSheetTarget | null>(null);
   const closeSheet = useCallback(() => setSheetTarget(null), []);
-  // The six-column table is cramped on a phone; start phones on the list view.
+  // The board is a timeline on a desktop and an agenda on a phone; the table stays for print and PDF.
   const isMobile = useIsMobile();
-  const [chosenViewMode, setViewMode] = useState<"list" | "table" | null>(null);
-  const viewMode = chosenViewMode ?? (isMobile ? "list" : "table");
+  const [prefs, updatePrefs] = useSchedulingViewPrefs();
+  const [isCopyOpen, setIsCopyOpen] = useState(false);
   const { toast } = useToast();
   
   const formatDateToString = useCallback((date: Date): string => {
@@ -158,6 +167,10 @@ export const FestivalScheduling = ({
       });
     },
   });
+  const createShift = useCallback(
+    (prefill: Partial<ShiftFormValues> = {}) => setSheetTarget({ kind: "create", prefill }),
+    [],
+  );
   const openShift = useCallback((shiftId: string) => setSheetTarget({ kind: "edit", shiftId }), []);
   const handleDeleteShift = (shiftId: string) => deleteShiftMutation.mutateAsync(shiftId).catch(() => undefined);
 
@@ -207,7 +220,7 @@ export const FestivalScheduling = ({
             {!isViewOnly && (
               <Button
                 size="sm"
-                onClick={() => setSheetTarget({ kind: "create" })}
+                onClick={() => createShift()}
                 className="flex items-center gap-1"
                 aria-label="Crear turno"
               >
@@ -222,14 +235,46 @@ export const FestivalScheduling = ({
             tables={['festival_shifts', 'festival_shift_assignments']} 
             variant="compact"
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
-            className="text-xs w-fit"
-          >
-            {viewMode === "table" ? "Vista de Lista" : "Vista de Tabla"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isViewOnly && shifts.length > 0 && jobDates.length > 1 && (
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => setIsCopyOpen(true)}>
+                <Copy className="mr-1 h-3.5 w-3.5" />
+                Copiar turnos
+              </Button>
+            )}
+            {prefs.view === "board" && (
+              <ToggleGroup
+                type="single"
+                size="sm"
+                variant="outline"
+                value={prefs.laneBy}
+                onValueChange={(value) => value && updatePrefs({ laneBy: value as "stage" | "department" })}
+                aria-label="Agrupar turnos"
+              >
+                <ToggleGroupItem value="stage" className="text-xs">
+                  Por stage
+                </ToggleGroupItem>
+                <ToggleGroupItem value="department" className="text-xs">
+                  Por departamento
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={prefs.view}
+              onValueChange={(value) => value && updatePrefs({ view: value as "board" | "table" })}
+              aria-label="Vista de turnos"
+            >
+              <ToggleGroupItem value="board" className="text-xs">
+                Tablero
+              </ToggleGroupItem>
+              <ToggleGroupItem value="table" className="text-xs">
+                Tabla
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-4 sm:p-6">
@@ -270,43 +315,72 @@ export const FestivalScheduling = ({
                   </Button>
                 </AlertDescription>
               </Alert>
-            ) : shifts.length === 0 ? (
-              <EmptyState
-                icon={CalendarX}
-                title="No hay turnos programados para esta fecha"
-                description={!isViewOnly ? 'Haz clic en "Crear Turno" para añadir uno.' : undefined}
-                className="my-2"
-              />
-            ) : viewMode === "table" ? (
-              <ShiftsTable 
-                shifts={shifts} 
-                stageOptions={stageOptions}
-                dayStartTime={resolvedDayStartTime}
-                onDeleteShift={handleDeleteShift}
-                onOpenShift={openShift}
-                date={selectedDate}
-                jobId={jobId}
-                isViewOnly={isViewOnly}
-                jobDates={jobDates}
-                onShiftsCopied={handleShiftsCopied}
-              />
             ) : (
-              <ShiftsList 
-                shifts={shifts} 
-                stageOptions={stageOptions}
-                dayStartTime={resolvedDayStartTime}
-                onDeleteShift={handleDeleteShift} 
-                onOpenShift={openShift}
-                jobId={jobId}
-                isViewOnly={isViewOnly}
-                jobDates={jobDates}
-                selectedDate={selectedDate}
-                onShiftsCopied={handleShiftsCopied}
-              />
+              <>
+                {shifts.length === 0 && (
+                  <EmptyState
+                    icon={CalendarX}
+                    title="No hay turnos programados para esta fecha"
+                    description={!isViewOnly ? 'Haz clic en "Crear Turno" para añadir uno.' : undefined}
+                    className="my-2"
+                  />
+                )}
+                {prefs.view === "table" ? (
+                  shifts.length > 0 && (
+                    <ShiftsTable
+                      shifts={shifts}
+                      stageOptions={stageOptions}
+                      dayStartTime={resolvedDayStartTime}
+                      onDeleteShift={handleDeleteShift}
+                      onOpenShift={openShift}
+                      date={selectedDate}
+                      jobId={jobId}
+                      isViewOnly={isViewOnly}
+                    />
+                  )
+                ) : isMobile ? (
+                  shifts.length > 0 && (
+                    <ShiftAgenda
+                      shifts={shifts}
+                      stageOptions={stageOptions}
+                      dayStartTime={resolvedDayStartTime}
+                      laneBy={prefs.laneBy}
+                      isViewOnly={isViewOnly}
+                      onOpenShift={openShift}
+                      onCreateShift={createShift}
+                    />
+                  )
+                ) : (
+                  <ShiftBoard
+                    shifts={shifts}
+                    stageOptions={stageOptions}
+                    dayStartTime={resolvedDayStartTime}
+                    laneBy={prefs.laneBy}
+                    isViewOnly={isViewOnly}
+                    scrollKey={selectedDate}
+                    onOpenShift={openShift}
+                    onCreateShift={createShift}
+                  />
+                )}
+              </>
             )
           )}
         </div>
       </CardContent>
+
+      {isCopyOpen && (
+        <CopyShiftsDialog
+          open={isCopyOpen}
+          onOpenChange={setIsCopyOpen}
+          sourceDate={selectedDate}
+          jobDates={jobDates}
+          jobId={jobId}
+          onShiftsCopied={async () => {
+            await handleShiftsCopied();
+            setIsCopyOpen(false);
+          }}
+        />
+      )}
 
       <ShiftSheet
         target={sheetTarget}

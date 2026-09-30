@@ -152,12 +152,9 @@ test.describe("festival shift planner", () => {
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
 
-    // Delete, after confirming.
-    if (isMobileViewport(page)) {
-      await page.getByRole("button", { name: "Eliminar", exact: true }).click();
-    } else {
-      await page.getByRole("button", { name: "Eliminar turno Montaje y pruebas" }).click();
-    }
+    // The shift is on the board (an agenda on a phone), in its lane; open it again and delete it, after confirming.
+    await page.getByRole("button", { name: /^Montaje y pruebas, de 09:00 a 18:00, 2 personas/ }).click();
+    await sheet.getByRole("button", { name: "Eliminar turno" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Eliminar" }).click();
     await expect.poll(() => tables.shifts.length).toBe(0);
     await expect(page.getByText("No hay turnos programados para esta fecha")).toBeVisible();
@@ -185,10 +182,7 @@ test.describe("festival shift planner", () => {
     });
     await page.reload();
 
-    await (isMobileViewport(page)
-      ? page.getByRole("button", { name: "Editar y personal" })
-      : page.getByRole("button", { name: "Editar turno Noche" })
-    ).click();
+    await page.getByRole("button", { name: /^Noche, de 22:00 a 06:00, 1 persona/ }).click();
 
     const sheet = page.getByRole("dialog");
     await expect(sheet.getByRole("heading", { name: "Editar turno" })).toBeVisible();
@@ -199,5 +193,46 @@ test.describe("festival shift planner", () => {
     await sheet.getByRole("button", { name: "Quitar a Pepe Externo del turno" }).click();
     await expect(sheet.getByText("Personal asignado (0)")).toBeVisible();
     expect(tables.assignments).toHaveLength(0);
+  });
+
+  test("shows shifts in the lane of their stage and starts one from a lane", async ({ page }) => {
+    const { tables } = await openScheduling(page);
+    tables.shifts.push(
+      { id: "s-main", job_id: JOB_ID, date: "2026-07-10", name: "Montaje", start_time: "09:00", end_time: "13:00", stage: 1, department: "sound", notes: null },
+      { id: "s-club", job_id: JOB_ID, date: "2026-07-10", name: "Noche", start_time: "22:00", end_time: "06:00", stage: 2, department: "lights", notes: null },
+    );
+    await page.reload();
+
+    // One lane per stage (a column on the board, a section on a phone), with its own shifts.
+    const laneRole = isMobileViewport(page) ? "region" : "group";
+    const main = page.getByRole(laneRole, { name: "Main" });
+    const club = page.getByRole(laneRole, { name: "Club" });
+    await expect(main.getByRole("button", { name: /^Montaje/ })).toBeVisible();
+    await expect(club.getByRole("button", { name: /^Noche/ })).toBeVisible();
+    await expect(main.getByRole("button", { name: /^Noche/ })).toHaveCount(0);
+
+    // A lane's add button opens the sheet already on that stage.
+    await page.getByRole("button", { name: "Añadir turno en Club" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByRole("heading", { name: "Crear turno" })).toBeVisible();
+    await expect(sheet.getByRole("combobox", { name: "Stage (opcional)" })).toHaveText("Club");
+  });
+
+  test("groups by department and offers the table for printing", async ({ page }) => {
+    const { tables } = await openScheduling(page);
+    tables.shifts.push(
+      { id: "s-sound", job_id: JOB_ID, date: "2026-07-10", name: "Montaje", start_time: "09:00", end_time: "13:00", stage: 1, department: "sound", notes: null },
+      { id: "s-lights", job_id: JOB_ID, date: "2026-07-10", name: "Noche", start_time: "22:00", end_time: "06:00", stage: 2, department: "lights", notes: null },
+    );
+    await page.reload();
+
+    await page.getByRole("radio", { name: "Por departamento" }).click();
+    const laneRole = isMobileViewport(page) ? "region" : "group";
+    await expect(page.getByRole(laneRole, { name: "Sonido" }).getByRole("button", { name: /^Montaje/ })).toBeVisible();
+    await expect(page.getByRole(laneRole, { name: "Luces" }).getByRole("button", { name: /^Noche/ })).toBeVisible();
+
+    await page.getByRole("radio", { name: "Tabla" }).click();
+    await expect(page.getByRole("button", { name: "Exportar a PDF" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Personal" })).toBeVisible();
   });
 });

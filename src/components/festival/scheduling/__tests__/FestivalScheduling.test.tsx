@@ -10,11 +10,12 @@ const mocks = vi.hoisted(() => ({
   trackError: vi.fn(),
   deleteFestivalShift: vi.fn(),
   fetchShiftsForDate: vi.fn(),
+  isMobile: false,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock("@/lib/errorTracking", () => ({ trackError: mocks.trackError }));
-vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => mocks.isMobile }));
 vi.mock("@/hooks/useRealtimeSubscription", () => ({ useRealtimeSubscription: vi.fn() }));
 vi.mock("@/features/festival-scheduling/api", () => ({
   fetchShiftsForDate: mocks.fetchShiftsForDate,
@@ -44,7 +45,34 @@ vi.mock("../ShiftSheet", () => ({
       </div>
     ) : null,
 }));
-vi.mock("../ShiftsList", () => ({ ShiftsList: (): null => null }));
+vi.mock("../ShiftBoard", () => ({
+  ShiftBoard: ({
+    shifts,
+    laneBy,
+    onOpenShift,
+    onCreateShift,
+  }: {
+    shifts: Array<{ id: string; name: string }>;
+    laneBy: string;
+    onOpenShift: (id: string) => void;
+    onCreateShift: (prefill: Record<string, string>) => void;
+  }) => (
+    <div data-testid="board" data-lane-by={laneBy}>
+      {shifts.map((shift) => (
+        <button key={shift.id} onClick={() => onOpenShift(shift.id)}>
+          Bloque {shift.name}
+        </button>
+      ))}
+      <button onClick={() => onCreateShift({ stage: "2" })}>Nuevo en la pista 2</button>
+    </div>
+  ),
+}));
+vi.mock("../ShiftAgenda", () => ({ ShiftAgenda: (): React.ReactElement => <div data-testid="agenda" /> }));
+vi.mock("../CopyShiftsDialog", () => ({
+  CopyShiftsDialog: ({ onShiftsCopied }: { onShiftsCopied: () => void }) => (
+    <button onClick={onShiftsCopied}>Confirmar copia</button>
+  ),
+}));
 vi.mock("../ShiftsTable", () => ({
   ShiftsTable: ({
     shifts,
@@ -68,18 +96,27 @@ vi.mock("../ShiftsTable", () => ({
 
 import { FestivalScheduling } from "../FestivalScheduling";
 
-const renderScheduling = () =>
-  renderWithProviders(<FestivalScheduling jobId="job-1" jobDates={[new Date("2026-07-01T12:00:00Z")]} />);
+const renderScheduling = ({ view, dates = 1 }: { view?: "table"; dates?: number } = {}) => {
+  if (view) window.localStorage.setItem("festival-scheduling-view", JSON.stringify({ view, laneBy: "stage" }));
+  return renderWithProviders(
+    <FestivalScheduling
+      jobId="job-1"
+      jobDates={Array.from({ length: dates }, (_, index) => new Date(`2026-07-0${index + 1}T12:00:00Z`))}
+    />,
+  );
+};
 
 describe("FestivalScheduling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+    mocks.isMobile = false;
     mocks.fetchShiftsForDate.mockResolvedValue([{ id: "s1", name: "Montaje", assignments: [] }]);
     mocks.deleteFestivalShift.mockResolvedValue(undefined);
   });
 
   it("has no manual refresh: the list stays live by itself", async () => {
-    renderScheduling();
+    renderScheduling({ view: "table" });
     await screen.findByRole("button", { name: "Borrar Montaje" });
 
     expect(screen.queryByRole("button", { name: /Actualizar/ })).not.toBeInTheDocument();
@@ -87,7 +124,7 @@ describe("FestivalScheduling", () => {
   });
 
   it("deletes a shift, refreshes the day and says so", async () => {
-    renderScheduling();
+    renderScheduling({ view: "table" });
     fireEvent.click(await screen.findByRole("button", { name: "Borrar Montaje" }));
 
     await waitFor(() => expect(mocks.deleteFestivalShift.mock.calls[0][0]).toBe("s1"));
@@ -98,7 +135,7 @@ describe("FestivalScheduling", () => {
 
   it("reports a failed delete without refreshing", async () => {
     mocks.deleteFestivalShift.mockRejectedValue(new Error("denied"));
-    renderScheduling();
+    renderScheduling({ view: "table" });
     fireEvent.click(await screen.findByRole("button", { name: "Borrar Montaje" }));
 
     await waitFor(() =>
@@ -120,12 +157,12 @@ describe("FestivalScheduling", () => {
     mocks.fetchShiftsForDate.mockResolvedValue([{ id: "s1", name: "Montaje", assignments: [] }]);
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
 
-    expect(await screen.findByRole("button", { name: "Borrar Montaje" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Bloque Montaje" })).toBeInTheDocument();
   }, 15000);
 
   it("opens the shift sheet to create, and keeps it open on the shift it just created", async () => {
     renderScheduling();
-    await screen.findByRole("button", { name: "Borrar Montaje" });
+    await screen.findByRole("button", { name: "Bloque Montaje" });
 
     fireEvent.click(screen.getByRole("button", { name: "Crear turno" }));
     expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "create");
@@ -137,11 +174,90 @@ describe("FestivalScheduling", () => {
     expect(mocks.fetchShiftsForDate.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("opens an existing shift in the sheet from the list", async () => {
-    renderScheduling();
+  it("opens an existing shift in the sheet from the table", async () => {
+    renderScheduling({ view: "table" });
     fireEvent.click(await screen.findByRole("button", { name: "Abrir Montaje" }));
 
     expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "edit");
     expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "s1");
+  });
+
+  describe("views", () => {
+    it("opens on the board, and a shift on it opens the sheet", async () => {
+      renderScheduling();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Bloque Montaje" }));
+
+      expect(screen.getByTestId("board")).toBeInTheDocument();
+      expect(screen.queryByTestId("agenda")).not.toBeInTheDocument();
+      expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-shift-id", "s1");
+    });
+
+    it("opens the sheet on a new shift with the stage of the lane it was started in", async () => {
+      renderScheduling();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Nuevo en la pista 2" }));
+
+      expect(screen.getByTestId("shift-sheet")).toHaveAttribute("data-kind", "create");
+    });
+
+    it("is an agenda on a phone", async () => {
+      mocks.isMobile = true;
+      renderScheduling();
+
+      expect(await screen.findByTestId("agenda")).toBeInTheDocument();
+      expect(screen.queryByTestId("board")).not.toBeInTheDocument();
+    });
+
+    it("switches to the table, remembers it, and offers grouping only on the board", async () => {
+      const first = renderScheduling();
+      await screen.findByTestId("board");
+      expect(screen.getByRole("radio", { name: "Por departamento" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("radio", { name: "Tabla" }));
+
+      expect(await screen.findByRole("button", { name: "Borrar Montaje" })).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Por departamento" })).not.toBeInTheDocument();
+      expect(JSON.parse(window.localStorage.getItem("festival-scheduling-view") ?? "{}").view).toBe("table");
+
+      // A later visit starts where the planner left off.
+      first.unmount();
+      renderScheduling();
+      expect(await screen.findByRole("button", { name: "Borrar Montaje" })).toBeInTheDocument();
+    });
+
+    it("groups the board by department when asked", async () => {
+      renderScheduling();
+      await screen.findByTestId("board");
+      expect(screen.getByTestId("board")).toHaveAttribute("data-lane-by", "stage");
+
+      fireEvent.click(screen.getByRole("radio", { name: "Por departamento" }));
+
+      expect(screen.getByTestId("board")).toHaveAttribute("data-lane-by", "department");
+    });
+
+    it("offers copying the day in every view once the festival has several dates", async () => {
+      renderScheduling({ dates: 2 });
+      fireEvent.click(await screen.findByRole("button", { name: "Copiar turnos" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Confirmar copia" }));
+
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Confirmar copia" })).not.toBeInTheDocument());
+      expect(mocks.fetchShiftsForDate.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("has nothing to copy on a single-date festival", async () => {
+      renderScheduling();
+      await screen.findByTestId("board");
+      expect(screen.queryByRole("button", { name: "Copiar turnos" })).not.toBeInTheDocument();
+    });
+
+    it("says so when the day has no shifts, and still shows the board to start one on", async () => {
+      mocks.fetchShiftsForDate.mockResolvedValue([]);
+      renderScheduling();
+
+      expect(await screen.findByText("No hay turnos programados para esta fecha")).toBeInTheDocument();
+      expect(screen.getByTestId("board")).toBeInTheDocument();
+    });
   });
 });
