@@ -364,10 +364,23 @@ With `require_no_conflicts=true`, `send-staffing-email` rechecks eligibility at 
 - same-date declines from other jobs;
 - hard conflict or explicit unavailability returned by `check_technician_conflicts`.
 
-Same-date decline behaviour added in current migrations:
+Same-date decline behaviour at **send time**:
 
 - declined availability on overlapping dates is a hard exclusion for another job;
 - declined offers are role-prefix sensitive, unless role context is absent.
+
+### Ranking replay finding
+
+The replayed final database definition of `rank_staffing_candidates` does **not** currently preserve two exclusion filters introduced earlier in the migration chain:
+
+- active job-scoped availability on the target job;
+- same-date declined staffing requests from another job.
+
+The May/June migrations add those filters, but the later `20260730120000_add_seasonal_house_tech_finance.sql` migration performs a full `CREATE OR REPLACE FUNCTION rank_staffing_candidates` using a definition that omits them.
+
+This does not remove the downstream send guard described above: `send-staffing-email` rechecks candidate eligibility with `require_no_conflicts=true` and can reject the send. The current practical failure mode is therefore a false-positive recommendation / wasted automatic staffing attempt rather than the guarded message being sent anyway.
+
+Phase 1 keeps the intended ranking assertions executable as pgTAP TODO tests. Do not treat the missing ranking filters as an intentional contract.
 
 ### Exact timesheet collision
 
@@ -570,6 +583,12 @@ Manager cancellation turns pending, confirmed or declined requests into expired,
 ### B10. Some conflict-check infrastructure fails open on query errors
 
 Both send-time exact-timesheet checking and click-time existing-timesheet lookup have paths that continue after a query error.
+
+### B11. Candidate ranking lost two exclusion filters in migration order
+
+The final replayed `rank_staffing_candidates` definition omits the earlier job-scoped availability and cross-job same-date-decline exclusions. The send-time recommendation guard still enforces them, so the immediate effect is false-positive candidate recommendations rather than an unguarded send.
+
+This is a known regression, not a behavior to preserve. The Phase 1 database suite marks the intended assertions as TODO until a runtime migration restores the filters.
 
 ## 13. Current safety net
 
