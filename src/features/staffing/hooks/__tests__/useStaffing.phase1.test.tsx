@@ -47,32 +47,37 @@ type BuilderResult = {
   count?: number | null;
 };
 
-const makeThenableBuilder = (result: BuilderResult) => {
+type ThenableBuilder = PromiseLike<BuilderResult> & {
+  calls: Array<[string, ...unknown[]]>;
+  select: (...args: unknown[]) => ThenableBuilder;
+  update: (...args: unknown[]) => ThenableBuilder;
+  eq: (...args: unknown[]) => ThenableBuilder;
+  neq: (...args: unknown[]) => ThenableBuilder;
+  maybeSingle: () => Promise<BuilderResult>;
+};
+
+const makeThenableBuilder = (result: BuilderResult): ThenableBuilder => {
   const calls: Array<[string, ...unknown[]]> = [];
-  const builder: any = {
-    calls,
-    select: vi.fn((...args: unknown[]) => {
-      calls.push(["select", ...args]);
-      return builder;
-    }),
-    update: vi.fn((...args: unknown[]) => {
-      calls.push(["update", ...args]);
-      return builder;
-    }),
-    eq: vi.fn((...args: unknown[]) => {
-      calls.push(["eq", ...args]);
-      return builder;
-    }),
-    neq: vi.fn((...args: unknown[]) => {
-      calls.push(["neq", ...args]);
-      return builder;
-    }),
-    maybeSingle: vi.fn(async () => result),
-    then: (
-      resolve: (value: BuilderResult) => unknown,
-      reject?: (reason: unknown) => unknown,
-    ) => Promise.resolve(result).then(resolve, reject),
-  };
+  const builder = {} as ThenableBuilder;
+  builder.calls = calls;
+  builder.select = vi.fn((...args: unknown[]) => {
+    calls.push(["select", ...args]);
+    return builder;
+  });
+  builder.update = vi.fn((...args: unknown[]) => {
+    calls.push(["update", ...args]);
+    return builder;
+  });
+  builder.eq = vi.fn((...args: unknown[]) => {
+    calls.push(["eq", ...args]);
+    return builder;
+  });
+  builder.neq = vi.fn((...args: unknown[]) => {
+    calls.push(["neq", ...args]);
+    return builder;
+  });
+  builder.maybeSingle = vi.fn(async () => result);
+  builder.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
   return builder;
 };
 
@@ -369,7 +374,7 @@ describe("staffing hooks Phase 1 characterization", () => {
 
       expect(invalidateSpy).toHaveBeenCalledTimes(5);
       expect(
-        invalidateSpy.mock.calls.map(([arg]) => JSON.stringify(arg.queryKey)),
+        invalidateSpy.mock.calls.map(([arg]) => JSON.stringify(arg?.queryKey)),
       ).toEqual(
         expect.arrayContaining([
           JSON.stringify(["staffing", "job-1", "tech-1"]),
