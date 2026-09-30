@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-29T21:38:49.773Z",
+  "generatedAt": "2026-09-30T08:29:12.356Z",
   "note": "Generated from current legacy debt. CI fails when current matches exceed these fingerprints.",
   "rules": {
     "pages-supabase-client-import": {
@@ -34,8 +34,6 @@
         "src/components/expenses/ExpenseList.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/expenses/PendingExpensesSummary.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/festival/ArtistRequirementsForm.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/ArtistTablePrintDialog.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
-        "src/components/festival/PushToFlexPullsheetDialog.tsx :: import { dataLayerClient } from '@/services/dataLayerClient';",
         "src/components/hoja-de-ruta/components/ProfileAutocomplete.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/hoja-de-ruta/sections/ModernStaffSection.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
         "src/components/hoja-de-ruta/sections/ModernTransportSection.tsx :: import { dataLayerClient } from \"@/services/dataLayerClient\";",
