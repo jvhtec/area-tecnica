@@ -1,11 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useCallback } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
@@ -14,50 +11,28 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
-import { FestivalGearSetup } from "@/types/festival";
-import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
-import { normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
-import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
-import { normalizeWavesModelSelections } from "@/constants/wavesModels";
-import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
+import { PublicRiderSection } from "./form/PublicRiderSection";
+import { Loader2, Printer } from "lucide-react";
 import { usePublicArtistRiderFiles } from "@/hooks/festival/usePublicArtistRiderFiles";
-import { toProviderValue } from "@/features/festival-artists/model";
+import { usePublicArtistFormContext } from "@/hooks/festival/usePublicArtistFormContext";
 import { usePublicArtistFormSubmit } from "@/hooks/festival/usePublicArtistFormSubmit";
 
 import {
-  asArray,
-  asBoolean,
-  asNumber,
-  asString,
   createInitialFormData,
-  hasConsoleSetups,
-  hasPositiveNumber,
-  hasText,
-  normalizeConsoleSetups,
-  normalizeFestivalLogoPath,
-  normalizeTime,
   type ArtistFormState,
   type ArtistRequirementsFormProps,
-  type PublicFormContextResponse,
 } from "@/components/festival/artistRequirementsFormModel";
 
 export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFormProps) => {
   const { token } = useParams();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { toast } = useToast();
 
   const blankJobId = searchParams.get("jobId") || "";
   const blankDate = searchParams.get("date") || "";
   const formLanguage = searchParams.get("lang") === "en" ? "en" : "es";
   const tx = useCallback((es: string, en: string) => (formLanguage === "en" ? en : es), [formLanguage]);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
-  const [stageNames, setStageNames] = useState<Record<number, string>>({});
-  const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
   const [companyLogo, setCompanyLogo] = useState("/sector pro logo.png");
-  const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
   const [publicArtistId, setPublicArtistId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
   const {
@@ -73,393 +48,17 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     setRiderFiles,
   } = usePublicArtistRiderFiles({ token, publicArtistId, formLanguage, tx });
 
-  const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
-    if (!rawFilePath) {
-      return null;
-    }
-
-    const normalizedPath = normalizeFestivalLogoPath(rawFilePath);
-    if (!normalizedPath) {
-      return null;
-    }
-
-    if (normalizedPath.startsWith("http")) {
-      return normalizedPath;
-    }
-
-    try {
-      const { data: signedData, error: signedError } = await dataLayerClient.storage
-        .from("festival-logos")
-        .createSignedUrl(normalizedPath, 60 * 60);
-
-      if (!signedError && signedData?.signedUrl) {
-        return signedData.signedUrl;
-      }
-    } catch (error) {
-      console.warn("Could not create signed logo URL:", error);
-    }
-
-    const { data } = dataLayerClient.storage.from("festival-logos").getPublicUrl(normalizedPath);
-    if (data?.publicUrl) {
-      return data.publicUrl;
-    }
-
-    return null;
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadBlankContext = async () => {
-      try {
-        setLockedFields(new Set());
-        setStageNames({});
-        setPublicArtistId(null);
-        setRiderFiles([]);
-        if (cancelled) return;
-        if (blankDate) {
-          setFormData((prev) => ({ ...prev, date: blankDate }));
-        }
-
-        if (!blankJobId) {
-          return;
-        }
-
-        const { data: gearData } = await dataLayerClient.from("festival_gear_setups")
-          .select("*")
-          .eq("job_id", blankJobId)
-          .maybeSingle();
-
-        if (cancelled) return;
-        if (gearData) {
-          setGearSetup(mapFestivalGearSetup(gearData));
-        }
-
-        const { data: stagesData } = await dataLayerClient.from("festival_stages")
-          .select("number, name")
-          .eq("job_id", blankJobId);
-
-        if (!cancelled && stagesData) {
-          const stageMap = stagesData.reduce<Record<number, string>>((acc, stage) => {
-            if (typeof stage.number === "number" && stage.name) {
-              acc[stage.number] = stage.name;
-            }
-            return acc;
-          }, {});
-          setStageNames(stageMap);
-        }
-
-        const { data: logoData } = await dataLayerClient.from("festival_logos")
-          .select("file_path")
-          .eq("job_id", blankJobId)
-          .maybeSingle();
-
-        if (cancelled) return;
-        if (logoData?.file_path) {
-          const resolvedLogo = await resolveFestivalLogoUrl(logoData.file_path);
-          if (!cancelled) {
-            setFestivalLogo(resolvedLogo);
-          }
-        }
-      } catch (error) {
-        if (cancelled) return;
-        console.warn("Could not load blank form context:", error);
-      }
-    };
-
-    const loadTokenContext = async () => {
-      if (!token) {
-        if (cancelled) return;
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("Token de formulario inválido", "Invalid form token"),
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setStageNames({});
-
-      const { data, error } = await dataLayerClient.rpc("get_public_artist_form_context", {
-        p_token: token,
-      });
-
-      if (cancelled) return;
-      if (error) {
-        throw error;
-      }
-
-      const context = data as unknown as PublicFormContextResponse;
-      if (!context?.ok) {
-        if (context?.status === "submitted") {
-          if (cancelled) return;
-          navigate(`/festival/form-submitted?lang=${formLanguage}`, { replace: true });
-          return;
-        }
-
-        if (cancelled) return;
-        const description =
-          context?.status === "expired"
-            ? tx("Este enlace de formulario ha expirado.", "This form link has expired.")
-            : tx("No se pudo abrir este formulario. Verifica que el enlace sea válido.", "Could not open this form. Verify that the link is valid.");
-
-        toast({
-          title: tx("Formulario no disponible", "Form unavailable"),
-          description,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const artistData = context.artist || {};
-      const artistJobId = asString(artistData.job_id);
-      const artistId = asString(artistData.id);
-      const contextStageNames = Array.isArray(context.stage_names) ? context.stage_names : [];
-      const contextRiderFiles = asArray<Record<string, unknown>>(context.rider_files).map((file) => ({
-        id: asString(file.id),
-        file_name: asString(file.file_name),
-        file_path: asString(file.file_path),
-        file_type: asString(file.file_type) || null,
-        file_size: typeof file.file_size === "number" ? file.file_size : null,
-        uploaded_at: asString(file.uploaded_at) || null,
-        uploaded_by: asString(file.uploaded_by) || null,
-        uploaded_by_name: asString(file.uploaded_by_name) || null,
-      }));
-
-      setPublicArtistId(artistId || null);
-      setRiderFiles(contextRiderFiles.filter((file) => file.id && file.file_path));
-      const hasSystems = (value: unknown) =>
-        asArray<Record<string, unknown>>(value).some((system) => {
-          return (
-            hasText(system?.model) ||
-            hasPositiveNumber(system?.quantity) ||
-            hasPositiveNumber(system?.quantity_hh) ||
-            hasPositiveNumber(system?.quantity_bp)
-          );
-        });
-      const hasWiredMics = (value: unknown) =>
-        asArray<Record<string, unknown>>(value).some((mic) => {
-          return hasText(mic?.model) || hasPositiveNumber(mic?.quantity);
-        });
-
-      const nextLockedFields = new Set<string>(["name", "stage", "date", "show_start", "show_end"]);
-      if (hasText(artistData.foh_console)) {
-        nextLockedFields.add("foh_console");
-        nextLockedFields.add("foh_console_provided_by");
-      }
-      if (hasText(artistData.foh_drive)) nextLockedFields.add("foh_drive");
-      if (hasText(artistData.foh_drive_position)) nextLockedFields.add("foh_drive_position");
-      if (hasConsoleSetups(artistData.foh_consoles)) nextLockedFields.add("foh_consoles");
-      if (asArray(artistData.foh_waves_models).length > 0 || hasText(artistData.foh_outboard)) {
-        nextLockedFields.add("foh_waves_models");
-        nextLockedFields.add("foh_waves_provided_by");
-      }
-      if (asBoolean(artistData.foh_tech)) nextLockedFields.add("foh_tech");
-      if (hasText(artistData.mon_console)) {
-        nextLockedFields.add("mon_console");
-        nextLockedFields.add("mon_console_provided_by");
-      }
-      if (hasText(artistData.mon_position)) nextLockedFields.add("mon_position");
-      if (hasConsoleSetups(artistData.mon_consoles)) nextLockedFields.add("mon_consoles");
-      if (asBoolean(artistData.monitors_from_foh)) nextLockedFields.add("monitors_from_foh");
-      if (asArray(artistData.mon_waves_models).length > 0 || hasText(artistData.mon_outboard)) {
-        nextLockedFields.add("mon_waves_models");
-        nextLockedFields.add("mon_waves_provided_by");
-      }
-      if (asBoolean(artistData.mon_tech)) nextLockedFields.add("mon_tech");
-      if (hasSystems(artistData.wireless_systems)) {
-        nextLockedFields.add("wireless_systems");
-        nextLockedFields.add("wireless_provided_by");
-      }
-      if (hasSystems(artistData.iem_systems)) {
-        nextLockedFields.add("iem_systems");
-        nextLockedFields.add("iem_provided_by");
-      }
-      if (asBoolean(artistData.monitors_enabled) || hasPositiveNumber(artistData.monitors_quantity)) {
-        nextLockedFields.add("monitors_enabled");
-        nextLockedFields.add("monitors_quantity");
-      }
-      if (asBoolean(artistData.extras_sf)) nextLockedFields.add("extras_sf");
-      if (asBoolean(artistData.extras_df)) nextLockedFields.add("extras_df");
-      if (asBoolean(artistData.extras_djbooth)) nextLockedFields.add("extras_djbooth");
-      if (hasText(artistData.extras_wired)) nextLockedFields.add("extras_wired");
-
-      const hasInfrastructure =
-        asBoolean(artistData.infra_cat6) ||
-        hasPositiveNumber(artistData.infra_cat6_quantity) ||
-        asBoolean(artistData.infra_hma) ||
-        hasPositiveNumber(artistData.infra_hma_quantity) ||
-        asBoolean(artistData.infra_coax) ||
-        hasPositiveNumber(artistData.infra_coax_quantity) ||
-        asBoolean(artistData.infra_opticalcon_duo) ||
-        hasPositiveNumber(artistData.infra_opticalcon_duo_quantity) ||
-        hasPositiveNumber(artistData.infra_analog) ||
-        hasText(artistData.other_infrastructure);
-
-      if (asBoolean(artistData.infra_cat6)) nextLockedFields.add("infra_cat6");
-      if (hasPositiveNumber(artistData.infra_cat6_quantity)) nextLockedFields.add("infra_cat6_quantity");
-      if (asBoolean(artistData.infra_hma)) nextLockedFields.add("infra_hma");
-      if (hasPositiveNumber(artistData.infra_hma_quantity)) nextLockedFields.add("infra_hma_quantity");
-      if (asBoolean(artistData.infra_coax)) nextLockedFields.add("infra_coax");
-      if (hasPositiveNumber(artistData.infra_coax_quantity)) nextLockedFields.add("infra_coax_quantity");
-      if (asBoolean(artistData.infra_opticalcon_duo)) nextLockedFields.add("infra_opticalcon_duo");
-      if (hasPositiveNumber(artistData.infra_opticalcon_duo_quantity)) nextLockedFields.add("infra_opticalcon_duo_quantity");
-      if (hasPositiveNumber(artistData.infra_analog)) nextLockedFields.add("infra_analog");
-      if (hasText(artistData.other_infrastructure)) nextLockedFields.add("other_infrastructure");
-      if (hasInfrastructure) nextLockedFields.add("infrastructure_provided_by");
-
-      if (hasText(artistData.notes)) nextLockedFields.add("notes");
-      if (asBoolean(artistData.rider_missing)) nextLockedFields.add("rider_missing");
-      if (asBoolean(artistData.isaftermidnight)) nextLockedFields.add("isaftermidnight");
-      if (hasWiredMics(artistData.wired_mics)) {
-        nextLockedFields.add("wired_mics");
-        nextLockedFields.add("mic_kit");
-      } else if (asString(artistData.mic_kit) === "festival" || asString(artistData.mic_kit) === "mixed") {
-        nextLockedFields.add("mic_kit");
-      }
-
-      setLockedFields(nextLockedFields);
-
-      const fohConsoles = normalizeConsoleSetups(artistData.foh_consoles);
-      const monConsoles = normalizeConsoleSetups(artistData.mon_consoles);
-
-      setFormData((prev) => ({
-        ...prev,
-        max_stages: asNumber(artistData.max_stages) || prev.max_stages || 1,
-        name: asString(artistData.name),
-        stage: asNumber(artistData.stage) || 1,
-        date: asString(artistData.date),
-        show_start: normalizeTime(asString(artistData.show_start)),
-        show_end: normalizeTime(asString(artistData.show_end)),
-        soundcheck: asBoolean(artistData.soundcheck),
-        soundcheck_date: asString(artistData.soundcheck_date) || asString(artistData.date),
-        soundcheck_start: normalizeTime(asString(artistData.soundcheck_start)),
-        soundcheck_end: normalizeTime(asString(artistData.soundcheck_end)),
-        line_check: asBoolean(artistData.line_check),
-        line_check_start: normalizeTime(asString(artistData.line_check_start)),
-        line_check_end: normalizeTime(asString(artistData.line_check_end)),
-        load_in_time: normalizeTime(asString(artistData.load_in_time)),
-        foh_console: asString(artistData.foh_console),
-        foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
-        foh_console_provided_by: toProviderValue(artistData.foh_console_provided_by),
-        foh_drive: asString(artistData.foh_drive),
-        foh_drive_position: asString(artistData.foh_drive_position),
-        foh_tech: asBoolean(artistData.foh_tech),
-        foh_waves_models: normalizeWavesModelSelections(artistData.foh_waves_models),
-        foh_outboard: asString(artistData.foh_outboard),
-        foh_waves_provided_by: toProviderValue(artistData.foh_waves_provided_by),
-        mon_console: asString(artistData.mon_console),
-        mon_consoles: monConsoles.length > 0 ? monConsoles : prev.mon_consoles,
-        mon_console_provided_by: toProviderValue(artistData.mon_console_provided_by),
-        mon_position: asString(artistData.mon_position),
-        monitors_from_foh: asBoolean(artistData.monitors_from_foh),
-        mon_waves_models: normalizeWavesModelSelections(artistData.mon_waves_models),
-        mon_outboard: asString(artistData.mon_outboard),
-        mon_waves_provided_by: toProviderValue(artistData.mon_waves_provided_by),
-        mon_tech: asBoolean(artistData.mon_tech),
-        wireless_systems: normalizeWirelessSystems(artistData.wireless_systems, "wireless"),
-        iem_systems: normalizeWirelessSystems(artistData.iem_systems, "iem"),
-        wireless_provided_by: toProviderValue(artistData.wireless_provided_by),
-        iem_provided_by: toProviderValue(artistData.iem_provided_by),
-        monitors_enabled: asBoolean(artistData.monitors_enabled),
-        monitors_quantity: asNumber(artistData.monitors_quantity),
-        extras_sf: asBoolean(artistData.extras_sf),
-        extras_df: asBoolean(artistData.extras_df),
-        extras_djbooth: asBoolean(artistData.extras_djbooth),
-        extras_wired: asString(artistData.extras_wired),
-        infra_cat6: asBoolean(artistData.infra_cat6),
-        infra_cat6_quantity: asNumber(artistData.infra_cat6_quantity),
-        infra_hma: asBoolean(artistData.infra_hma),
-        infra_hma_quantity: asNumber(artistData.infra_hma_quantity),
-        infra_coax: asBoolean(artistData.infra_coax),
-        infra_coax_quantity: asNumber(artistData.infra_coax_quantity),
-        infra_opticalcon_duo: asBoolean(artistData.infra_opticalcon_duo),
-        infra_opticalcon_duo_quantity: asNumber(artistData.infra_opticalcon_duo_quantity),
-        infra_analog: asNumber(artistData.infra_analog),
-        infrastructure_provided_by: toProviderValue(artistData.infrastructure_provided_by),
-        other_infrastructure: asString(artistData.other_infrastructure),
-        notes: asString(artistData.notes),
-        rider_missing: asBoolean(artistData.rider_missing),
-        isaftermidnight: asBoolean(artistData.isaftermidnight),
-        mic_kit: (asString(artistData.mic_kit) === "festival" || asString(artistData.mic_kit) === "mixed")
-          ? (asString(artistData.mic_kit) as "festival" | "mixed")
-          : "band",
-        wired_mics: asArray<Record<string, unknown>>(artistData.wired_mics).map((mic) => ({
-          model: asString(mic.model),
-          quantity: asNumber(mic.quantity),
-          exclusive_use: asBoolean(mic.exclusive_use),
-          notes: asString(mic.notes),
-        })),
-      }));
-
-      if (context.gear_setup) {
-        setGearSetup({
-          ...context.gear_setup,
-          wireless_systems: normalizeWirelessSystems(context.gear_setup.wireless_systems, "wireless"),
-          iem_systems: normalizeWirelessSystems(context.gear_setup.iem_systems, "iem"),
-        });
-      }
-
-      const stageMapFromContext = contextStageNames.reduce<Record<number, string>>((acc, stage) => {
-        if (typeof stage.number === "number" && stage.name) {
-          acc[stage.number] = stage.name;
-        }
-        return acc;
-      }, {});
-
-      if (Object.keys(stageMapFromContext).length > 0) {
-        setStageNames(stageMapFromContext);
-      } else if (artistJobId) {
-        const { data: stagesData } = await dataLayerClient.from("festival_stages")
-          .select("number, name")
-          .eq("job_id", artistJobId);
-
-        if (!cancelled && stagesData) {
-          const stageMap = stagesData.reduce<Record<number, string>>((acc, stage) => {
-            if (typeof stage.number === "number" && stage.name) {
-              acc[stage.number] = stage.name;
-            }
-            return acc;
-          }, {});
-          setStageNames(stageMap);
-        }
-      }
-
-      const resolvedLogo = await resolveFestivalLogoUrl(context.logo_file_path);
-      if (cancelled) return;
-      setFestivalLogo(resolvedLogo);
-    };
-
-    const fetchContext = async () => {
-      if (cancelled) return;
-      setIsLoading(true);
-      try {
-        if (isBlank) {
-          await loadBlankContext();
-        } else {
-          await loadTokenContext();
-        }
-      } catch (error) {
-        if (cancelled) return;
-        console.error("Error loading form context:", error);
-        toast({
-          title: tx("Error", "Error"),
-          description: tx("No se pudieron cargar los datos del formulario.", "Could not load form data."),
-          variant: "destructive",
-        });
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void fetchContext();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [blankDate, blankJobId, formLanguage, isBlank, navigate, resolveFestivalLogoUrl, setRiderFiles, token, toast, tx]);
+  const { isLoading, gearSetup, stageNames, festivalLogo, setFestivalLogo, lockedFields } = usePublicArtistFormContext({
+    isBlank,
+    token,
+    blankJobId,
+    blankDate,
+    formLanguage,
+    tx,
+    setFormData,
+    setRiderFiles,
+    setPublicArtistId,
+  });
 
   const { handleSubmit, isSubmitting } = usePublicArtistFormSubmit({
     formData,
@@ -550,110 +149,19 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
                 {shouldShowRiderSection && (
-                  <div className="space-y-4 border rounded-lg p-4">
-                    <h3 className="text-lg font-semibold">{tx("Rider Técnico", "Technical Rider")}</h3>
-
-                    {formData.rider_missing && (
-                      <p className="text-sm font-medium text-destructive">
-                        {tx(
-                          "Aún no hemos recibido el rider técnico de este artista. Por favor súbelo en esta sección.",
-                          "We have not received this artist's technical rider yet. Please upload it in this section."
-                        )}
-                      </p>
-                    )}
-
-                    {riderFiles.length > 0 ? (
-                      <div className="rounded-md border p-3 space-y-3">
-                        {riderFiles.map((file) => (
-                          <div key={file.id} className="flex flex-col gap-3 border rounded-md p-3 md:flex-row md:items-start md:justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 text-sm font-medium">
-                                <FileText className="h-4 w-4" />
-                                <span>{file.file_name}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {tx("Subido", "Uploaded")}: {formatUploadedAt(file.uploaded_at)} ·{" "}
-                                {formatFileSize(file.file_size)}
-                              </p>
-                              {file.uploaded_by_name && (
-                                <p className="text-xs text-muted-foreground">
-                                  {tx("Subido por", "Uploaded by")}: {file.uploaded_by_name}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openRiderFile(file)}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                {tx("Ver", "View")}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => downloadRiderFile(file)}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                {tx("Descargar", "Download")}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                disabled={deletingRiderId === file.id}
-                                onClick={() => handleDeleteRider(file)}
-                              >
-                                {deletingRiderId === file.id ? (
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                )}
-                                {tx("Eliminar", "Delete")}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                        <p className="text-xs text-muted-foreground">
-                          {tx(
-                            "Estos son los riders actuales que tenemos registrados. Si existe una versión más nueva, súbela usando el campo inferior y elimina las versiones erróneas.",
-                            "These are the rider files we currently have on file. If there is a newer version, upload it below and delete any incorrect versions."
-                          )}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {tx(
-                          "No hay ningún rider cargado actualmente para este artista.",
-                          "There is currently no rider file uploaded for this artist."
-                        )}
-                      </p>
-                    )}
-
-                    <div className="space-y-2">
-                      <label htmlFor="public-rider-upload" className="text-sm font-medium">
-                        {tx("Subir rider(s) (PDF, Word, imagen, SoundVision, NWM o CAD)", "Upload rider file(s) (PDF, Word, image, SoundVision, NWM, or CAD)")}
-                      </label>
-                      <Input
-                        id="public-rider-upload"
-                        type="file"
-                        accept={DOCUMENT_UPLOAD_ACCEPT}
-                        multiple
-                        onChange={handleRiderUpload}
-                        disabled={isUploadingRider}
-                      />
-                      {isUploadingRider && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {tx("Subiendo rider...", "Uploading rider...")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <PublicRiderSection
+                    riderMissing={Boolean(formData.rider_missing)}
+                    riderFiles={riderFiles}
+                    deletingRiderId={deletingRiderId}
+                    isUploadingRider={isUploadingRider}
+                    tx={tx}
+                    formatFileSize={formatFileSize}
+                    formatUploadedAt={formatUploadedAt}
+                    onOpen={openRiderFile}
+                    onDownload={downloadRiderFile}
+                    onDelete={handleDeleteRider}
+                    onUpload={handleRiderUpload}
+                  />
                 )}
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
