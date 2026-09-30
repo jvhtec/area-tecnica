@@ -20,8 +20,8 @@ const driverAssignmentMigration = readRepoFile(
 );
 const productionSchema = readRepoFile("supabase/migrations/00000000000000_production_schema.sql");
 
-function indexOrFail(source: string, marker: string) {
-  const index = source.indexOf(marker);
+function indexOrFail(source: string, marker: string, fromIndex = 0) {
+  const index = source.indexOf(marker, fromIndex);
   expect(index, `missing marker: ${marker}`).toBeGreaterThanOrEqual(0);
   return index;
 }
@@ -53,8 +53,14 @@ describe("Staffing Phase 1 characterization", () => {
     });
 
     it("treats idempotency as persisted-request identity rather than proven delivery", () => {
-      const start = indexOrFail(sendStaffingEmail, "// Idempotency check: prevent duplicate sends within 24h");
-      const end = indexOrFail(sendStaffingEmail, "// Check required environment variables");
+      const start = indexOrFail(
+        sendStaffingEmail,
+        "// Idempotency check: prevent duplicate sends within 24h",
+      );
+      const end = indexOrFail(
+        sendStaffingEmail,
+        "// Check required environment variables",
+      );
       const idempotencyBlock = sendStaffingEmail.slice(start, end);
 
       expect(idempotencyBlock).toContain(".from('staffing_requests')");
@@ -89,7 +95,7 @@ describe("Staffing Phase 1 characterization", () => {
       expectOrdered(
         staffingClick,
         "if (row.status !== 'pending')",
-        "const newStatus = action === "confirm" ? "confirmed" : "declined"",
+        `const newStatus = action === "confirm" ? "confirmed" : "declined"`,
       );
     });
 
@@ -130,7 +136,11 @@ describe("Staffing Phase 1 characterization", () => {
     });
 
     it("does not roll back a successful assignment when staffing timesheet creation fails", () => {
-      const timesheetFailure = indexOrFail(staffingClick, "if (tsErr) {");
+      const timesheetWrite = indexOrFail(
+        staffingClick,
+        ".upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' })",
+      );
+      const timesheetFailure = indexOrFail(staffingClick, "if (tsErr) {", timesheetWrite);
       const timesheetFailureBlock = staffingClick.slice(
         timesheetFailure,
         indexOrFail(staffingClick, "} else {", timesheetFailure),
@@ -160,7 +170,7 @@ describe("Staffing Phase 1 characterization", () => {
 
       expect(timesheetWrite).toBeLessThan(flexCall);
 
-      const flexSection = staffingClick.slice(flexCall - 250, flexCall + 850);
+      const flexSection = staffingClick.slice(flexCall - 300, flexCall + 950);
       expect(flexSection).toContain("try {");
       expect(flexSection).toContain("catch");
       expect(flexSection).toContain("non-blocking");
@@ -187,7 +197,10 @@ describe("Staffing Phase 1 characterization", () => {
 
   describe("direct assignment partial-commit behavior", () => {
     it("persists the base job assignment before per-date timesheet mutation", () => {
-      const assignmentInsert = indexOrFail(assignJobDialog, ".from('job_assignments').insert(row)");
+      const assignmentInsert = indexOrFail(
+        assignJobDialog,
+        ".from('job_assignments').insert(row)",
+      );
       const timesheetSection = indexOrFail(
         assignJobDialog,
         "// Handle timesheet updates based on whether we're modifying the selected job",
@@ -259,9 +272,7 @@ describe("Staffing Phase 1 characterization", () => {
 
   describe("campaign semantics", () => {
     it("counts every non-declined job assignment toward role fill, including invited", () => {
-      expect(staffingOrchestrator).toContain(
-        "if (status === 'declined') return;",
-      );
+      expect(staffingOrchestrator).toContain("if (status === 'declined') return;");
       expect(staffingOrchestrator).not.toContain(
         "if (status !== 'confirmed') return;",
       );
@@ -289,8 +300,15 @@ describe("Staffing Phase 1 characterization", () => {
     });
 
     it("a paused campaign can be nudged without being ticked", () => {
-      const nudgeStart = indexOrFail(staffingOrchestrator, "async function nudgeCampaign");
-      const nudgeEnd = indexOrFail(staffingOrchestrator, "// TICK action:", nudgeStart);
+      const nudgeStart = indexOrFail(
+        staffingOrchestrator,
+        "async function nudgeCampaign",
+      );
+      const nudgeEnd = indexOrFail(
+        staffingOrchestrator,
+        "// TICK action:",
+        nudgeStart,
+      );
       const nudge = staffingOrchestrator.slice(nudgeStart, nudgeEnd);
 
       expect(nudge).toContain(
@@ -328,9 +346,7 @@ describe("Staffing Phase 1 characterization", () => {
       expect(campaignFinalization).toContain(
         'status: outcome.allFilled ? "completed" : "active"',
       );
-      expect(campaignFinalization).toContain(
-        "a push failure must not",
-      );
+      expect(campaignFinalization).toContain("a push failure must not");
     });
   });
 
