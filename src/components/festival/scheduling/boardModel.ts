@@ -25,6 +25,10 @@ export const BOARD_SNAP_MINUTES = 30;
 export const BOARD_DEFAULT_SHIFT_MINUTES = 60;
 /** Pixels per hour of the timeline. */
 export const BOARD_HOUR_PX = 48;
+/** A block is never drawn shorter than this, so its name stays readable and clickable. */
+export const BOARD_MIN_BLOCK_PX = 30;
+/** The minutes a minimum-height block actually covers: what overlap has to be judged on. */
+export const BOARD_MIN_BLOCK_MINUTES = (BOARD_MIN_BLOCK_PX / BOARD_HOUR_PX) * 60;
 
 export type BoardLaneMode = "stage" | "department";
 
@@ -83,6 +87,9 @@ export const boardHourMarks = (dayStartTime: string): BoardHourMark[] =>
  * every item in a group of overlapping shifts shares the group's column count, so widths line up.
  */
 const packColumns = (items: BoardItem[]): void => {
+  // Overlap is judged on what is drawn, not on the times: a 30-minute shift is drawn taller than its
+  // slot, so the shift right after it would otherwise be painted over it.
+  const drawnEnd = (item: BoardItem) => Math.max(item.end, item.start + BOARD_MIN_BLOCK_MINUTES);
   const sorted = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
   let group: BoardItem[] = [];
   let groupEnd = -1;
@@ -100,13 +107,13 @@ const packColumns = (items: BoardItem[]): void => {
     let column = columnEnds.findIndex((end) => end <= item.start);
     if (column === -1) {
       column = columnEnds.length;
-      columnEnds.push(item.end);
+      columnEnds.push(drawnEnd(item));
     } else {
-      columnEnds[column] = item.end;
+      columnEnds[column] = drawnEnd(item);
     }
     item.column = column;
     group.push(item);
-    groupEnd = Math.max(groupEnd, item.end);
+    groupEnd = Math.max(groupEnd, drawnEnd(item));
   }
   closeGroup();
 };

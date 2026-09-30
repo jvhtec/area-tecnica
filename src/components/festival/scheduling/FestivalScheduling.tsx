@@ -344,7 +344,8 @@ export const FestivalScheduling = ({
                     />
                   )
                 ) : isMobile ? (
-                  shifts.length > 0 && (
+                  // An empty day still gets its sections, so a shift can be started in a given stage.
+                  (shifts.length > 0 || !isViewOnly) && (
                     <ShiftAgenda
                       shifts={shifts}
                       stageOptions={stageOptions}

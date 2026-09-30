@@ -236,6 +236,15 @@ describe("FestivalScheduling", () => {
       expect(screen.getByTestId("board")).toHaveAttribute("data-lane-by", "department");
     });
 
+    it("shows the agenda on a phone even for an empty day, so a shift can be started in a stage", async () => {
+      mocks.isMobile = true;
+      mocks.fetchShiftsForDate.mockResolvedValue([]);
+      renderScheduling();
+
+      expect(await screen.findByText("No hay turnos programados para esta fecha")).toBeInTheDocument();
+      expect(screen.getByTestId("agenda")).toBeInTheDocument();
+    });
+
     it("offers copying the day in every view once the festival has several dates", async () => {
       renderScheduling({ dates: 2 });
       fireEvent.click(await screen.findByRole("button", { name: "Copiar turnos" }));

@@ -13,6 +13,7 @@ import {
   shiftTimesFromBoardClick,
   summarizeCrew,
   BOARD_HOUR_PX,
+  BOARD_MIN_BLOCK_PX,
   departmentStripe,
   shiftAriaLabel,
   type BoardItem,
@@ -27,7 +28,6 @@ import {
   type ShiftFormValues,
 } from "./shiftModel";
 
-const MIN_BLOCK_PX = 30;
 const GUTTER = "3.5rem";
 
 interface ShiftBoardProps {
@@ -157,7 +157,7 @@ const ShiftBlock = ({
   const { shift } = item;
   const end = Math.min(item.end, 24 * 60);
   const top = (item.start / 60) * BOARD_HOUR_PX;
-  const height = Math.max(((end - item.start) / 60) * BOARD_HOUR_PX, MIN_BLOCK_PX);
+  const height = Math.max(((end - item.start) / 60) * BOARD_HOUR_PX, BOARD_MIN_BLOCK_PX);
   const names = shiftCrewNames(shift);
   const nextDay = shiftNextDayNote(shift.start_time, shift.end_time, dayStartTime);
 

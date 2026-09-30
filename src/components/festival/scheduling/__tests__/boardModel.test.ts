@@ -108,6 +108,23 @@ describe("buildDayBoard by stage", () => {
     expect(layout).toEqual({ a: [0, 2], b: [1, 2], c: [1, 2], d: [0, 1] });
   });
 
+  it("keeps short back-to-back shifts apart, since a block is never drawn shorter than its minimum", () => {
+    const [main] = board([
+      shift("a", "10:00", "10:30"),
+      shift("b", "10:30", "11:00"),
+      shift("c", "11:00", "12:00"),
+    ]).lanes;
+    const layout = Object.fromEntries(main.items.map((item) => [item.shift.id, [item.column, item.columns]]));
+
+    // a is drawn 37.5 min tall, so b (starting at 30 min) shares its width instead of being painted over it.
+    expect(layout).toEqual({ a: [0, 2], b: [1, 2], c: [0, 2] });
+  });
+
+  it("still lets full-length back-to-back shifts share one column", () => {
+    const [main] = board([shift("a", "10:00", "11:00"), shift("b", "11:00", "12:00")]).lanes;
+    expect(main.items.map((item) => [item.column, item.columns])).toEqual([[0, 1], [0, 1]]);
+  });
+
   it("does not overlap shifts of different lanes", () => {
     const lanes = board([shift("a", "10:00", "14:00"), shift("b", "10:00", "14:00", { stage: 2 })]).lanes;
     expect(lanes.map((lane) => lane.items.map((item) => item.columns))).toEqual([[1], [1]]);
