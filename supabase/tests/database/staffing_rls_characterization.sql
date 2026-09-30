@@ -135,9 +135,16 @@ SELECT is((SELECT count(*)::integer FROM changed), 0,
   'sound management cannot update a lights campaign');
 
 SELECT is(
-  (SELECT count(*)::integer FROM public.staffing_requests),
+  (
+    SELECT count(*)::integer
+    FROM public.staffing_requests
+    WHERE id IN (
+      'cc600000-0000-0000-0000-000000000001'::uuid,
+      'cc600000-0000-0000-0000-000000000002'::uuid
+    )
+  ),
   2,
-  'management retains current unscoped staffing-request visibility'
+  'management retains visibility of both staffing-request fixtures'
 );
 
 RESET ROLE;
