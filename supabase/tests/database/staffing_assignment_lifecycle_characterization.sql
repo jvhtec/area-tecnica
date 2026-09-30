@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(17);
+SELECT plan(18);
 
 SELECT ok(
   to_regprocedure('public.manage_assignment_lifecycle(uuid,uuid,text,text,uuid,jsonb)') IS NOT NULL,
