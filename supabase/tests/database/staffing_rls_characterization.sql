@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(18);
+SELECT plan(19);
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
