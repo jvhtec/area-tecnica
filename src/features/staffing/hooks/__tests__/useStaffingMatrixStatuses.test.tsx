@@ -86,6 +86,16 @@ describe('useStaffingMatrixStatuses', () => {
     expect([...result.current.data!.byDate.keys()]).toEqual(['tech-1-2026-07-03', 'tech-1-2026-07-04'])
   })
 
+  it.each(['pending', 'confirmed'])('does not hide a newer legacy availability cycle (%s) behind historical confirmation', async status => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    const addedRequest = { ...originalRequests[0], id: 'new-legacy-cycle', status, created_at: '2026-07-03T10:00:00Z', updated_at: '2026-07-03T10:00:00Z' }
+    fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests' ? [...originalRequests, addedRequest] : [], error: null }))
+    const scheduled = [{ job_id: 'job-1', technician_id: 'tech-1', date: '2026-07-03', status: 'confirmed' }]
+    const { result } = renderHook(() => useStaffingMatrixStatuses(['tech-1'], [extendedJob], extendedDates, scheduled), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data!.byDate.get('tech-1-2026-07-05')).toMatchObject({ availability_status: status === 'pending' ? 'requested' : 'confirmed', offer_status: null })
+  })
+
   it('recomputes date statuses when the same job changes dates or scheduling changes', async () => {
     rpcMock.mockResolvedValue({ data: [], error: null })
     fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests' ? originalRequests : [], error: null }))

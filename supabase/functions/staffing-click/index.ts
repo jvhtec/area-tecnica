@@ -1,13 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
-import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
+import { type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
 import {
   buildStaffingClickWhatsappFollowupMessage,
   shouldSendStaffingClickWhatsappFollowup,
 } from "./followupUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
+import { buildStaffingTimesheets, detectConflictForStaffingDates, getAcceptedStaffingDates, getLegacyStaffingSpanDates, persistStaffingMembership } from "./assignmentDates.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -515,30 +516,30 @@ serve(async (req) => {
     if (newStatus === 'confirmed' && row.phase === 'offer') {
       try {
         // 1) Resolve chosen role from last email_sent event for this request (offer phase)
-        const { data: lastEmail, error: lastEmailErr } = await supabase
+        const { data: deliveryEvents, error: deliveryEventsError } = await supabase
           .from('staffing_events')
           .select('meta, created_at')
           .eq('staffing_request_id', rid)
           .in('event', ['email_sent', 'whatsapp_sent'])
           .contains('meta', { phase: 'offer' })
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const chosenRole = (lastEmail?.meta as any)?.role ?? null;
+          .order('created_at', { ascending: false });
+        if (deliveryEventsError) throw new Error('Unable to verify staffing delivery snapshot');
+        const chosenRole = (deliveryEvents?.[0]?.meta as any)?.role ?? null;
+        const acceptedDates = getAcceptedStaffingDates(row, updatedBatchRows, deliveryEvents ?? []);
 
         // 2) Fetch target job and technician profile (for department)
-        const [{ data: job, error: jobErr }, { data: prof, error: profErr }] = await Promise.all([
+        const [{ data: job, error: jobErr }, { data: prof, error: profErr }, { data: existingMembership, error: membershipError }] = await Promise.all([
           supabase.from('jobs').select('id,title,start_time,end_time,job_type').eq('id', row.job_id).maybeSingle(),
-          supabase.from('profiles').select('id,department').eq('id', row.profile_id).maybeSingle()
+          supabase.from('profiles').select('id,department').eq('id', row.profile_id).maybeSingle(),
+          supabase.from('job_assignments').select('id,status').eq('job_id', row.job_id).eq('technician_id', row.profile_id).maybeSingle()
         ]);
 
-        if (jobErr || profErr) {
+        if (jobErr || profErr || membershipError) {
           console.warn('⚠️ Auto-assign: job/profile fetch error', { jobErr, profErr });
           await supabase.from('staffing_events').insert({
             staffing_request_id: rid,
             event: 'auto_assign_prereq_error',
-            meta: { jobErr, profErr }
+            meta: { jobErr, profErr, membershipError }
           });
         } else if (job && prof) {
           await supabase.from('staffing_events').insert({
@@ -623,7 +624,7 @@ serve(async (req) => {
           // 5) Check for conflicts before auto-assigning
           const targetDate = (row as any).target_date ?? null;
           const isSingleDay = (row as any).single_day ?? false;
-          const conflictCheck = detectConflictForAssignment({
+          const conflictCheck = detectConflictForStaffingDates({
             targetDate,
             existingAssignmentWindows,
             jobInfo: job ? {
@@ -636,7 +637,7 @@ serve(async (req) => {
             jobId: row.job_id,
             jobStartTime: job?.start_time ?? null,
             jobEndTime: job?.end_time ?? null,
-          });
+          }, acceptedDates);
 
           if (conflictCheck.conflict) {
             console.warn('⚠️ Auto-assign skipped due to conflict', conflictCheck.meta);
@@ -656,25 +657,17 @@ serve(async (req) => {
               assignment_date: targetDate,
             });
 
-            // Prepare assignment upsert object
-            // NOTE: single_day and assignment_date are deprecated but still included for backwards compatibility
-            // as the matrix still reads these fields. They should eventually be removed once matrix is fully migrated.
+            // Preserve existing coverage; legacy scope fields are only set for new membership.
             const assignmentData: any = {
-              job_id: row.job_id,
-              technician_id: row.profile_id,
-              status: 'confirmed',
               assigned_by: row.requested_by ?? null,
               assigned_at: new Date().toISOString(),
               assignment_source: 'staffing',
               response_time: new Date().toISOString(),
-              single_day: isSingleDay,
-              assignment_date: isSingleDay && targetDate ? targetDate : null,
               ...rolePatch
             };
 
-          const { error: assignUpsertErr } = await supabase
-            .from('job_assignments')
-            .upsert(assignmentData, { onConflict: 'job_id,technician_id' });
+          const { error: assignUpsertErr } = await persistStaffingMembership(
+            supabase, row.job_id, row.profile_id, existingMembership, acceptedDates, assignmentData);
 
           if (assignUpsertErr) {
             console.error('❌ job_assignments upsert failed', assignUpsertErr);
@@ -697,79 +690,8 @@ serve(async (req) => {
               console.log('⏭️ Skipping timesheet creation for dryhire job');
             } else {
               const isScheduleOnly = jobType === 'tourdate';
-              const timesheetRows: Array<{ job_id: string; technician_id: string; date: string; is_schedule_only: boolean; source: string }> = [];
-
-              // Collect all confirmed dates
-              if ((row as any)?.batch_id) {
-                // Batch: use already-updated batch rows from the status update above
-                // (updatedBatchRows was populated at line 173 with all updated rows)
-                const batchRows = updatedBatchRows || [];
-
-                if (!updatedBatchRows || updatedBatchRows.length === 0) {
-                  console.warn('⚠️ No batch rows available for timesheet creation', {
-                    batch_id: (row as any).batch_id,
-                    job_id: row.job_id,
-                    profile_id: row.profile_id
-                  });
-                  await supabase.from('staffing_events').insert({
-                    staffing_request_id: rid,
-                    event: 'batch_timesheet_no_rows',
-                    meta: { batch_id: (row as any).batch_id }
-                  });
-                }
-
-                for (const br of batchRows) {
-                  if (br.target_date && typeof br.target_date === 'string') {
-                    timesheetRows.push({
-                      job_id: row.job_id,
-                      technician_id: row.profile_id,
-                      date: br.target_date,
-                      is_schedule_only: isScheduleOnly,
-                      source: 'staffing'
-                    });
-                  }
-                }
-              } else {
-                // Single request: check if it's for a specific date or whole job
-                const targetDate = (row as any).target_date;
-                const isSingleDay = (row as any).single_day;
-
-                if (isSingleDay && targetDate) {
-                  // Single day confirmation
-                  timesheetRows.push({
-                    job_id: row.job_id,
-                    technician_id: row.profile_id,
-                    date: targetDate,
-                    is_schedule_only: isScheduleOnly,
-                    source: 'staffing'
-                  });
-                } else if (job?.start_time && job?.end_time) {
-                  // Whole job confirmation - create timesheets for all days
-                  const jobStart = new Date(job.start_time);
-                  const jobEnd = new Date(job.end_time);
-
-                  // Use Spain timezone (Europe/Madrid) to avoid timezone bugs
-                  // E.g., a job at 00:00 CET should create a timesheet for that day, not the previous day
-                  const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: 'Europe/Madrid',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                  });
-
-                  for (let d = new Date(jobStart); d <= jobEnd; d.setDate(d.getDate() + 1)) {
-                    // Format date in Spanish timezone (en-CA gives YYYY-MM-DD format)
-                    const dateStr = spanishDateFormatter.format(d);
-                    timesheetRows.push({
-                      job_id: row.job_id,
-                      technician_id: row.profile_id,
-                      date: dateStr,
-                      is_schedule_only: isScheduleOnly,
-                      source: 'staffing'
-                    });
-                  }
-                }
-              }
+              const datesToActivate = acceptedDates ?? getLegacyStaffingSpanDates(job.start_time, job.end_time);
+              const timesheetRows = buildStaffingTimesheets(row.job_id, row.profile_id, datesToActivate, isScheduleOnly);
 
               // Create all timesheets in one batch
               if (timesheetRows.length > 0) {

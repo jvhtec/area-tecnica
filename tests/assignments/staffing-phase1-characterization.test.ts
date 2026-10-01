@@ -6,6 +6,8 @@ const readRepoFile = (path: string) => readFileSync(join(process.cwd(), path), "
 
 const sendStaffingEmail = readRepoFile("supabase/functions/send-staffing-email/index.ts");
 const staffingClick = readRepoFile("supabase/functions/staffing-click/index.ts");
+const requestPersistence = readRepoFile("supabase/functions/send-staffing-email/persistRequests.ts");
+const assignmentDates = readRepoFile("supabase/functions/staffing-click/assignmentDates.ts");
 const staffingOrchestrator = readRepoFile("supabase/functions/staffing-orchestrator/index.ts");
 const campaignFinalization = readRepoFile("supabase/functions/staffing-orchestrator/campaignFinalization.ts");
 const staffingSweeper = readRepoFile("supabase/functions/staffing-sweeper/index.ts");
@@ -33,21 +35,10 @@ function expectOrdered(source: string, earlier: string, later: string) {
 describe("Staffing Phase 1 characterization", () => {
   describe("request persistence and delivery ordering", () => {
     it("awaits real batch and single-request writes before Email/WhatsApp delivery", () => {
-      // Inspect executable operations rather than section comments: a refactor
-      // must not make external delivery run before either persistence branch.
-      const batchInsert = indexOrFail(
-        sendStaffingEmail,
-        "const firstInsert = await supabase.from('staffing_requests').insert({",
-      );
-      const existingBatchUpdate = indexOrFail(
-        sendStaffingEmail,
-        "const upd = await supabase",
-        indexOrFail(sendStaffingEmail, "// Reuse existing row: refresh token + expiry + batch association."),
-      );
-      const singleInsert = indexOrFail(
-        sendStaffingEmail,
-        'const insertRes = await supabase.from("staffing_requests").insert({',
-      );
+      // Persistence is shared by singles/batches, including exact-scope resends.
+      const persistence = indexOrFail(sendStaffingEmail, "await persistDateScopedRequests(");
+      expect(requestPersistence).toContain("await client.from('staffing_requests').insert(rows)");
+      expect(requestPersistence).toContain("await client.from('staffing_requests').update({");
       const whatsappDelivery = indexOrFail(
         sendStaffingEmail,
         "const res = await fetchWithTimeout(attempt.url,",
@@ -57,10 +48,8 @@ describe("Staffing Phase 1 characterization", () => {
         "const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload)",
       );
 
-      for (const persist of [batchInsert, existingBatchUpdate, singleInsert]) {
-        expect(persist).toBeLessThan(whatsappDelivery);
-        expect(persist).toBeLessThan(emailDelivery);
-      }
+      expect(persistence).toBeLessThan(whatsappDelivery);
+      expect(persistence).toBeLessThan(emailDelivery);
     });
 
     it("returns a delivery error without rolling back the persisted staffing request", () => {
@@ -137,7 +126,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("can retain a confirmed offer when a post-response conflict blocks assignment", () => {
       const responseWrite = indexOrFail(staffingClick, ".update({ status: newStatus })");
       const conflictBranch = indexOrFail(staffingClick, "if (conflictCheck.conflict)");
-      const assignmentWrite = indexOrFail(staffingClick, ".from('job_assignments')");
+      const assignmentWrite = indexOrFail(staffingClick, "await persistStaffingMembership(");
 
       expect(responseWrite).toBeLessThan(conflictBranch);
       expect(conflictBranch).toBeLessThan(assignmentWrite);
@@ -153,7 +142,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("writes the job assignment before creating its timesheets", () => {
       expectOrdered(
         staffingClick,
-        ".upsert(assignmentData, { onConflict: 'job_id,technician_id' })",
+        "await persistStaffingMembership(",
         ".upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' })",
       );
     });
@@ -178,7 +167,8 @@ describe("Staffing Phase 1 characterization", () => {
       expect(staffingClick).toContain("if (jobType === 'dryhire')");
       expect(staffingClick).toContain("Skipping timesheet creation for dryhire job");
       expect(staffingClick).toContain("const isScheduleOnly = jobType === 'tourdate'");
-      expect(staffingClick).toContain("is_schedule_only: isScheduleOnly");
+      expect(staffingClick).toContain("buildStaffingTimesheets(row.job_id, row.profile_id, datesToActivate, isScheduleOnly)");
+      expect(assignmentDates).toContain("is_schedule_only: isScheduleOnly");
     });
 
     it("treats Flex synchronization after staffing acceptance as best effort", () => {
@@ -387,7 +377,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("blocks a failed or incomplete mandatory timesheet check before persisting a request", () => {
       const verificationBlock = sendStaffingEmail.slice(
         indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
-        indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
+        indexOrFail(sendStaffingEmail, "await persistDateScopedRequests("),
       );
       expect(verificationBlock).toContain("classifyTimesheetVerification(existingTimesheets, timesheetErr)");
       const unavailableBranch = verificationBlock.slice(
@@ -403,7 +393,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("blocks a request when there are no verifiable dates", () => {
       const verificationBlock = sendStaffingEmail.slice(
         indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
-        indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
+        indexOrFail(sendStaffingEmail, "await persistDateScopedRequests("),
       );
       expect(verificationBlock).toContain("if (datesToCheck.length === 0)");
       expect(verificationBlock).toContain("staffing_email.timesheet_check_has_no_verifiable_dates");

@@ -294,8 +294,12 @@ export function useStaffingMatrixStatuses(
       // Legacy whole-job requests did not persist their dates. Once an offer
       // was confirmed, active scheduled dates are the available evidence of
       // accepted coverage; extending the job must not extend that consent.
-      const completedLegacyPairs = new Set(reqRows.filter(r => !r.single_day && r.phase === 'offer' && r.status === 'confirmed')
-        .map(r => `${r.job_id}:${r.profile_id}`))
+      const completedLegacyPairs = new Map<string, number>()
+      reqRows.filter(r => !r.single_day && r.phase === 'offer' && r.status === 'confirmed').forEach(r => {
+        const key = `${r.job_id}:${r.profile_id}`
+        const created = Date.parse(r.created_at ?? r.updated_at ?? '') || 0
+        completedLegacyPairs.set(key, Math.max(completedLegacyPairs.get(key) ?? 0, created))
+      })
       const scheduledDates = new Map<string, Set<string>>()
       scheduledAssignments.filter(a => a.status === 'confirmed').forEach(a => {
         const key = `${a.job_id}:${a.technician_id}`
@@ -333,7 +337,11 @@ export function useStaffingMatrixStatuses(
               const snapshot = r.id ? requestDates.get(r.id) : undefined
               if (snapshot) return snapshot.has(dStr)
               const pair = `${r.job_id}:${r.profile_id}`
-              if (completedLegacyPairs.has(pair)) return scheduledDates.get(pair)?.has(dStr) ?? false
+              const completedAt = completedLegacyPairs.get(pair)
+              const created = Date.parse(r.created_at ?? r.updated_at ?? '') || 0
+              const belongsToCompletedCycle = r.status === 'confirmed' && completedAt !== undefined &&
+                (r.phase === 'offer' || created <= completedAt)
+              if (belongsToCompletedCycle) return scheduledDates.get(pair)?.has(dStr) ?? false
               const job = jobLookup.get(r.job_id)
               if (!job) return false
               // dStr is a Madrid day, so the job bounds have to be Madrid days too.
