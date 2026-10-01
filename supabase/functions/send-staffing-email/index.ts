@@ -17,6 +17,18 @@ import {
   HttpError,
   readBoundedJsonObject,
 } from "../_shared/http.ts";
+import { classifyTimesheetVerification } from "./timesheetVerification.ts";
+
+// Return a retryable error before creating or delivering any staffing request.
+function scheduleVerificationUnavailableResponse(): Response {
+  return new Response(JSON.stringify({
+    error: "Unable to verify technician bookings. Please retry.",
+    details: { conflict_type: "verification_unavailable", retryable: true },
+  }), {
+    status: 503,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 // Inlined from roles.ts for dashboard deployment compatibility
 const CODE_TO_LABEL: Record<string, string> = {
@@ -949,13 +961,7 @@ serve(createHttpHandler(async (req) => {
             if (conflictErr) {
               logEvent('warn', 'staffing_email.conflict_check_failed');
               if (shouldRequireNoConflicts) {
-                return new Response(JSON.stringify({
-                  error: 'Unable to verify technician availability',
-                  details: conflictErr,
-                }), {
-                  status: 500,
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
+                return scheduleVerificationUnavailableResponse();
               }
             } else if (conflictResult) {
               const hardConflicts = Array.isArray(conflictResult.hardConflicts) ? conflictResult.hardConflicts : [];
@@ -1017,6 +1023,10 @@ serve(createHttpHandler(async (req) => {
             logEvent('info', 'staffing_email.no_conflicts_detected_proceeding_to_send_email');
           }
         } catch (conflictCheckErr) {
+          if (shouldRequireNoConflicts) {
+            logEvent('error', 'staffing_email.strict_conflict_check_threw_blocking_send');
+            return scheduleVerificationUnavailableResponse();
+          }
           logEvent('warn', 'staffing_email.conflict_check_encountered_an_error_continuing_to_send_email');
         }
       }
@@ -1042,6 +1052,11 @@ serve(createHttpHandler(async (req) => {
           logEvent('info', 'staffing_email.whole_span_request_detected_checking_dates_from_job_span');
         }
 
+        if (datesToCheck.length === 0) {
+          logEvent('error', 'staffing_email.timesheet_check_has_no_verifiable_dates');
+          return scheduleVerificationUnavailableResponse();
+        }
+
         if (datesToCheck.length > 0) {
           // Check if technician already has ACTIVE timesheets for these exact dates
           // Voided timesheets (is_active = false) don't count as conflicts
@@ -1053,11 +1068,13 @@ serve(createHttpHandler(async (req) => {
             .neq('job_id', job_id)
             .eq('is_active', true); // Only check active timesheets
 
-          if (timesheetErr) {
-            logEvent('warn', 'staffing_email.timesheet_check_failed_continuing');
-          } else if (existingTimesheets && existingTimesheets.length > 0) {
+          const verification = classifyTimesheetVerification(existingTimesheets, timesheetErr);
+          if (verification.kind === "unavailable") {
+            logEvent('error', 'staffing_email.timesheet_check_failed_blocking_send');
+            return scheduleVerificationUnavailableResponse();
+          } else if (verification.kind === "conflict") {
             // Found actual timesheet conflicts - this is a real double-booking
-            const conflictDates = existingTimesheets.map(ts => ({
+            const conflictDates = verification.rows.map(ts => ({
               date: ts.date,
               job_title: (ts.jobs as any)?.title || 'Unknown Job'
             }));
@@ -1085,7 +1102,8 @@ serve(createHttpHandler(async (req) => {
           }
         }
       } catch (timesheetCheckErr) {
-        logEvent('warn', 'staffing_email.timesheet_check_encountered_an_error_continuing');
+        logEvent('error', 'staffing_email.timesheet_check_threw_blocking_send');
+        return scheduleVerificationUnavailableResponse();
       }
 
       // Step 3: Determine request id (rid) and batch shape
