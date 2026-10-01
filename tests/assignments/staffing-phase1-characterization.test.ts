@@ -390,7 +390,10 @@ describe("Staffing Phase 1 characterization", () => {
         indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
       );
       expect(verificationBlock).toContain("classifyTimesheetVerification(existingTimesheets, timesheetErr)");
-      expect(verificationBlock).toMatch(/verification.kind === "unavailable"[\\s\\S]*?return scheduleVerificationUnavailableResponse\\(\\)/);
+      expectOrdered(verificationBlock,
+        'if (verification.kind === "unavailable")',
+        "return scheduleVerificationUnavailableResponse()",
+      );
       expect(verificationBlock).toContain("staffing_email.timesheet_check_threw_blocking_send");
       expect(verificationBlock).not.toContain("timesheet_check_failed_continuing");
       expect(sendStaffingEmail).toContain("status: 503");
@@ -410,7 +413,12 @@ describe("Staffing Phase 1 characterization", () => {
         indexOrFail(sendStaffingEmail, "// Step 2b: Enhanced conflict check"),
         indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
       );
-      expect(check).toMatch(/catch \\(conflictCheckErr\\) {[\\s\\S]*?if \\(shouldRequireNoConflicts\\) {[\\s\\S]*?return scheduleVerificationUnavailableResponse\\(\\)/);
+      const errorHandler = check.slice(indexOrFail(check, "} catch (conflictCheckErr) {"));
+      expectOrdered(errorHandler,
+        "if (shouldRequireNoConflicts) {",
+        "return scheduleVerificationUnavailableResponse()",
+      );
+      expect(errorHandler).toContain("staffing_email.strict_conflict_check_threw_blocking_send");
       expect(check).toContain("staffing_email.conflict_check_encountered_an_error_continuing_to_send_email");
     });
   });
