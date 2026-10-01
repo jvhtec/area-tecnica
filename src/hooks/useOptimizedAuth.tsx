@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { isNetworkFailure, sessionOrPersisted } from "@/lib/offline-session";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import type { UserRole } from "@/types/user";
 import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
@@ -44,7 +43,6 @@ export const useOptimizedAuth = () => {
 export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { refreshSubscriptions, invalidateQueries } = useSubscriptionContext();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -323,9 +321,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           });
         }
 
-        refreshSubscriptions();
-        invalidateQueries();
-
+        // A new token changes no data, and supabase-js hands it to the open
+        // realtime channels itself (realtime.setAuth on TOKEN_REFRESHED).
+        // Rebuilding every channel and refetching every query here made each
+        // refresh look like a reload. Coming back online is resynced by AppInit.
         return refreshedSession;
       }
 
@@ -335,7 +334,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.error("Exception in refreshSession:", error);
       return null;
     }
-  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries, clearProfileCache, applySession, boundary]);
+  }, [fetchUserProfile, navigate, user, tokenManager, toast, clearProfileCache, applySession, boundary]);
 
   const resolveCurrentAuditUserId = useCallback(async (): Promise<string | null> => {
     if (user?.id) {

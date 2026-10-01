@@ -10,6 +10,7 @@ import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isAdminRole } from '@/utils/permissions';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+import { getRealtimeConnectionStatus } from '@/lib/enhanced-supabase-client';
 import type { SubscriptionQueryKey } from '@/lib/unified-subscription-support';
 import {
   GLOBAL_SUBSCRIPTION_TABLES,
@@ -135,15 +136,17 @@ export function useEnhancedRouteSubscriptions() {
         wasInactive.current = true;
         console.log(`Page was inactive for ${timeSinceLastActive}ms, refreshing subscriptions`);
 
-        // Force refresh all subscriptions
         const tableNames = [...status.requiredTables];
         if (tableNames.length > 0) {
-          manager.forceRefreshSubscriptions(tableNames);
+          // Events may have been missed while the tab was throttled, so the
+          // on-screen queries refetch — in the background, over the data
+          // already shown, with no toast. The channels are only rebuilt when
+          // they actually dropped: a healthy socket has already rejoined, and
+          // tearing it down again just opens a fresh gap.
+          if (getRealtimeConnectionStatus() !== 'CONNECTED') {
+            manager.forceRefreshSubscriptions(tableNames);
+          }
           multiTabCoordinator.invalidateQueries();
-
-          toast.info("Actualizando datos tras inactividad", {
-            description: "Reconectando actualizaciones en tiempo real..."
-          });
         }
       }
 

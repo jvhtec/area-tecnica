@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
     requestSubscriptions: vi.fn(),
     invalidateQueries: vi.fn(),
     lastRefreshTime: Date.now(),
+    realtimeStatus: "CONNECTED" as "CONNECTED" | "CONNECTING" | "DISCONNECTED",
     coordinator: {
       getIsLeader: vi.fn(() => true),
       requestSubscriptions: vi.fn(),
@@ -60,6 +61,10 @@ vi.mock("@/hooks/useOptimizedAuth", () => ({
   useOptimizedAuth: () => ({ userRole: "management" }),
 }));
 
+vi.mock("@/lib/enhanced-supabase-client", () => ({
+  getRealtimeConnectionStatus: () => mocks.realtimeStatus,
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     info: vi.fn(),
@@ -68,6 +73,9 @@ vi.mock("sonner", () => ({
 }));
 
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
+import { APP_RUNTIME_EVENTS, emitAppRuntimeEvent } from "@/runtime/app-runtime-events";
+import { toast } from "sonner";
+import { act } from "@testing-library/react";
 
 function Harness(): React.JSX.Element | null {
   useEnhancedRouteSubscriptions();
@@ -91,6 +99,7 @@ const renderHookHarness = (route: string) => {
 describe("useEnhancedRouteSubscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.realtimeStatus = "CONNECTED";
     mocks.coordinator.getIsLeader.mockReturnValue(true);
     mocks.manager.getSubscriptionsByTable.mockReturnValue({
       profiles: ["profiles-subscription"],
@@ -206,5 +215,44 @@ describe("useEnhancedRouteSubscriptions", () => {
 
     expect(mocks.coordinator.releaseSubscriptions).toHaveBeenCalledWith("/dashboard");
     expect(mocks.manager.cleanupRouteDependentSubscriptions).not.toHaveBeenCalled();
+  });
+
+  const resumeAfter = (hiddenDurationMs: number) => {
+    act(() => {
+      emitAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, { at: Date.now(), hiddenDurationMs });
+    });
+  };
+
+  it("refetches quietly after a long absence, keeping a healthy realtime connection", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds the channels after a long absence only when realtime dropped", async () => {
+    mocks.realtimeStatus = "DISCONNECTED";
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("does nothing after a short absence", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(30 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
   });
 });

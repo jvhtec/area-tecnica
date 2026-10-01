@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TokenManager } from "@/lib/token-manager";
 import {
   UnifiedSubscriptionManager,
   type SubscriptionDebugEntry,
@@ -124,18 +123,9 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
 
-  useEffect(() => {
-    const tokenManager = TokenManager.getInstance();
-    const unsubscribe = tokenManager.subscribe(() => {
-      console.log("Token refreshed, updating subscriptions");
-      manager.reestablishSubscriptions();
-      manager.markRefreshed();
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [manager]);
+  // No resubscribe on token refresh: supabase-js already moves the open
+  // channels onto the new token (realtime.setAuth on TOKEN_REFRESHED), and
+  // tearing every channel down hourly dropped events and refetched queries.
 
   const refreshSubscriptions = useCallback(() => {
     manager.reestablishSubscriptions();
