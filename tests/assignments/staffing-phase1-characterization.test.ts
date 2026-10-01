@@ -384,10 +384,43 @@ describe("Staffing Phase 1 characterization", () => {
       expect(sendStaffingEmail).toContain("status: 409");
     });
 
-    it("currently continues if the exact-timesheet collision query itself throws", () => {
-      expect(sendStaffingEmail).toContain(
-        "staffing_email.timesheet_check_encountered_an_error_continuing",
+    it("blocks a failed or incomplete mandatory timesheet check before persisting a request", () => {
+      const verificationBlock = sendStaffingEmail.slice(
+        indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
+        indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
       );
+      expect(verificationBlock).toContain("classifyTimesheetVerification(existingTimesheets, timesheetErr)");
+      const unavailableBranch = verificationBlock.slice(
+        indexOrFail(verificationBlock, 'if (verification.kind === "unavailable")'),
+        indexOrFail(verificationBlock, '} else if (verification.kind === "conflict")'),
+      );
+      expect(unavailableBranch).toContain("return scheduleVerificationUnavailableResponse()");
+      expect(verificationBlock).toContain("staffing_email.timesheet_check_threw_blocking_send");
+      expect(verificationBlock).not.toContain("timesheet_check_failed_continuing");
+      expect(sendStaffingEmail).toContain("status: 503");
+    });
+
+    it("blocks a request when there are no verifiable dates", () => {
+      const verificationBlock = sendStaffingEmail.slice(
+        indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
+        indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
+      );
+      expect(verificationBlock).toContain("if (datesToCheck.length === 0)");
+      expect(verificationBlock).toContain("staffing_email.timesheet_check_has_no_verifiable_dates");
+    });
+
+    it("blocks strict recommendation sends when the enhanced conflict RPC throws", () => {
+      const check = sendStaffingEmail.slice(
+        indexOrFail(sendStaffingEmail, "// Step 2b: Enhanced conflict check"),
+        indexOrFail(sendStaffingEmail, "// Step 2c: Hard block for actual timesheet conflicts"),
+      );
+      const errorHandler = check.slice(indexOrFail(check, "} catch (conflictCheckErr) {"));
+      expectOrdered(errorHandler,
+        "if (shouldRequireNoConflicts) {",
+        "return scheduleVerificationUnavailableResponse()",
+      );
+      expect(errorHandler).toContain("staffing_email.strict_conflict_check_threw_blocking_send");
+      expect(check).toContain("staffing_email.conflict_check_encountered_an_error_continuing_to_send_email");
     });
   });
 
