@@ -32,6 +32,7 @@ import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix
 import {
   assignmentStatusLabel,
   availabilityStatusLabel,
+  isStaffingDeclined,
   normalizeStatus,
   offerStatusLabel,
 } from '@/components/matrix/optimized-matrix-cell/helpers';
@@ -206,6 +207,7 @@ export const MatrixMobileCellSheet = ({
   const isInvited = assignmentStatus === 'invited';
   const isDeclined = assignmentStatus === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
+  const staffingDeclined = isStaffingDeclined(staffingStatus);
   const jobId: string | undefined = assignment?.job_id ?? undefined;
 
   const cellState = resolveMatrixCellState({
@@ -237,7 +239,7 @@ export const MatrixMobileCellSheet = ({
     : undefined;
 
   const staffingActions: SheetAction[] = [];
-  if (!hasAssignment && !isUnavailable && !isFridge) {
+  if (!hasAssignment && !isUnavailable && !isFridge && !staffingDeclined) {
     const availabilitySettled = staffingStatus?.availability_status === 'confirmed';
     if (!availabilitySettled) {
       staffingActions.push({
@@ -274,7 +276,7 @@ export const MatrixMobileCellSheet = ({
   }
 
   const inFlightActions: SheetAction[] = [];
-  if (staffingStatus?.availability_status) {
+  if (!staffingDeclined && staffingStatus?.availability_status) {
     inFlightActions.push({
       id: 'retry-availability',
       label: 'Reenviar solicitud de disponibilidad',
@@ -300,7 +302,7 @@ export const MatrixMobileCellSheet = ({
       },
     });
   }
-  if (staffingStatus?.offer_status) {
+  if (!staffingDeclined && staffingStatus?.offer_status) {
     inFlightActions.push({
       id: 'retry-offer',
       label: 'Reenviar oferta',

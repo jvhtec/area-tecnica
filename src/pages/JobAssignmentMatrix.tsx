@@ -15,6 +15,8 @@ import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageCont
 import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
 import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
+import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
+import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -409,7 +411,11 @@ export default function JobAssignmentMatrix() {
     selectedDepartment,
   ]);
 
-  const jobIds = React.useMemo(() => yearJobs.map((j: any) => j.id).filter(Boolean), [yearJobs]);
+  const todayKey = formatMadridDateKey(new Date());
+  const staffingJobs = useMemo(() => yearJobs.filter((job: MatrixJob) =>
+    getScheduledWorkDateKeys(job).some((dateKey) => dateKey >= todayKey),
+  ), [yearJobs, todayKey]);
+  const jobIds = React.useMemo(() => staffingJobs.map((job: MatrixJob) => job.id).filter(Boolean), [staffingJobs]);
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
 
   const staffingReminderQuery = useQuery({
@@ -459,9 +465,9 @@ export default function JobAssignmentMatrix() {
     if (!summaries.length) return [];
 
     const jobTitleMap = new Map<string, string>(
-      yearJobs.map((job: any) => [job.id, job.title || 'Trabajo sin título'])
+      staffingJobs.map((job: MatrixJob) => [job.id, job.title || 'Trabajo sin título'])
     );
-    const jobOrder = yearJobs.map((job: any) => job.id);
+    const jobOrder = staffingJobs.map((job: MatrixJob) => job.id);
 
     const assignmentCounts = new Map<string, number>();
 
@@ -537,7 +543,7 @@ export default function JobAssignmentMatrix() {
     });
 
     return ordered;
-  }, [staffingReminderQuery.data, yearJobs]);
+  }, [staffingReminderQuery.data, staffingJobs]);
 
   const outstandingHash = useMemo(() => (outstandingJobs.length ? JSON.stringify(outstandingJobs) : null), [outstandingJobs]);
 

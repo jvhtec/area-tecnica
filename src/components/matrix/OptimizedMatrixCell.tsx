@@ -15,6 +15,7 @@ import { MatrixCellStaffingBadges } from '@/components/matrix/optimized-matrix-c
 import {
   assignmentStatusLabel,
   availabilityStatusLabel,
+  isStaffingDeclined,
   normalizeStatus,
   offerStatusLabel,
 } from '@/components/matrix/optimized-matrix-cell/helpers';
@@ -289,7 +290,7 @@ export const OptimizedMatrixCell = memo(({
   // On touch the four-icon cluster is gone: it never had room for real tap
   // targets, and every one of its actions now lives in the action sheet.
   const hasVisibleStaffingAction =
-    !mobile && (showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp);
+    !mobile && !isStaffingDeclined(staffingStatus) && (showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp);
 
   // Corner budget, so nothing stacks on top of anything else:
   //   top-left     status indicators (fridge / declined), side by side

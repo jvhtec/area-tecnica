@@ -427,6 +427,112 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getByTitle('Enviar oferta por WhatsApp')).toBeInTheDocument();
   });
 
+  it.each([
+    { availability_status: 'declined', offer_status: null },
+    { availability_status: 'confirmed', offer_status: 'declined' },
+    { availability_status: 'declined', offer_status: 'pending' },
+    { availability_status: 'pending', offer_status: 'declined' },
+    { availability_status: 'declined', offer_status: 'declined' },
+  ])('keeps declined staffing indicators without any staffing controls: %j', (staffingStatus) => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+        staffingStatusByDateProvided={staffingStatus}
+      />
+    );
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    const declinedBadge = screen.getByText(staffingStatus.availability_status === 'declined' ? 'A:✗' : 'O:✗');
+    expect(declinedBadge.closest('button')).toBeNull();
+    if (!staffingStatus.offer_status || staffingStatus.offer_status === 'declined') {
+      expect(screen.getByText('Rechazada')).toBeInTheDocument();
+    }
+    expect(onClick).not.toHaveBeenCalled();
+    expect(requiredCellProps.sendStaffingEmail).not.toHaveBeenCalled();
+    expect(requiredCellProps.cancelStaffing).not.toHaveBeenCalled();
+  });
+
+  it('preserves assignment confirmation, editing and removal controls when staffing is declined', () => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={{ ...mockAssignment, status: 'invited' }}
+        staffingStatusProvided={{ availability_status: 'declined', offer_status: 'pending' }}
+        allowDirectAssign
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    expect(screen.queryByTitle('Reintentar solicitud de disponibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Cancelar oferta')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Eliminar asignación')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Confirmar'));
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'confirm', undefined);
+    fireEvent.click(screen.getByTitle('Rechazar'));
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'decline', undefined);
+    fireEvent.click(getCellElement());
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'assign', undefined);
+  });
+
+  it('keeps mark-unavailable available on a declined staffing cell', () => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        staffingStatusByDateProvided={{ availability_status: 'declined', offer_status: null }}
+        allowMarkUnavailable
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    fireEvent.click(getCellElement());
+    expect(onClick).toHaveBeenCalledWith('tech-1', mockDate, 'toggle-unavailable', undefined);
+  });
+
+  it.each(['pending', 'confirmed', 'expired'])('preserves non-declined staffing controls for %s', (status) => {
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        staffingStatusByDateProvided={{ availability_status: status, offer_status: status }}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTitle('Reintentar solicitud de disponibilidad')).toBeInTheDocument();
+    expect(screen.getByTitle('Cancelar solicitud de disponibilidad')).toBeInTheDocument();
+    expect(screen.getByTitle('Reintentar oferta')).toBeInTheDocument();
+    expect(screen.getByTitle('Cancelar oferta')).toBeInTheDocument();
+    expect(screen.getByTitle('Enviar oferta (progreso manual)')).toBeInTheDocument();
+    expect(screen.getByTitle('Enviar oferta por WhatsApp (progreso manual)')).toBeInTheDocument();
+  });
+
   // The remove button and the desktop staffing actions share the top-right
   // corner and the actions carry z-10, so they must never both render. The
   // other two gates already excluded assigned cells; canSendOffer did not, so a

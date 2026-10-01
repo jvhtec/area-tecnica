@@ -1,11 +1,14 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 
-import type { AssignmentLifecycleResult } from '@/components/matrix/optimized-matrix-cell/types';
+import type { AssignmentLifecycleResult, MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
 
 export const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
 
 export const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
+
+export const isStaffingDeclined = (status?: MatrixStaffingStatus | null): boolean =>
+  status?.availability_status === 'declined' || status?.offer_status === 'declined';
 
 export const formatDateTimeEs = (iso?: string | null) => {
   if (!iso) return null;

@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { cn } from '@/lib/utils';
+import { isStaffingDeclined } from '@/components/matrix/optimized-matrix-cell/helpers';
 import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
 
 /**
@@ -57,7 +58,7 @@ export const MatrixCellStaffingBadges: React.FC<MatrixCellStaffingBadgesProps> =
     handler();
   };
 
-  if (!interactive) {
+  if (!interactive || isStaffingDeclined(staffingStatus)) {
     return (
       <div className={cn(positionClass, 'z-10 flex items-center gap-1')}>
         {staffingStatus.availability_status && (
