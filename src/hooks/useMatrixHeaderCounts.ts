@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
 import { supabase } from "@/lib/supabase";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { formatMadridDateKey } from "@/utils/timezoneUtils";
 import type { MatrixJob, MatrixTimesheetAssignment } from "@/hooks/useOptimizedMatrixData";
 
@@ -39,21 +40,6 @@ interface JobSlotTotals {
 }
 
 const JOB_BATCH = 50;
-const PAGE_SIZE = 1000;
-
-type PageResult<T> = PromiseLike<{ data: T[] | null; error: unknown }>;
-
-/** Reads every page: PostgREST caps a response at max_rows (1000 by default). */
-async function fetchAllPages<T>(page: (from: number, to: number) => PageResult<T>): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await page(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    const batch = data ?? [];
-    rows.push(...batch);
-    if (batch.length < PAGE_SIZE) return rows;
-  }
-}
 
 type TimesheetRow = { id: string; job_id: string; technician_id: string };
 // A view: PostgREST types every column of it as nullable.

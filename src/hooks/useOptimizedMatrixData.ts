@@ -8,6 +8,8 @@ import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 import { addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
 import { throttle } from "@/utils/throttle";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
+import { getErrorMessage } from "@/utils/errorMessage";
 import {
   applyJobAssignmentChange,
   applyTimesheetChange,
@@ -212,19 +214,27 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   for (let i = 0; i < jobIds.length; i += batchSize) {
     const jobBatch = jobIds.slice(i, i + batchSize);
-    let query = supabase
-      .from('timesheets')
-      .select('job_id, technician_id, date, is_schedule_only, source')
-      .eq('is_active', true)
-      .in('job_id', jobBatch)
-      .in('technician_id', technicianIds)
-      .order('date', { ascending: true })
-      .limit(2000);
+    // Every page: one response stops at PostgREST's max_rows (1000), which
+    // used to drop the later days of a busy range from the grid and from the
+    // date-header counts derived from these rows. Ordered by a unique key so
+    // pages neither overlap nor skip.
+    const readBatch = fetchAllPages<TimesheetAssignmentRow>((from, to) => {
+      let query = supabase
+        .from('timesheets')
+        .select('job_id, technician_id, date, is_schedule_only, source')
+        .eq('is_active', true)
+        .in('job_id', jobBatch)
+        .in('technician_id', technicianIds);
+      if (startIso) query = query.gte('date', startIso);
+      if (endIso) query = query.lte('date', endIso);
+      return query.order('date', { ascending: true }).order('id', { ascending: true }).range(from, to);
+    });
 
-    if (startIso) query = query.gte('date', startIso);
-    if (endIso) query = query.lte('date', endIso);
-
-    promises.push(Promise.resolve(query));
+    // Same per-batch contract as before: a failed batch is logged and skipped.
+    promises.push(readBatch.then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error: { message: getErrorMessage(error), code: getErrorCode(error) } }),
+    ));
   }
 
   // Leverage materialized view for staffing status/cost rollups per job

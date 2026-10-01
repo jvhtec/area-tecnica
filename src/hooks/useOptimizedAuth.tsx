@@ -367,17 +367,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         // Offline with an expired token supabase-js reports INITIAL_SESSION with
         // no session while keeping it stored; that is not a sign-out.
         const newSession = event === 'INITIAL_SESSION' ? sessionOrPersisted(rawSession) : rawSession;
-        const sameProfileUser = isBackgroundProfileRead(appliedProfileRef.current, newSession?.user?.id);
         applySession(newSession);
 
-        if (event === 'TOKEN_REFRESHED' && sameProfileUser) {
-          // A new access token changes nothing about who the user is.
-          setIsLoading(false);
-          return;
-        }
-
         if (newSession?.user?.id) {
-          // Background profile fetch without blocking UI
+          // Still re-read on TOKEN_REFRESHED, so a role or access change made by
+          // an admin reaches a signed-in user. For a user whose profile is
+          // already applied this is a background read (isBackgroundProfileRead):
+          // no isProfileLoading, so the route guards never swap the page out.
           fetchUserProfile(newSession.user.id, event === 'INITIAL_SESSION').catch(error => {
             console.error('Auth state profile fetch failed:', error);
           });

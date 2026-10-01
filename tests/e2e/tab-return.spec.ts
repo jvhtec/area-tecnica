@@ -21,8 +21,12 @@ const today = () => {
 
 async function openMatrix(page: Page) {
   const tokenRequests: string[] = [];
+  const ownProfileReads: number[] = [];
   page.on("request", (request) => {
-    if (request.url().includes("/auth/v1/token")) tokenRequests.push(request.url());
+    const url = request.url();
+    if (url.includes("/auth/v1/token")) tokenRequests.push(url);
+    // The signed-in user's own profile read (role, department, access flags).
+    if (url.includes("/rest/v1/profiles") && url.includes("id=eq.e2e-user")) ownProfileReads.push(Date.now());
   });
 
   await page.clock.install();
@@ -84,7 +88,7 @@ async function openMatrix(page: Page) {
     (el as HTMLElement & { __e2eMarker?: boolean }).__e2eMarker = true;
     el.scrollTop = 400;
   });
-  return tokenRequests;
+  return { tokenRequests, ownProfileReads };
 }
 
 async function expectSamePage(page: Page) {
@@ -106,7 +110,8 @@ const setVisibility = (page: Page, state: "hidden" | "visible") =>
   }, state);
 
 test("switching to another tab and back keeps the page as it was", async ({ page }) => {
-  const tokenRequests = await openMatrix(page);
+  const { tokenRequests, ownProfileReads } = await openMatrix(page);
+  const profileReadsBefore = ownProfileReads.length;
 
   await setVisibility(page, "hidden");
   await page.clock.fastForward("06:00");
@@ -115,10 +120,13 @@ test("switching to another tab and back keeps the page as it was", async ({ page
   // The return refreshes the token, the trigger this guards against.
   await expect.poll(() => tokenRequests.length).toBeGreaterThan(0);
   await expectSamePage(page);
+  // The profile is still re-read after the refresh (an admin's role change has
+  // to reach a signed-in user), just without taking the page down.
+  expect(ownProfileReads.length).toBeGreaterThan(profileReadsBefore);
 });
 
 test("sitting idle through a token refresh keeps the page as it was", async ({ page }) => {
-  const tokenRequests = await openMatrix(page);
+  const { tokenRequests } = await openMatrix(page);
 
   // Past the point where the session is refreshed in the background.
   await page.clock.fastForward("58:00");

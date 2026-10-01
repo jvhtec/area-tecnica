@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/supabase', () => {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'eq', 'in', 'gte', 'lte', 'order', 'limit', 'neq', 'or']) {
+  for (const method of ['select', 'eq', 'in', 'gte', 'lte', 'order', 'limit', 'neq', 'or', 'range']) {
     builder[method] = () => builder;
   }
   builder.then = (resolve: (value: { data: unknown[]; error: null }) => unknown) =>
