@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { useDragScroll } from "@/hooks/useDragScroll";
@@ -78,7 +78,9 @@ export const useMatrixScrollState = ({
   // follows the scroll position exactly); it only adds standing DOM that every
   // style and layout pass walks. A few rows and columns cover a frame of lag.
   const overscanRows = mobile ? 4 : 5;
-  const overscanCols = mobile ? 2 : 3;
+  // Mobile keeps 4: phone columns are few and wide, and a fast swipe outruns a
+  // 2-column margin.
+  const overscanCols = mobile ? 4 : 3;
 
   const updateNavAvailability = useCallback(() => {
     if (!mobile) return;
@@ -198,6 +200,9 @@ export const useMatrixScrollState = ({
     const maxScroll = container.scrollWidth - container.clientWidth;
     scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
     container.scrollLeft = scrollPosition;
+    // Recorded so the position-restore effect keeps it instead of rewinding.
+    lastKnownScrollRef.current.left = container.scrollLeft;
+    previousMainScrollLeftRef.current = container.scrollLeft;
 
     return true;
   }, [cellWidth, dates, technicianWidth]);
@@ -211,7 +216,11 @@ export const useMatrixScrollState = ({
     }
   }, [cellWidth]);
 
-  useEffect(() => {
+  // A layout effect, so the first paint is already at today: run as a passive
+  // effect it landed after the first window was computed for scrollLeft 0,
+  // which mounted the opening columns, dropped today's column when the window
+  // shrank to the screen, and mounted it again after the jump.
+  useLayoutEffect(() => {
     if (autoScrolledRef.current) return;
     if (isInitialLoading || dates.length === 0) return;
 
@@ -226,6 +235,7 @@ export const useMatrixScrollState = ({
       if (success) {
         autoScrolledRef.current = true;
         autoScrolledCellWidthRef.current = cellWidth;
+        updateVisibleWindow();
         return;
       }
 
@@ -235,14 +245,15 @@ export const useMatrixScrollState = ({
       }
     };
 
-    timeoutId = setTimeout(attemptScroll, 50);
+    // Before paint when the scroller already has its size; otherwise retry.
+    attemptScroll();
     return () => {
       cancelled = true;
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
     };
-  }, [cellWidth, dates.length, isInitialLoading, scrollToToday]);
+  }, [cellWidth, dates.length, isInitialLoading, scrollToToday, updateVisibleWindow]);
 
   useEffect(() => {
     updateVisibleWindow();
