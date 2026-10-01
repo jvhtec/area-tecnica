@@ -720,7 +720,7 @@ describe('OptimizedMatrixCell', () => {
     const singleDayAssignment = {
       ...mockAssignment,
       single_day: true,
-      assignment_date: '2024-05-20',
+      assignment_date: '2024-05-15',
     };
 
     render(
@@ -738,6 +738,14 @@ describe('OptimizedMatrixCell', () => {
     );
 
     expect(screen.getByText(/Día único:/i)).toBeInTheDocument();
+  });
+
+  it('does not repeat a legacy single-day badge on another scheduled date', () => {
+    render(<OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+      assignment={{ ...mockAssignment, single_day: true, assignment_date: '2024-05-14' }}
+      width={160} height={60} isSelected={false} onSelect={vi.fn()} onClick={vi.fn()} />);
+    expect(screen.queryByText(/Día único:/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Test Concert')).toBeInTheDocument();
   });
 
   it('shows delete button for assignments', () => {

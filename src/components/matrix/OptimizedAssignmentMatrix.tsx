@@ -382,6 +382,10 @@ export const OptimizedAssignmentMatrix = ({
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
+      const dateKey = formatMadridDateKey(cellAction.date);
+      const existingDates = allAssignments.filter(a => a.job_id === jobId && a.technician_id === cellAction.technicianId && a.status === 'confirmed');
+      const isAddedDate = existingDates.length > 0 && !existingDates.some(a => a.date === dateKey);
+      const singleDay = isAddedDate || !!options?.singleDay;
       // If the technician already declined this job, block staffing for this job only
       const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
       if (declinedSet?.has(jobId)) {
@@ -393,7 +397,7 @@ export const OptimizedAssignmentMatrix = ({
         setOfferChannel(offerPreferredChannel ?? 'email');
         setOfferPreferredChannel(null);
         // Open offer details dialog; do not send immediately
-        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
+        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay });
         return;
       }
       // Availability: pre-check conflicts, then direct-send via intent/preference if set, else ask
@@ -401,7 +405,7 @@ export const OptimizedAssignmentMatrix = ({
         const technicianId = cellAction.technicianId;
         const conflictResult = await checkTimeConflictEnhanced(technicianId, jobId, {
           targetDateIso: formatMadridDateKey(cellAction.date),
-          singleDayOnly: !!options?.singleDay,
+          singleDayOnly: singleDay,
           includePending: true,
         });
         if (conflictResult.hasHardConflict) {
@@ -424,14 +428,14 @@ export const OptimizedAssignmentMatrix = ({
           jobId,
           profileId: technicianId,
           dateIso: formatMadridDateKey(cellAction.date),
-          singleDay: !!options?.singleDay,
+          singleDay,
           channel: defaultChannel
         });
       })();
     } else {
       // no-op
     }
-  }, [cellAction, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel]);
+  }, [cellAction, allAssignments, declinedJobsByTech, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
@@ -449,7 +453,11 @@ export const OptimizedAssignmentMatrix = ({
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
   const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, title: j.title, start_time: j.start_time, end_time: j.end_time })), [jobs]);
-  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
+  const visibleStaffingAssignments = useMemo(() => {
+    const ids = new Set(visibleTechIds);
+    return allAssignments.filter(a => ids.has(a.technician_id));
+  }, [allAssignments, visibleTechIds]);
+  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates, visibleStaffingAssignments);
   const actorIdsForTooltip = useMemo(() => {
     const ids = new Set<string>();
     allAssignments.forEach((assignment) => {

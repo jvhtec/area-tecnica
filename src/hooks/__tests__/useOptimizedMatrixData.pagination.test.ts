@@ -45,6 +45,21 @@ vi.mock("@/lib/supabase", () => {
 import { fetchMatrixTimesheetAssignments, type MatrixJob } from "@/hooks/useOptimizedMatrixData";
 
 describe("fetchMatrixTimesheetAssignments", () => {
+  it("does not label a multi-date batch as a single-day assignment", async () => {
+    const job: MatrixJob = { id: "job-1", title: "Gira", start_time: "2026-07-03T08:00:00Z", end_time: "2026-07-06T20:00:00Z", status: "Confirmado", job_type: "tour" };
+    tables.rows.timesheets = [3, 4, 5, 6].map(day => ({ id: `ts-${day}`, job_id: "job-1", technician_id: "tech-1", date: `2026-07-0${day}`, is_active: true }));
+    tables.rows.job_assignments = [{ job_id: "job-1", technician_id: "tech-1", single_day: true, assignment_date: "2026-07-03", status: "confirmed" }];
+    const rows = await fetchMatrixTimesheetAssignments({ jobIds: ["job-1"], technicianIds: ["tech-1"], jobsById: new Map([["job-1", job]]) });
+    expect(rows).toHaveLength(4);
+    expect(rows.every(row => row.single_day === false)).toBe(true);
+    // A genuine single-day assignment still carries its badge.
+    tables.rows.timesheets = tables.rows.timesheets.slice(0, 1);
+    const single = await fetchMatrixTimesheetAssignments({ jobIds: ["job-1"], technicianIds: ["tech-1"], jobsById: new Map([["job-1", job]]) });
+    expect(single[0]).toMatchObject({ single_day: true, assignment_date: "2026-07-03" });
+    const partial = await fetchMatrixTimesheetAssignments({ jobIds: ["job-1"], technicianIds: ["tech-1"], jobsById: new Map([["job-1", job]]), startDate: new Date("2026-07-03T10:00:00Z"), endDate: new Date("2026-07-03T10:00:00Z") });
+    expect(partial[0].single_day).toBe(false);
+  });
+
   it("reads every page, so a busy range keeps its later days", async () => {
     const job: MatrixJob = {
       id: "job-1", title: "Gira", start_time: "2026-10-01T08:00:00Z", end_time: "2026-12-31T20:00:00Z",

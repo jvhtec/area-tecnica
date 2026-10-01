@@ -44,6 +44,64 @@ const createWrapper = () => {
 }
 
 describe('useStaffingMatrixStatuses', () => {
+  const originalRequests = ['availability', 'offer'].map(phase => ({
+    id: `original-${phase}`, job_id: 'job-1', profile_id: 'tech-1', phase,
+    status: 'confirmed', single_day: false, target_date: null,
+    created_at: '2026-07-01T10:00:00Z', updated_at: '2026-07-02T10:00:00Z', requested_by: 'manager-1',
+  }))
+  const extendedJob = { id: 'job-1', start_time: '2026-07-02T10:00:00Z', end_time: '2026-07-06T10:00:00Z' }
+  const extendedDates = [2, 3, 4, 5, 6].map(day => new Date(`2026-07-0${day}T10:00:00Z`))
+
+  it('keeps a completed legacy whole-job cycle on its scheduled dates after extension', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests' ? originalRequests : [], error: null }))
+    const scheduled = [3, 4].map(day => ({ job_id: 'job-1', technician_id: 'tech-1', date: `2026-07-0${day}`, status: 'confirmed' }))
+    const { result } = renderHook(() => useStaffingMatrixStatuses(['tech-1'], [extendedJob], extendedDates, scheduled), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect([...result.current.data!.byDate.keys()]).toEqual(['tech-1-2026-07-03', 'tech-1-2026-07-04'])
+  })
+
+  it('shows the new request cycle only on added dates alongside the original confirmation', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    const addedRequest = { ...originalRequests[0], id: 'extension', status: 'pending', single_day: true, target_date: '2026-07-05', updated_at: '2026-07-03T10:00:00Z' }
+    fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests' ? [...originalRequests, addedRequest] : [], error: null }))
+    const scheduled = [{ job_id: 'job-1', technician_id: 'tech-1', date: '2026-07-03', status: 'confirmed' }]
+    const { result } = renderHook(() => useStaffingMatrixStatuses(['tech-1'], [extendedJob], extendedDates, scheduled), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data!.byDate.get('tech-1-2026-07-05')).toMatchObject({ availability_status: 'requested', offer_status: null })
+    expect(result.current.data!.byDate.get('tech-1-2026-07-03')).toMatchObject({ availability_status: 'confirmed', offer_status: 'confirmed' })
+    expect(result.current.data!.byDate.has('tech-1-2026-07-06')).toBe(false)
+  })
+
+  it('honors a delivery date snapshot even before confirmation', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests'
+      ? [{ ...originalRequests[0], status: 'pending' }]
+      : [
+        { staffing_request_id: 'original-availability', event: 'email_sent', created_at: '2026-07-02T10:00:00Z', meta: { status: 200, dates: ['2026-07-03', '2026-07-04', '2026-07-05'] } },
+        { staffing_request_id: 'original-availability', event: 'email_sent', created_at: '2026-07-01T10:00:00Z', meta: { status: 200, dates: ['2026-07-03', '2026-07-04'] } },
+      ], error: null }))
+    const { result } = renderHook(() => useStaffingMatrixStatuses(['tech-1'], [extendedJob], extendedDates), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect([...result.current.data!.byDate.keys()]).toEqual(['tech-1-2026-07-03', 'tech-1-2026-07-04'])
+  })
+
+  it('recomputes date statuses when the same job changes dates or scheduling changes', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    fromMock.mockImplementation(table => createQueryBuilder({ data: table === 'staffing_requests' ? originalRequests : [], error: null }))
+    const originalJob = { ...extendedJob, end_time: '2026-07-04T10:00:00Z' }
+    const originalSchedule = [{ job_id: 'job-1', technician_id: 'tech-1', date: '2026-07-03', status: 'confirmed' }]
+    const { result, rerender } = renderHook(({ jobs, scheduled }) => useStaffingMatrixStatuses(['tech-1'], jobs, extendedDates, scheduled),
+      { wrapper: createWrapper(), initialProps: { jobs: [originalJob], scheduled: originalSchedule } })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const calls = fromMock.mock.calls.length
+    rerender({ jobs: [extendedJob], scheduled: originalSchedule })
+    await waitFor(() => expect(fromMock.mock.calls.length).toBeGreaterThan(calls))
+    expect(result.current.data!.byDate.has('tech-1-2026-07-05')).toBe(false)
+    rerender({ jobs: [extendedJob], scheduled: [...originalSchedule, { ...originalSchedule[0], date: '2026-07-05' }] })
+    await waitFor(() => expect(result.current.data!.byDate.has('tech-1-2026-07-05')).toBe(true))
+  })
+
   beforeEach(() => {
     fromMock.mockReset()
     rpcMock.mockReset()

@@ -112,6 +112,11 @@ vi.mock('../optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
       <div data-testid="dates-count">{props.dates.length}</div>
       <div data-testid="jobs-count">{props.jobs.length}</div>
       <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
+      <button onClick={() => props.handleCellClick('tech-1', new Date('2024-05-02T10:00:00Z'), 'select-job-for-staffing')}>Open added date</button>
+      <button onClick={() => props.handleStaffingActionSelected('job-1', 'availability', { singleDay: false })}>Choose availability</button>
+      <button onClick={() => props.handleStaffingActionSelected('job-1', 'offer', { singleDay: false })}>Choose offer</button>
+      <div data-testid="availability-coverage">{props.availabilityDialog?.singleDay ? 'single' : 'full'}</div>
+      <div data-testid="offer-coverage">{props.cellAction?.singleDay ? 'single' : 'full'}</div>
     </div>
   ),
 }));
@@ -249,7 +254,18 @@ describe('OptimizedAssignmentMatrix', () => {
         },
       ],
       mockDates,
+      [],
     );
+  });
+
+  it.each(['availability', 'offer'])('defaults %s on an added date to that day only', async action => {
+    const user = userEvent.setup();
+    const original = { job_id: 'job-1', technician_id: 'tech-1', date: '2024-05-01', status: 'confirmed' };
+    useOptimizedMatrixDataMock.mockReturnValue({ ...useOptimizedMatrixDataMock(), allAssignments: [original] });
+    render(<OptimizedAssignmentMatrix technicians={mockTechnicians} dates={mockDates} jobs={mockJobs} />);
+    await user.click(screen.getByText('Open added date'));
+    await user.click(screen.getByText(action === 'availability' ? 'Choose availability' : 'Choose offer'));
+    await waitFor(() => expect(screen.getByTestId(`${action}-coverage`)).toHaveTextContent('single'));
   });
 
   it('shows loading state initially', () => {

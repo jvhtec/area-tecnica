@@ -433,7 +433,7 @@ export const OptimizedMatrixCell = memo(({
                   >
                     {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
                   </div>
-                  {assignment.single_day && assignment.assignment_date && (
+                  {assignment.single_day && assignment.assignment_date === formatMadridDateKey(date) && (
                     <div
                       className={cellClass('truncate text-[10px] leading-tight', !isConfirmedAssignment && 'text-muted-foreground')}
                       style={{ color: isConfirmedAssignment ? confirmedSubTextColor : undefined }}

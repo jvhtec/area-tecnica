@@ -290,6 +290,20 @@ export const fetchMatrixTimesheetAssignments = async ({
   }
 
   const rows: MatrixTimesheetAssignment[] = [];
+  const completeJobIds = new Set([...jobsById.values()].filter(job => {
+    const days = [toMadridDateKey(new Date(job.start_time)), toMadridDateKey(new Date(job.end_time)), ...(job.job_date_types ?? []).map(day => day.date)];
+    return days.every(day => (!startIso || day >= startIso) && (!endIso || day <= endIso));
+  }).map(job => job.id));
+  const scheduledDaysByPair = new Map<string, Set<string>>();
+  timesheetResults.forEach(result => {
+    if (result.error) return;
+    (result.data || []).forEach(row => {
+      const key = `${row.job_id}:${row.technician_id}`;
+      const days = scheduledDaysByPair.get(key) ?? new Set<string>();
+      days.add(row.date);
+      scheduledDaysByPair.set(key, days);
+    });
+  });
 
   timesheetResults.forEach((result) => {
     if (result.error) {
@@ -302,6 +316,7 @@ export const fetchMatrixTimesheetAssignments = async ({
       if (!job) return;
       const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
       const staffing = staffingMap.get(row.job_id);
+      const isSingleScheduledDay = completeJobIds.has(row.job_id) && scheduledDaysByPair.get(`${row.job_id}:${row.technician_id}`)?.size === 1;
       rows.push({
         job_id: row.job_id,
         technician_id: row.technician_id,
@@ -316,7 +331,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         status: meta?.status ?? null,
         assigned_at: meta?.assigned_at ?? null,
         assigned_by: meta?.assigned_by ?? null,
-        single_day: meta?.single_day ?? Boolean(meta?.assignment_date),
+        single_day: Boolean((meta?.single_day ?? Boolean(meta?.assignment_date)) && isSingleScheduledDay && meta?.assignment_date === row.date),
         assignment_date: meta?.assignment_date ?? null,
         sound_role: meta?.sound_role ?? null,
         lights_role: meta?.lights_role ?? null,
