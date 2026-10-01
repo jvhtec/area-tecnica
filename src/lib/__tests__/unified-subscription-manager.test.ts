@@ -278,4 +278,32 @@ describe("UnifiedSubscriptionManager", () => {
 
     expect(removeChannel).toHaveBeenCalledWith(refreshedChannel);
   });
+
+  it("refetches at once on a colleague's change and coalesces a burst into one trailing refetch", async () => {
+    vi.useFakeTimers();
+    const { manager, queryClient, channels } = await setupManager();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+    manager.subscribeToTable("job_assignments", ["job-assignments"], undefined, "medium");
+    const channel = channels.find((mockChannel) => mockChannel.name.startsWith("job_assignments-"));
+    const emit = () =>
+      channel?.postgresHandlers[0]({ eventType: "UPDATE", table: "job_assignments", new: { id: "a" } });
+
+    emit();
+    // No waiting: the first change refetches immediately.
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+
+    // A burst inside the window adds exactly one trailing refetch.
+    emit();
+    emit();
+    emit();
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
+
+    // Quiet after that: the next change is immediate again.
+    await vi.advanceTimersByTimeAsync(300);
+    emit();
+    expect(invalidateQueries).toHaveBeenCalledTimes(3);
+  });
 });

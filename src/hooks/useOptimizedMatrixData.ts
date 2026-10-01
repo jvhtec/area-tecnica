@@ -7,7 +7,13 @@ import { queryKeys } from "@/lib/react-query";
 import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
 import { addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
-import { debounce } from "@/utils/throttle";
+import { throttle } from "@/utils/throttle";
+import {
+  applyJobAssignmentChange,
+  applyTimesheetChange,
+  type MatrixQueryScope,
+  type RealtimeChange,
+} from "@/hooks/matrixRealtimePatches";
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 // Shared defaults while a query has no data: `= []` in the destructuring made a
 // new array per render, which rebuilt every lookup derived from it and handed
@@ -15,10 +21,10 @@ const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 const EMPTY_ASSIGNMENTS: MatrixTimesheetAssignment[] = [];
 const EMPTY_AVAILABILITY: AvailabilityDay[] = [];
 
-// Realtime bursts (a tour assignment writes one timesheet per date) collapse
-// into one refetch; maxWait keeps a busy day from postponing it indefinitely.
-const REALTIME_INVALIDATION_DEBOUNCE_MS = 400;
-const REALTIME_INVALIDATION_MAX_WAIT_MS = 2000;
+// A colleague's change refetches at once; a burst (a tour assignment writes one
+// timesheet per date) adds at most one trailing refetch per window rather than
+// one per row. Leading edge on purpose: updates must never wait for quiet.
+const REALTIME_REFETCH_WINDOW_MS = 250;
 
 function toMadridDateKey(date: Date | undefined): string {
   return date ? formatMadridDateKey(date) : '';
@@ -527,9 +533,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Realtime invalidation for availability changes
   useEffect(() => {
     if (!technicianIds.length) return;
-    const invalidateAvailability = debounce(() => {
+    const invalidateAvailability = throttle(() => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
+    }, REALTIME_REFETCH_WINDOW_MS);
     const ch2 = supabase
       .channel('rt-availability-schedules')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, invalidateAvailability)
@@ -630,11 +636,53 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     ]);
   }, [queryClient]);
 
+  // Every job the current range shows, for patches that add a day. Read through
+  // a ref so the realtime channels are not re-created when the range changes.
+  const jobsByIdRef = React.useRef(jobsById);
+  useEffect(() => {
+    jobsByIdRef.current = jobsById;
+  }, [jobsById]);
+
+  /**
+   * Apply a realtime change to every cached matrix query at once, each within
+   * what its own key covers, so a colleague's change shows on arrival rather
+   * than after the refetch round trip. The refetch still follows.
+   */
+  const patchMatrixCaches = useCallback(
+    (apply: (rows: MatrixTimesheetAssignment[], scope: MatrixQueryScope) => MatrixTimesheetAssignment[] | null) => {
+      const cached = queryClient.getQueriesData<MatrixTimesheetAssignment[]>({
+        queryKey: queryKeys.scope('optimized-matrix-assignments'),
+      });
+      cached.forEach(([key, rows]) => {
+        if (!rows) return;
+        const [, keyJobIds, keyTechnicianIds, startKey, endKey] = key as [string, string[], string[], string, string];
+        if (!Array.isArray(keyJobIds) || !Array.isArray(keyTechnicianIds)) return;
+        const jobsInKey = new Map<string, MatrixJob>();
+        keyJobIds.forEach((id) => {
+          const job = jobsByIdRef.current.get(id);
+          if (job) jobsInKey.set(id, job);
+        });
+        const next = apply(rows, {
+          jobsById: jobsInKey,
+          technicianIds: new Set(keyTechnicianIds),
+          startKey,
+          endKey,
+        });
+        if (next && next !== rows) queryClient.setQueryData(key, next);
+      });
+    },
+    [queryClient],
+  );
+
   // Realtime subscription for job_assignments table
   useEffect(() => {
-    const invalidate = debounce(() => {
+    const invalidate = throttle(() => {
       void invalidateAssignmentQueries();
-    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
+    }, REALTIME_REFETCH_WINDOW_MS);
+    const onChange = (payload: RealtimeChange) => {
+      patchMatrixCaches((rows) => applyJobAssignmentChange(rows, payload));
+      invalidate();
+    };
     const channel = supabase
       .channel('matrix-job-assignments')
       .on(
@@ -644,7 +692,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        invalidate
+        onChange
       )
       .subscribe();
 
@@ -652,15 +700,19 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       invalidate.cancel();
       supabase.removeChannel(channel);
     };
-  }, [invalidateAssignmentQueries]);
+  }, [invalidateAssignmentQueries, patchMatrixCaches]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
-    const invalidate = debounce(() => {
+    const invalidate = throttle(() => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
       // Confirmed and open-slot badges are counted off timesheets too.
       void invalidateMatrixHeaderCounts(queryClient);
-    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
+    }, REALTIME_REFETCH_WINDOW_MS);
+    const onChange = (payload: RealtimeChange) => {
+      patchMatrixCaches((rows, scope) => applyTimesheetChange(rows, payload, scope));
+      invalidate();
+    };
     const channel = supabase
       .channel('matrix-timesheets')
       .on(
@@ -670,7 +722,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'timesheets',
         },
-        invalidate
+        onChange
       )
       .subscribe();
 
@@ -678,7 +730,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       invalidate.cancel();
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, patchMatrixCaches]);
 
   const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
   const isFetching = assignmentsFetching || availabilityFetching;

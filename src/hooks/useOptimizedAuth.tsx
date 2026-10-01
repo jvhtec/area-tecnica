@@ -15,12 +15,17 @@ import { canAccessSoundVision } from "@/utils/permissions";
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from "@/runtime/app-runtime-events";
 import {
   readCachedProfile,
+  writeCachedProfile,
+  isBackgroundProfileRead,
+  keepSameAuthUser,
+  NO_APPLIED_PROFILE,
   PROFILE_CACHE_KEY,
   VALID_USER_ROLES,
   getErrorCode,
   getErrorMessage,
   getMetadataString,
   type AuthContextType,
+  type AppliedProfile,
   type AuthUser,
   type CachedProfile,
   type ProfileData,
@@ -51,11 +56,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [assignableAsTechFlag, setAssignableAsTechFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  // Whose role is currently applied. A profile read for that same user is a
-  // background refresh: it must not raise isProfileLoading, which route guards
-  // answer by swapping the whole page for a spinner — the "reload" users saw on
-  // returning to a tab, when the token refresh refetched the profile.
-  const appliedProfileRef = useRef<{ userId: string | null; role: string | null }>({ userId: null, role: null });
+  // See isBackgroundProfileRead.
+  const appliedProfileRef = useRef<AppliedProfile>(NO_APPLIED_PROFILE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tokenManager = TokenManager.getInstance();
@@ -68,7 +70,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const boundary = useMemo(() => new PrivateAuthBoundary(queryClient), [queryClient]);
   const applySession = useCallback((next: Session | null) => {
     if (boundary.acceptSession(next?.user.id ?? null)) {
-      appliedProfileRef.current = { userId: null, role: null };
+      appliedProfileRef.current = NO_APPLIED_PROFILE;
       setUserRole(null);
       setUserDepartment(null);
       setSoundVisionAccessFlag(false);
@@ -76,15 +78,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       setIsProfileLoading(false);
     }
     setSession(next);
-    // A refreshed token carries the same user; keep the object everything
-    // downstream already holds so a token refresh re-renders nothing.
-    setUser((previous) => {
-      const nextUser = next?.user ?? null;
-      if (previous && nextUser && previous.id === nextUser.id && previous.updated_at === nextUser.updated_at) {
-        return previous;
-      }
-      return nextUser;
-    });
+    // A token refresh keeps the user object, so it re-renders nothing.
+    setUser((previous) => keepSameAuthUser(previous, next?.user ?? null));
     setIsInitialized(true);
   }, [boundary]);
 
@@ -95,22 +90,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     [],
   );
 
-  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) => {
-    try {
-      const profile: CachedProfile = {
-        role,
-        department,
-        soundVisionAccess,
-        assignableAsTech,
-        userId,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
-      console.log('✅ Profile cached successfully');
-    } catch (error) {
-      console.error('Error caching profile:', error);
-    }
-  }, []);
+  const setCachedProfile = useCallback(
+    (userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) =>
+      writeCachedProfile({ userId, role, department, soundVisionAccess, assignableAsTech }),
+    [],
+  );
 
   const clearProfileCache = useCallback(() => {
     try {
@@ -126,8 +110,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
     const request = boundary.beginProfile(userId);
     if (!request) return null;
-    const background =
-      appliedProfileRef.current.userId === userId && appliedProfileRef.current.role !== null;
+    const background = isBackgroundProfileRead(appliedProfileRef.current, userId);
     const applyCachedProfile = (cached: CachedProfile): ProfileData | null => {
       if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
       appliedProfileRef.current = { userId, role: cached.role };
@@ -259,9 +242,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
-        // A background refresh that comes back empty keeps the profile the
-        // user is working with rather than locking them out mid-session.
-        if (background) return null;
+        if (background) return null; // keep the role the user is working with
         if (!request.apply(null, null, false, false)) return null;
         appliedProfileRef.current = { userId, role: null };
         setUserRole(null);
@@ -343,10 +324,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           });
         }
 
-        // A new token changes no data, and supabase-js hands it to the open
-        // realtime channels itself (realtime.setAuth on TOKEN_REFRESHED).
-        // Rebuilding every channel and refetching every query here made each
-        // refresh look like a reload. Coming back online is resynced by AppInit.
         return refreshedSession;
       }
 
@@ -390,8 +367,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         // Offline with an expired token supabase-js reports INITIAL_SESSION with
         // no session while keeping it stored; that is not a sign-out.
         const newSession = event === 'INITIAL_SESSION' ? sessionOrPersisted(rawSession) : rawSession;
-        const sameProfileUser =
-          !!newSession?.user?.id && appliedProfileRef.current.userId === newSession.user.id;
+        const sameProfileUser = isBackgroundProfileRead(appliedProfileRef.current, newSession?.user?.id);
         applySession(newSession);
 
         if (event === 'TOKEN_REFRESHED' && sameProfileUser) {

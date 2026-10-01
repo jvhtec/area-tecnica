@@ -7,12 +7,12 @@ import { UnifiedSubscriptionManager, type RealtimeChangePayload } from '@/lib/un
 
 import { queryKeys } from "@/lib/react-query";
 import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
-import { debounce } from "@/utils/throttle";
+import { throttle } from "@/utils/throttle";
 
-// One send writes a request plus its delivery events (and an activity_log row),
-// so a single action used to refetch the whole matrix three or four times over.
-const MATRIX_INVALIDATION_DEBOUNCE_MS = 400
-const MATRIX_INVALIDATION_MAX_WAIT_MS = 2000
+// One send writes a request plus its delivery events (and an activity_log row).
+// The first refetches at once; the rest of the burst adds one trailing refetch
+// instead of three or four. Leading edge: a colleague's change must not wait.
+const MATRIX_REFETCH_WINDOW_MS = 250
 
 export function useStaffingRealtime() {
   const qc = useQueryClient()
@@ -27,8 +27,8 @@ export function useStaffingRealtime() {
     console.log('🚀 Setting up staffing realtime subscriptions')
     const ownerRoute = `${location.pathname}:${ownerIdRef.current}`
 
-    // Broad matrix-wide refetches, coalesced across a burst of events.
-    const invalidateMatrixQueries = debounce(() => {
+    // Broad matrix-wide refetches: immediate, with a burst coalesced behind.
+    const invalidateMatrixQueries = throttle(() => {
       qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
@@ -36,7 +36,7 @@ export function useStaffingRealtime() {
       // mutations; remote changes arrive here, so the date-header counts have
       // to be invalidated on this path too.
       void invalidateMatrixHeaderCounts(qc)
-    }, MATRIX_INVALIDATION_DEBOUNCE_MS, { maxWait: MATRIX_INVALIDATION_MAX_WAIT_MS })
+    }, MATRIX_REFETCH_WINDOW_MS)
 
     // Listen to both staffing_requests and staffing_events tables
     subscriptionManager.subscribeToTable(

@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { LeadingEdgeScheduler } from "@/lib/leading-edge-scheduler";
 import { supabase } from "./supabase";
 import { ChannelRetryManager } from "./subscription-retry";
 
@@ -46,7 +47,7 @@ export class UnifiedSubscriptionManager {
   private connectionStatus: 'connected' | 'disconnected' | 'connecting';
   private pingChannel: any | null;
   private tableLastActivity: Map<string, number>;
-  private invalidationTimers: Map<string, number>;
+  private invalidationScheduler = new LeadingEdgeScheduler();
   private channelRetryManager: ChannelRetryManager;
   private listeners: Set<() => void>;
   private snapshot: SubscriptionSnapshot;
@@ -60,7 +61,6 @@ export class UnifiedSubscriptionManager {
     this.lastReconnectAttempt = 0;
     this.connectionStatus = 'connecting';
     this.pingChannel = null;
-    this.invalidationTimers = new Map();
     this.channelRetryManager = new ChannelRetryManager();
     this.listeners = new Set();
     this.snapshot = createInitialSubscriptionSnapshot();
@@ -301,25 +301,13 @@ export class UnifiedSubscriptionManager {
     }
   }
 
+  /** Refetch for a realtime change: immediately, with bursts coalesced (see LeadingEdgeScheduler). */
   private scheduleInvalidation(queryKey: SubscriptionQueryKey, priority: 'high' | 'medium' | 'low') {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
-    const key = hashSubscriptionQueryKey(normalizedQueryKey);
-
-    const existing = this.invalidationTimers.get(key);
-    if (existing) {
-      clearTimeout(existing);
-    }
-
-    const delay = priority === 'high' ? 50 : priority === 'medium' ? 200 : 500;
-    const timeout = window.setTimeout(() => {
-      try {
-        this.queryClient.invalidateQueries({ queryKey: normalizedQueryKey });
-      } finally {
-        this.invalidationTimers.delete(key);
-      }
-    }, delay);
-
-    this.invalidationTimers.set(key, timeout);
+    const windowMs = priority === 'high' ? 150 : priority === 'medium' ? 300 : 600;
+    this.invalidationScheduler.run(hashSubscriptionQueryKey(normalizedQueryKey), windowMs, () => {
+      this.queryClient.invalidateQueries({ queryKey: normalizedQueryKey });
+    });
   }
 
   private invalidateStaleQueries(maxAgeMs: number) {

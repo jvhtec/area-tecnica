@@ -112,7 +112,7 @@ export function useEnhancedRouteSubscriptions() {
     return () => {
       window.removeEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
     };
-  }, []);
+  }, [multiTabCoordinator]);
 
   const cleanupRouteOwner = useCallback((routeKey: string, ownerMode: RouteOwnerMode) => {
     if (ownerMode === 'leader') {
