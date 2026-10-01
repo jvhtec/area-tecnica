@@ -1,6 +1,6 @@
 # PR989 critical staffing function review
 
-Review date: 2026-10-02. Scope: `send-staffing-email` and `staffing-click`, their local date/persistence helpers, and matrix resend callers. No migration, RLS, RPC, rate calculation or production deployment changes.
+Review date: 2026-10-02 (Europe/Madrid; 2026-10-01 UTC). Scope: `send-staffing-email` and `staffing-click`, their local date/persistence helpers, and matrix resend callers. No migration, RLS, RPC, rate calculation or production deployment changes.
 
 ## Roadmap boundary
 
@@ -28,6 +28,12 @@ The initial seven resend regression cases failed against `11e966b3` without thes
 
 Final Astra closure: independently replayed the superseded-resend race (A 409, B 200, one batch hash), reran 28 focused tests, and reported no remaining introduced blockers within this scope. The reviewer did not rerun the mutating real-DB suites; those were independently executed by the orchestrator. This is review evidence, not a zero-risk guarantee.
 
+Fresh CodeRabbit review of `68c7b426` identified three additional valid issues. Assignment metadata now paginates with unique job/technician ordering; a 1,500-pair regression verifies every role and status. Staffing selection verifies confirmed active coverage outside the visible date range before opening a whole-job cycle, and stops on read errors. Legacy unsnapshotted span coverage now iterates Madrid date keys as UTC calendar days; DST and partial-day tests cover the correction. The original helper under `TZ=UTC` reproduced `24,25,25` instead of `24,25,26`; the fixed helper passes in UTC and local Madrid runs. The report date is labelled with both timezones.
+
+Astra's follow-up caught an overnight legacy conflict mismatch after correcting the calendar loop. Conflict detection and timesheet writes now use the same resolved Madrid date list, while membership persistence retains the original `acceptedDates` argument. The failing actual-handler fixture had a job ending at 00:30 Madrid and another booking on that final day; the fix preserves that booking and skips assignment while retaining the confirmed response, as required by the roadmap's response-first contract.
+
+Final follow-up closure: Astra independently reran 39 focused tests, confirmed the overnight fix and unchanged membership argument, and found no remaining introduced blockers in that narrow diff.
+
 ## Evidence and its limits
 
 `preservedMutationContracts.test.ts`, `resendCoverage.test.ts`, `clickCredentialCompatibility.test.ts`, and desktop/mobile `staffingResend.integration.test.tsx` execute actual handlers, with an in-memory PostgREST boundary and stubbed external services. Scope concurrency, cancellation, failed writes and old query/path links are exercised explicitly.
@@ -38,7 +44,7 @@ Actual pgTAP checks passed: staffing state (41), assignment lifecycle (18), staf
 
 The HTTP suite mocks authentication/rate-limit boundaries and external email/WhatsApp/Flex/push services. It uses local `service_role`; it does not replace RLS tests or verify real delivery. The database has no outbound network. The suite is opt-in and skipped by default; the new pgTAP file runs in the normal database CI suite. No claim of zero regression risk or complete overhaul readiness follows from these checks. Existing acceptance/capacity races and partial-commit failure outcomes outside this requested date fix remain roadmap work.
 
-Local validation after the review corrections: full Vitest suite 512 files / 3,223 tests passed (7 opt-in database cases skipped and separately passed); critical suites 140 + 71 passed; desktop/mobile matrix/tab-return Playwright 11 passed / 3 viewport skips. App/Edge lint, application typecheck, governance, build and bundle budget passed; CI-pinned Deno checked all 102 function modules. The first full test run overlapped several heavy checks and timed out in an unrelated file-size test; the complete rerun with `--maxWorkers=2` passed.
+Local validation after the final CodeRabbit corrections: full Vitest suite 513 files / 3,235 tests passed (7 opt-in database cases skipped, separately passed at `68c7b426` before the pure legacy-calendar correction); critical suites 140 + 71 passed; desktop/mobile matrix/tab-return Playwright 11 passed / 3 viewport skips. App/Edge lint, application typecheck, governance, build and bundle budget passed; CI-pinned Deno checked all 102 function modules. The first full test run overlapped several heavy checks and timed out in an unrelated file-size test; complete reruns with `--maxWorkers=2` passed.
 
 ## Reproduce the real database checks (PowerShell)
 

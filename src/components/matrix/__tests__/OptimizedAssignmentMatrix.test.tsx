@@ -38,6 +38,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
     useQuery: useQueryMock,
     useQueryClient: () => ({
       invalidateQueries: vi.fn(),
+      fetchQuery: (options: { queryFn: () => Promise<unknown> }) => options.queryFn(),
     }),
   };
 });
@@ -220,6 +221,22 @@ beforeEach(() => {
 });
 
 describe('OptimizedAssignmentMatrix', () => {
+  it('does not open a staffing offer when out-of-view coverage cannot be verified', async () => {
+    supabaseMock.from.mockReturnValue(createMockQueryBuilder({ data: null, error: { message: 'network unavailable' } }));
+    const user = userEvent.setup();
+    render(<OptimizedAssignmentMatrix technicians={mockTechnicians} dates={mockDates.slice(1)} jobs={mockJobs} />);
+    await user.click(screen.getByText('Open added date'));
+    await user.click(screen.getByText('Choose offer'));
+    await waitFor(() => expect(toastFn).toHaveBeenCalledWith(expect.objectContaining({ title: 'No se pudo verificar la cobertura' })));
+  });
+  it.each(['availability', 'offer'])('keeps an added %s date scoped when confirmed coverage is outside the viewport', async action => {
+    supabaseMock.from.mockImplementation(table => createMockQueryBuilder({ data: table === 'job_assignments' ? { status: 'confirmed' } : [{ date: '2024-04-30' }], error: null }));
+    const user = userEvent.setup();
+    render(<OptimizedAssignmentMatrix technicians={mockTechnicians} dates={mockDates.slice(1)} jobs={mockJobs} />);
+    await user.click(screen.getByText('Open added date'));
+    await user.click(screen.getByText(action === 'availability' ? 'Choose availability' : 'Choose offer'));
+    await waitFor(() => expect(screen.getByTestId(`${action}-coverage`)).toHaveTextContent('single'));
+  });
   it('renders with basic props', () => {
     render(
       <OptimizedAssignmentMatrix

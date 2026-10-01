@@ -246,7 +246,7 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   for (let i = 0; i < jobIds.length; i += assignmentBatchSize) {
     const jobBatch = jobIds.slice(i, i + assignmentBatchSize);
-    assignmentPromises.push(Promise.resolve(
+    const readMetadata = fetchAllPages<AssignmentMetadataRow>((from, to) =>
       supabase
         .from('job_assignments')
         // NOTE: single_day and assignment_date are deprecated after simplification migration
@@ -254,6 +254,11 @@ export const fetchMatrixTimesheetAssignments = async ({
         .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at, assigned_by')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)
+        .order('job_id', { ascending: true }).order('technician_id', { ascending: true }).range(from, to)
+    );
+    assignmentPromises.push(readMetadata.then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error: { message: getErrorMessage(error), code: getErrorCode(error) } }),
     ));
   }
 

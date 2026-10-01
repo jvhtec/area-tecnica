@@ -618,6 +618,7 @@ serve(async (req) => {
           // 5) Check for conflicts before auto-assigning
           const targetDate = (row as any).target_date ?? null;
           const isSingleDay = (row as any).single_day ?? false;
+          const datesToActivate = acceptedDates ?? getLegacyStaffingSpanDates(job.start_time, job.end_time);
           const conflictCheck = detectConflictForStaffingDates({
             targetDate,
             existingAssignmentWindows,
@@ -631,7 +632,7 @@ serve(async (req) => {
             jobId: row.job_id,
             jobStartTime: job?.start_time ?? null,
             jobEndTime: job?.end_time ?? null,
-          }, acceptedDates);
+          }, datesToActivate);
 
           if (conflictCheck.conflict) {
             console.warn('⚠️ Auto-assign skipped due to conflict', conflictCheck.meta);
@@ -684,7 +685,6 @@ serve(async (req) => {
               console.log('⏭️ Skipping timesheet creation for dryhire job');
             } else {
               const isScheduleOnly = jobType === 'tourdate';
-              const datesToActivate = acceptedDates ?? getLegacyStaffingSpanDates(job.start_time, job.end_time);
               const timesheetRows = buildStaffingTimesheets(row.job_id, row.profile_id, datesToActivate, isScheduleOnly);
 
               // Create all timesheets in one batch

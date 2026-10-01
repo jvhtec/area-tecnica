@@ -380,11 +380,35 @@ export const OptimizedAssignmentMatrix = ({
     clearGlobalSelection();
   }, [clearGlobalSelection]);
 
-  const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
+  const handleStaffingActionSelected = useCallback(async (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
       const dateKey = formatMadridDateKey(cellAction.date);
       const existingDates = allAssignments.filter(a => a.job_id === jobId && a.technician_id === cellAction.technicianId && a.status === 'confirmed');
-      const isAddedDate = existingDates.length > 0 && !existingDates.some(a => a.date === dateKey);
+      let isAddedDate = existingDates.length > 0 && !existingDates.some(a => a.date === dateKey);
+      if (existingDates.length === 0 && !options?.singleDay) {
+        try {
+          // The grid contains only visible dates. Verify coverage outside it
+          // before defaulting an extension to a whole-job solicitation.
+          isAddedDate = await qc.fetchQuery({
+            queryKey: queryKeys.scope('matrix-staffing-existing-coverage', jobId, cellAction.technicianId, dateKey),
+            staleTime: 0,
+            queryFn: async () => {
+              const [assignment, schedule] = await Promise.all([
+                dataLayerClient.from('job_assignments').select('status').eq('job_id', jobId)
+                  .eq('technician_id', cellAction.technicianId).eq('status', 'confirmed').maybeSingle(),
+                dataLayerClient.from('timesheets').select('date').eq('job_id', jobId)
+                  .eq('technician_id', cellAction.technicianId).eq('is_active', true).neq('date', dateKey).limit(1),
+              ]);
+              if (assignment.error) throw assignment.error;
+              if (schedule.error) throw schedule.error;
+              return assignment.data?.status === 'confirmed' && Boolean(schedule.data?.length);
+            },
+          });
+        } catch {
+          toast({ title: 'No se pudo verificar la cobertura', description: 'Inténtalo de nuevo antes de enviar la solicitud.', variant: 'destructive' });
+          return;
+        }
+      }
       const singleDay = isAddedDate || !!options?.singleDay;
       // If the technician already declined this job, block staffing for this job only
       const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
@@ -435,7 +459,7 @@ export const OptimizedAssignmentMatrix = ({
     } else {
       // no-op
     }
-  }, [cellAction, allAssignments, declinedJobsByTech, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel]);
+  }, [cellAction, allAssignments, declinedJobsByTech, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel, qc]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);

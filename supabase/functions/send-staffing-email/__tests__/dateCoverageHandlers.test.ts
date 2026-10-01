@@ -4,6 +4,21 @@ import { confirmRequest, sendRequest, StaffingDatabase } from './staffingHandler
 const dates = (db: StaffingDatabase) => db.tables.timesheets.filter(row => row.job_id === 'job' && row.is_active).map(row => row.date).sort();
 
 describe('staffing date coverage through the send and click handlers', () => {
+  it('checks every Madrid fallback date before assigning an overnight legacy offer', async () => {
+    const db = new StaffingDatabase();
+    await sendRequest(db);
+    const head = db.tables.staffing_requests[0];
+    Object.assign(head, { single_day: false, target_date: null, batch_id: null });
+    db.tables.staffing_requests = [head];
+    db.tables.staffing_events.forEach(event => { if (event.meta) (event.meta as Record<string, unknown>).dates = []; });
+    Object.assign(db.tables.jobs[0], { start_time: '2026-10-20T20:00:00Z', end_time: '2026-10-20T22:30:00Z' });
+    db.tables.timesheets.push({ job_id: 'other-job', technician_id: 'tech', date: '2026-10-21', is_active: true });
+    await confirmRequest(db);
+    expect(head.status).toBe('confirmed');
+    expect(db.tables.job_assignments).toHaveLength(0);
+    expect(db.tables.timesheets).toEqual([{ job_id: 'other-job', technician_id: 'tech', date: '2026-10-21', is_active: true }]);
+    expect(db.tables.staffing_events.some(event => event.event === 'auto_assign_skipped_conflict')).toBe(true);
+  });
   it('freezes a new full-job request before the job is extended', async () => {
     const db = new StaffingDatabase();
     expect((await sendRequest(db)).status).toBe(200);

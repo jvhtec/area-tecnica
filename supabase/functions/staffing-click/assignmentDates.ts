@@ -76,8 +76,14 @@ export async function persistStaffingMembership(client: SupabaseClient, jobId: s
 export function getLegacyStaffingSpanDates(start?: string | null, end?: string | null): string[] {
   if (!start || !end) return [];
   const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const firstInstant = new Date(start);
+  const lastInstant = new Date(end);
+  if (Number.isNaN(firstInstant.getTime()) || Number.isNaN(lastInstant.getTime())) return [];
+  const first = formatter.format(firstInstant);
+  const last = formatter.format(lastInstant);
   const dates: string[] = [];
-  const last = new Date(end);
-  for (const day = new Date(start); day <= last; day.setDate(day.getDate() + 1)) dates.push(formatter.format(day));
+  for (const day = new Date(`${first}T00:00:00Z`); day.toISOString().slice(0, 10) <= last; day.setUTCDate(day.getUTCDate() + 1)) {
+    dates.push(day.toISOString().slice(0, 10));
+  }
   return dates;
 }

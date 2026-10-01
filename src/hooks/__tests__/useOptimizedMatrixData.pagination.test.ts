@@ -45,6 +45,15 @@ vi.mock("@/lib/supabase", () => {
 import { fetchMatrixTimesheetAssignments, type MatrixJob } from "@/hooks/useOptimizedMatrixData";
 
 describe("fetchMatrixTimesheetAssignments", () => {
+  it("preserves metadata for more than 1000 job-technician pairs", async () => {
+    const jobs = Array.from({ length: 50 }, (_, i): MatrixJob => ({ id: `job-${i}`, title: 'Gira', start_time: '2026-10-20T08:00:00Z', end_time: '2026-10-20T18:00:00Z', status: 'Confirmado', job_type: 'single' }));
+    const technicianIds = Array.from({ length: 30 }, (_, i) => `tech-${i}`);
+    tables.rows.timesheets = jobs.flatMap(job => technicianIds.map(technician_id => ({ id: `${job.id}-${technician_id}`, job_id: job.id, technician_id, date: '2026-10-20', is_active: true })));
+    tables.rows.job_assignments = tables.rows.timesheets.map(row => ({ job_id: row.job_id, technician_id: row.technician_id, status: 'confirmed', sound_role: 'SND-FOH-R', single_day: true, assignment_date: '2026-10-20' }));
+    const rows = await fetchMatrixTimesheetAssignments({ jobIds: jobs.map(job => job.id), technicianIds, jobsById: new Map(jobs.map(job => [job.id, job])) });
+    expect(rows).toHaveLength(1500);
+    expect(rows.every(row => row.status === 'confirmed' && row.sound_role === 'SND-FOH-R')).toBe(true);
+  });
   it("does not label a multi-date batch as a single-day assignment", async () => {
     const job: MatrixJob = { id: "job-1", title: "Gira", start_time: "2026-07-03T08:00:00Z", end_time: "2026-07-06T20:00:00Z", status: "Confirmado", job_type: "tour" };
     tables.rows.timesheets = [3, 4, 5, 6].map(day => ({ id: `ts-${day}`, job_id: "job-1", technician_id: "tech-1", date: `2026-07-0${day}`, is_active: true }));
