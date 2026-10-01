@@ -2,9 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps } from 'react';
+import React, { type ComponentProps } from 'react';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  MatrixCellHoverTooltip,
+  type MatrixCellHoverTooltipHandle,
+} from '@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip';
+import { formatUserName } from '@/utils/userName';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
 
 // Hoisted mocks
@@ -110,6 +115,38 @@ const render = (ui: JSX.Element) => rtlRender(
   <TooltipProvider delayDuration={0}>{ui}</TooltipProvider>
 );
 
+/**
+ * The tooltip is owned by the grid (one MatrixCellHoverTooltip, fed by pointer
+ * delegation), so cell tooltip tests mount the cell inside that same wiring.
+ */
+const renderWithHoverTooltip = (
+  cell: React.ReactElement<ComponentProps<typeof OptimizedMatrixCell>>,
+  profileNamesMap: Map<string, string> = new Map(),
+) => {
+  const tooltipRef = React.createRef<MatrixCellHoverTooltipHandle>();
+  const { technician, assignment, availability, staffingStatusByDateProvided } = cell.props;
+  const resolve = () => ({
+    displayName: formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico',
+    technician,
+    hasAssignment: !!assignment,
+    assignment,
+    isUnavailable: availability?.status === 'unavailable',
+    availability,
+    staffingStatusByDate: staffingStatusByDateProvided ?? null,
+    profileNamesMap,
+  });
+  return render(
+    <div
+      onMouseOver={(event) =>
+        tooltipRef.current?.hover((event.target as HTMLElement).closest<HTMLElement>('[data-matrix-cell]'))
+      }
+    >
+      {cell}
+      <MatrixCellHoverTooltip ref={tooltipRef} resolve={resolve} />
+    </div>,
+  );
+};
+
 const getCellElement = () => {
   // Not `.cursor-pointer`: read-only cells (no edit mode enabled) render
   // cursor-default, so the cell is addressed by its stable data attribute.
@@ -151,7 +188,7 @@ describe('OptimizedMatrixCell', () => {
   it('renders basic cell with technician name in tooltip', async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -686,7 +723,7 @@ describe('OptimizedMatrixCell', () => {
     };
     const profileNamesMap = new Map<string, string>([['manager-1', 'Manager Name']]);
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -697,8 +734,8 @@ describe('OptimizedMatrixCell', () => {
         isSelected={false}
         onSelect={vi.fn()}
         onClick={vi.fn()}
-        profileNamesMap={profileNamesMap}
-      />
+      />,
+      profileNamesMap,
     );
 
     await user.hover(getCellElement());
@@ -712,7 +749,7 @@ describe('OptimizedMatrixCell', () => {
   it('normalizes unknown or English assignment statuses to Spanish pending in the tooltip', async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -749,7 +786,7 @@ describe('OptimizedMatrixCell', () => {
       offer_created_at: '2026-04-09T11:00:00.000Z',
     };
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -760,8 +797,8 @@ describe('OptimizedMatrixCell', () => {
         onSelect={vi.fn()}
         onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
-        profileNamesMap={new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']])}
-      />
+      />,
+      new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']]),
     );
 
     await user.hover(getCellElement());
@@ -793,7 +830,7 @@ describe('OptimizedMatrixCell', () => {
       pending_offer_job_titles: [],
     };
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}

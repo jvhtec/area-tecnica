@@ -8,17 +8,20 @@ import { Button } from "@/components/ui/button";
 import { MatrixMobileCellSheet, type MatrixMobileCellTarget } from "@/components/matrix/MatrixMobileCellSheet";
 
 import { TechnicianRow } from "../TechnicianRow";
-import { OptimizedMatrixCell } from "../OptimizedMatrixCell";
 import { DateHeader } from "../DateHeader";
+import { MatrixGridRow } from "@/components/matrix/optimized-assignment-matrix/MatrixGridRow";
+import { useMatrixScrollState } from "@/components/matrix/optimized-assignment-matrix/useMatrixScrollState";
+import {
+  MatrixCellHoverTooltip,
+  type MatrixCellHoverTooltipHandle,
+} from "@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip";
+import { formatUserName } from "@/utils/userName";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
 import type {
   CancelStaffingMutate,
   MatrixCellAction,
   SendStaffingEmailMutate,
 } from "@/components/matrix/optimized-matrix-cell/types";
-
-// Shared so cells for technicians with no declined jobs keep a stable prop.
-const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
 
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
@@ -29,11 +32,12 @@ export interface OptimizedAssignmentMatrixViewProps {
   CELL_HEIGHT: number;
   matrixWidth: number;
   matrixHeight: number;
-  dateHeadersRef: React.RefObject<HTMLDivElement>;
-  technicianScrollRef: React.RefObject<HTMLDivElement>;
-  mainScrollRef: React.RefObject<HTMLDivElement>;
-  visibleCols: { start: number; end: number };
-  visibleRows: { start: number; end: number };
+  /** The date range can grow at either end as the user nears it. */
+  canExpandBefore?: boolean;
+  canExpandAfter?: boolean;
+  onNearEdgeScroll?: (direction: "before" | "after") => void;
+  /** Reports the virtualised row window (the staffing badges load per block). */
+  onVisibleRowsChange?: (rows: { start: number; end: number }) => void;
   dates: Date[];
   technicians: any[];
   orderedTechnicians: any[];
@@ -44,12 +48,6 @@ export interface OptimizedAssignmentMatrixViewProps {
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
-  canNavLeft: boolean;
-  canNavRight: boolean;
-  handleMobileNav: (dir: "left" | "right") => void;
-  handleDateHeadersScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  handleTechnicianScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  handleMainScroll: (e: React.UIEvent<HTMLDivElement>) => void;
   cycleTechSort: () => void;
   getSortLabel: () => string;
   isManagementUser: boolean;
@@ -115,11 +113,10 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   CELL_HEIGHT,
   matrixWidth,
   matrixHeight,
-  dateHeadersRef,
-  technicianScrollRef,
-  mainScrollRef,
-  visibleCols,
-  visibleRows,
+  canExpandBefore = false,
+  canExpandAfter = false,
+  onNearEdgeScroll,
+  onVisibleRowsChange,
   dates,
   technicians,
   orderedTechnicians,
@@ -130,12 +127,6 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
-  canNavLeft,
-  canNavRight,
-  handleMobileNav,
-  handleDateHeadersScroll,
-  handleTechnicianScroll,
-  handleMainScroll,
   cycleTechSort,
   getSortLabel,
   isManagementUser,
@@ -189,6 +180,36 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   clearCellSelection,
   offerSeedDates,
 }: OptimizedAssignmentMatrixViewProps) => {
+  // Scroll position and the virtualised window are owned here rather than by
+  // the matrix container, so a scroll step re-renders this view alone.
+  const {
+    dateHeadersRef,
+    technicianScrollRef,
+    mainScrollRef,
+    visibleCols,
+    visibleRows,
+    canNavLeft,
+    canNavRight,
+    handleMobileNav,
+    handleMainScroll,
+  } = useMatrixScrollState({
+    dates,
+    techniciansLength: orderedTechnicians.length,
+    cellWidth: CELL_WIDTH,
+    cellHeight: CELL_HEIGHT,
+    technicianWidth: TECHNICIAN_WIDTH,
+    headerHeight: HEADER_HEIGHT,
+    mobile,
+    isInitialLoading,
+    canExpandBefore,
+    canExpandAfter,
+    onNearEdgeScroll,
+  });
+
+  React.useEffect(() => {
+    onVisibleRowsChange?.(visibleRows);
+  }, [onVisibleRowsChange, visibleRows]);
+
   void _isGlobalCellSelected;
 
   // Touch action sheet: one instance for the grid, opened by tapping a cell.
@@ -203,6 +224,24 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   const closeSheet = React.useCallback(() => setSheetTarget(null), []);
 
   const selectionActive = mobile && selectedCells.size > 0;
+
+  // Selection per row, so selecting a cell re-renders the rows whose selection
+  // changed instead of every row (each used to receive the whole set). Cell
+  // keys are `${technicianId}-${yyyy-MM-dd}`; the id is a uuid with dashes of
+  // its own, so the day key is read off the end.
+  const selectedDateKeysByTech = React.useMemo(() => {
+    const byTech = new Map<string, Set<string>>();
+    selectedCells.forEach((cellKey) => {
+      const technicianId = cellKey.slice(0, -11);
+      let keys = byTech.get(technicianId);
+      if (!keys) {
+        keys = new Set<string>();
+        byTech.set(technicianId, keys);
+      }
+      keys.add(cellKey.slice(-10));
+    });
+    return byTech;
+  }, [selectedCells]);
 
   // Cell keys are `${technicianId}-${yyyy-MM-dd}`, and the id is a uuid that
   // carries dashes of its own, so the day key is read off the end.
@@ -234,6 +273,52 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     mainScrollRef.current.scrollTo({ left: index * CELL_WIDTH, behavior: "smooth" });
   }, [dates, mainScrollRef, CELL_WIDTH]);
 
+  // The rendered column window. Memoised on the window itself, so a vertical
+  // scroll step hands every row the same arrays and their memo holds.
+  const visibleDates = React.useMemo(
+    () => dates.slice(visibleCols.start, visibleCols.end + 1),
+    [dates, visibleCols.start, visibleCols.end],
+  );
+  const visibleDateKeys = React.useMemo(() => visibleDates.map((date) => formatMadridDateKey(date)), [visibleDates]);
+
+  // Shared hover tooltip (see MatrixCellHoverTooltip): cells only carry data
+  // attributes, and the content is resolved here from the grid's current data.
+  const hoverTooltipRef = React.useRef<MatrixCellHoverTooltipHandle>(null);
+  const techniciansById = React.useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
+  const datesByKey = React.useMemo(() => new Map(dates.map((date) => [formatMadridDateKey(date), date])), [dates]);
+  const resolveCellTooltip = React.useCallback(
+    (technicianId: string, dateKey: string) => {
+      const technician = techniciansById.get(technicianId);
+      const date = datesByKey.get(dateKey);
+      if (!technician || !date) return null;
+      const assignment = getAssignmentForCell(technicianId, date);
+      const availability = getAvailabilityForCell(technicianId, date);
+      return {
+        displayName: formatUserName(technician.first_name, technician.nickname, technician.last_name) || "Técnico",
+        technician,
+        hasAssignment: !!assignment,
+        assignment,
+        isUnavailable: availability?.status === "unavailable",
+        availability,
+        staffingStatusByDate: staffingMaps?.byDate.get(`${technicianId}-${dateKey}`) ?? null,
+        profileNamesMap,
+      };
+    },
+    [techniciansById, datesByKey, getAssignmentForCell, getAvailabilityForCell, staffingMaps, profileNamesMap],
+  );
+  const handleGridMouseOver = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-matrix-cell]");
+    hoverTooltipRef.current?.hover(cell);
+  }, []);
+  const hideCellTooltip = React.useCallback(() => hoverTooltipRef.current?.hide(), []);
+  const handleGridScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      hoverTooltipRef.current?.hide();
+      handleMainScroll(event);
+    },
+    [handleMainScroll],
+  );
+
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
   const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
@@ -250,266 +335,223 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           <span>Actualizando...</span>
         </div>
       )}
-      {/* Fixed Corner Header */}
-      <div
-        className="matrix-corner"
-        style={{
-          width: TECHNICIAN_WIDTH,
-          height: HEADER_HEIGHT,
-        }}
-      >
-        {/* overflow-hidden is a backstop: the corner is a fixed TECHNICIAN_WIDTH
-            box, and anything that outgrows it spills across the borders into the
-            first date column instead of being clipped. */}
-        <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
-          <div className={`flex border-b border-border/60 ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
-            {/* size="inline" so the primitive adds no box of its own: this row
-                is 28px tall on a phone, and the default size's h-10 plus its
-                44px hit pseudo-element would both overflow the corner and
-                overlap the control beside it. */}
-            <Button
-              variant="ghost"
-              size="inline"
-              className={`group flex cursor-pointer items-center gap-1 font-semibold hover:bg-transparent hover:text-primary ${
-                mobile
-                  ? // min-h-6 is a floor, not a change: items-stretch on the row
-                    // already gives this 24px. But it gets that by matching the
-                    // height of the button beside it, so shrinking that one
-                    // would silently drop this under the 24px WCAG minimum.
-                    "min-h-6 min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3"
-                  : "[&_svg]:size-3.5"
-              }`}
-              onClick={cycleTechSort}
-              title="Cambia el orden de técnicos"
-            >
-              <span
-                className={
-                  mobile
-                    ? "min-w-0 flex-1 truncate text-left text-xs"
-                    : "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                }
+      {/* One scroll container. The date header row and the technician column
+          are sticky inside it, so the browser keeps them aligned with the grid
+          on the compositor: no scroll sync in JavaScript, and they cannot trail
+          the grid when the main thread is busy. */}
+      <TooltipProvider>
+        <div ref={mainScrollRef} className="matrix-main-scroll" onScroll={handleGridScroll}>
+          <div
+            className="matrix-canvas"
+            style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: HEADER_HEIGHT + matrixHeight }}
+          >
+            {/* Header row, sticky to the top: the frozen corner, then the dates. */}
+            <div className="matrix-header-row" style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: HEADER_HEIGHT }}>
+              <div
+                className="matrix-corner"
+                style={{
+                  width: TECHNICIAN_WIDTH,
+                  height: HEADER_HEIGHT,
+                }}
               >
-                Técnicos
-              </span>
-              <ArrowUpDown className="shrink-0 opacity-50 group-hover:opacity-100" />
-            </Button>
-            {isManagementUser &&
-              (mobile ? (
-                // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
-                // overflowed this 109px corner even with h-6 w-6 p-0 applied.
-                // hit-target-fill grows the tap area to this cell rather than
-                // to 44px, which at this pitch would overlap the sort control.
-                <span className="relative flex shrink-0 items-center">
-                  <Button
-                    variant="outline"
-                    size="icon-xs"
-                    className="hit-target-fill shrink-0"
-                    onClick={() => setCreateUserOpen(true)}
-                    aria-label="Añadir usuario"
-                  >
-                    <UserPlus />
-                  </Button>
-                </span>
-              ) : (
-                <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
-                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
-                </Button>
-              ))}
-          </div>
-          {(mobile || getSortLabel()) && (
-            <div className={`flex items-center justify-center flex-1 min-h-0 px-1 ${mobile ? "gap-1 py-0.5" : "gap-2 py-1"}`}>
-              {/* Mobile date paging. It used to be an overlay inside the header's
-                  scroll container, which both scrolled away with the content and
-                  covered the first and last visible columns. */}
-              {mobile && (
-                <>
-                  {/* Each arrow sits in its own stretched flex cell so its tap
-                      area fills that cell. The cells tile the row, so the two
-                      targets meet without overlapping — the 44px pseudo-element
-                      the default sizes carry would overlap at this pitch. */}
-                  <span className="relative flex flex-1 items-center justify-center self-stretch">
+                {/* overflow-hidden is a backstop: the corner is a fixed TECHNICIAN_WIDTH
+                    box, and anything that outgrows it spills across the borders into the
+                    first date column instead of being clipped. */}
+                <div className="flex flex-col h-full overflow-hidden bg-card border-r border-b">
+                  <div className={`flex border-b border-border/60 ${mobile ? "items-stretch gap-0.5 px-0.5 py-0.5" : "items-center justify-between px-2 py-1"}`}>
+                    {/* size="inline" so the primitive adds no box of its own: this row
+                        is 28px tall on a phone, and the default size's h-10 plus its
+                        44px hit pseudo-element would both overflow the corner and
+                        overlap the control beside it. */}
                     <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Fechas anteriores"
-                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
-                      onClick={() => handleMobileNav("left")}
-                      disabled={!canNavLeft}
+                      variant="ghost"
+                      size="inline"
+                      className={`group flex cursor-pointer items-center gap-1 font-semibold hover:bg-transparent hover:text-primary ${
+                        mobile
+                          ? // min-h-6 is a floor, not a change: items-stretch on the row
+                            // already gives this 24px. But it gets that by matching the
+                            // height of the button beside it, so shrinking that one
+                            // would silently drop this under the 24px WCAG minimum.
+                            "min-h-6 min-w-0 flex-1 justify-start overflow-hidden [&_svg]:size-3"
+                          : "[&_svg]:size-3.5"
+                      }`}
+                      onClick={cycleTechSort}
+                      title="Cambia el orden de técnicos"
                     >
-                      <ChevronLeft aria-hidden="true" />
+                      <span
+                        className={
+                          mobile
+                            ? "min-w-0 flex-1 truncate text-left text-xs"
+                            : "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                        }
+                      >
+                        Técnicos
+                      </span>
+                      <ArrowUpDown className="shrink-0 opacity-50 group-hover:opacity-100" />
                     </Button>
-                  </span>
-                  <span className="relative flex flex-1 items-center justify-center self-stretch">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Fechas siguientes"
-                      className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
-                      onClick={() => handleMobileNav("right")}
-                      disabled={!canNavRight}
-                    >
-                      <ChevronRight aria-hidden="true" />
-                    </Button>
-                  </span>
-                </>
-              )}
-              {getSortLabel() && (
-                <span className="truncate rounded-full border border-border/60 bg-accent/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  {getSortLabel()}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Date Headers */}
-      <div
-        ref={dateHeadersRef}
-        className="matrix-date-headers"
-        style={{
-          left: TECHNICIAN_WIDTH,
-          height: HEADER_HEIGHT,
-          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
-        }}
-        onScroll={handleDateHeadersScroll}
-      >
-        <div style={{ width: matrixWidth, height: "100%", display: "flex", position: "relative" }}>
-          {/* Leading spacer for virtualized columns */}
-          <div style={{ width: visibleCols.start * CELL_WIDTH }} />
-          {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, idx) => (
-            <DateHeader
-              key={visibleCols.start + idx}
-              date={date}
-              width={CELL_WIDTH}
-              jobs={getJobsForDate(date)}
-              technicianIds={technicianIds}
-              compact={mobile}
-              onJobClick={handleDateHeaderJobClick}
-            />
-          ))}
-          {/* Trailing spacer to fill remaining width */}
-          <div style={{ width: Math.max(0, (dates.length - (visibleCols.end + 1)) * CELL_WIDTH) }} />
-        </div>
-      </div>
-
-      {/* Fixed Technician Names Column */}
-      <div
-        className="matrix-technician-column"
-        style={{
-          width: TECHNICIAN_WIDTH,
-          top: HEADER_HEIGHT,
-          height: `calc(100% - ${HEADER_HEIGHT}px)`,
-        }}
-      >
-        <div ref={technicianScrollRef} className="matrix-technician-scroll" onScroll={handleTechnicianScroll}>
-          <div style={{ height: matrixHeight, position: "relative" }}>
-            {/* Leading spacer for virtualized rows */}
-            <div style={{ height: visibleRows.start * CELL_HEIGHT }} />
-            {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician) => (
-              <TechnicianRow
-                key={technician.id}
-                technician={technician}
-                height={CELL_HEIGHT}
-                isFridge={fridgeSet?.has(technician.id) || false}
-                // @ts-ignore – optional prop for compact rendering
-                compact={mobile}
-                medalRank={techMedalRankings.get(technician.id)}
-                lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Scrollable Matrix Area */}
-      <div
-        className="matrix-main-area"
-        style={{
-          left: TECHNICIAN_WIDTH,
-          top: HEADER_HEIGHT,
-          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
-          height: `calc(100% - ${HEADER_HEIGHT}px)`,
-        }}
-      >
-        <TooltipProvider>
-          <div ref={mainScrollRef} className="matrix-main-scroll" onScroll={handleMainScroll}>
-            <div className="matrix-grid" style={{ width: matrixWidth, height: matrixHeight }}>
-              {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
-                const techIndex = visibleRows.start + idx;
-                return (
-                  <div
-                    key={technician.id}
-                    className="matrix-row"
-                    style={{ transform: `translate3d(0, ${techIndex * CELL_HEIGHT}px, 0)`, height: CELL_HEIGHT }}
-                  >
-                    {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, jdx) => {
-                      const dateIndex = visibleCols.start + jdx;
-                      const assignment = getAssignmentForCell(technician.id, date);
-                      const availability = getAvailabilityForCell(technician.id, date);
-                      const cellKey = `${technician.id}-${formatMadridDateKey(date)}`;
-                      const isSelected = selectedCells.has(cellKey);
-                      const jobId = assignment?.job_id;
-                      const byJobKey = jobId ? `${jobId}-${technician.id}` : "";
-                      const byDateKey = cellKey;
-                      const providedByJob =
-                        jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
-                      const providedByDate = staffingMaps?.byDate.get(byDateKey)
-                        ? (staffingMaps?.byDate.get(byDateKey) as any)
-                        : null;
-
-                      return (
-                        <div
-                          key={dateIndex}
-                          className="matrix-cell-wrapper"
-                          style={{
-                            transform: `translate3d(${dateIndex * CELL_WIDTH}px, 0, 0)`,
-                            width: CELL_WIDTH,
-                            height: CELL_HEIGHT,
-                          }}
-                        >
-                          <OptimizedMatrixCell
-                            technician={technician}
-                            date={date}
-                            assignment={assignment}
-                            availability={availability}
-                            width={CELL_WIDTH}
-                            height={CELL_HEIGHT}
-                            isSelected={isSelected}
-                            onSelect={handleCellSelect}
-                            onClick={handleCellClick}
-                            onOpenSheet={handleOpenSheet}
-                            selectionActive={selectionActive}
-                            onPrefetch={handleCellPrefetch}
-                            onOptimisticUpdate={handleOptimisticUpdate}
-                            onRender={incrementCellRender}
-                            jobId={jobId}
-                            declinedJobIdsSet={declinedJobsByTech.get(technician.id) ?? EMPTY_DECLINED_JOB_IDS}
-                            allowDirectAssign={allowDirectAssign}
-                            allowMarkUnavailable={allowMarkUnavailable}
-                            staffingStatusProvided={providedByJob}
-                            staffingStatusByDateProvided={providedByDate}
-                            profileNamesMap={profileNamesMap}
-                            isFridge={fridgeSet?.has(technician.id) || false}
-                            mobile={mobile}
-                            staffingDepartment={staffingDepartment}
-                            hideStaffingEmailButtons={hideStaffingEmailButtons}
-                            hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
-                            sendStaffingEmail={sendStaffingEmail}
-                            isSendingStaffingEmail={isSendingStaffingEmail}
-                            cancelStaffing={cancelStaffing}
-                            isCancellingStaffing={isCancellingStaffing}
-                          />
-                        </div>
-                      );
-                    })}
+                    {isManagementUser &&
+                      (mobile ? (
+                        // icon-xs, not sm: the sm variant's px-3/h-9 intrinsics
+                        // overflowed this 109px corner even with h-6 w-6 p-0 applied.
+                        // hit-target-fill grows the tap area to this cell rather than
+                        // to 44px, which at this pitch would overlap the sort control.
+                        <span className="relative flex shrink-0 items-center">
+                          <Button
+                            variant="outline"
+                            size="icon-xs"
+                            className="hit-target-fill shrink-0"
+                            onClick={() => setCreateUserOpen(true)}
+                            aria-label="Añadir usuario"
+                          >
+                            <UserPlus />
+                          </Button>
+                        </span>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateUserOpen(true)}>
+                          <UserPlus className="h-3.5 w-3.5 mr-1" /> Añadir
+                        </Button>
+                      ))}
                   </div>
-                );
-              })}
+                  {(mobile || getSortLabel()) && (
+                    <div className={`flex items-center justify-center flex-1 min-h-0 px-1 ${mobile ? "gap-1 py-0.5" : "gap-2 py-1"}`}>
+                      {/* Mobile date paging. It used to be an overlay inside the header's
+                          scroll container, which both scrolled away with the content and
+                          covered the first and last visible columns. */}
+                      {mobile && (
+                        <>
+                          {/* Each arrow sits in its own stretched flex cell so its tap
+                              area fills that cell. The cells tile the row, so the two
+                              targets meet without overlapping — the 44px pseudo-element
+                              the default sizes carry would overlap at this pitch. */}
+                          <span className="relative flex flex-1 items-center justify-center self-stretch">
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label="Fechas anteriores"
+                              className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavLeft ? "opacity-100" : "opacity-40"}`}
+                              onClick={() => handleMobileNav("left")}
+                              disabled={!canNavLeft}
+                            >
+                              <ChevronLeft aria-hidden="true" />
+                            </Button>
+                          </span>
+                          <span className="relative flex flex-1 items-center justify-center self-stretch">
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label="Fechas siguientes"
+                              className={`hit-target-fill shrink-0 rounded-full shadow-sm ${canNavRight ? "opacity-100" : "opacity-40"}`}
+                              onClick={() => handleMobileNav("right")}
+                              disabled={!canNavRight}
+                            >
+                              <ChevronRight aria-hidden="true" />
+                            </Button>
+                          </span>
+                        </>
+                      )}
+                      {getSortLabel() && (
+                        <span className="truncate rounded-full border border-border/60 bg-accent/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {getSortLabel()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                ref={dateHeadersRef}
+                className="matrix-date-headers"
+                style={{ width: matrixWidth, height: HEADER_HEIGHT }}
+              >
+                {/* Leading spacer for virtualized columns */}
+                <div style={{ width: visibleCols.start * CELL_WIDTH, flexShrink: 0 }} />
+                {visibleDates.map((date, idx) => (
+                  <DateHeader
+                    key={visibleCols.start + idx}
+                    date={date}
+                    width={CELL_WIDTH}
+                    jobs={getJobsForDate(date)}
+                    technicianIds={technicianIds}
+                    compact={mobile}
+                    onJobClick={handleDateHeaderJobClick}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="matrix-body" style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: matrixHeight }}>
+              {/* Technician names, sticky to the left. */}
+              <div
+                ref={technicianScrollRef}
+                className="matrix-technician-column"
+                style={{ width: TECHNICIAN_WIDTH, height: matrixHeight }}
+              >
+                {/* Leading spacer for virtualized rows */}
+                <div style={{ height: visibleRows.start * CELL_HEIGHT }} />
+                {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician) => (
+                  <TechnicianRow
+                    key={technician.id}
+                    technician={technician}
+                    height={CELL_HEIGHT}
+                    isFridge={fridgeSet?.has(technician.id) || false}
+                    // @ts-ignore – optional prop for compact rendering
+                    compact={mobile}
+                    medalRank={techMedalRankings.get(technician.id)}
+                    lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
+                  />
+                ))}
+              </div>
+
+              <div
+                className="matrix-grid"
+                style={{ width: matrixWidth, height: matrixHeight }}
+                onMouseOver={mobile ? undefined : handleGridMouseOver}
+                onMouseLeave={mobile ? undefined : hideCellTooltip}
+                onMouseDown={mobile ? undefined : hideCellTooltip}
+              >
+                {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => (
+                  <MatrixGridRow
+                    key={technician.id}
+                    technician={technician}
+                    rowIndex={visibleRows.start + idx}
+                    colStart={visibleCols.start}
+                    visibleDates={visibleDates}
+                    visibleDateKeys={visibleDateKeys}
+                    cellWidth={CELL_WIDTH}
+                    cellHeight={CELL_HEIGHT}
+                    getAssignmentForCell={getAssignmentForCell}
+                    getAvailabilityForCell={getAvailabilityForCell}
+                    staffingMaps={staffingMaps}
+                    selectedDateKeys={selectedDateKeysByTech.get(technician.id)}
+                    selectionActive={selectionActive}
+                    declinedJobIds={declinedJobsByTech.get(technician.id)}
+                    isFridge={fridgeSet?.has(technician.id) || false}
+                    allowDirectAssign={allowDirectAssign}
+                    allowMarkUnavailable={allowMarkUnavailable}
+                    mobile={mobile}
+                    staffingDepartment={staffingDepartment}
+                    hideStaffingEmailButtons={hideStaffingEmailButtons}
+                    hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+                    onSelect={handleCellSelect}
+                    onClick={handleCellClick}
+                    onOpenSheet={handleOpenSheet}
+                    onPrefetch={handleCellPrefetch}
+                    onOptimisticUpdate={handleOptimisticUpdate}
+                    onRender={incrementCellRender}
+                    sendStaffingEmail={sendStaffingEmail}
+                    isSendingStaffingEmail={isSendingStaffingEmail}
+                    cancelStaffing={cancelStaffing}
+                    isCancellingStaffing={isCancellingStaffing}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        </TooltipProvider>
-      </div>
+        </div>
+      </TooltipProvider>
+
+      {!mobile && <MatrixCellHoverTooltip ref={hoverTooltipRef} resolve={resolveCellTooltip} />}
 
       {/* Touch affordances over the grid */}
       {mobile && !selectionActive && !sheetTarget && (

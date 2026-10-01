@@ -96,7 +96,6 @@ export interface OptimizedMatrixCellProps {
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: MatrixStaffingStatus | null;
   staffingStatusByDateProvided?: MatrixStaffingStatus | null;
-  profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
   staffingDepartment?: string | null;

@@ -1,7 +1,6 @@
 import React, { memo, useCallback } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { badgeVariants } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Check, X, UserX, Ban, Refrigerator, Plus } from 'lucide-react';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -11,13 +10,11 @@ import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellDialogs';
-import { OptimizedMatrixCellTooltip } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip';
 import { MatrixCellStaffingActions } from '@/components/matrix/optimized-matrix-cell/MatrixCellStaffingActions';
 import { MatrixCellStaffingBadges } from '@/components/matrix/optimized-matrix-cell/MatrixCellStaffingBadges';
 import {
   assignmentStatusLabel,
   availabilityStatusLabel,
-  EMPTY_PROFILE_NAMES_MAP,
   normalizeStatus,
   offerStatusLabel,
 } from '@/components/matrix/optimized-matrix-cell/helpers';
@@ -30,6 +27,27 @@ import {
 } from '@/components/matrix/matrixCellVisuals';
 
 const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
+
+// Hundreds of cells mount on every scroll step, so the class strings are
+// resolved once here instead of through Button/Badge (cva + tailwind-merge +
+// Slot) or cn() on every render. Each constant is the exact string those
+// components produced, so nothing changes visually.
+const CONTROL_BUTTON_BASE = 'h-5 w-5 rounded-full bg-background/70 p-0 shadow-sm';
+const CONFIRM_BUTTON_CLASS = cn(buttonVariants({ variant: 'ghost', size: 'sm' }), CONTROL_BUTTON_BASE, 'hover:bg-emerald-500/20');
+const DANGER_BUTTON_CLASS = cn(buttonVariants({ variant: 'ghost', size: 'sm' }), CONTROL_BUTTON_BASE, 'hover:bg-rose-500/20');
+const STATUS_BADGE_CLASS = cn(badgeVariants({ variant: 'secondary' }), 'h-4 px-1 py-0 text-xs');
+
+/** cn() for the few class combinations a cell can take, merged once each. */
+const mergedClassCache = new Map<string, string>();
+const cellClass = (...parts: Array<string | false | null | undefined>): string => {
+  const key = parts.map((part) => part || '').join('\u0000');
+  let merged = mergedClassCache.get(key);
+  if (merged === undefined) {
+    merged = cn(...parts);
+    mergedClassCache.set(key, merged);
+  }
+  return merged;
+};
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -52,7 +70,6 @@ export const OptimizedMatrixCell = memo(({
   declinedJobIdsSet = EMPTY_DECLINED_JOB_IDS,
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
-  profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
   isFridge = false,
   mobile = false,
   staffingDepartment = null,
@@ -88,8 +105,9 @@ export const OptimizedMatrixCell = memo(({
     onRender?.();
   }, [onRender]);
 
-  const isTodayCell = isMadridToday(date);
-  const isWeekendCell = isMadridWeekend(date);
+  const dateKey = formatMadridDateKey(date);
+  const isTodayCell = isMadridToday(dateKey);
+  const isWeekendCell = isMadridWeekend(dateKey);
   const hasAssignment = !!assignment;
   const assignmentStatus = hasAssignment ? normalizeStatus(assignment.status) : null;
   const isConfirmedAssignment = assignmentStatus === 'confirmed';
@@ -303,7 +321,7 @@ export const OptimizedMatrixCell = memo(({
 
   // A phone cell is a button, so it needs a name: the grid position plus what
   // the cell is currently showing.
-  const cellAriaLabel = `${displayName}, ${formatMadridDayKey(formatMadridDateKey(date), "d 'de' MMMM", { locale: es })}: ${
+  const cellAriaLabel = mobile ? `${displayName}, ${formatMadridDayKey(dateKey, "d 'de' MMMM", { locale: es })}: ${
     hasAssignment
       ? `${assignment.job?.title || 'asignación'} (${assignmentStatusLabel(assignment.status)})`
       : isUnavailable
@@ -311,7 +329,7 @@ export const OptimizedMatrixCell = memo(({
         : staffingCaption
           ? `${staffingCaption.title.toLowerCase()} ${staffingCaption.detail?.toLowerCase() ?? ''}`.trim()
           : 'sin actividad'
-  }`;
+  }` : undefined;
 
   // The corner controls (confirm/decline, the P/R badge, the staffing chips) are
   // drawn over the card, so the card's own text has to step out of their way.
@@ -333,10 +351,8 @@ export const OptimizedMatrixCell = memo(({
       : undefined;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
         <div
-          className={cn(
+          className={cellClass(
             'group/cell relative flex flex-col p-1 text-xs transition-colors duration-150',
             plainClickIsActionable ? 'cursor-pointer' : 'cursor-default',
             MATRIX_CELL_SURFACE[cellState],
@@ -348,9 +364,12 @@ export const OptimizedMatrixCell = memo(({
           }}
           data-matrix-cell="true"
           data-matrix-cell-state={cellState}
+          // Read by the grid's shared hover tooltip (MatrixCellHoverTooltip).
+          data-technician-id={technicianId}
+          data-date-key={dateKey}
           role={mobile ? 'button' : undefined}
           tabIndex={mobile ? 0 : undefined}
-          aria-label={mobile ? cellAriaLabel : undefined}
+          aria-label={cellAriaLabel}
           aria-pressed={mobile && selectionActive ? isSelected : undefined}
           onClick={handleCellClick}
           onContextMenu={handleRightClick}
@@ -388,7 +407,7 @@ export const OptimizedMatrixCell = memo(({
           {/* Status card: the cell's content, drawn as one rounded object */}
           {showStatusCard && (
             <div
-              className={cn(
+              className={cellClass(
                 'pointer-events-none flex h-full min-w-0 flex-col overflow-hidden rounded-lg border px-1.5',
                 hasBottomControls
                   ? mobile
@@ -400,22 +419,22 @@ export const OptimizedMatrixCell = memo(({
               style={cardStyle}
             >
               {hasAssignment && (
-                <div className={cn('min-w-0', mobile ? 'pr-6' : 'pr-6')}>
+                <div className="min-w-0 pr-6">
                   <div
-                    className={cn('truncate text-xs font-semibold leading-tight', !isConfirmedAssignment && chip.caption)}
+                    className={cellClass('truncate text-xs font-semibold leading-tight', !isConfirmedAssignment && chip.caption)}
                     style={{ color: isConfirmedAssignment ? confirmedTextColor : undefined }}
                   >
                     {assignment.job?.title || 'Asignación'}
                   </div>
                   <div
-                    className={cn('truncate text-[11px] leading-tight', !isConfirmedAssignment && chip.detail)}
+                    className={cellClass('truncate text-[11px] leading-tight', !isConfirmedAssignment && chip.detail)}
                     style={{ color: isConfirmedAssignment ? confirmedSubTextColor : undefined }}
                   >
                     {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
                   </div>
                   {assignment.single_day && assignment.assignment_date && (
                     <div
-                      className={cn('truncate text-[10px] leading-tight', !isConfirmedAssignment && 'text-muted-foreground')}
+                      className={cellClass('truncate text-[10px] leading-tight', !isConfirmedAssignment && 'text-muted-foreground')}
                       style={{ color: isConfirmedAssignment ? confirmedSubTextColor : undefined }}
                     >
                       Día único: {formatMadridDayKey(assignment.assignment_date, 'd MMM', { locale: es })}
@@ -440,11 +459,11 @@ export const OptimizedMatrixCell = memo(({
 
               {!hasAssignment && !isUnavailable && staffingCaption && (
                 <div className="min-w-0">
-                  <div className={cn('truncate text-xs font-bold uppercase leading-tight tracking-wide', chip.caption)}>
+                  <div className={cellClass('truncate text-xs font-bold uppercase leading-tight tracking-wide', chip.caption)}>
                     {staffingCaption.title}
                   </div>
                   {staffingCaption.detail && (
-                    <div className={cn('truncate text-xs leading-tight', chip.detail)}>
+                    <div className={cellClass('truncate text-xs leading-tight', chip.detail)}>
                       {staffingCaption.detail}
                     </div>
                   )}
@@ -532,58 +551,56 @@ export const OptimizedMatrixCell = memo(({
             <>
               {assignment.status === 'invited' && (
                 <div className="absolute bottom-1.5 left-1.5 z-10 flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 rounded-full bg-background/70 p-0 shadow-sm hover:bg-emerald-500/20"
+                  <button
+                    type="button"
+                    className={CONFIRM_BUTTON_CLASS}
                     onClick={(e) => handleStatusClick(e, 'confirm')}
                     title="Confirmar"
                   >
                     <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 rounded-full bg-background/70 p-0 shadow-sm hover:bg-rose-500/20"
+                  </button>
+                  <button
+                    type="button"
+                    className={DANGER_BUTTON_CLASS}
                     onClick={(e) => handleStatusClick(e, 'decline')}
                     title="Rechazar"
                   >
                     <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                  </Button>
+                  </button>
                 </div>
               )}
 
               {/* Status Badge - moved to not conflict with staffing badges */}
               {!isConfirmedAssignment && (
                 <div className="absolute bottom-1.5 right-1.5 z-10" title={assignmentStatusLabel(assignment.status)}>
-                  <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                  <div className={STATUS_BADGE_CLASS}>
                     {isDeclinedAssignment ? 'R' : 'SC'}
-                  </Badge>
+                  </div>
                 </div>
               )}
 
               <div className="absolute top-1.5 right-1.5 z-10">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 rounded-full bg-background/70 p-0 shadow-sm hover:bg-rose-500/20"
+                <button
+                  type="button"
+                  className={DANGER_BUTTON_CLASS}
                   title="Eliminar asignación"
                   onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
                 >
                   <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                </Button>
+                </button>
               </div>
             </>
           )}
 
           {hasAssignment && mobile && !isConfirmedAssignment && (
             <div className="absolute bottom-1.5 right-1.5 z-10" title={assignmentStatusLabel(assignment.status)}>
-              <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+              <div className={STATUS_BADGE_CLASS}>
                 {isDeclinedAssignment ? 'R' : 'SC'}
-              </Badge>
+              </div>
             </div>
           )}
 
+          {(pendingRetry || pendingCancel || multiDateRemoval.isOpen) && (
           <OptimizedMatrixCellDialogs
             date={date}
             technicianId={technician.id}
@@ -605,24 +622,8 @@ export const OptimizedMatrixCell = memo(({
             handleRemoveAssignment={handleRemoveAssignment}
             isRemovingAssignment={isRemovingAssignment}
           />
+          )}
         </div>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        className="max-w-xs p-2"
-      >
-        <OptimizedMatrixCellTooltip
-          displayName={displayName}
-          technician={technician}
-          hasAssignment={hasAssignment}
-          assignment={assignment}
-          isUnavailable={isUnavailable}
-          availability={availability}
-          staffingStatusByDate={staffingStatusByDate}
-          profileNamesMap={profileNamesMap}
-        />
-      </TooltipContent>
-    </Tooltip>
   );
 });
 

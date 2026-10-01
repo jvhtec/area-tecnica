@@ -16,7 +16,6 @@ import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
-import { useMatrixScrollState } from '@/components/matrix/optimized-assignment-matrix/useMatrixScrollState';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
 
@@ -162,30 +161,16 @@ export const OptimizedAssignmentMatrix = ({
   const matrixWidth = dates.length * CELL_WIDTH;
   const matrixHeight = technicians.length * CELL_HEIGHT;
 
-  const {
-    dateHeadersRef,
-    technicianScrollRef,
-    mainScrollRef,
-    visibleCols,
-    visibleRows,
-    canNavLeft,
-    canNavRight,
-    handleMobileNav,
-    handleDateHeadersScroll,
-    handleTechnicianScroll,
-    handleMainScroll,
-  } = useMatrixScrollState({
-    dates,
-    techniciansLength: technicians.length,
-    cellWidth: CELL_WIDTH,
-    cellHeight: CELL_HEIGHT,
-    matrixWidth,
-    mobile,
-    isInitialLoading,
-    canExpandBefore,
-    canExpandAfter,
-    onNearEdgeScroll,
-  });
+  // The scroll position and virtualised window live in the view, so a scroll
+  // step re-renders the grid alone and not this component's data hooks. Only
+  // the staffing badges need to know where the user is, and only per block of
+  // technicians: the view reports the visible rows and this keeps the block.
+  const [staffingBlock, setStaffingBlock] = useState({ start: 0, end: STAFFING_TECH_BLOCK });
+  const handleVisibleRowsChange = useCallback((rows: { start: number; end: number }) => {
+    const start = Math.floor(Math.max(0, rows.start - STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) * STAFFING_TECH_BLOCK;
+    const end = (Math.floor((rows.end + STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) + 1) * STAFFING_TECH_BLOCK;
+    setStaffingBlock((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
 
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
@@ -447,11 +432,9 @@ export const OptimizedAssignmentMatrix = ({
   }, [updateAssignmentOptimistically]);
 
   // Batched staffing statuses for visible window
-  const staffingBlockStart = Math.floor(Math.max(0, visibleRows.start - STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) * STAFFING_TECH_BLOCK;
-  const staffingBlockEnd = (Math.floor((visibleRows.end + STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) + 1) * STAFFING_TECH_BLOCK;
   const visibleTechIds = useMemo(
-    () => orderedTechnicians.slice(staffingBlockStart, staffingBlockEnd).map(t => t.id),
-    [orderedTechnicians, staffingBlockStart, staffingBlockEnd],
+    () => orderedTechnicians.slice(staffingBlock.start, staffingBlock.end).map(t => t.id),
+    [orderedTechnicians, staffingBlock],
   );
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
@@ -497,6 +480,9 @@ export const OptimizedAssignmentMatrix = ({
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    // Keep the names already loaded while a wider id set fetches, rather than
+    // dropping every tooltip back to "unknown sender" in the meantime.
+    placeholderData: (previous) => previous,
     enabled: actorIdsForTooltip.length > 0,
   });
 
@@ -648,12 +634,11 @@ export const OptimizedAssignmentMatrix = ({
   const viewProps = {
     isFetching, isInitialLoading,
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
-    dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
+    canExpandBefore, canExpandAfter, onNearEdgeScroll, onVisibleRowsChange: handleVisibleRowsChange,
     dates, technicians, orderedTechnicians,
     fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
     hideStaffingEmailButtons, hideStaffingWhatsappButtons,
-    canNavLeft, canNavRight, handleMobileNav,
-    handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
+    cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
     profileNamesMap,

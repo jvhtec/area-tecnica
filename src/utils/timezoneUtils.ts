@@ -169,6 +169,9 @@ export const getMadridTodayKey = (reference: Date = new Date()): string =>
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
 
+const MADRID_DAY_LABEL_CACHE_LIMIT = 5000;
+const madridDayLabelCache = new Map<string, string>();
+
 /**
  * Renders a Madrid day key for display.
  *
@@ -183,7 +186,23 @@ export const formatMadridDayKey = (
   dateKey: string,
   pattern: string,
   options?: Parameters<typeof formatInTimeZone>[3],
-): string => formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+): string => {
+  // A day key, a pattern and a locale always render the same label, so those
+  // are memoised: building one costs two timezone conversions plus a localised
+  // format (~40µs), and grids label the same days over and over. Any other
+  // option skips the cache rather than risk keying on it incompletely.
+  const optionKeys = options ? Object.keys(options) : [];
+  const cacheable = optionKeys.every((key) => key === "locale");
+  if (!cacheable) return formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+
+  const cacheKey = `${dateKey}\u0000${pattern}\u0000${options?.locale?.code ?? ""}`;
+  const cached = madridDayLabelCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const label = formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+  if (madridDayLabelCache.size >= MADRID_DAY_LABEL_CACHE_LIMIT) madridDayLabelCache.clear();
+  madridDayLabelCache.set(cacheKey, label);
+  return label;
+};
 
 /**
  * Turns a Madrid calendar-day key into the local-midnight Date that calendar

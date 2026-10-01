@@ -10,7 +10,7 @@ import {
   offerStatusLabel,
 } from '@/components/matrix/optimized-matrix-cell/helpers';
 
-type OptimizedMatrixCellTooltipProps = {
+export type OptimizedMatrixCellTooltipProps = {
   displayName: string;
   technician: {
     department: string;

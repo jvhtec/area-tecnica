@@ -14,7 +14,8 @@ const defaultArgs = {
   techniciansLength: 2,
   cellWidth: 120,
   cellHeight: 48,
-  matrixWidth: 240,
+  technicianWidth: 0,
+  headerHeight: 0,
   mobile: false,
   isInitialLoading: false,
   canExpandBefore: false,
@@ -65,31 +66,7 @@ describe("useMatrixScrollState", () => {
     }
   };
 
-  it("captures date header scroll values before throttled work runs", () => {
-    const { result } = renderHook(() => useMatrixScrollState(defaultArgs));
-    const header = createScrollableDiv({ scrollLeft: 96 });
-    const main = createScrollableDiv();
-
-    result.current.dateHeadersRef.current = header;
-    result.current.mainScrollRef.current = main;
-
-    const event = { currentTarget: header } as React.UIEvent<HTMLDivElement>;
-
-    act(() => {
-      result.current.handleDateHeadersScroll(event);
-    });
-    (event as unknown as { currentTarget: HTMLDivElement | null }).currentTarget = null;
-
-    expect(() => {
-      act(() => {
-        vi.runOnlyPendingTimers();
-        flushAnimationFrames();
-      });
-    }).not.toThrow();
-    expect(main.scrollLeft).toBe(96);
-  });
-
-  it("ignores pending scroll sync frames after unmount", () => {
+  it("ignores pending window updates after unmount", () => {
     const { result, unmount } = renderHook(() => useMatrixScrollState(defaultArgs));
     const main = createScrollableDiv({ scrollLeft: 120, scrollTop: 40 });
 
@@ -112,19 +89,14 @@ describe("useMatrixScrollState", () => {
       initialProps: defaultArgs,
     });
     const main = createScrollableDiv();
-    const headers = createScrollableDiv();
-    const technicianColumn = createScrollableDiv();
 
     result.current.mainScrollRef.current = main;
-    result.current.dateHeadersRef.current = headers;
-    result.current.technicianScrollRef.current = technicianColumn;
 
     // Establish a horizontal baseline, then scroll down only — the case that
     // used to return before recording the position.
     act(() => {
       main.scrollLeft = 0;
       result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
-      // Releases the in-progress sync guard, which otherwise drops the next event.
       flushAnimationFrames();
     });
     act(() => {
@@ -142,17 +114,15 @@ describe("useMatrixScrollState", () => {
     });
 
     expect(main.scrollTop).toBe(240);
-    expect(technicianColumn.scrollTop).toBe(240);
   });
-  it("keeps the newest vertical position when events outrun the sync frame", () => {
+
+  it("keeps the newest vertical position when events outrun the update frame", () => {
     const { result, rerender } = renderHook((args: typeof defaultArgs) => useMatrixScrollState(args), {
       initialProps: defaultArgs,
     });
     const main = createScrollableDiv();
-    const technicianColumn = createScrollableDiv();
 
     result.current.mainScrollRef.current = main;
-    result.current.technicianScrollRef.current = technicianColumn;
 
     act(() => {
       main.scrollLeft = 0;
@@ -160,8 +130,8 @@ describe("useMatrixScrollState", () => {
       flushAnimationFrames();
     });
 
-    // Two vertical events with no frame in between: the second is dropped for
-    // syncing (a frame is already pending) but is still the newest position.
+    // Two vertical events with no frame in between: one window update is
+    // pending, and the second event is still the newest position.
     act(() => {
       main.scrollTop = 120;
       result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
@@ -190,10 +160,8 @@ describe("useMatrixScrollState", () => {
       initialProps: defaultArgs,
     });
     const main = createScrollableDiv();
-    const headers = createScrollableDiv();
 
     result.current.mainScrollRef.current = main;
-    result.current.dateHeadersRef.current = headers;
 
     act(() => {
       main.scrollLeft = 360; // column 3 at cellWidth 120
@@ -207,7 +175,6 @@ describe("useMatrixScrollState", () => {
 
     // Column 3 at cellWidth 40.
     expect(main.scrollLeft).toBe(120);
-    expect(headers.scrollLeft).toBe(120);
   });
 
   it("still shifts by the prepended columns when the range grows backwards", () => {
@@ -215,10 +182,8 @@ describe("useMatrixScrollState", () => {
       initialProps: defaultArgs,
     });
     const main = createScrollableDiv();
-    const headers = createScrollableDiv();
 
     result.current.mainScrollRef.current = main;
-    result.current.dateHeadersRef.current = headers;
 
     act(() => {
       main.scrollLeft = 240; // column 2 at cellWidth 120
@@ -240,6 +205,40 @@ describe("useMatrixScrollState", () => {
     });
 
     expect(main.scrollLeft).toBe(480);
-    expect(headers.scrollLeft).toBe(480);
+  });
+
+  it("windows the grid past the sticky header row and technician column", () => {
+    // 20 technicians x 30 days at 100x50; the scroller is 700x450 with a 200px
+    // sticky column and a 50px sticky header, so the grid shows 500x400.
+    const dates = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 3, 1 + index)));
+    const { result } = renderHook(() =>
+      useMatrixScrollState({
+        ...defaultArgs,
+        dates,
+        techniciansLength: 20,
+        cellWidth: 100,
+        cellHeight: 50,
+        technicianWidth: 200,
+        headerHeight: 50,
+      }),
+    );
+    const main = createScrollableDiv({ scrollLeft: 1000, scrollTop: 250 });
+    Object.defineProperties(main, {
+      clientWidth: { value: 700 },
+      clientHeight: { value: 450 },
+      scrollWidth: { value: 3200 },
+      scrollHeight: { value: 1050 },
+    });
+    result.current.mainScrollRef.current = main;
+
+    act(() => {
+      result.current.handleMainScroll({ currentTarget: main } as React.UIEvent<HTMLDivElement>);
+      flushAnimationFrames();
+    });
+
+    // Visible: columns 10..15 (1000..1500) and rows 5..13 (250..650), plus the
+    // desktop overscan of 3 columns and 5 rows.
+    expect(result.current.visibleCols).toEqual({ start: 7, end: 18 });
+    expect(result.current.visibleRows).toEqual({ start: 0, end: 18 });
   });
 });
