@@ -3,7 +3,10 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(11);
+-- Test mutations and synthetic candidate fixtures must not survive local reruns.
+BEGIN;
+
+SELECT plan(19);
 
 SELECT set_config('request.jwt.claim.role', 'service_role', false);
 SELECT set_config('request.jwt.claim.sub', '', false);
@@ -31,7 +34,15 @@ FROM (VALUES
   ('cd100000-0000-0000-0000-000000000005'::uuid, 'rank-fridge@test.local'),
   ('cd100000-0000-0000-0000-000000000006'::uuid, 'rank-assigned@test.local'),
   ('cd100000-0000-0000-0000-000000000007'::uuid, 'rank-cross-job-decline@test.local'),
-  ('cd100000-0000-0000-0000-000000000008'::uuid, 'rank-role-offer@test.local')
+  ('cd100000-0000-0000-0000-000000000008'::uuid, 'rank-role-offer@test.local'),
+  ('cd100000-0000-0000-0000-000000000009'::uuid, 'rank-cross-job-same-role-offer@test.local'),
+  ('cd100000-0000-0000-0000-000000000010'::uuid, 'rank-cross-job-other-role-offer@test.local'),
+  ('cd100000-0000-0000-0000-000000000011'::uuid, 'rank-nonoverlap-decline@test.local'),
+  ('cd100000-0000-0000-0000-000000000012'::uuid, 'rank-nonoverlap-pending@test.local'),
+  ('cd100000-0000-0000-0000-000000000013'::uuid, 'rank-confirmed-availability@test.local'),
+  ('cd100000-0000-0000-0000-000000000014'::uuid, 'rank-cross-job-unknown-role@test.local'),
+  ('cd100000-0000-0000-0000-000000000015'::uuid, 'rank-cross-job-span-decline@test.local'),
+  ('cd100000-0000-0000-0000-000000000016'::uuid, 'rank-event-role-fallback@test.local')
 ) AS fixtures(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -47,7 +58,15 @@ FROM (VALUES
   ('cd100000-0000-0000-0000-000000000005'::uuid, 'rank-fridge@test.local', 'Fridge'),
   ('cd100000-0000-0000-0000-000000000006'::uuid, 'rank-assigned@test.local', 'Assigned'),
   ('cd100000-0000-0000-0000-000000000007'::uuid, 'rank-cross-job-decline@test.local', 'CrossDecline'),
-  ('cd100000-0000-0000-0000-000000000008'::uuid, 'rank-role-offer@test.local', 'RoleOffer')
+  ('cd100000-0000-0000-0000-000000000008'::uuid, 'rank-role-offer@test.local', 'RoleOffer'),
+  ('cd100000-0000-0000-0000-000000000009'::uuid, 'rank-cross-job-same-role-offer@test.local', 'SameRole'),
+  ('cd100000-0000-0000-0000-000000000010'::uuid, 'rank-cross-job-other-role-offer@test.local', 'OtherRole'),
+  ('cd100000-0000-0000-0000-000000000011'::uuid, 'rank-nonoverlap-decline@test.local', 'NonOverlap'),
+  ('cd100000-0000-0000-0000-000000000012'::uuid, 'rank-nonoverlap-pending@test.local', 'PendingOtherDay'),
+  ('cd100000-0000-0000-0000-000000000013'::uuid, 'rank-confirmed-availability@test.local', 'ConfirmedAvailability'),
+  ('cd100000-0000-0000-0000-000000000014'::uuid, 'rank-cross-job-unknown-role@test.local', 'UnknownRole'),
+  ('cd100000-0000-0000-0000-000000000015'::uuid, 'rank-cross-job-span-decline@test.local', 'SpanDecline'),
+  ('cd100000-0000-0000-0000-000000000016'::uuid, 'rank-event-role-fallback@test.local', 'EventFallback')
 ) AS fixtures(id, email, first_name)
 ON CONFLICT (id) DO UPDATE
 SET department = excluded.department,
@@ -107,8 +126,72 @@ INSERT INTO public.staffing_requests (
     'cd100000-0000-0000-0000-000000000008'::uuid,
     'offer', 'pending', 'role-offer', now() + interval '1 day',
     false, NULL, 'SND-FOH-R'
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000005'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000009'::uuid,
+    'offer', 'declined', 'ranking-005', now() + interval '1 day',
+    true, '2026-10-25', 'SND-FOH-R'
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000006'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000010'::uuid,
+    'offer', 'declined', 'ranking-006', now() + interval '1 day',
+    true, '2026-10-25', 'LGT-MON-R'
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000007'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000011'::uuid,
+    'availability', 'declined', 'ranking-007', now() + interval '1 day',
+    true, '2026-10-24', NULL
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000008'::uuid,
+    'cd200000-0000-0000-0000-000000000001'::uuid,
+    'cd100000-0000-0000-0000-000000000012'::uuid,
+    'availability', 'pending', 'ranking-008', now() + interval '1 day',
+    true, '2026-10-24', NULL
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000009'::uuid,
+    'cd200000-0000-0000-0000-000000000001'::uuid,
+    'cd100000-0000-0000-0000-000000000013'::uuid,
+    'availability', 'confirmed', 'ranking-009', now() + interval '1 day',
+    false, NULL, NULL
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000010'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000014'::uuid,
+    'offer', 'declined', 'ranking-010', now() + interval '1 day',
+    false, NULL, NULL
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000011'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000015'::uuid,
+    'availability', 'declined', 'ranking-011', now() + interval '1 day',
+    false, NULL, NULL
+  ),
+  (
+    'cd300000-0000-0000-0000-000000000012'::uuid,
+    'cd200000-0000-0000-0000-000000000002'::uuid,
+    'cd100000-0000-0000-0000-000000000016'::uuid,
+    'offer', 'declined', 'ranking-012', now() + interval '1 day',
+    true, '2026-10-25', NULL
   )
 ON CONFLICT (id) DO NOTHING;
+
+-- The event fallback is used when an old declined offer has no role_code.
+INSERT INTO public.staffing_events (staffing_request_id, event, meta)
+VALUES (
+  'cd300000-0000-0000-0000-000000000012'::uuid,
+  'email_sent',
+  '{"phase":"offer","role":"LGT-MON-R"}'::jsonb
+);
 
 INSERT INTO public.technician_availability (
   technician_id, date, status
@@ -200,15 +283,7 @@ SELECT ok(
   'an expired availability request does not exclude a candidate'
 );
 
--- Known migration-order regression: the 2026-07-30 full CREATE OR REPLACE
--- currently drops the May/June job-scoped availability and same-date decline
--- filters. Keep the intended assertions executable as TODOs rather than
--- inverting them and blessing the regression as a contract.
-SELECT todo(
-  '2026-07-30 rank_staffing_candidates replacement dropped May/June exclusion filters',
-  2
-);
-
+-- Required regression assertions: no TODO exemptions after restoration.
 SELECT ok(
   NOT EXISTS (
     SELECT 1 FROM phase1_rank_default
@@ -223,6 +298,70 @@ SELECT ok(
     WHERE profile_id = 'cd100000-0000-0000-0000-000000000007'::uuid
   ),
   'a same-date declined availability request from another job excludes the candidate'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000009'::uuid
+  ),
+  'same-day declined offer for the requested role excludes the candidate'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000010'::uuid
+  ),
+  'same-day declined offer for another role remains eligible'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000011'::uuid
+  ),
+  'declined availability on a different date does not exclude the candidate'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000012'::uuid
+  ),
+  'pending same-job availability on another date remains eligible'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000013'::uuid
+  ),
+  'confirmed job-scoped availability excludes another availability recommendation'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000014'::uuid
+  ),
+  'same-day declined offer with no role metadata excludes conservatively'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000015'::uuid
+  ),
+  'a declined full-span availability on an overlapping job excludes the candidate'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM phase1_rank_default
+    WHERE profile_id = 'cd100000-0000-0000-0000-000000000016'::uuid
+  ),
+  'declined offer without role_code uses event role fallback to avoid unrelated-role exclusion'
 );
 
 SELECT ok(
@@ -265,3 +404,5 @@ SELECT ok(
 );
 
 SELECT * FROM finish();
+
+ROLLBACK;
