@@ -11,6 +11,7 @@ import { TechnicianRow } from "../TechnicianRow";
 import { DateHeader } from "../DateHeader";
 import { MatrixGridRow } from "@/components/matrix/optimized-assignment-matrix/MatrixGridRow";
 import { useMatrixScrollState } from "@/components/matrix/optimized-assignment-matrix/useMatrixScrollState";
+import type { DateHeaderCounts } from "@/components/matrix/optimized-assignment-matrix/useMatrixHeaderCounts";
 import {
   MatrixCellHoverTooltip,
   type MatrixCellHoverTooltipHandle,
@@ -56,6 +57,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   qc: any;
   setSortJobId: React.Dispatch<React.SetStateAction<string | null>>;
   getJobsForDate: (date: Date) => any[];
+  getHeaderCounts?: (date: Date) => DateHeaderCounts;
   getAssignmentForCell: (technicianId: string, date: Date) => any;
   getAvailabilityForCell: (technicianId: string, date: Date) => any;
   selectedCells: Set<string>;
@@ -135,6 +137,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   qc,
   setSortJobId,
   getJobsForDate,
+  getHeaderCounts,
   getAssignmentForCell,
   getAvailabilityForCell,
   selectedCells,
@@ -466,17 +469,22 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
               >
                 {/* Leading spacer for virtualized columns */}
                 <div style={{ width: visibleCols.start * CELL_WIDTH, flexShrink: 0 }} />
-                {visibleDates.map((date, idx) => (
-                  <DateHeader
-                    key={visibleCols.start + idx}
-                    date={date}
-                    width={CELL_WIDTH}
-                    jobs={getJobsForDate(date)}
-                    technicianIds={technicianIds}
-                    compact={mobile}
-                    onJobClick={handleDateHeaderJobClick}
-                  />
-                ))}
+                {visibleDates.map((date, idx) => {
+                  const counts = getHeaderCounts?.(date);
+                  return (
+                    <DateHeader
+                      key={visibleCols.start + idx}
+                      date={date}
+                      width={CELL_WIDTH}
+                      jobs={getJobsForDate(date)}
+                      technicianIds={technicianIds}
+                      confirmedCount={counts?.confirmed}
+                      openSlots={counts?.openSlots}
+                      compact={mobile}
+                      onJobClick={handleDateHeaderJobClick}
+                    />
+                  );
+                })}
               </div>
             </div>
 

@@ -17,6 +17,7 @@ import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
+import { useMatrixHeaderCounts } from '@/components/matrix/optimized-assignment-matrix/useMatrixHeaderCounts';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
 
 
@@ -171,6 +172,15 @@ export const OptimizedAssignmentMatrix = ({
     const end = (Math.floor((rows.end + STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) + 1) * STAFFING_TECH_BLOCK;
     setStaffingBlock((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
   }, []);
+
+  // Date header counts for the whole range (no per-column queries on scroll).
+  const getHeaderCounts = useMatrixHeaderCounts({
+    dates,
+    jobs,
+    allAssignments,
+    getJobsForDate,
+    includeOpenSlots: !mobile,
+  });
 
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
@@ -640,7 +650,7 @@ export const OptimizedAssignmentMatrix = ({
     hideStaffingEmailButtons, hideStaffingWhatsappButtons,
     cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
-    getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
+    getJobsForDate, getHeaderCounts, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
     profileNamesMap,
     handleCellSelect, handleCellClick, handleCellPrefetch, handleOptimisticUpdate, incrementCellRender,
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
