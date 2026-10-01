@@ -250,6 +250,9 @@ test("assignment matrix stays smooth on a dense dataset", async ({ page }) => {
     };
   };
 
+  // Floor: 1px per frame never changes the virtualised window, so this is the
+  // cost of scrolling and painting the grid with no React work at all.
+  const floor = await breakdown(() => measureScroll(page, "y", 1, 60));
   const vertical = await breakdown(() => measureScroll(page, "y", 36, 120));
   const horizontal = await breakdown(() => measureScroll(page, "x", 60, 120));
 
@@ -270,7 +273,7 @@ test("assignment matrix stays smooth on a dense dataset", async ({ page }) => {
 
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
 
-  const result = { cpuThrottle: CPU_THROTTLE, vertical, horizontal, clickMs };
+  const result = { cpuThrottle: CPU_THROTTLE, floor, vertical, horizontal, clickMs };
   console.log(`MATRIX_PERF ${JSON.stringify(result)}`);
   test.info().annotations.push({ type: "matrix-perf", description: JSON.stringify(result) });
 });
