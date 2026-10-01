@@ -3,6 +3,10 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
+-- Keep the fixture, its lifecycle events, and every mutation ephemeral.
+-- BEGIN/ROLLBACK also prevent persistent audit events from contaminating later runs.
+BEGIN;
+
 SELECT plan(18);
 
 SELECT ok(
@@ -237,6 +241,18 @@ SET is_active = true,
     category = excluded.category,
     source = excluded.source;
 
+-- A prior version of this test left committed fixture audit events behind.
+-- Clear only these synthetic assignment IDs inside the rolled-back transaction
+-- so rerunning against an existing local database yields deterministic counts.
+DELETE FROM public.assignment_audit_log
+WHERE assignment_id IN (
+  'ca300000-0000-0000-0000-000000000001'::uuid,
+  'ca300000-0000-0000-0000-000000000002'::uuid,
+  'ca300000-0000-0000-0000-000000000003'::uuid,
+  'ca300000-0000-0000-0000-000000000004'::uuid,
+  'ca300000-0000-0000-0000-000000000005'::uuid
+);
+
 CREATE TEMP TABLE phase1_lifecycle_results (
   scenario text PRIMARY KEY,
   result jsonb NOT NULL
@@ -446,3 +462,5 @@ SELECT is(
 );
 
 SELECT * FROM finish();
+
+ROLLBACK;
