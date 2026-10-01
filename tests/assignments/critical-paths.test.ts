@@ -123,6 +123,7 @@ const configureDialogSupabase = ({
 } = {}) => {
   const insertMock = vi.fn().mockResolvedValue({ error: null });
   const updateBuilder = createMockQueryBuilder({ data: null, error: null });
+  const deleteBuilder = createMockQueryBuilder({ data: null, error: null });
 
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === "job_assignments") {
@@ -149,6 +150,7 @@ const configureDialogSupabase = ({
         }),
         insert: insertMock,
         update: updateBuilder.update,
+        delete: deleteBuilder.delete,
       };
     }
 
@@ -181,7 +183,11 @@ const configureDialogSupabase = ({
     return createMockQueryBuilder();
   });
 
-  return { insertMock, updateMock: updateBuilder.update };
+  return {
+    insertMock,
+    updateMock: updateBuilder.update,
+    deleteMock: deleteBuilder.delete,
+  };
 };
 
 const renderAssignmentDialog = async ({
@@ -555,6 +561,64 @@ describe("Assignments Critical Paths", () => {
         present: true,
         source: "assignment-dialog",
       });
+    });
+
+    it("preserves the committed base assignment and still attempts every date when one timesheet write fails", async () => {
+      const { insertMock, deleteMock } = configureDialogSupabase();
+      toggleTimesheetDayMock
+        .mockRejectedValueOnce(new Error("first date failed"))
+        .mockResolvedValueOnce(undefined);
+
+      await renderAssignmentDialog();
+
+      await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2));
+
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-01",
+        present: true,
+        source: "assignment-dialog",
+      });
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-02",
+        present: true,
+        source: "assignment-dialog",
+      });
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
+    });
+
+    it("can leave partial date coverage when a later timesheet write fails", async () => {
+      const { insertMock, deleteMock } = configureDialogSupabase();
+      toggleTimesheetDayMock
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("second date failed"));
+
+      await renderAssignmentDialog();
+
+      await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2));
+
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-01",
+        present: true,
+        source: "assignment-dialog",
+      });
+      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-02",
+        present: true,
+        source: "assignment-dialog",
+      });
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
     });
   });
 });
