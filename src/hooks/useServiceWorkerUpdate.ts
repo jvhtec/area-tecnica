@@ -44,12 +44,17 @@ const isIOS = (): boolean => {
  * 2. Shows a toast notification to the user (works for both logged-in and non-logged-in users)
  * 3. Provides different messaging for PWA vs browser users
  * 4. Allows the user to trigger the update
- * 5. Reloads the page when the new SW takes control
+ * 5. Reloads the page when the new SW takes control — only after the user
+ *    chose "Actualizar" in this tab; nothing reloads on its own
  */
 export function useServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const refreshing = useRef(false);
+  // Set when this tab asks the waiting worker to take over. A controller change
+  // this tab did not ask for (the first install claiming the page, or another
+  // tab applying the update) must not reload it out from under the user.
+  const updateRequested = useRef(false);
   const toastId = useRef<string | number | undefined>(undefined);
   const isStandalone = isPWAMode();
 
@@ -95,6 +100,7 @@ export function useServiceWorkerUpdate() {
               label: 'Actualizar',
               onClick: () => {
                 if (registration.waiting) {
+                  updateRequested.current = true;
                   try {
                     // Send SKIP_WAITING message to the waiting service worker
                     registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -103,6 +109,10 @@ export function useServiceWorkerUpdate() {
                     // Fallback: just reload the page to get the new version
                     window.location.reload();
                   }
+                } else {
+                  // Another tab already applied it: this one only needs to load
+                  // the new version, which the user has just asked for.
+                  window.location.reload();
                 }
               },
             },
@@ -169,7 +179,7 @@ export function useServiceWorkerUpdate() {
     // Listen for the new service worker to take control
     // When it does, reload the page to get the new assets
     const handleControllerChange = () => {
-      if (isDisposed) {
+      if (isDisposed || !updateRequested.current) {
         return;
       }
 

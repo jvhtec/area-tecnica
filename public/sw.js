@@ -91,7 +91,14 @@ self.addEventListener('install', (event) => {
         await self.precacheAssets()
       }
 
-      await self.skipWaiting()
+      // Only the very first install takes over straight away. An update waits
+      // until the user applies it (SKIP_WAITING from the update toast) or every
+      // tab is closed: activating on install made each open tab reload itself
+      // a few minutes after every deploy, mid-task. Old tabs keep working in the
+      // meantime because hashed /assets live in the version-independent cache.
+      if (!self.registration.active) {
+        await self.skipWaiting()
+      }
     })()
   )
 })
