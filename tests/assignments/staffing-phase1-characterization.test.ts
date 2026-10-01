@@ -32,12 +32,35 @@ function expectOrdered(source: string, earlier: string, later: string) {
 
 describe("Staffing Phase 1 characterization", () => {
   describe("request persistence and delivery ordering", () => {
-    it("persists the staffing request before attempting external delivery", () => {
-      expectOrdered(
+    it("awaits real batch and single-request writes before Email/WhatsApp delivery", () => {
+      // Inspect executable operations rather than section comments: a refactor
+      // must not make external delivery run before either persistence branch.
+      const batchInsert = indexOrFail(
         sendStaffingEmail,
-        "// Step 5: Insert/update staffing request(s)",
-        "// Step 6: Deliver via chosen channel",
+        "const firstInsert = await supabase.from('staffing_requests').insert({",
       );
+      const existingBatchUpdate = indexOrFail(
+        sendStaffingEmail,
+        "const upd = await supabase",
+        indexOrFail(sendStaffingEmail, "// Reuse existing row: refresh token + expiry + batch association."),
+      );
+      const singleInsert = indexOrFail(
+        sendStaffingEmail,
+        'const insertRes = await supabase.from("staffing_requests").insert({',
+      );
+      const whatsappDelivery = indexOrFail(
+        sendStaffingEmail,
+        "const res = await fetchWithTimeout(attempt.url,",
+      );
+      const emailDelivery = indexOrFail(
+        sendStaffingEmail,
+        "const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload)",
+      );
+
+      for (const persist of [batchInsert, existingBatchUpdate, singleInsert]) {
+        expect(persist).toBeLessThan(whatsappDelivery);
+        expect(persist).toBeLessThan(emailDelivery);
+      }
     });
 
     it("returns a delivery error without rolling back the persisted staffing request", () => {
