@@ -24,6 +24,13 @@ import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/compo
 import { queryKeys } from "@/lib/react-query";
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
 
+// The staffing badges are fetched for a block-aligned window of technicians
+// rather than exactly the visible rows: the query is keyed on the id list, so
+// a window that moved with every row scrolled refetched (three round trips)
+// on nearly every scroll step. Aligned blocks only change at a boundary.
+const STAFFING_TECH_BLOCK = 40;
+const STAFFING_TECH_OVERSCAN = 10;
+
 type ProfileNameRow = {
   id: string;
   first_name: string | null;
@@ -68,11 +75,11 @@ export const OptimizedAssignmentMatrix = ({
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
 
   // Global selected cell store for Stream Deck integration
-  const {
-    selectCell,
-    clearSelection: clearGlobalSelection,
-    isCellSelected: isGlobalCellSelected
-  } = useSelectedCellStore();
+  // Selected individually: the bare hook subscribes to the whole store, so
+  // every selection change re-rendered the matrix a second time.
+  const selectCell = useSelectedCellStore((state) => state.selectCell);
+  const clearGlobalSelection = useSelectedCellStore((state) => state.clearSelection);
+  const isGlobalCellSelected = useSelectedCellStore((state) => state.isCellSelected);
 
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
@@ -350,24 +357,28 @@ export const OptimizedAssignmentMatrix = ({
 
 
 
+  // Independent of selectedCells, so the callback every cell receives stays
+  // stable: depending on the set handed each of the hundreds of memoized cells
+  // a new onSelect on every click, re-rendering the whole visible grid.
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
     const cellKey = `${technicianId}-${formatMadridDateKey(date)}`;
-    const newSelected = new Set(selectedCells);
 
     if (selected) {
-      newSelected.add(cellKey);
       // Update global store for single-cell selection (for Stream Deck shortcuts)
       selectCell(technicianId, date);
-    } else {
-      newSelected.delete(cellKey);
+    } else if (isGlobalCellSelected(technicianId, date)) {
       // Clear global selection if deselecting
-      if (isGlobalCellSelected(technicianId, date)) {
-        clearGlobalSelection();
-      }
+      clearGlobalSelection();
     }
 
-    setSelectedCells(newSelected);
-  }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
+    setSelectedCells((prev) => {
+      if (prev.has(cellKey) === selected) return prev;
+      const next = new Set(prev);
+      if (selected) next.add(cellKey);
+      else next.delete(cellKey);
+      return next;
+    });
+  }, [selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
   const clearCellSelection = useCallback(() => {
     setSelectedCells(new Set());
@@ -436,11 +447,12 @@ export const OptimizedAssignmentMatrix = ({
   }, [updateAssignmentOptimistically]);
 
   // Batched staffing statuses for visible window
-  const visibleTechIds = useMemo(() => {
-    const start = Math.max(0, visibleRows.start - 10);
-    const end = Math.min(orderedTechnicians.length - 1, visibleRows.end + 10);
-    return orderedTechnicians.slice(start, end + 1).map(t => t.id);
-  }, [orderedTechnicians, visibleRows.start, visibleRows.end]);
+  const staffingBlockStart = Math.floor(Math.max(0, visibleRows.start - STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) * STAFFING_TECH_BLOCK;
+  const staffingBlockEnd = (Math.floor((visibleRows.end + STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) + 1) * STAFFING_TECH_BLOCK;
+  const visibleTechIds = useMemo(
+    () => orderedTechnicians.slice(staffingBlockStart, staffingBlockEnd).map(t => t.id),
+    [orderedTechnicians, staffingBlockStart, staffingBlockEnd],
+  );
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
   const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, title: j.title, start_time: j.start_time, end_time: j.end_time })), [jobs]);

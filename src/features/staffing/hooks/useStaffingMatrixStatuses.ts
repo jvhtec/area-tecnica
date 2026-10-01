@@ -264,12 +264,22 @@ export function useStaffingMatrixStatuses(
       }
 
       // Build job lookup with parsed dates for overlap check
-      const jobLookup = new Map<string, { id: string, title: string | null, start: Date, end: Date }>()
+      // Job bounds as Madrid day keys, computed once per job rather than once
+      // per request × technician × date in the loop below.
+      const jobLookup = new Map<string, { id: string, title: string | null, startKey: string, endKey: string }>()
       jobs.forEach(j => {
         const start = j.start_time ? new Date(j.start_time) : new Date()
         const end = j.end_time ? new Date(j.end_time) : new Date()
-        jobLookup.set(j.id, { id: j.id, title: j.title?.trim() || null, start, end })
+        jobLookup.set(j.id, {
+          id: j.id,
+          title: j.title?.trim() || null,
+          startKey: formatMadridDateKey(start),
+          endKey: formatMadridDateKey(end),
+        })
       })
+      // target_date rows are Madrid calendar days, so key the map the same
+      // way — and the matrix reads these keys back with the same helper.
+      const dateKeys = dates.map(d => formatMadridDateKey(d))
 
       // Group requests by technician for faster lookups
       const byTech = new Map<string, StaffingRequestRow[]>()
@@ -283,10 +293,8 @@ export function useStaffingMatrixStatuses(
       // For each technician and visible date, compute latest per-phase over overlapping jobs
       technicianIds.forEach(tid => {
         const reqs = byTech.get(tid) || []
-        dates.forEach(d => {
-          // target_date rows are Madrid calendar days, so key the map the same
-          // way — and the matrix reads these keys back with the same helper.
-          const dStr = formatMadridDateKey(d)
+        if (!reqs.length) return
+        dateKeys.forEach(dStr => {
           // Filter requests based on type:
           // - Single-day requests: exact target_date match (prevents following job reschedules)
           // - Full-span requests: show on all dates within the job's date range
@@ -304,7 +312,7 @@ export function useStaffingMatrixStatuses(
               // dStr is a Madrid day, so the job bounds have to be Madrid days too.
               // Comparing local midnights here put the badge on the neighbouring
               // column in browsers east or west of Madrid.
-              return dStr >= formatMadridDateKey(job.start) && dStr <= formatMadridDateKey(job.end)
+              return dStr >= job.startKey && dStr <= job.endKey
             }
 
             return false

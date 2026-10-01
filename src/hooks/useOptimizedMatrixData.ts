@@ -1,18 +1,22 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
-import { formatInTimeZone } from 'date-fns-tz';
 
 
 import { queryKeys } from "@/lib/react-query";
 import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
-import { addMadridCalendarDays } from "@/utils/timezoneUtils";
-const MADRID_TIMEZONE = 'Europe/Madrid';
+import { addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
+import { debounce } from "@/utils/throttle";
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
 
+// Realtime bursts (a tour assignment writes one timesheet per date) collapse
+// into one refetch; maxWait keeps a busy day from postponing it indefinitely.
+const REALTIME_INVALIDATION_DEBOUNCE_MS = 400;
+const REALTIME_INVALIDATION_MAX_WAIT_MS = 2000;
+
 function toMadridDateKey(date: Date | undefined): string {
-  return date ? formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') : '';
+  return date ? formatMadridDateKey(date) : '';
 }
 
 /**
@@ -116,16 +120,20 @@ export const buildAssignmentDateMap = (
  */
 export const buildJobsByDate = (jobs: MatrixJob[], dates: Date[]) => {
   const jobsByDate = new Map<string, MatrixJob[]>();
+  // Once per job, not once per job per column.
+  const jobSpans = jobs.map((job) => ({
+    job,
+    startKey: toMadridDateKey(new Date(job.start_time)),
+    endKey: toMadridDateKey(new Date(job.end_time)),
+  }));
 
   dates.forEach((date) => {
     const dateKey = toMadridDateKey(date);
-    jobsByDate.set(dateKey, jobs.filter((job) => {
+    jobsByDate.set(dateKey, jobSpans.filter(({ job, startKey, endKey }) => {
       const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
       if (hasTypedDate) return true;
-      const jobStartKey = toMadridDateKey(new Date(job.start_time));
-      const jobEndKey = toMadridDateKey(new Date(job.end_time));
-      return dateKey >= jobStartKey && dateKey <= jobEndKey;
-    }));
+      return dateKey >= startKey && dateKey <= endKey;
+    }).map(({ job }) => job));
   });
 
   return jobsByDate;
@@ -514,25 +522,23 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Realtime invalidation for availability changes
   useEffect(() => {
     if (!technicianIds.length) return;
+    const invalidateAvailability = debounce(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
+    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
     const ch2 = supabase
       .channel('rt-availability-schedules')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, invalidateAvailability)
       .subscribe();
     const ch3 = supabase
       .channel('rt-technician-availability')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, invalidateAvailability)
       .subscribe();
     const ch4 = supabase
       .channel('rt-vacation-requests')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, invalidateAvailability)
       .subscribe();
     return () => {
+      invalidateAvailability.cancel();
       try { supabase.removeChannel(ch2); } catch { /* channel may already be removed */ }
       try { supabase.removeChannel(ch3); } catch { /* channel may already be removed */ }
       try { supabase.removeChannel(ch4); } catch { /* channel may already be removed */ }
@@ -620,6 +626,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Realtime subscription for job_assignments table
   useEffect(() => {
+    const invalidate = debounce(() => {
+      void invalidateAssignmentQueries();
+    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
     const channel = supabase
       .channel('matrix-job-assignments')
       .on(
@@ -629,20 +638,23 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        () => {
-          // Immediately invalidate and refetch
-          invalidateAssignmentQueries();
-        }
+        invalidate
       )
       .subscribe();
 
     return () => {
+      invalidate.cancel();
       supabase.removeChannel(channel);
     };
   }, [invalidateAssignmentQueries]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
+    const invalidate = debounce(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+      // Confirmed and open-slot badges are counted off timesheets too.
+      void invalidateMatrixHeaderCounts(queryClient);
+    }, REALTIME_INVALIDATION_DEBOUNCE_MS, { maxWait: REALTIME_INVALIDATION_MAX_WAIT_MS });
     const channel = supabase
       .channel('matrix-timesheets')
       .on(
@@ -652,15 +664,12 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'timesheets',
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
-          // Confirmed and open-slot badges are counted off timesheets too.
-          void invalidateMatrixHeaderCounts(queryClient);
-        }
+        invalidate
       )
       .subscribe();
 
     return () => {
+      invalidate.cancel();
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
