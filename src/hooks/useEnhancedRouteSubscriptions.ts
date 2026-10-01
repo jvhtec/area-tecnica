@@ -75,6 +75,16 @@ export function useEnhancedRouteSubscriptions() {
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
   const currentRouteOwnerMode = useRef<RouteOwnerMode>(null);
   const [isLeader, setIsLeader] = useState(() => multiTabCoordinator.getIsLeader());
+  // Read, not depended on, by the subscription effect below: that effect ends
+  // in subscribe/markRefreshed calls that move lastRefreshTime themselves, so
+  // depending on it re-ran the effect from its own write — a tight loop that
+  // froze the tab (seen after returning to it, when leadership was in flux).
+  const lastRefreshTimeRef = useRef(lastRefreshTime);
+  // Synced in an effect (declared before the subscription effect, so it runs
+  // first) rather than during render.
+  useEffect(() => {
+    lastRefreshTimeRef.current = lastRefreshTime;
+  }, [lastRefreshTime]);
 
   const [status, setStatus] = useState({
     requiredTables: [] as string[],
@@ -94,6 +104,10 @@ export function useEnhancedRouteSubscriptions() {
     };
     
     window.addEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
+    // Election is asynchronous and may have settled before this listener was
+    // attached; a missed event left the hook treating the leader tab as a
+    // follower of itself.
+    setIsLeader(multiTabCoordinator.getIsLeader());
     
     return () => {
       window.removeEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
@@ -167,7 +181,10 @@ export function useEnhancedRouteSubscriptions() {
     const { routeKey, tables: routeTables } = getSubscriptionConfigForPathname(pathname);
     const previousRouteKey = currentRouteKey.current;
     const previousOwnerMode = currentRouteOwnerMode.current;
-    const nextOwnerMode: RouteOwnerMode = isLeader ? 'leader' : 'follower';
+    // The coordinator is the source of truth; the state above only re-runs
+    // this effect when leadership changes.
+    const actsAsLeader = multiTabCoordinator.getIsLeader();
+    const nextOwnerMode: RouteOwnerMode = actsAsLeader ? 'leader' : 'follower';
     
     console.log('Configuring subscriptions for route:', pathname);
     console.log('Using route key for subscriptions:', routeKey);
@@ -224,7 +241,7 @@ export function useEnhancedRouteSubscriptions() {
     }));
 
     // Subscribe to all tables (only if we're the leader)
-    if (isLeader) {
+    if (actsAsLeader) {
       subscriptionRequirements.forEach(({ table, queryKey, priority }) => {
         console.log(`Subscribing to ${table} with priority ${priority}`);
         const subscription = manager.subscribeToTable(table, queryKey, undefined, priority);
@@ -255,12 +272,12 @@ export function useEnhancedRouteSubscriptions() {
     // Format last activity time
     let formattedLastActivity = "Unknown";
     try {
-      formattedLastActivity = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
+      formattedLastActivity = formatDistanceToNow(lastRefreshTimeRef.current, { addSuffix: true });
     } catch (error) {
       console.error("Error formatting time:", error);
     }
     
-    const isStale = Date.now() - lastRefreshTime > SUBSCRIPTION_STALE_TIME;
+    const isStale = Date.now() - lastRefreshTimeRef.current > SUBSCRIPTION_STALE_TIME;
     
     setStatus({
       requiredTables: tableNames,
@@ -273,7 +290,7 @@ export function useEnhancedRouteSubscriptions() {
       requiredSubscriptions: subscriptionRequirements,
     });
     
-  }, [cleanupRouteOwner, location.pathname, manager, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
+  }, [cleanupRouteOwner, location.pathname, manager, queryClient, isLeader, multiTabCoordinator]);
 
   // Helper to get priority value for comparison
   function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {

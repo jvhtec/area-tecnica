@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext, createContext, useMemo, useSyncExternalStore, Fragment, ReactNode } from "react";
+import { useState, useEffect, useCallback, useContext, createContext, useMemo, useSyncExternalStore, useRef, Fragment, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PrivateAuthBoundary } from "@/hooks/optimizedAuthBoundary";
 import { getPrivateDataScope, subscribePrivateDataScope } from "@/lib/private-data-scope";
@@ -51,6 +51,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [assignableAsTechFlag, setAssignableAsTechFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  // Whose role is currently applied. A profile read for that same user is a
+  // background refresh: it must not raise isProfileLoading, which route guards
+  // answer by swapping the whole page for a spinner — the "reload" users saw on
+  // returning to a tab, when the token refresh refetched the profile.
+  const appliedProfileRef = useRef<{ userId: string | null; role: string | null }>({ userId: null, role: null });
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tokenManager = TokenManager.getInstance();
@@ -63,6 +68,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const boundary = useMemo(() => new PrivateAuthBoundary(queryClient), [queryClient]);
   const applySession = useCallback((next: Session | null) => {
     if (boundary.acceptSession(next?.user.id ?? null)) {
+      appliedProfileRef.current = { userId: null, role: null };
       setUserRole(null);
       setUserDepartment(null);
       setSoundVisionAccessFlag(false);
@@ -70,7 +76,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       setIsProfileLoading(false);
     }
     setSession(next);
-    setUser(next?.user ?? null);
+    // A refreshed token carries the same user; keep the object everything
+    // downstream already holds so a token refresh re-renders nothing.
+    setUser((previous) => {
+      const nextUser = next?.user ?? null;
+      if (previous && nextUser && previous.id === nextUser.id && previous.updated_at === nextUser.updated_at) {
+        return previous;
+      }
+      return nextUser;
+    });
     setIsInitialized(true);
   }, [boundary]);
 
@@ -112,8 +126,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
     const request = boundary.beginProfile(userId);
     if (!request) return null;
+    const background =
+      appliedProfileRef.current.userId === userId && appliedProfileRef.current.role !== null;
     const applyCachedProfile = (cached: CachedProfile): ProfileData | null => {
       if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
+      appliedProfileRef.current = { userId, role: cached.role };
       setUserRole(cached.role);
       setUserDepartment(cached.department);
       setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
@@ -138,7 +155,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       console.log('🔄 Fetching fresh profile data...');
-      setIsProfileLoading(true);
+      if (!background) setIsProfileLoading(true);
 
       const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: SupabaseErrorLike | null }> => {
         if (!request.isCurrent()) throw new Error("La sesión ha cambiado");
@@ -234,6 +251,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const soundVisionAccess = Boolean(typedData.soundvision_access);
         const assignableAsTech = Boolean(typedData.assignable_as_tech);
         if (!request.apply(typedData.role, typedData.department, soundVisionAccess, assignableAsTech)) return null;
+        appliedProfileRef.current = { userId, role: typedData.role };
         setUserRole(typedData.role);
         setUserDepartment(typedData.department);
         setSoundVisionAccessFlag(soundVisionAccess);
@@ -241,7 +259,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
+        // A background refresh that comes back empty keeps the profile the
+        // user is working with rather than locking them out mid-session.
+        if (background) return null;
         if (!request.apply(null, null, false, false)) return null;
+        appliedProfileRef.current = { userId, role: null };
         setUserRole(null);
         setUserDepartment(null);
         setSoundVisionAccessFlag(false);
@@ -368,7 +390,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         // Offline with an expired token supabase-js reports INITIAL_SESSION with
         // no session while keeping it stored; that is not a sign-out.
         const newSession = event === 'INITIAL_SESSION' ? sessionOrPersisted(rawSession) : rawSession;
+        const sameProfileUser =
+          !!newSession?.user?.id && appliedProfileRef.current.userId === newSession.user.id;
         applySession(newSession);
+
+        if (event === 'TOKEN_REFRESHED' && sameProfileUser) {
+          // A new access token changes nothing about who the user is.
+          setIsLoading(false);
+          return;
+        }
 
         if (newSession?.user?.id) {
           // Background profile fetch without blocking UI

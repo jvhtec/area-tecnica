@@ -46,7 +46,7 @@ vi.mock("@/lib/unified-subscription-manager", () => ({
 
 vi.mock("@/providers/SubscriptionProvider", () => ({
   useSubscriptionContext: () => ({
-    lastRefreshTime: mocks.lastRefreshTime,
+    lastRefreshTime: mocks.lastRefreshTime as number,
     connectionStatus: "connected",
   }),
 }));
@@ -254,5 +254,35 @@ describe("useEnhancedRouteSubscriptions", () => {
 
     expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
     expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("does not re-run its subscription work when the refresh time moves", async () => {
+    // Subscribing marks the manager refreshed, which moves lastRefreshTime;
+    // re-running on that change looped until the tab froze.
+    const queryClient = new QueryClient();
+    const tree = () => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <Harness />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const rendered = render(tree());
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    const callsAfterMount = mocks.manager.subscribeToTable.mock.calls.length;
+
+    mocks.lastRefreshTime = Date.now() + 60_000;
+    rendered.rerender(tree());
+
+    expect(mocks.manager.subscribeToTable.mock.calls.length).toBe(callsAfterMount);
+  });
+
+  it("acts as leader when the coordinator is, even if it missed the election event", async () => {
+    // getIsLeader() is false at first render and true by the time effects run.
+    mocks.coordinator.getIsLeader.mockReturnValueOnce(false).mockReturnValue(true);
+    renderHookHarness("/dashboard");
+
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    expect(mocks.coordinator.requestSubscriptions).not.toHaveBeenCalled();
   });
 });
