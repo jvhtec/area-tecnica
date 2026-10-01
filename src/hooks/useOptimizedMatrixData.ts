@@ -9,6 +9,11 @@ import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/ut
 import { addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
 import { debounce } from "@/utils/throttle";
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
+// Shared defaults while a query has no data: `= []` in the destructuring made a
+// new array per render, which rebuilt every lookup derived from it and handed
+// each grid row new functions.
+const EMPTY_ASSIGNMENTS: MatrixTimesheetAssignment[] = [];
+const EMPTY_AVAILABILITY: AvailabilityDay[] = [];
 
 // Realtime bursts (a tour assignment writes one timesheet per date) collapse
 // into one refetch; maxWait keeps a busy day from postponing it indefinitely.
@@ -328,7 +333,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Much more optimized assignments query - only fetch what's actually needed
   const {
-    data: allAssignments = [],
+    data: allAssignments = EMPTY_ASSIGNMENTS,
     isLoading: assignmentsInitialLoading,
     isFetching: assignmentsFetching,
   } = useQuery({
@@ -363,7 +368,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   );
 
   const {
-    data: availabilityData = [],
+    data: availabilityData = EMPTY_AVAILABILITY,
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
@@ -545,8 +550,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [queryClient, technicianIds.length]);
 
-  // Preload technician data for dialogs
-  const prefetchTechnicianData = async (technicianId: string) => {
+  // Preload technician data for dialogs. Stable (useCallback) because it is
+  // handed to every grid row: a fresh function per render re-rendered them all.
+  const prefetchTechnicianData = useCallback(async (technicianId: string) => {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.scope('technician', technicianId),
       queryFn: async () => {
@@ -561,7 +567,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       },
       staleTime: 2 * 60 * 1000, // 2 minutes
     });
-  };
+  }, [queryClient]);
 
   // Memoized helper functions
   const getAssignmentForCell = useMemo(() => {
@@ -595,7 +601,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   }, [jobs, dates]);
 
   // Optimistic update functions
-  const updateAssignmentOptimistically = (technicianId: string, jobId: string, newStatus: string) => {
+  const updateAssignmentOptimistically = useCallback((technicianId: string, jobId: string, newStatus: string) => {
     // Update all cached assignment queries to reflect the new status immediately
     queryClient.setQueriesData<MatrixTimesheetAssignment[]>({ queryKey: queryKeys.scope('optimized-matrix-assignments') }, (old) => {
       if (!old) return old;
@@ -610,7 +616,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         return old;
       }
     });
-  };
+  }, [queryClient]);
 
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = useCallback(async () => {
