@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Row = Record<string, unknown>;
 type Filter = (row: Row) => boolean;
@@ -19,6 +20,10 @@ export class StaffingDatabase {
   deliveries: Row[] = [];
   writes: Array<{ table: string; operation: string; rows: Row[]; input: Row[] }> = [];
   supportsRoleCode = true;
+  client?: SupabaseClient;
+  deliveryStatus = 200;
+  externalStatus = 200;
+  afterQuery?: (query: { table: string; operation: string; columns: string; rows: Row[] }) => void | Promise<void>;
 
   from(table: string) {
     this.tables[table] ??= [];
@@ -40,18 +45,22 @@ export class StaffingDatabase {
       or: (_expression: string) => query,
       order: (_key: string, options?: { ascending?: boolean }) => { descending = options?.ascending === false; return query; },
       limit: (value: number) => { max = value; return query; },
+      returns: () => query,
       maybeSingle: () => { single = true; return query; },
       single: () => { single = true; return query; },
       insert: (value: Row | Row[], _options?: unknown) => { operation = 'insert'; payload = Array.isArray(value) ? value : [value]; return query; },
       update: (value: Row) => { operation = 'update'; payload = [value]; return query; },
       upsert: (value: Row | Row[], options: { onConflict: string }) => { operation = 'upsert'; payload = Array.isArray(value) ? value : [value]; keys = options.onConflict.split(','); return query; },
       then: (fulfilled: (result: Row) => unknown, rejected?: (reason: unknown) => unknown) => {
-        const execute = () => {
+        const execute = async () => {
           const failure = this.failures[`${table}:${operation}`];
           if (failure) return { data: null, error: { code: 'XX000', message: failure }, count: 0 };
           if (!this.supportsRoleCode && table === 'staffing_requests' && columns.includes('role_code')) return { data: null, error: { code: '42703', message: 'Missing role_code' }, count: 0 };
           let rows = this.tables[table].filter(row => filters.every(filter => filter(row)));
           if (operation === 'insert') {
+            if (payload.some(incoming => incoming.id && this.tables[table].some(row => row.id === incoming.id))) {
+              return { data: null, error: { code: '23505', message: 'duplicate primary key' }, count: 0 };
+            }
             if (table === 'staffing_requests' && payload.some(incoming => this.tables[table].some(row =>
               row.status === 'pending' && incoming.status === 'pending' && row.job_id === incoming.job_id && row.profile_id === incoming.profile_id && row.phase === incoming.phase &&
               (row.single_day === true && incoming.single_day === true ? row.target_date === incoming.target_date : row.single_day === incoming.single_day)
@@ -73,7 +82,9 @@ export class StaffingDatabase {
           if (descending) rows = [...rows].reverse();
           rows = rows.slice(0, max);
           // Responses are snapshots, as with the real HTTP boundary.
-          return { data: structuredClone(single ? rows[0] ?? null : rows), error: null, count: rows.length };
+          const result = { data: structuredClone(single ? rows[0] ?? null : rows), error: null, count: rows.length };
+          await this.afterQuery?.({ table, operation, columns, rows: structuredClone(rows) });
+          return result;
         };
         return Promise.resolve().then(execute).then(fulfilled, rejected);
       },
@@ -94,13 +105,20 @@ export function loadStaffingHandler(kind: 'send-staffing-email' | 'staffing-clic
     'auth.ts': { isServiceRoleRequest: () => true, requireAdminOrManagement: async () => ({ userId: 'manager' }) },
     'structuredLogger.ts': { logEvent: () => undefined },
     'rateLimit.ts': { checkEdgeRateLimit: async () => ({ allowed: true }), rateLimitHeaders: () => ({}) },
-    'brevo.ts': { sendBrevoEmail: async (_key: string, payload: Row) => { db.deliveries.push(payload); return new Response('{}', { status: 200 }); } },
+    'brevo.ts': { sendBrevoEmail: async (_key: string, payload: Row) => { db.deliveries.push(payload); return new Response('{}', { status: db.deliveryStatus }); } },
   };
   const load = (path: string): Row => {
     if (cache.has(path)) return cache.get(path)!;
     const exports: Row = {};
     cache.set(path, exports);
-    const code = ts.transpileModule(readFileSync(path, 'utf8'), {
+    // Optional historical entrypoints let characterization tests execute the
+    // pre-change handlers against the same boundary, without changing the checkout.
+    const referenceDirectory = process.env.STAFFING_HANDLER_REFERENCE_DIR;
+    const referencePath = referenceDirectory ? resolve(referenceDirectory, relative(resolve('supabase/functions'), path)) : null;
+    const sourcePath = referencePath && existsSync(referencePath) ? referencePath :
+      referenceDirectory && path === resolve('supabase/functions', kind, 'index.ts')
+        ? resolve(referenceDirectory, `${kind}.ts`) : path;
+    const code = ts.transpileModule(readFileSync(sourcePath, 'utf8'), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
       fileName: path,
     }).outputText;
@@ -108,7 +126,7 @@ export function loadStaffingHandler(kind: 'send-staffing-email' | 'staffing-clic
       exports,
       require: (specifier: string) => {
         if (specifier.startsWith('https://deno.land/')) return { serve: (fn: typeof handler) => { handler = fn; } };
-        if (specifier === 'npm:@supabase/supabase-js@2') return { createClient: () => db };
+        if (specifier === 'npm:@supabase/supabase-js@2') return { createClient: () => db.client ?? db };
         if (specifier.startsWith('../_shared/')) {
           const mock = sharedMocks[specifier.split('/').at(-1)!];
           if (mock) return mock;
@@ -120,7 +138,7 @@ export function loadStaffingHandler(kind: 'send-staffing-email' | 'staffing-clic
       EdgeRuntime: { waitUntil: (_task: Promise<unknown>) => undefined },
       crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, URL, URLSearchParams, Request, Response, Headers,
       AbortController, setTimeout, clearTimeout, btoa, atob,
-      fetch: async () => new Response('{}', { status: 200 }),
+      fetch: async () => new Response('{}', { status: db.externalStatus }),
       console: { log: () => undefined, warn: () => undefined, error: () => undefined, info: () => undefined },
     });
     return exports;
@@ -136,9 +154,13 @@ export async function sendRequest(db: StaffingDatabase, body: Row = {}) {
   }));
 }
 
-export async function confirmRequest(db: StaffingDatabase, row = db.tables.staffing_requests[0]) {
+export async function confirmRequest(db: StaffingDatabase, row = db.tables.staffing_requests[0], action: 'confirm' | 'decline' = 'confirm') {
+  return loadStaffingHandler('staffing-click', db)(await staffingClickRequest(row, action));
+}
+
+export async function staffingClickRequest(row: Row, action: 'confirm' | 'decline' = 'confirm') {
   const key = await webcrypto.subtle.importKey('raw', new TextEncoder().encode('test-secret'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signature = new Uint8Array(await webcrypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${row.id}:${row.phase}:${row.token_expires_at}`)));
   const token = Buffer.from(signature).toString('base64url');
-  return loadStaffingHandler('staffing-click', db)(new Request(`https://edge.example.test/click?rid=${row.id}&a=confirm&exp=${encodeURIComponent(String(row.token_expires_at))}&t=${token}`));
+  return new Request(`https://edge.example.test/click?rid=${row.id}&a=${action}&exp=${encodeURIComponent(String(row.token_expires_at))}&t=${token}`);
 }

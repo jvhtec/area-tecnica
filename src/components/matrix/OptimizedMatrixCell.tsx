@@ -123,7 +123,7 @@ export const OptimizedMatrixCell = memo(({
   const staffingStatusByJob = staffingStatusProvided;
   const staffingStatusByDate = staffingStatusByDateProvided;
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
-  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
+  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string; requestId?: string | null }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null, allJobIds?: string[] }>(null);
   const [retryChannel, setRetryChannel] = React.useState<'email' | 'whatsapp'>('email');
   const {
@@ -491,7 +491,10 @@ export const OptimizedMatrixCell = memo(({
               onRetryAvailability={() => {
                 const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id;
                 if (targetJobId) {
-                  setPendingRetry({ jobId: targetJobId });
+                  const isPending = ['requested', 'pending'].includes(staffingStatus?.availability_status ?? '');
+                  const requestId = staffingStatusByDate?.availability_job_id === targetJobId
+                    ? staffingStatusByDate?.availability_request_id : staffingStatusByJob?.availability_request_id;
+                  setPendingRetry({ jobId: targetJobId, requestId: isPending ? requestId : null });
                 } else {
                   onClick('select-job-for-staffing');
                 }

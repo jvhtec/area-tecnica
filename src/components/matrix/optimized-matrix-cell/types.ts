@@ -43,6 +43,7 @@ export interface MultiDateRemovalState {
 }
 
 export interface MatrixStaffingStatus {
+  availability_request_id?: string | null;
   availability_status: string | null;
   offer_status: string | null;
   availability_job_id?: string | null;

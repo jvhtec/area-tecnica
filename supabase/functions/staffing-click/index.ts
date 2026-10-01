@@ -12,7 +12,6 @@ import { buildStaffingTimesheets, detectConflictForStaffingDates, getAcceptedSta
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const TOKEN_SECRET = Deno.env.get("STAFFING_TOKEN_SECRET")!;
 // Optional branding (same defaults as email)
 const COMPANY_LOGO_URL = Deno.env.get("COMPANY_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
 const AT_LOGO_URL = Deno.env.get("AT_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
@@ -323,7 +322,7 @@ serve(async (req) => {
       });
     }
 
-    const expTime = new Date(effectiveExp).getTime();
+    const expTime = Math.min(new Date(effectiveExp).getTime(), new Date(row.token_expires_at).getTime());
     const nowTime = Date.now();
     if (Number.isNaN(expTime) || expTime < nowTime) {
       logEvent('info', 'staffing_click.link_expired', { url_style: urlStyle });
@@ -336,21 +335,16 @@ serve(async (req) => {
     }
     logEvent('info', 'staffing_click.expiry_validated', { url_style: urlStyle });
 
-    // Recompute expected token hash (HMAC over rid:phase:exp)
+    // Validate the credential actually supplied. Path links derive expiry from
+    // the row, so recomputing its current HMAC cannot authenticate an old token.
     logEvent('info', 'staffing_click.token_validation_started', { url_style: urlStyle });
     try {
-      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
-        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
-        new TextEncoder().encode(`${rid}:${row.phase}:${effectiveExp}`)));
-      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
-      const token_hash_expected = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
-
-      // Compare provided token too (defense-in-depth)
+      // Stored hashes also preserve historical links signed with an incorrect
+      // request ID, provided the technician supplies the original stored token.
       const providedHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b64uToU8(t))))
         .map(x=>x.toString(16).padStart(2,'0')).join('');
 
-      if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
+      if (providedHash !== row.token_hash) {
         logEvent('warn', 'staffing_click.token_validation_failed', { url_style: urlStyle });
       return await redirectResponse({
         title: 'Token inválido',
@@ -518,9 +512,9 @@ serve(async (req) => {
         // 1) Resolve chosen role from last email_sent event for this request (offer phase)
         const { data: deliveryEvents, error: deliveryEventsError } = await supabase
           .from('staffing_events')
-          .select('meta, created_at')
+          .select('event, meta, created_at')
           .eq('staffing_request_id', rid)
-          .in('event', ['email_sent', 'whatsapp_sent'])
+          .in('event', ['email_sent', 'whatsapp_sent', 'request_scope'])
           .contains('meta', { phase: 'offer' })
           .order('created_at', { ascending: false });
         if (deliveryEventsError) throw new Error('Unable to verify staffing delivery snapshot');

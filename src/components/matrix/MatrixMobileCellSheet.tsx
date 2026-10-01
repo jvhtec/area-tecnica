@@ -155,7 +155,7 @@ export const MatrixMobileCellSheet = ({
   cancelStaffing,
   isCancellingStaffing = false,
 }: MatrixMobileCellSheetProps) => {
-  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
+  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string; requestId?: string | null }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | {
     phase: 'availability' | 'offer';
     jobId: string | null;
@@ -282,9 +282,10 @@ export const MatrixMobileCellSheet = ({
       label: 'Reenviar solicitud de disponibilidad',
       icon: RotateCcw,
       onSelect: () => {
-        const targetJobId = jobId || staffingStatus.availability_job_id;
+        const targetJobId = staffingStatus.availability_job_id || jobId;
         if (targetJobId) {
-          handOff(() => setPendingRetry({ jobId: targetJobId }));
+          const isPending = ['requested', 'pending'].includes(staffingStatus.availability_status ?? '');
+          handOff(() => setPendingRetry({ jobId: targetJobId, requestId: isPending ? staffingStatus.availability_request_id : null }));
         } else {
           run('select-job-for-staffing');
         }

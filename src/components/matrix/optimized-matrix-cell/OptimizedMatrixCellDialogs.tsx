@@ -14,7 +14,7 @@ import type {
 } from '@/components/matrix/optimized-matrix-cell/types';
 import { getErrorMessage } from '@/utils/errorMessage';
 
-type PendingRetry = { jobId: string } | null;
+type PendingRetry = { jobId: string; requestId?: string | null } | null;
 type PendingCancel = { phase: 'availability' | 'offer'; jobId: string | null; allJobIds?: string[] } | null;
 
 type OptimizedMatrixCellDialogsProps = {
@@ -103,8 +103,9 @@ export const OptimizedMatrixCellDialogs = ({
                   phase: 'availability',
                   channel: retryChannel,
                   department: staffingDepartment,
-                  target_date: formatMadridDateKey(date),
-                  single_day: true,
+                  ...(pendingRetry.requestId ? { resend_request_id: pendingRetry.requestId } : {
+                    target_date: formatMadridDateKey(date), single_day: true,
+                  }),
                 },
                 {
                   onSuccess: () => {

@@ -132,7 +132,8 @@ describe('staffing date coverage through the send and click handlers', () => {
     expect((await sendRequest(db, body)).status).toBe(200);
     expect(db.tables.staffing_requests.map(row => [row.id, row.target_date, row.batch_id])).toEqual(original.map(row => [row.id, row.target_date, row.batch_id]));
     expect(db.tables.staffing_requests.map(row => row.token_expires_at)).toEqual(body.dates.map(() => db.tables.staffing_requests[0].token_expires_at));
-    expect(db.tables.staffing_requests.slice(1).map(row => [row.token_hash, row.idempotency_key])).toEqual(original.slice(1).map(row => [row.token_hash, row.idempotency_key]));
+    expect(db.tables.staffing_requests.every(row => row.token_hash === db.tables.staffing_requests[0].token_hash)).toBe(true);
+    expect(db.tables.staffing_requests.slice(1).map(row => row.idempotency_key)).toEqual(original.slice(1).map(row => row.idempotency_key));
     await confirmRequest(db);
     expect(dates(db)).toEqual(body.dates);
   });

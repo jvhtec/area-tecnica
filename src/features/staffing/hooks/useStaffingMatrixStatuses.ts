@@ -27,11 +27,13 @@ export interface MatrixJobLite {
 }
 
 interface ByJobStatus {
+  availability_request_id?: string | null
   availability_status: Status
   offer_status: Status
 }
 
 interface ByDateStatus extends ByJobStatus {
+  availability_request_id?: string | null
   availability_job_id?: string | null
   availability_job_title?: string | null
   offer_job_id?: string | null
@@ -74,6 +76,7 @@ interface StaffingEventRow {
 }
 
 interface LatestByPhaseAccumulator {
+  availability_request_id: string | null
   availability_status: Status
   offer_status: Status
   availability_updated_at: number
@@ -95,6 +98,7 @@ interface LatestByPhaseAccumulator {
 }
 
 const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
+  availability_request_id: null,
   availability_status: null,
   offer_status: null,
   availability_updated_at: 0,
@@ -235,6 +239,12 @@ export function useStaffingMatrixStatuses(
       }
 
       const autoStaffingRequestIds = new Set<string>()
+      for (const row of reqRows) {
+        const status = mapByJob.get(`${row.job_id}-${row.profile_id}`)
+        if (row.phase === 'availability' && row.status === 'pending' && status?.availability_status === 'requested' && !status.availability_request_id) {
+          status.availability_request_id = row.id ?? null
+        }
+      }
       const requestDates = new Map<string, Set<string>>()
       try {
         const requestIds = Array.from(new Set(reqRows.map((row) => row.id).filter(Boolean) as string[]))
@@ -245,7 +255,7 @@ export function useStaffingMatrixStatuses(
               .from('staffing_events')
               .select('staffing_request_id, event, meta, created_at')
               .in('staffing_request_id', batch)
-              .in('event', ['email_sent', 'whatsapp_sent'])
+              .in('event', ['email_sent', 'whatsapp_sent', 'request_scope'])
               .order('created_at', { ascending: false }))
           ))
           const eventResults = await Promise.all(eventPromises)
@@ -259,7 +269,7 @@ export function useStaffingMatrixStatuses(
             ;((res.data || []) as StaffingEventRow[]).slice().reverse().forEach((event) => {
               const requestId = String(event.staffing_request_id || '')
               if (!requestId) return
-              const delivered = Number(event.meta?.status) >= 200 && Number(event.meta?.status) < 300
+              const delivered = event.event === 'request_scope' || (Number(event.meta?.status) >= 200 && Number(event.meta?.status) < 300)
               if (delivered && !requestDates.has(requestId) && event.meta?.dates?.length) {
                 requestDates.set(requestId, new Set(event.meta.dates))
               }
@@ -371,6 +381,7 @@ export function useStaffingMatrixStatuses(
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
+                acc.availability_request_id = r.id ?? null
                 acc.availability_job_title = jobTitle
                 acc.availability_requested_by = r.requested_by ?? null
                 acc.availability_actor_label = r.id && autoStaffingRequestIds.has(r.id)
@@ -407,6 +418,7 @@ export function useStaffingMatrixStatuses(
               availability_status: latest.availability_status as Status,
               offer_status: latest.offer_status as Status,
               availability_job_id: latest.availability_job_id,
+              availability_request_id: latest.availability_request_id,
               availability_job_title: latest.availability_job_title,
               offer_job_id: latest.offer_job_id,
               offer_job_title: latest.offer_job_title,

@@ -462,13 +462,13 @@ describe("Staffing Phase 1 characterization", () => {
     it("validates expiry before cryptographic token validation", () => {
       expectOrdered(
         staffingClick,
-        "const expTime = new Date(effectiveExp).getTime()",
+        "const expTime = Math.min(new Date(effectiveExp).getTime(), new Date(row.token_expires_at).getTime())",
         "staffing_click.token_validation_started",
       );
       expectOrdered(
         staffingClick,
         "staffing_click.link_expired",
-        "crypto.subtle.importKey",
+        'crypto.subtle.digest("SHA-256", b64uToU8(t))',
       );
     });
 
@@ -488,12 +488,9 @@ describe("Staffing Phase 1 characterization", () => {
       );
     });
 
-    it("keeps defense-in-depth token compatibility with either expected HMAC or provided token hash", () => {
+    it("requires the supplied stored credential, including historical incorrect-ID links", () => {
       expect(staffingClick).toContain(
-        "if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash)",
-      );
-      expect(staffingClick).toContain(
-        "new TextEncoder().encode(`${rid}:${row.phase}:${effectiveExp}`)",
+        "if (providedHash !== row.token_hash)",
       );
       expect(staffingClick).toContain(
         "crypto.subtle.digest(\"SHA-256\", b64uToU8(t))",

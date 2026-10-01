@@ -25,10 +25,27 @@ export async function createStaffingRequestToken(secret: string, id: string, pha
 }
 
 /** New snapshots insert atomically. Only an exact existing cycle may refresh its link. */
-export async function persistDateScopedRequests(client: SupabaseClient, request: NewRequest, dates: string[], sign: (id: string) => Promise<Credentials>) {
+export async function persistDateScopedRequests(client: SupabaseClient, request: NewRequest, dates: string[], sign: (id: string) => Promise<Credentials>, legacyRequestId?: string, expectedIds?: string[]) {
   if (dates.length === 0) throw new Error('A staffing request requires at least one date');
   const failed = (error: { code?: string; message: string }) => ({ error, id: request.id, token: '' });
   const collision = () => failed({ code: '23505', message: 'Pending coverage belongs to a different staffing cycle' });
+  if (legacyRequestId) {
+    const credentials = await sign(legacyRequestId);
+    const { data, error } = await client.from('staffing_requests').update({
+      requested_by: request.requested_by, token_expires_at: request.token_expires_at,
+      token_hash: credentials.token_hash, idempotency_key: request.idempotency_key,
+      updated_at: new Date().toISOString(),
+    }).eq('id', legacyRequestId).eq('job_id', request.job_id).eq('profile_id', request.profile_id)
+      .eq('phase', request.phase).eq('status', 'pending').eq('single_day', false).select('id').maybeSingle();
+    return error ? failed(error) : data ? { error: null, id: legacyRequestId, token: credentials.token } : collision();
+  }
+  // Full-span and per-day requests have separate unique indexes. Explicitly
+  // prevent creating a second cycle while an older unscoped link is active.
+  const { data: legacy, error: legacyError } = await client.from('staffing_requests').select('id')
+    .eq('job_id', request.job_id).eq('profile_id', request.profile_id).eq('phase', request.phase)
+    .eq('status', 'pending').eq('single_day', false).limit(1);
+  if (legacyError) return failed(legacyError);
+  if (legacy?.length) return collision();
   const hasRoleCode = 'role_code' in request;
   const pendingQuery = () => {
     const table = client.from('staffing_requests');
@@ -38,6 +55,7 @@ export async function persistDateScopedRequests(client: SupabaseClient, request:
   const { data: overlapping, error: lookupError } = await pendingQuery().eq('single_day', true).in('target_date', dates);
   if (lookupError) return failed(lookupError);
   const candidates = (overlapping ?? []) as PendingRequest[];
+  if (expectedIds && candidates.length === 0) return collision();
   if (candidates.length > 0) {
     const head = candidates.find(row => row.target_date === dates[0]) ?? candidates[0];
     let cycle = candidates;
@@ -48,18 +66,21 @@ export async function persistDateScopedRequests(client: SupabaseClient, request:
     } else if (dates.length !== 1) {
       return collision();
     }
-    if (cycle.length !== dates.length || candidates.length !== dates.length || cycle.some(row =>
+    if (cycle.length !== dates.length || candidates.length !== dates.length || (expectedIds &&
+      (expectedIds.length !== cycle.length || cycle.some(row => !expectedIds.includes(row.id)))) || cycle.some(row =>
       !dates.includes(row.target_date) || row.batch_id !== head.batch_id || (hasRoleCode && (row.role_code ?? null) !== request.role_code)
     )) return collision();
     const credentials = await sign(head.id);
     const { data: refreshedCycle, error: cycleError } = await client.from('staffing_requests').update({
       requested_by: request.requested_by, token_expires_at: request.token_expires_at, updated_at: new Date().toISOString(),
+      token_hash: credentials.token_hash,
     }).in('id', cycle.map(row => row.id)).eq('status', 'pending').select('id');
     if (cycleError) return failed(cycleError);
     if (refreshedCycle?.length !== cycle.length) return collision();
     const { data: refreshed, error } = await client.from('staffing_requests').update({
-      token_hash: credentials.token_hash, idempotency_key: request.idempotency_key,
-    }).eq('id', head.id).eq('status', 'pending').select('id').maybeSingle();
+      idempotency_key: request.idempotency_key,
+    }).eq('id', head.id).eq('status', 'pending').eq('token_hash', credentials.token_hash)
+      .eq('token_expires_at', request.token_expires_at).select('id').maybeSingle();
     if (error) return failed(error);
     if (!refreshed) return collision();
     return { error: null, id: head.id, token: credentials.token };

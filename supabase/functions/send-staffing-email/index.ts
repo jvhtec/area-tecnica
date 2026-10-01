@@ -19,6 +19,7 @@ import {
 } from "../_shared/http.ts";
 import { classifyTimesheetVerification } from "./timesheetVerification.ts";
 import { resolveNewStaffingDates } from "./requestDates.ts";
+import { PendingStaffingScopeError, preserveLegacyResendScope, resolveStaffingResend } from "./resendScope.ts";
 import { createStaffingRequestToken, persistDateScopedRequests } from "./persistRequests.ts";
 
 // Return a retryable error before creating or delivering any staffing request.
@@ -338,9 +339,9 @@ serve(createHttpHandler(async (req) => {
     logEvent('info', 'staffing_email.received_staffing_request');
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key, request_origin, campaign_id, department } = body;
-    const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
+    let roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
     const departmentHint = typeof department === 'string' && department.trim().length > 0 ? department.trim() : null;
-    const roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
+    let roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
     const shouldRequireNoConflicts = Boolean(require_no_conflicts);
@@ -636,7 +637,29 @@ serve(createHttpHandler(async (req) => {
         });
       }
 
-      normalizedDates = await resolveNewStaffingDates(supabase, job_id, profile_id, job, normalizedDates, normalizedTargetDate);
+      let legacyResendId: string | undefined;
+      let needsLegacySnapshot = false;
+      let resendIds: string[] | undefined;
+      if (typeof body.resend_request_id === 'string' && body.resend_request_id) {
+        try {
+          const scope = await resolveStaffingResend(supabase, body.resend_request_id, job_id, profile_id, phase, job, roleCode);
+          normalizedDates = scope.dates;
+          legacyResendId = scope.legacyRequestId;
+          needsLegacySnapshot = Boolean(scope.needsSnapshot);
+          resendIds = scope.expectedIds;
+          if (phase === 'offer' && scope.roleCode) {
+            if (roleCode && roleCode !== scope.roleCode) throw new PendingStaffingScopeError('El rol ha cambiado. Cancela la oferta anterior y crea una nueva.');
+            roleCode = scope.roleCode;
+            roleCodePatch = { role_code: roleCode };
+          }
+        } catch (error) {
+          if (!(error instanceof PendingStaffingScopeError)) throw error;
+          return new Response(JSON.stringify({ error: error.message, details: { reason: 'pending_request' } }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      } else {
+        normalizedDates = await resolveNewStaffingDates(supabase, job_id, profile_id, job, normalizedDates, normalizedTargetDate);
+      }
       if (normalizedDates.length === 0) {
         return new Response(JSON.stringify({ error: 'No hay fechas de trabajo pendientes de solicitar.', details: { reason: 'no_uncovered_dates' } }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -1113,13 +1136,22 @@ serve(createHttpHandler(async (req) => {
       }
 
       // Insert a complete snapshot or refresh only an identical pending cycle.
+      if (legacyResendId && needsLegacySnapshot) {
+        try {
+          await preserveLegacyResendScope(supabase, legacyResendId, phase, normalizedDates, roleCode);
+        } catch (error) {
+          if (!(error instanceof PendingStaffingScopeError)) throw error;
+          return new Response(JSON.stringify({ error: error.message, details: { reason: 'pending_request' } }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
       const isBatch = normalizedDates.length > 1;
       const rid = crypto.randomUUID();
       const exp = new Date(Date.now() + 1000*60*60*48).toISOString();
       const { error: requestError, id: insertedId, token } = await persistDateScopedRequests(supabase, {
         id: rid, job_id, profile_id, phase, requested_by: actorId,
         token_expires_at: exp, idempotency_key: idempotency_key || null, ...roleCodePatch,
-      }, normalizedDates, id => createStaffingRequestToken(TOKEN_SECRET, id, phase, exp));
+      }, normalizedDates, id => createStaffingRequestToken(TOKEN_SECRET, id, phase, exp), legacyResendId, resendIds);
       if (requestError) {
         const pendingCollision = requestError.code === '23505';
         logEvent('error', 'staffing_email.staffing_request_insert_error');

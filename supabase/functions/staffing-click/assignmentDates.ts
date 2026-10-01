@@ -2,7 +2,7 @@ import { detectConflictForAssignment, type ConflictContext, type ConflictResult 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 type RequestScope = { single_day?: boolean | null; target_date?: string | null; batch_id?: string | null };
-type DeliveryEvent = { meta?: Record<string, unknown> | null };
+type DeliveryEvent = { event?: string; meta?: Record<string, unknown> | null };
 
 function explicitDateKeys(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
@@ -26,7 +26,7 @@ export function getAcceptedStaffingDates(request: RequestScope, updatedBatchRows
   // The handler reads newest first. Pin the earliest successful explicit snapshot:
   // a later resend or job extension must never broaden that original coverage.
   const delivered = [...deliveryEvents].reverse().find(event => event.meta?.phase === 'offer' &&
-    Number(event.meta.status) >= 200 && Number(event.meta.status) < 300 &&
+    (event.event === 'request_scope' || (Number(event.meta.status) >= 200 && Number(event.meta.status) < 300)) &&
     Array.isArray(event.meta.dates) && event.meta.dates.length > 0);
   if (delivered?.meta?.dates && Array.isArray(delivered.meta.dates) && delivered.meta.dates.length > 0) {
     const dates = explicitDateKeys(delivered.meta.dates);
