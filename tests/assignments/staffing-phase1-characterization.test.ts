@@ -390,10 +390,11 @@ describe("Staffing Phase 1 characterization", () => {
         indexOrFail(sendStaffingEmail, "// Step 3: Determine request id"),
       );
       expect(verificationBlock).toContain("classifyTimesheetVerification(existingTimesheets, timesheetErr)");
-      expectOrdered(verificationBlock,
-        'if (verification.kind === "unavailable")',
-        "return scheduleVerificationUnavailableResponse()",
+      const unavailableBranch = verificationBlock.slice(
+        indexOrFail(verificationBlock, 'if (verification.kind === "unavailable")'),
+        indexOrFail(verificationBlock, '} else if (verification.kind === "conflict")'),
       );
+      expect(unavailableBranch).toContain("return scheduleVerificationUnavailableResponse()");
       expect(verificationBlock).toContain("staffing_email.timesheet_check_threw_blocking_send");
       expect(verificationBlock).not.toContain("timesheet_check_failed_continuing");
       expect(sendStaffingEmail).toContain("status: 503");
