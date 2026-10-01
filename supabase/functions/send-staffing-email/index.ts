@@ -364,7 +364,6 @@ serve(createHttpHandler(async (req) => {
     if (!normalizedTargetDate && single_day && normalizedDates.length === 1) {
       normalizedTargetDate = normalizedDates[0];
     }
-    let isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     
     // Enhanced validation logging
     logEvent('info', 'staffing_email.validating_fields');
@@ -642,7 +641,7 @@ serve(createHttpHandler(async (req) => {
         return new Response(JSON.stringify({ error: 'No hay fechas de trabajo pendientes de solicitar.', details: { reason: 'no_uncovered_dates' } }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       normalizedTargetDate = normalizedDates.length === 1 ? normalizedDates[0] : null;
-      isSingleDayRequest = normalizedDates.length === 1;
+      const isSingleDayRequest = normalizedDates.length === 1;
 
       const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
       logEvent('info', 'staffing_email.tech_info');
