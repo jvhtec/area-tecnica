@@ -17,7 +17,7 @@ import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
-import { useMatrixHeaderCounts } from '@/components/matrix/optimized-assignment-matrix/useMatrixHeaderCounts';
+import { useMatrixHeaderCounts } from '@/hooks/useMatrixHeaderCounts';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
 
 

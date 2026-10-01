@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Row = Record<string, unknown>;
 const tables = vi.hoisted(() => ({ rows: {} as Record<string, Row[]>, ranges: [] as Array<[string, number, number]> }));
 
-vi.mock('@/services/dataLayerClient', () => ({
-  dataLayerClient: {
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
     from: vi.fn((table: string) => {
       const filters: Array<(row: Row) => boolean> = [];
       const builder = {
@@ -33,7 +33,7 @@ vi.mock('@/services/dataLayerClient', () => ({
   },
 }));
 
-import { fetchJobSlotTotals, useMatrixHeaderCounts } from '../useMatrixHeaderCounts';
+import { fetchJobSlotTotals, useMatrixHeaderCounts } from '@/hooks/useMatrixHeaderCounts';
 import { createTestQueryClient } from '@/test/createTestQueryClient';
 import type { MatrixJob, MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
 

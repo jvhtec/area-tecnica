@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/react-query";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { supabase } from "@/lib/supabase";
 import { formatMadridDateKey } from "@/utils/timezoneUtils";
 import type { MatrixJob, MatrixTimesheetAssignment } from "@/hooks/useOptimizedMatrixData";
 
@@ -75,7 +75,7 @@ export async function fetchJobSlotTotals(jobIds: string[]): Promise<Map<string, 
     const batch = jobIds.slice(i, i + JOB_BATCH);
     const [timesheets, required, assignments] = await Promise.all([
       fetchAllPages<TimesheetRow>((from, to) =>
-        dataLayerClient
+        supabase
           .from("timesheets")
           .select("id, technician_id, job_id")
           .eq("is_active", true)
@@ -84,7 +84,7 @@ export async function fetchJobSlotTotals(jobIds: string[]): Promise<Map<string, 
           .range(from, to),
       ),
       fetchAllPages<RequiredRow>((from, to) =>
-        dataLayerClient
+        supabase
           .from("job_required_roles_summary")
           .select("total_required, job_id")
           .in("job_id", batch)
@@ -92,7 +92,7 @@ export async function fetchJobSlotTotals(jobIds: string[]): Promise<Map<string, 
           .range(from, to),
       ),
       fetchAllPages<AssignmentRow>((from, to) =>
-        dataLayerClient
+        supabase
           .from("job_assignments")
           .select("job_id, technician_id, sound_role, lights_role, video_role")
           .in("job_id", batch)

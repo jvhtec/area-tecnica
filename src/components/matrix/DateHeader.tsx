@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { queryKeys } from "@/lib/react-query";
-import type { MatrixOpenSlots } from "@/components/matrix/optimized-assignment-matrix/useMatrixHeaderCounts";
+import type { MatrixOpenSlots } from "@/hooks/useMatrixHeaderCounts";
 interface DateHeaderProps {
   date: Date;
   width: number;

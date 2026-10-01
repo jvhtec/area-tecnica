@@ -11,7 +11,7 @@ import { TechnicianRow } from "../TechnicianRow";
 import { DateHeader } from "../DateHeader";
 import { MatrixGridRow } from "@/components/matrix/optimized-assignment-matrix/MatrixGridRow";
 import { useMatrixScrollState } from "@/components/matrix/optimized-assignment-matrix/useMatrixScrollState";
-import type { DateHeaderCounts } from "@/components/matrix/optimized-assignment-matrix/useMatrixHeaderCounts";
+import type { DateHeaderCounts } from "@/hooks/useMatrixHeaderCounts";
 import {
   MatrixCellHoverTooltip,
   type MatrixCellHoverTooltipHandle,
