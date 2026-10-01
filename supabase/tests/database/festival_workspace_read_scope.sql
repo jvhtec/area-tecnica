@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(56);
+SELECT plan(57);
 
 -- ---------------------------------------------------------------------------
 -- Structural assertions
@@ -184,7 +184,8 @@ FROM (VALUES
   ('fa100000-0000-0000-0000-000000000006'::uuid, 'fest-scope-house@test.local'),
   ('fa100000-0000-0000-0000-000000000007'::uuid, 'fest-scope-logistics@test.local'),
   ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local'),
-  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local')
+  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local'),
+  ('fa100000-0000-0000-0000-000000000010'::uuid, 'fest-scope-admin@test.local')
 ) AS u(id, email)
 ON CONFLICT (id) DO NOTHING;
 
@@ -198,7 +199,8 @@ VALUES
   ('fa100000-0000-0000-0000-000000000006'::uuid, 'fest-scope-house@test.local', 'Hugo', 'Casa', 'house_tech', 'sound'),
   ('fa100000-0000-0000-0000-000000000007'::uuid, 'fest-scope-logistics@test.local', 'Lola', 'Logística', 'logistics', 'logistics'),
   ('fa100000-0000-0000-0000-000000000008'::uuid, 'fest-scope-no-role@test.local', 'Rita', 'Rol', 'technician', 'lights'),
-  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local', 'Cruz', 'Cruzado', 'technician', 'sound')
+  ('fa100000-0000-0000-0000-000000000009'::uuid, 'fest-scope-cross-dept@test.local', 'Cruz', 'Cruzado', 'technician', 'sound'),
+  ('fa100000-0000-0000-0000-000000000010'::uuid, 'fest-scope-admin@test.local', 'Ada', 'Admin', 'admin', 'administrative')
 ON CONFLICT (id) DO UPDATE
 SET email = excluded.email,
     role = excluded.role,
@@ -454,6 +456,23 @@ SELECT is((SELECT submissions FROM public.__fest_scope_counts), 1, 'logistics re
 SELECT ok(
   (SELECT gear = 1 AND stage_gear = 1 AND settings = 1 AND logos = 1 AND stages = 1 FROM public.__fest_scope_counts),
   'logistics reads job-level festival data'
+);
+
+-- ---------------------------------------------------------------------------
+-- Full-read writer can return the row created by the same statement
+-- ---------------------------------------------------------------------------
+SELECT set_config('request.jwt.claim.sub', 'fa100000-0000-0000-0000-000000000010', true);
+
+SELECT lives_ok(
+  $$INSERT INTO public.festival_shifts (
+      id, job_id, date, start_time, end_time, name, stage, department
+    ) VALUES (
+      'fa400000-0000-0000-0000-000000000010'::uuid,
+      'fa200000-0000-0000-0000-000000000001'::uuid,
+      '2031-07-10'::date, '19:00'::time, '20:00'::time,
+      'Admin returning probe', 1, 'sound'
+    ) RETURNING id$$,
+  'admin can create a festival shift and receive the returned row'
 );
 
 -- ---------------------------------------------------------------------------
