@@ -175,6 +175,10 @@ export const forceRefreshManagedSubscriptions = (
     const subscriptionKeys = Array.from(subscriptions.keys()).filter((key) =>
       key.startsWith(`${table}::`) && (!keysToRefresh || keysToRefresh.has(key)),
     );
+    const selectedQueryKeys = subscriptionKeys.flatMap(key => {
+      const subscription = subscriptions.get(key);
+      return subscription ? [normalizeQueryKey(subscription.options.queryKey)] : [];
+    });
 
     subscriptionKeys.forEach((key) => {
       const subscription = subscriptions.get(key);
@@ -191,13 +195,13 @@ export const forceRefreshManagedSubscriptions = (
       }
     });
 
-    const queryKeysForTable = Array.from(subscriptions.values())
+    const queryKeysForTable = keysToRefresh ? selectedQueryKeys : Array.from(subscriptions.values())
       .filter((subscription) => subscription.options.table === table)
       .map((subscription) => normalizeQueryKey(subscription.options.queryKey));
 
     if (queryKeysForTable.length > 0) {
       queryKeysForTable.forEach(invalidateQuery);
-    } else {
+    } else if (!keysToRefresh) {
       invalidateQuery([table]);
     }
   });

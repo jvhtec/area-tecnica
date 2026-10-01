@@ -480,10 +480,10 @@ describe('OptimizedMatrixCell', () => {
 
     expect(screen.queryByTitle('Reintentar solicitud de disponibilidad')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Cancelar oferta')).not.toBeInTheDocument();
-    expect(screen.getByTitle('Eliminar asignación')).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle('Confirmar'));
+    expect(screen.getByRole('button', { name: 'Eliminar asignación' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
     expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'confirm', undefined);
-    fireEvent.click(screen.getByTitle('Rechazar'));
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
     expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'decline', undefined);
     fireEvent.click(getCellElement());
     expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'assign', undefined);

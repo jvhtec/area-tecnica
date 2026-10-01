@@ -76,7 +76,8 @@ afterEach(() => {
 
 describe("UnifiedSubscriptionManager", () => {
   it("preserves a healthy sibling channel when only one read model needs repair", async () => {
-    const { manager, channels, removeChannel } = await setupManager();
+    const { manager, channels, removeChannel, queryClient } = await setupManager();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
     manager.subscribeToTable("logistics_events", ["logistics_events"]);
     const calendar = channels.at(-1)!;
     const aggregate = manager.subscribeToTable("logistics_events", ["transport_driver_assignments"]);
@@ -89,6 +90,27 @@ describe("UnifiedSubscriptionManager", () => {
     expect(removeChannel).not.toHaveBeenCalledWith(calendar);
     expect(manager.getSubscriptionStatus("logistics_events", ["logistics_events"]).isConnected).toBe(true);
     expect(manager.getSubscriptionStatus("logistics_events", ["transport_driver_assignments"]).isConnected).toBe(true);
+    expect(invalidateQueries).toHaveBeenCalledExactlyOnceWith({ queryKey: ['transport_driver_assignments'] });
+  });
+
+  it('does not invalidate or rebuild anything for an empty refresh-key selection', async () => {
+    const { manager, removeChannel, queryClient } = await setupManager();
+    manager.subscribeToTable('logistics_events', ['calendar']);
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    manager.forceRefreshSubscriptions(['logistics_events', 'unregistered_table'], []);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(removeChannel).not.toHaveBeenCalled();
+  });
+
+  it('keeps table-wide invalidation when no refresh-key filter is supplied', async () => {
+    const { manager, queryClient } = await setupManager();
+    manager.subscribeToTable('logistics_events', ['calendar']);
+    manager.subscribeToTable('logistics_events', ['driver-aggregate']);
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    manager.forceRefreshSubscriptions(['logistics_events', 'unregistered_table']);
+    expect(invalidateQueries.mock.calls.map(([options]) => options?.queryKey)).toEqual([
+      ['calendar'], ['driver-aggregate'], ['unregistered_table'],
+    ]);
   });
 
   it("checks the required table channel independently of a joined ping channel", async () => {
