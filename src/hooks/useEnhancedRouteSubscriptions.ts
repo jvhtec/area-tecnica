@@ -10,7 +10,6 @@ import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isAdminRole } from '@/utils/permissions';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
-import { getRealtimeConnectionStatus } from '@/lib/enhanced-supabase-client';
 import type { SubscriptionQueryKey } from '@/lib/unified-subscription-support';
 import {
   GLOBAL_SUBSCRIPTION_TABLES,
@@ -139,7 +138,10 @@ export function useEnhancedRouteSubscriptions() {
   // Check app resume events to detect when the user returns to the page (only for leader)
   useEffect(() => {
     const unsubscribe = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, ({ at, hiddenDurationMs }) => {
-      if (!isLeader) {
+      const actsAsLeader = multiTabCoordinator.getIsLeader();
+      // Reconcile missed election events as well as checking the live role.
+      setIsLeader(actsAsLeader);
+      if (!actsAsLeader) {
         return;
       }
 
@@ -152,13 +154,18 @@ export function useEnhancedRouteSubscriptions() {
 
         const tableNames = [...status.requiredTables];
         if (tableNames.length > 0) {
-          // Events may have been missed while the tab was throttled, so the
-          // on-screen queries refetch — in the background, over the data
-          // already shown, with no toast. The channels are only rebuilt when
-          // they actually dropped: a healthy socket has already rejoined, and
-          // tearing it down again just opens a fresh gap.
-          if (getRealtimeConnectionStatus() !== 'CONNECTED') {
-            manager.forceRefreshSubscriptions(tableNames);
+          // A joined ping channel says nothing about the table channels.
+          // Preserve healthy tables and repair each required read model.
+          const unhealthy = status.requiredSubscriptions.filter(({ table, queryKey }) =>
+            !manager.getSubscriptionStatus(table, queryKey).isConnected,
+          );
+          if (unhealthy.length > 0) {
+            const subscriptionKeys = unhealthy.map(({ table, queryKey, priority }) => {
+              const subscription = manager.subscribeToTable(table, queryKey, undefined, priority);
+              manager.registerRouteSubscription(status.routeKey, subscription.key);
+              return subscription.key;
+            });
+            manager.forceRefreshSubscriptions([...new Set(unhealthy.map(({ table }) => table))], subscriptionKeys);
           }
           multiTabCoordinator.invalidateQueries();
         }
@@ -169,7 +176,7 @@ export function useEnhancedRouteSubscriptions() {
     });
 
     return unsubscribe;
-  }, [manager, status.requiredTables, isLeader, multiTabCoordinator]);
+  }, [manager, status.requiredTables, status.requiredSubscriptions, status.routeKey, multiTabCoordinator]);
 
   // Subscribe to required tables for the current route
   useEffect(() => {

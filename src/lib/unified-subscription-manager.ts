@@ -550,6 +550,7 @@ export class UnifiedSubscriptionManager {
       // Create an object with unsubscribe function
       const subscription: ManagedSubscription = {
         key: subscriptionKey,
+        isConnected: () => channel.state === 'joined',
         unsubscribe: () => {
           console.log(`Unsubscribing from ${subscriptionKey}`);
           try {
@@ -617,6 +618,7 @@ export class UnifiedSubscriptionManager {
       // Return dummy subscription
       const fallbackSubscription: ManagedSubscription = {
         key: subscriptionKey,
+        isConnected: () => false,
         unsubscribe: () => {},
         options: { table, queryKey, filter, priority },
         ownerRoutes: new Set(),
@@ -754,7 +756,7 @@ export class UnifiedSubscriptionManager {
   public getSubscriptionStatus(table: string, queryKey: SubscriptionQueryKey): { isConnected: boolean, lastActivity: number } {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey);
     
-    const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';
+    const isConnected = this.subscriptions.get(subscriptionKey)?.isConnected() ?? false;
     const lastActivity = this.tableLastActivity.get(subscriptionKey) || 0;
     
     return { isConnected, lastActivity };
@@ -763,10 +765,11 @@ export class UnifiedSubscriptionManager {
   /**
    * Force refresh subscriptions for specific tables
    */
-  public forceRefreshSubscriptions(tables: string[]) {
+  public forceRefreshSubscriptions(tables: string[], subscriptionKeys?: string[]) {
     console.log(`Forcing refresh of subscriptions for tables: ${tables.join(', ')}`);
     forceRefreshManagedSubscriptions(tables, {
       subscriptions: this.subscriptions,
+      keysToRefresh: subscriptionKeys ? new Set(subscriptionKeys) : undefined,
       tableLastActivity: this.tableLastActivity,
       snapshotSubscription: (subscription) => this.snapshotManagedSubscription(subscription),
       replaySubscription: (subscription) => this.replayPendingSubscription(subscription),

@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => {
       job_date_types: ["job-date-types-subscription"],
     })),
     forceRefreshSubscriptions: vi.fn(),
+    getSubscriptionStatus: vi.fn<(table: string, queryKey: unknown) => { isConnected: boolean; lastActivity: number }>(
+      () => ({ isConnected: true, lastActivity: Date.now() }),
+    ),
   };
 
   return {
@@ -100,6 +103,7 @@ describe("useEnhancedRouteSubscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.realtimeStatus = "CONNECTED";
+    mocks.manager.getSubscriptionStatus.mockReturnValue({ isConnected: true, lastActivity: Date.now() });
     mocks.coordinator.getIsLeader.mockReturnValue(true);
     mocks.manager.getSubscriptionsByTable.mockReturnValue({
       profiles: ["profiles-subscription"],
@@ -236,6 +240,7 @@ describe("useEnhancedRouteSubscriptions", () => {
 
   it("rebuilds the channels after a long absence only when realtime dropped", async () => {
     mocks.realtimeStatus = "DISCONNECTED";
+    mocks.manager.getSubscriptionStatus.mockReturnValue({ isConnected: false, lastActivity: 0 });
     renderHookHarness("/dashboard");
     await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
 
@@ -254,6 +259,60 @@ describe("useEnhancedRouteSubscriptions", () => {
 
     expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
     expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("refreshes and takes route ownership when leadership changes without an election event", async () => {
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.coordinator.requestSubscriptions).toHaveBeenCalled());
+
+    mocks.coordinator.getIsLeader.mockReturnValue(true);
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    expect(mocks.coordinator.releaseSubscriptions).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("does not refresh when leadership was lost without an election event", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("repairs a failed assignments channel even when the aggregate ping status is connected", async () => {
+    mocks.manager.getSubscriptionStatus.mockImplementation((table: string) => ({
+      isConnected: table !== "job_assignments",
+      lastActivity: 0,
+    }));
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("job_assignments", ["optimized-jobs"]);
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledExactlyOnceWith(["job_assignments"], ["job_assignments-subscription"]);
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks each read model when multiple requirements share a table", async () => {
+    mocks.manager.getSubscriptionStatus.mockImplementation((table, queryKey) => ({
+      isConnected: table !== "logistics_events" || JSON.stringify(queryKey) !== '["transport_driver_assignments"]',
+      lastActivity: 0,
+    }));
+    renderHookHarness("/logistics");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("logistics_events", ["logistics_events"]);
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("logistics_events", ["transport_driver_assignments"]);
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledExactlyOnceWith(["logistics_events"], ["logistics_events-subscription"]);
   });
 
   it("does not re-run its subscription work when the refresh time moves", async () => {

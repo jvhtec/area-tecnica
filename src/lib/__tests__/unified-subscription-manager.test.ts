@@ -39,6 +39,7 @@ const setupManager = async () => {
 const createChannel = (name: string) => {
   const mockChannel = {
     name,
+    state: "closed",
     postgresHandlers: [] as PostgresHandler[],
     statusHandlers: [] as ChannelStatusHandler[],
     on: vi.fn(),
@@ -58,6 +59,7 @@ const createChannel = (name: string) => {
   mockChannel.subscribe.mockImplementation((callback?: (status: string) => void) => {
     if (callback) {
       mockChannel.statusHandlers.push(callback);
+      mockChannel.state = "joined";
       callback("SUBSCRIBED");
     }
     return mockChannel;
@@ -73,6 +75,38 @@ afterEach(() => {
 });
 
 describe("UnifiedSubscriptionManager", () => {
+  it("preserves a healthy sibling channel when only one read model needs repair", async () => {
+    const { manager, channels, removeChannel } = await setupManager();
+    manager.subscribeToTable("logistics_events", ["logistics_events"]);
+    const calendar = channels.at(-1)!;
+    const aggregate = manager.subscribeToTable("logistics_events", ["transport_driver_assignments"]);
+    const failed = channels.at(-1)!;
+    failed.state = "errored";
+
+    manager.forceRefreshSubscriptions(["logistics_events"], [aggregate.key]);
+
+    expect(removeChannel).toHaveBeenCalledWith(failed);
+    expect(removeChannel).not.toHaveBeenCalledWith(calendar);
+    expect(manager.getSubscriptionStatus("logistics_events", ["logistics_events"]).isConnected).toBe(true);
+    expect(manager.getSubscriptionStatus("logistics_events", ["transport_driver_assignments"]).isConnected).toBe(true);
+  });
+
+  it("checks the required table channel independently of a joined ping channel", async () => {
+    const { manager, channels } = await setupManager();
+    manager.subscribeToTable("job_assignments", ["optimized-jobs"]);
+    const assignments = channels.find((channel) => channel.name.startsWith("job_assignments-"))!;
+    expect(channels.find((channel) => channel.name === "ping")?.state).toBe("joined");
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(true);
+
+    assignments.state = "errored";
+    expect(manager.getConnectionStatus()).toBe("connected");
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(false);
+    assignments.state = "joining";
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(false);
+    assignments.state = "joined";
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(true);
+    expect(manager.getSubscriptionStatus("job_assignments", ["other-model"]).isConnected).toBe(false);
+  });
   it("deduplicates query keys with equivalent object properties in a different order", async () => {
     const { manager, channels } = await setupManager();
 

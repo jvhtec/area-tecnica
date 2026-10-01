@@ -56,7 +56,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [assignableAsTechFlag, setAssignableAsTechFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  // See isBackgroundProfileRead.
+  // Keep the applied identity after revocation so later reads cannot bootstrap it again.
   const appliedProfileRef = useRef<AppliedProfile>(NO_APPLIED_PROFILE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +111,14 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     const request = boundary.beginProfile(userId);
     if (!request) return null;
     const background = isBackgroundProfileRead(appliedProfileRef.current, userId);
+    const clearAppliedProfile = (): null => {
+      if (!request.apply(null, null, false, false)) return null;
+      appliedProfileRef.current = { userId, role: null };
+      setUserRole(null);
+      setUserDepartment(null);
+      clearProfileCache();
+      return null;
+    };
     const applyCachedProfile = (cached: CachedProfile): ProfileData | null => {
       if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
       appliedProfileRef.current = { userId, role: cached.role };
@@ -126,6 +134,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       };
     };
     const applyStaleProfileIfOffline = (failure: unknown): ProfileData | null => {
+      // An explicit denial wins even when navigator.onLine reports offline.
+      if (getErrorCode(failure) === '42501') return clearAppliedProfile();
+      // A failed background read does not replace the profile already in use.
+      if (background) return null;
       if (!isNetworkFailure(failure)) return null;
       const stale = getCachedProfile(userId, true);
       return stale ? applyCachedProfile(stale) : null;
@@ -175,7 +187,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         }
       }
 
-      if (!data && !error) {
+      if (!data && !error && !background) {
         const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
         if (!request.isCurrent()) return null;
         const authUser = authUserData?.user ?? null;
@@ -242,13 +254,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
-        if (background) return null; // keep the role the user is working with
-        if (!request.apply(null, null, false, false)) return null;
-        appliedProfileRef.current = { userId, role: null };
-        setUserRole(null);
-        setUserDepartment(null);
-        setSoundVisionAccessFlag(false);
-        setAssignableAsTechFlag(false);
+        return clearAppliedProfile();
       }
       return data ?? null;
     } catch (error) {
@@ -258,7 +264,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       if (request.isCurrent()) setIsProfileLoading(false);
     }
-  }, [getCachedProfile, setCachedProfile, boundary]);
+  }, [getCachedProfile, setCachedProfile, clearProfileCache, boundary]);
 
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
@@ -372,7 +378,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         if (newSession?.user?.id) {
           // Still re-read on TOKEN_REFRESHED, so a role or access change made by
           // an admin reaches a signed-in user. For a user whose profile is
-          // already applied this is a background read (isBackgroundProfileRead):
+          // already applied this is a background read:
           // no isProfileLoading, so the route guards never swap the page out.
           fetchUserProfile(newSession.user.id, event === 'INITIAL_SESSION').catch(error => {
             console.error('Auth state profile fetch failed:', error);

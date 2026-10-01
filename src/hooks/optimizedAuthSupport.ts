@@ -107,7 +107,8 @@ export function writeCachedProfile(profile: Omit<CachedProfile, "timestamp">, no
  * background refresh: it must not raise isProfileLoading, which the route
  * guards answer by swapping the whole page for a spinner (what users saw as a
  * reload on returning to a tab, when a token refresh refetched the profile),
- * and an empty result must not clear the role mid-session.
+ * while confirmed missing profiles still clear authorization. Remember the
+ * applied identity even after revocation so later refreshes cannot bootstrap it.
  */
 export interface AppliedProfile {
   userId: string | null;
@@ -117,7 +118,7 @@ export interface AppliedProfile {
 export const NO_APPLIED_PROFILE: AppliedProfile = { userId: null, role: null };
 
 export const isBackgroundProfileRead = (applied: AppliedProfile, userId: string | null | undefined): boolean =>
-  !!userId && applied.userId === userId && applied.role !== null;
+  !!userId && applied.userId === userId;
 
 /** Keeps the user object when a refreshed session carries the same, unchanged user. */
 export const keepSameAuthUser = <U extends { id: string; updated_at?: string | null }>(previous: U | null, next: U | null): U | null =>

@@ -66,6 +66,7 @@ const noopManager = {
   subscribeToTable: (table = "noop", queryKey: SubscriptionQueryKey = []) => ({
     key: "noop",
     unsubscribe: () => {},
+    isConnected: () => false,
     options: { table, queryKey, priority: "low" as const },
     ownerRoutes: new Set<string>(),
     payloadHandlers: new Map(),
