@@ -80,6 +80,14 @@ SELECT is((SELECT count(*) FROM timesheets WHERE job_id = 'cc210000-0000-0000-00
 SELECT lives_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000003', ARRAY['2026-10-20']::date[], true, 'SND-FOH-R') $$, 'tourdate commits');
 SELECT ok((SELECT is_schedule_only AND is_active AND source = 'staffing' FROM timesheets WHERE job_id = 'cc210000-0000-0000-0000-000000000003'), 'tourdate creates schedule-only staffing timesheet');
 
+-- Legacy delivery events can lack meta.role. The old handler also cleared the
+-- department role on an extension; characterize that behavior without changing it.
+SELECT lives_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000003', ARRAY['2026-10-21']::date[], true, NULL) $$, 'extension without role metadata commits');
+SELECT ok((SELECT sound_role IS NULL AND status = 'confirmed' AND single_day AND assignment_date = '2026-10-20'
+  FROM job_assignments WHERE job_id = 'cc210000-0000-0000-0000-000000000003'), 'null role clears the old role while preserving confirmed membership scope');
+SELECT results_eq($$ SELECT date FROM timesheets WHERE job_id = 'cc210000-0000-0000-0000-000000000003' AND is_active ORDER BY date $$,
+  $$ VALUES ('2026-10-20'::date), ('2026-10-21'::date) $$, 'null role extension still activates exactly the accepted date');
+
 -- A draft created before role assignment has no category. The previous HTTP
 -- upsert fired the category UPDATE trigger; the atomic command must retain it.
 INSERT INTO timesheets (job_id, technician_id, date)

@@ -45,18 +45,6 @@ export function detectConflictForStaffingDates(context: ConflictContext, dates: 
   return { conflict: false };
 }
 
-/** Omit legacy scope fields on extensions, avoiding prep-day trigger side effects. */
-export function getNewMembershipScope(existing: { status?: string | null } | null, dates: string[] | null): { single_day?: boolean; assignment_date?: string | null } {
-  if (existing?.status === 'confirmed') return {};
-  return dates?.length === 1
-    ? { single_day: true, assignment_date: dates[0] }
-    : { single_day: false, assignment_date: null };
-}
-
-export function buildStaffingTimesheets(jobId: string, technicianId: string, dates: string[], isScheduleOnly: boolean) {
-  return dates.map(date => ({ job_id: jobId, technician_id: technicianId, date, is_schedule_only: isScheduleOnly, source: 'staffing', is_active: true }));
-}
-
 /** Compatibility only: old unscoped requests cannot recover their original dates. */
 export function getLegacyStaffingSpanDates(start?: string | null, end?: string | null): string[] {
   if (!start || !end) return [];
