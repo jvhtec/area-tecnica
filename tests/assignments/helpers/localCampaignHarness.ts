@@ -133,12 +133,13 @@ export function localCampaignHarness() {
       // Both the random IDs and this run's title must match before removal.
       const result = await client.from('jobs').delete().in('id', [...jobs]).eq('title', marker);
       expect(result.error).toBeNull();
+      // Activity deliberately has no cascading job FK. Include rows created by
+      // sender success and by assignment deletion before any assertion about
+      // surviving fixture jobs can prevent cleanup. Retain IDs for retries.
+      expect((await client.from('activity_log').delete().in('job_id', [...jobs])).error).toBeNull();
       const remaining = await client.from('jobs').select('id').in('id', [...jobs]);
       expect(remaining.error).toBeNull();
       expect(remaining.data).toEqual([]);
-      // Activity deliberately has no cascading job FK. Include rows created by
-      // sender success and by assignment deletion before forgetting owned IDs.
-      expect((await client.from('activity_log').delete().in('job_id', [...jobs])).error).toBeNull();
       jobs.clear();
     }
   }

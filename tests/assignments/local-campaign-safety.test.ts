@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localCampaignHarness } from './helpers/localCampaignHarness';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('node:fs', () => ({ readFileSync: vi.fn() }));
+vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 const command = vi.mocked(execFileSync);
 const readSource = vi.mocked(readFileSync);
 const jwt = (role: string, iss = 'supabase-demo') => `header.${Buffer.from(JSON.stringify({ role, iss })).toString('base64url')}.signature`;
@@ -16,6 +18,7 @@ describe('local campaign fixture safety gates', () => {
     vi.stubEnv('STAFFING_EDGE_TEST_SERVICE_KEY', jwt('service_role'));
     command.mockReset();
     readSource.mockReset();
+    vi.mocked(createClient).mockReset();
   });
   afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -69,5 +72,28 @@ describe('local campaign fixture safety gates', () => {
     });
     expect(localCampaignHarness().localUrl).toBe('http://127.0.0.1:54441');
     expect(command).toHaveBeenCalledWith('docker', expect.arrayContaining(['/local/functions/send-staffing-email/index.ts']), expect.anything());
+  });
+
+  it('cleans owned activity even when a successful job delete leaves a fixture row behind', async () => {
+    readSource.mockReturnValue('current source');
+    command.mockImplementation((...args) => {
+      const parts = args[1] as string[];
+      if (parts[0] === 'network') return JSON.stringify([{ Internal: true }]);
+      if (parts[0] === 'inspect') return JSON.stringify([{ NetworkSettings: { Networks: { 'area-tecnica-history': {} } } }]);
+      return 'current source';
+    });
+    const activityDelete = vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) });
+    const client = { from: vi.fn((table: string) => ({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      delete: table === 'activity_log' ? activityDelete : vi.fn().mockReturnValue({
+        in: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+      }),
+      select: vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null, data: [{ id: 'surviving-fixture' }] }) }),
+    })) };
+    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>);
+    const h = localCampaignHarness();
+    await h.job();
+    await expect(h.cleanJobs()).rejects.toThrow();
+    expect(activityDelete).toHaveBeenCalledOnce();
   });
 });
