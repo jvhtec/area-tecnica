@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { confirmRequest, sendRequest, StaffingDatabase } from './staffingHandlerHarness';
 
-// Phase 0's odd partial-commit outcomes are intentional characterization here.
-// Date consent fixes must not silently introduce transactional or delivery redesign.
+// Response-first and delivery contracts remain unchanged in Phase 2A;
+// membership and accepted timesheets now share a transaction.
 describe('preserved staffing mutation and failure contracts', () => {
   it.each(['confirm', 'decline'] as const)('availability %s records the response without assigning', async action => {
     const db = new StaffingDatabase();
@@ -63,14 +63,15 @@ describe('preserved staffing mutation and failure contracts', () => {
     expect(db.tables.staffing_events.some(row => row.event === 'auto_assign_upsert_error')).toBe(true);
   });
 
-  it('timesheet failure retains the confirmed request and membership', async () => {
+  it('timesheet failure retains the confirmed request and rolls back membership', async () => {
     const db = new StaffingDatabase();
     await sendRequest(db);
     db.failures['timesheets:upsert'] = 'schedule unavailable';
     await confirmRequest(db);
     expect(db.tables.staffing_requests.every(row => row.status === 'confirmed')).toBe(true);
-    expect(db.tables.job_assignments[0]).toMatchObject({ status: 'confirmed' });
+    expect(db.tables.job_assignments).toHaveLength(0);
     expect(db.tables.timesheets).toHaveLength(0);
+    expect(db.tables.staffing_events.some(row => row.event === 'auto_assigned_on_confirm')).toBe(false);
   });
 
   it('external service failures after confirmation do not roll back the database writes', async () => {

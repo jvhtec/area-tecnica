@@ -126,7 +126,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("can retain a confirmed offer when a post-response conflict blocks assignment", () => {
       const responseWrite = indexOrFail(staffingClick, ".update({ status: newStatus })");
       const conflictBranch = indexOrFail(staffingClick, "if (conflictCheck.conflict)");
-      const assignmentWrite = indexOrFail(staffingClick, "await persistStaffingMembership(");
+      const assignmentWrite = indexOrFail(staffingClick, "await supabase.rpc('assign_staffing_offer'");
 
       expect(responseWrite).toBeLessThan(conflictBranch);
       expect(conflictBranch).toBeLessThan(assignmentWrite);
@@ -139,42 +139,16 @@ describe("Staffing Phase 1 characterization", () => {
       expect(conflictBlock).not.toContain(".from('staffing_requests')");
     });
 
-    it("writes the job assignment before creating its timesheets", () => {
-      expectOrdered(
-        staffingClick,
-        "await persistStaffingMembership(",
-        ".upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' })",
-      );
-    });
-
-    it("does not roll back a successful assignment when staffing timesheet creation fails", () => {
-      const timesheetWrite = indexOrFail(
-        staffingClick,
-        ".upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' })",
-      );
-      const timesheetFailure = indexOrFail(staffingClick, "if (tsErr) {", timesheetWrite);
-      const timesheetFailureBlock = staffingClick.slice(
-        timesheetFailure,
-        indexOrFail(staffingClick, "} else {", timesheetFailure),
-      );
-
-      expect(timesheetFailureBlock).toContain("Timesheet creation failed");
-      expect(timesheetFailureBlock).not.toContain(".from('job_assignments')");
-      expect(timesheetFailureBlock).not.toContain(".delete()");
-    });
-
-    it("keeps dry-hire acceptance assignment-only and marks tour-date timesheets schedule-only", () => {
-      expect(staffingClick).toContain("if (jobType === 'dryhire')");
-      expect(staffingClick).toContain("Skipping timesheet creation for dryhire job");
-      expect(staffingClick).toContain("const isScheduleOnly = jobType === 'tourdate'");
-      expect(staffingClick).toContain("buildStaffingTimesheets(row.job_id, row.profile_id, datesToActivate, isScheduleOnly)");
-      expect(assignmentDates).toContain("is_schedule_only: isScheduleOnly");
+    it("persists assignment and timesheets through one command after the response", () => {
+      expectOrdered(staffingClick, ".update({ status: newStatus })", "await supabase.rpc('assign_staffing_offer'");
+      expect(staffingClick).not.toContain(".from('job_assignments')");
+      expect(staffingClick).not.toContain(".upsert(timesheetRows");
     });
 
     it("treats Flex synchronization after staffing acceptance as best effort", () => {
       const timesheetWrite = indexOrFail(
         staffingClick,
-        ".upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' })",
+        "await supabase.rpc('assign_staffing_offer'",
       );
       const flexCall = indexOrFail(
         staffingClick,

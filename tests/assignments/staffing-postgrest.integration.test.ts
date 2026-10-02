@@ -14,6 +14,7 @@ const techId = 'cb910000-0000-0000-0000-000000000001';
 const managerId = 'cb910000-0000-0000-0000-000000000002';
 let client: SupabaseClient;
 let afterBatchRefresh: (() => Promise<void>) | undefined;
+let afterPendingRead: (() => Promise<void>) | undefined;
 
 describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () => {
   beforeAll(async () => {
@@ -26,6 +27,9 @@ describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () =>
         const headers = new Headers(init?.headers);
         headers.delete('Authorization');
         const response = await realFetch(url, { ...init, headers });
+        if (afterPendingRead && (!init?.method || init.method === 'GET') && url.pathname === '/staffing_requests' && url.searchParams.get('id')?.startsWith('eq.')) {
+          await afterPendingRead();
+        }
         if (init?.method === 'PATCH' && url.pathname === '/staffing_requests' && url.searchParams.get('id')?.startsWith('in.')) {
           const hook = afterBatchRefresh;
           afterBatchRefresh = undefined;
@@ -83,6 +87,75 @@ describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () =>
     expect(original.map(row => row.target_date)).toEqual(['2026-10-20', '2026-10-21']);
     expect((await client.from('jobs').update({ end_time: '2026-10-23T18:00:00Z' }).eq('id', f.jobId)).error).toBeNull();
     await f.click();
+    expect(await f.activeDates()).toEqual(['2026-10-20', '2026-10-21']);
+  });
+
+  it.each([false, true])('rolls back every internal write on a late timesheet failure (existing membership: %s)', async existing => {
+    const f = await fixture();
+    if (existing) {
+      expect((await client.from('job_assignments').insert({ job_id: f.jobId, technician_id: techId,
+        status: 'confirmed', single_day: true, assignment_date: '2026-10-19', sound_role: 'SND-MON-R' })).error).toBeNull();
+      expect((await client.from('timesheets').insert({ job_id: f.jobId, technician_id: techId,
+        date: '2026-10-19', notes: 'Approved', approved_by_manager: true, source: 'staffing' })).error).toBeNull();
+    }
+    const { data: assignments } = await client.from('job_assignments').select('*').eq('job_id', f.jobId);
+    const { data: schedule } = await client.from('timesheets').select('*').eq('job_id', f.jobId);
+    expect((await f.send()).status).toBe(200);
+    expect((await client.from('staffing_test_faults').insert({ job_id: f.jobId, fail_date: '2026-10-21' })).error).toBeNull();
+    await f.click();
+    expect((await f.requests()).every(row => row.status === 'confirmed')).toBe(true);
+    expect((await client.from('job_assignments').select('*').eq('job_id', f.jobId)).data).toEqual(assignments);
+    expect((await client.from('timesheets').select('*').eq('job_id', f.jobId)).data).toEqual(schedule);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
+    expect(events?.some(row => row.event === 'auto_assign_error')).toBe(true);
+    expect(events?.some(row => row.event === 'auto_assigned_on_confirm')).toBe(false);
+  });
+
+  it.each([false, true])('elects one response writer for two simultaneous clicks (single date: %s)', async singleDay => {
+    const f = await fixture();
+    expect((await f.send(singleDay ? { single_day: true, target_date: '2026-10-20' } : {})).status).toBe(200);
+    let reads = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    afterPendingRead = async () => {
+      if (++reads === 2) { afterPendingRead = undefined; release(); }
+      await barrier;
+    };
+    try {
+      await Promise.all([f.click(), f.click()]);
+    } finally {
+      afterPendingRead = undefined;
+      release();
+    }
+    expect((await f.requests()).every(row => row.status === 'confirmed')).toBe(true);
+    const { data: memberships, error } = await client.from('job_assignments').select('*').eq('job_id', f.jobId);
+    expect(error).toBeNull();
+    expect(memberships).toHaveLength(1);
+    expect(memberships![0].status).toBe('confirmed');
+    expect(await f.activeDates()).toEqual(singleDay ? ['2026-10-20'] : ['2026-10-20', '2026-10-21']);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
+    expect(events?.filter(row => row.event === 'clicked_confirm')).toHaveLength(1);
+    expect(events?.filter(row => row.event === 'auto_assigned_on_confirm')).toHaveLength(1);
+  });
+
+  it('serializes two overlapping RPC transactions and preserves the first membership scope', async () => {
+    const f = await fixture();
+    expect((await f.send()).status).toBe(200);
+    const requests = await f.requests();
+    expect((await client.from('staffing_requests').update({ status: 'confirmed' }).eq('job_id', f.jobId)).error).toBeNull();
+    expect((await client.from('staffing_test_faults').insert({ job_id: f.jobId, delay_assignment: true })).error).toBeNull();
+    const completion: string[] = [];
+    const attempts = await Promise.all(requests.map(async request => {
+      const result = await client.rpc('assign_staffing_offer', { p_request_id: request.id,
+        p_dates: [request.target_date], p_single_day: true, p_role: 'SND-FOH-R' });
+      completion.push(request.target_date);
+      return result;
+    }));
+    expect(attempts.map(result => result.error)).toEqual([null, null]);
+    expect(attempts[0].data).toBe(attempts[1].data);
+    const { data: memberships } = await client.from('job_assignments').select('*').eq('job_id', f.jobId);
+    expect(memberships).toHaveLength(1);
+    expect(memberships![0]).toMatchObject({ status: 'confirmed', single_day: true, assignment_date: completion[0] });
     expect(await f.activeDates()).toEqual(['2026-10-20', '2026-10-21']);
   });
 

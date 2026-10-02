@@ -1,5 +1,4 @@
 import { detectConflictForAssignment, type ConflictContext, type ConflictResult } from './conflictUtils.ts';
-import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 type RequestScope = { single_day?: boolean | null; target_date?: string | null; batch_id?: string | null };
 type DeliveryEvent = { event?: string; meta?: Record<string, unknown> | null };
@@ -56,20 +55,6 @@ export function getNewMembershipScope(existing: { status?: string | null } | nul
 
 export function buildStaffingTimesheets(jobId: string, technicianId: string, dates: string[], isScheduleOnly: boolean) {
   return dates.map(date => ({ job_id: jobId, technician_id: technicianId, date, is_schedule_only: isScheduleOnly, source: 'staffing', is_active: true }));
-}
-
-export async function persistStaffingMembership(client: SupabaseClient, jobId: string, technicianId: string, existing: { status?: string | null } | null, dates: string[] | null, details: Record<string, unknown>) {
-  if (existing?.status === 'confirmed') {
-    // Even an unchanged status/job_id/technician_id in an UPSERT fires the prep
-    // trigger. Extend confirmed membership without touching any trigger columns.
-    const { data, error } = await client.from('job_assignments').update(details)
-      .eq('job_id', jobId).eq('technician_id', technicianId).eq('status', 'confirmed').select('id').maybeSingle();
-    return { error: error ?? (data ? null : { message: 'Assignment changed during confirmation' }) };
-  }
-  return await client.from('job_assignments').upsert({
-    job_id: jobId, technician_id: technicianId, status: 'confirmed',
-    ...getNewMembershipScope(existing, dates), ...details,
-  }, { onConflict: 'job_id,technician_id' });
 }
 
 /** Compatibility only: old unscoped requests cannot recover their original dates. */

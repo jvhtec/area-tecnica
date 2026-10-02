@@ -8,7 +8,7 @@ import {
 } from "./followupUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
-import { buildStaffingTimesheets, detectConflictForStaffingDates, getAcceptedStaffingDates, getLegacyStaffingSpanDates, persistStaffingMembership } from "./assignmentDates.ts";
+import { detectConflictForStaffingDates, getAcceptedStaffingDates, getLegacyStaffingSpanDates } from "./assignmentDates.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -421,6 +421,7 @@ serve(async (req) => {
         .from("staffing_requests")
         .update({ status: newStatus })
         .eq("id", rid)
+        .eq("status", "pending")
         .select('id,status')
         .maybeSingle();
       updRow = data;
@@ -522,18 +523,17 @@ serve(async (req) => {
         const acceptedDates = getAcceptedStaffingDates(row, updatedBatchRows, deliveryEvents ?? []);
 
         // 2) Fetch target job and technician profile (for department)
-        const [{ data: job, error: jobErr }, { data: prof, error: profErr }, { data: existingMembership, error: membershipError }] = await Promise.all([
+        const [{ data: job, error: jobErr }, { data: prof, error: profErr }] = await Promise.all([
           supabase.from('jobs').select('id,title,start_time,end_time,job_type').eq('id', row.job_id).maybeSingle(),
-          supabase.from('profiles').select('id,department').eq('id', row.profile_id).maybeSingle(),
-          supabase.from('job_assignments').select('id,status').eq('job_id', row.job_id).eq('technician_id', row.profile_id).maybeSingle()
+          supabase.from('profiles').select('id,department').eq('id', row.profile_id).maybeSingle()
         ]);
 
-        if (jobErr || profErr || membershipError) {
+        if (jobErr || profErr) {
           console.warn('⚠️ Auto-assign: job/profile fetch error', { jobErr, profErr });
           await supabase.from('staffing_events').insert({
             staffing_request_id: rid,
             event: 'auto_assign_prereq_error',
-            meta: { jobErr, profErr, membershipError }
+            meta: { jobErr, profErr }
           });
         } else if (job && prof) {
           await supabase.from('staffing_events').insert({
@@ -609,12 +609,6 @@ serve(async (req) => {
           }
 
           // 4) SIMPLIFIED: Create one assignment per job+tech, then create timesheets for confirmed days
-          const rolePatch: Record<string, string | null> = {};
-          if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
-          else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
-          else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
-          else if (prof.department === 'production' || prof.department === 'logistics') rolePatch['production_role'] = chosenRole;
-
           // 5) Check for conflicts before auto-assigning
           const targetDate = (row as any).target_date ?? null;
           const isSingleDay = (row as any).single_day ?? false;
@@ -652,55 +646,27 @@ serve(async (req) => {
               assignment_date: targetDate,
             });
 
-            // Preserve existing coverage; legacy scope fields are only set for new membership.
-            const assignmentData: any = {
-              assigned_by: row.requested_by ?? null,
-              assigned_at: new Date().toISOString(),
-              assignment_source: 'staffing',
-              response_time: new Date().toISOString(),
-              ...rolePatch
-            };
-
-          const { error: assignUpsertErr } = await persistStaffingMembership(
-            supabase, row.job_id, row.profile_id, existingMembership, acceptedDates, assignmentData);
-
-          if (assignUpsertErr) {
-            console.error('❌ job_assignments upsert failed', assignUpsertErr);
-            await supabase.from('staffing_events').insert({
-              staffing_request_id: rid,
-              event: 'auto_assign_upsert_error',
-              meta: { message: assignUpsertErr.message }
+            // The response above is already committed. Membership and its complete
+            // accepted schedule now succeed or roll back as one database command.
+            const { error: assignmentError } = await supabase.rpc('assign_staffing_offer', {
+              p_request_id: rid,
+              p_dates: datesToActivate,
+              p_single_day: acceptedDates?.length === 1,
+              p_role: chosenRole,
             });
-          } else {
-            console.log('✅ job_assignment created/updated');
+            if (assignmentError) {
+              await supabase.from('staffing_events').insert({
+                staffing_request_id: rid,
+                event: 'auto_assign_upsert_error',
+                meta: { message: assignmentError.message }
+              });
+              throw new Error(assignmentError.message);
+            }
             await supabase.from('staffing_events').insert({
               staffing_request_id: rid,
               event: 'auto_assign_upsert_ok',
               meta: { role: chosenRole, department: prof.department }
             });
-
-            // Create timesheets for the confirmed days
-            const jobType = (job as any)?.job_type;
-            if (jobType === 'dryhire') {
-              console.log('⏭️ Skipping timesheet creation for dryhire job');
-            } else {
-              const isScheduleOnly = jobType === 'tourdate';
-              const timesheetRows = buildStaffingTimesheets(row.job_id, row.profile_id, datesToActivate, isScheduleOnly);
-
-              // Create all timesheets in one batch
-              if (timesheetRows.length > 0) {
-                const { error: tsErr } = await supabase
-                  .from('timesheets')
-                  .upsert(timesheetRows, { onConflict: 'job_id,technician_id,date' });
-
-                if (tsErr) {
-                  console.warn('⚠️ Timesheet creation failed:', { count: timesheetRows.length, error: tsErr });
-                } else {
-                  console.log('✅ Timesheets created:', { count: timesheetRows.length, isScheduleOnly });
-                }
-              }
-            }
-          }
 
             try {
               await fetch(`${SUPABASE_URL}/functions/v1/push`, {

@@ -91,7 +91,37 @@ export class StaffingDatabase {
     };
     return query;
   }
-  rpc = async (_name: string, _args?: Row) => ({ data: {}, error: null });
+  rpcCalls: Array<{ name: string; args?: Row }> = [];
+  rpc = async (name: string, args?: Row): Promise<{ data: unknown; error: { message: string } | null }> => {
+    this.rpcCalls.push({ name, args });
+    if (name !== 'assign_staffing_offer') return { data: {}, error: null };
+    // Handler-boundary fake only; rollback and locking are separately tested
+    // against the actual SQL command, constraints and triggers.
+    const request = this.tables.staffing_requests.find(row => row.id === args?.p_request_id)!;
+    const job = this.tables.jobs.find(row => row.id === request.job_id)!;
+    const profile = this.tables.profiles.find(row => row.id === request.profile_id)!;
+    const before = structuredClone({ assignments: this.tables.job_assignments, timesheets: this.tables.timesheets });
+    const existing = this.tables.job_assignments.find(row => row.job_id === request.job_id && row.technician_id === request.profile_id);
+    const dates = args?.p_dates as string[];
+    const department = profile.department as string;
+    const roleKey = { sound: 'sound_role', lights: 'lights_role', video: 'video_role', production: 'production_role', logistics: 'production_role' }[department];
+    const details = { assigned_by: request.requested_by ?? null, assigned_at: new Date().toISOString(),
+      assignment_source: 'staffing', response_time: new Date().toISOString(), ...(roleKey ? { [roleKey]: args?.p_role } : {}) };
+    const assignment = existing?.status === 'confirmed'
+      ? await this.from('job_assignments').update(details).eq('id', existing.id)
+      : await this.from('job_assignments').upsert({ job_id: request.job_id, technician_id: request.profile_id,
+        status: 'confirmed', single_day: args?.p_single_day, assignment_date: args?.p_single_day ? dates[0] : null, ...details },
+      { onConflict: 'job_id,technician_id' });
+    const schedule = assignment.error || job.job_type === 'dryhire' ? assignment
+      : await this.from('timesheets').upsert(dates.map(date => ({ job_id: request.job_id, technician_id: request.profile_id,
+        date, is_schedule_only: job.job_type === 'tourdate', source: 'staffing', is_active: true })), { onConflict: 'job_id,technician_id,date' });
+    const error = schedule.error as { message: string } | null;
+    if (error) {
+      this.tables.job_assignments = before.assignments;
+      this.tables.timesheets = before.timesheets;
+    }
+    return { data: error ? null : 'assignment', error };
+  };
 }
 
 export function loadStaffingHandler(kind: 'send-staffing-email' | 'staffing-click', db: StaffingDatabase) {
