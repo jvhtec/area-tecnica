@@ -16,12 +16,15 @@ Only the production `staffing-click` Edge Function changes in this PR. Sender ch
 
 ## Independent review and reproduced corrections
 
-Luna audited the roadmap and test coverage. Astra independently reviewed the critical SQL/handler boundary; the targeted corrections were sent back for a closure review. Model conclusions were checked against actual handlers and PostgreSQL; they are not a guarantee of zero regressions.
+Luna audited the roadmap and test coverage. Astra independently reviewed the critical SQL/handler boundary and the targeted corrections. Its closure identified no remaining introduced production blocker and independently passed 151 focused tests. Model conclusions were checked against actual handlers and PostgreSQL; they are not a guarantee of zero regressions.
 
 - CI initially stopped after ten assertions because four rollback-test references contained a malformed UUID. Corrected fixture IDs allow the remaining tests and subsequent HTTP suite to execute.
 - A losing simultaneous click rendered “Error al guardar respuesta” after the winning click committed confirmation. Both single-date and batch HTTP reproductions failed with one success redirect and one error page. The loser now re-reads the durable status and shows the already-recorded or expired result; real read/write errors retain the error path.
 - The SQL conflict update omitted columns that previously fired category and prep pricing update triggers. Real SQL reproduced an existing draft retaining a null category and an inactive prep row retaining €321 instead of €120 for eight hours. The RPC fills only missing categories from the existing insert/category trigger result and invokes the canonical prep pricing trigger for accepted, unapproved prep rows with hours. It does not redefine any rate calculation.
 - No-op schedule replays now avoid updates. Tests verify an already active approved prep row remains byte-for-byte unchanged, including its version. Seasonal house-tech acceptance uses the existing overtime rule: sixteen hours, four hours above twelve, €30 custom hourly rate, €120 total. Profile changes and a later acceptance leave the previously approved prep row unchanged.
+
+Approved-row preservation is scoped: the repricing update excludes approved rows. The existing category-filling behavior can still fill an approved row whose category is null and bump its version; coverage/source changes can also update it. That behavior existed on `main`. The byte-for-byte replay assertion applies to an already active row with a resolved category and matching coverage flags, not every possible approved row.
+
 - Real HTTP coverage also verifies a booking created after send blocks assignment, assignment-write failure retains the response without coverage, and an attempted Flex call returning 503 leaves committed membership and coverage intact. Assignment failure does not attempt Flex or emit the assignment-success event.
 - The CI HTTP helper refuses local execution before installing destructive fixtures. The fixture is installed after authorization tests in CI, so its service-only fault triggers cannot contaminate authenticated/anonymous tests.
 
