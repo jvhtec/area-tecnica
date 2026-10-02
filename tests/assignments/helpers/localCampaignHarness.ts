@@ -34,9 +34,16 @@ export function localCampaignHarness() {
   }
   // The local runtime serves a copied snapshot. Refuse stale code instead of
   // claiming tests covered the checkout when only the private copy was run.
+  // Include the separately invoked sender and its complete local import closure
+  // (http also imports cors). Update this list when either handler adds imports.
   for (const file of ['staffing-orchestrator/index.ts', 'staffing-orchestrator/policyUtils.ts',
     'staffing-orchestrator/orchestrationUtils.ts', 'staffing-orchestrator/campaignFinalization.ts',
-    '_shared/pushBroadcast.ts', '_shared/structuredLogger.ts']) {
+    '_shared/pushBroadcast.ts', '_shared/structuredLogger.ts',
+    'send-staffing-email/index.ts', 'send-staffing-email/messageUtils.ts',
+    'send-staffing-email/timesheetVerification.ts', 'send-staffing-email/requestDates.ts',
+    'send-staffing-email/resendScope.ts', 'send-staffing-email/persistRequests.ts',
+    '_shared/brevo.ts', '_shared/auth.ts', '_shared/joins.ts',
+    '_shared/corporateEmailTemplate.ts', '_shared/http.ts', '_shared/cors.ts']) {
     const normalize = (text: string) => text.replace(/\r\n/g, '\n').trimEnd();
     const source = docker('exec', 'supabase_edge_runtime_dev-history', 'cat', `/local/functions/${file}`)
       .replace(/^import '\.\.\/\.\.\/outbound.ts';\r?\n/, '');

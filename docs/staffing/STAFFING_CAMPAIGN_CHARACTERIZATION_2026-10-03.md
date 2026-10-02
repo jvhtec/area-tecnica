@@ -10,7 +10,7 @@ Start the private historical stack described in its local `README.md`, then run 
 ./scripts/test-staffing-edge-local.ps1 -CredentialsPath C:/Users/Javi/AppData/Local/AreaTecnica/dev-history/status.env
 ```
 
-The path contains local demo keys and remains outside Git. The runner restores its process environment afterward. The suite rejects hosted URLs, non-demo credentials, external routing, additional runtime/database/capture networks, and stale copies of the orchestrator or its five imported helper modules. Five regular unit tests exercise the refusal paths without touching Docker or a database.
+The path contains local demo keys and remains outside Git. The runner restores its process environment afterward. The suite rejects hosted URLs, non-demo credentials, external routing, additional runtime/database/capture networks, and stale copies of the orchestrator, the separately invoked sender and their local dependency closure (18 modules). Nine regular unit tests exercise refusal paths and a matching-source positive control without touching Docker or a database. Three stale-sender cases failed against the original six-module gate and passed after expanding it.
 
 The runtime suite uses real local GoTrue authentication, JWTs, Edge Runtime, Supabase JS, PostgREST, SQL RPCs, constraints and triggers. The original fetch transport is passed explicitly because the ordinary unit-test setup replaces global fetch before each test. Synthetic identities and jobs are owned by each run. Providers are captured inside the isolated network; no email/WhatsApp is delivered externally. Automatic availability waves are disabled, so no historical candidate is contacted. Automatic offer handoff uses only synthetic candidates.
 
@@ -35,7 +35,7 @@ The tests preserve the current odd outcomes. In particular, invited-as-filled an
 
 ## Limits and remaining roadmap work
 
-The runtime suite is **opt-in local evidence**. Ordinary CI runs its five safety tests and reports these 27 cases as skipped; a skipped suite is not runtime verification. CI provisioning of an isolated Auth/Edge/capture stack remains separate work. The existing CI PostgREST acceptance/lock and pgTAP suites continue unchanged.
+The runtime suite is **opt-in local evidence**. Ordinary CI runs its nine safety tests and reports these 27 cases as skipped; a skipped suite is not runtime verification. CI provisioning of an isolated Auth/Edge/capture stack remains separate work. The existing CI PostgREST acceptance/lock and pgTAP suites continue unchanged.
 
 This closes the named controls/counting/handoff/recovery slice, not the entire Phase 1 exit gate. Still missing here: automatic availability-wave ranking/size/deterministic keys and cross-job decline selection (P1.1/10/12), two simultaneous initial CAS contenders (P1.7), exact completion-push count/failure controls (P1.14), real manager cancellation (P0.13), and real direct matrix persistence (P0.14–17). Full GET-versus-POST behavior (P0.21), TTL/cancellation semantics, failure fencing and transactional capacity/conflict checks remain later boundaries. No stale-lock recovery or other production behavior is changed by these tests.
 
@@ -43,4 +43,4 @@ Rollback is removal/reversion of the test harness, runner and documentation. No 
 
 ## Validation on 2026-10-03
 
-The final isolated runtime run passed all 27 cases, including the six-table preservation check after cleanup. The ordinary suite passed 3,248 tests and skipped 50 opt-in cases (27 new runtime cases plus 23 existing PostgREST/lock cases). Five new safety tests also passed independently. Lint passed with zero errors and the existing 296 warnings; application typecheck, governance and build passed. CI and review results are recorded in the follow-up PR.
+The final isolated runtime run passed all 27 cases, including the six-table preservation check after cleanup. The ordinary suite passed 3,252 tests and skipped 50 opt-in cases (27 new runtime cases plus 23 existing PostgREST/lock cases). Nine new safety tests also passed independently. Lint passed with zero errors and the existing 296 warnings; application typecheck, governance and build passed. After expanding the sender source gate, changed-file lint, application typecheck and the full ordinary suite passed again. CI and review results are recorded in the follow-up PR.
