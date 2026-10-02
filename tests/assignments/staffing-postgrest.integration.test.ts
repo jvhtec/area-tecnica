@@ -122,7 +122,10 @@ describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () =>
       await barrier;
     };
     try {
-      await Promise.all([f.click(), f.click()]);
+      const responses = await Promise.all([f.click(), f.click()]);
+      expect(responses.map(response => response.status)).toEqual([302, 302]);
+      expect(responses.map(response => new URL(response.headers.get('location')!).searchParams.get('status')).sort())
+        .toEqual(['success', 'warning']);
     } finally {
       afterPendingRead = undefined;
       release();
@@ -136,6 +139,86 @@ describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () =>
     const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
     expect(events?.filter(row => row.event === 'clicked_confirm')).toHaveLength(1);
     expect(events?.filter(row => row.event === 'auto_assigned_on_confirm')).toHaveLength(1);
+  });
+
+  it('retains the response and existing booking when a conflict appears after sending', async () => {
+    const f = await fixture();
+    expect((await f.send()).status).toBe(200);
+    const otherJobId = randomUUID();
+    expect((await client.from('jobs').insert({ id: otherJobId, title: 'Disposable staffing review',
+      start_time: '2026-10-20T08:00:00Z', end_time: '2026-10-20T18:00:00Z', job_type: 'single', status: 'Confirmado' })).error).toBeNull();
+    expect((await client.from('job_assignments').insert({ job_id: otherJobId, technician_id: techId,
+      status: 'confirmed', single_day: true, assignment_date: '2026-10-20' })).error).toBeNull();
+    expect((await client.from('timesheets').insert({ job_id: otherJobId, technician_id: techId,
+      date: '2026-10-20', is_active: true, notes: 'Keep existing booking' })).error).toBeNull();
+    const before = (await client.from('timesheets').select('*').eq('job_id', otherJobId)).data;
+    await f.click();
+    expect((await f.requests()).every(row => row.status === 'confirmed')).toBe(true);
+    expect((await client.from('job_assignments').select('*').eq('job_id', f.jobId)).data).toEqual([]);
+    expect(await f.activeDates()).toEqual([]);
+    expect((await client.from('timesheets').select('*').eq('job_id', otherJobId)).data).toEqual(before);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
+    expect(events?.some(row => row.event === 'auto_assign_skipped_conflict')).toBe(true);
+    expect(f.db.externalRequests.some(url => url.includes('manage-flex-crew-assignments'))).toBe(false);
+  });
+
+  it.each([false, true])('does not overwrite the winning response when confirm and decline race (single date: %s)', async singleDay => {
+    const f = await fixture();
+    expect((await f.send(singleDay ? { single_day: true, target_date: '2026-10-20' } : {})).status).toBe(200);
+    let reads = 0;
+    let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    afterPendingRead = async () => {
+      if (++reads === 2) { afterPendingRead = undefined; release(); }
+      await barrier;
+    };
+    let responses: Response[];
+    try {
+      responses = await Promise.all([f.click(), f.click('decline')]);
+    } finally {
+      afterPendingRead = undefined;
+      release();
+    }
+    const requests = await f.requests();
+    const winner = requests[0].status;
+    expect(['confirmed', 'declined']).toContain(winner);
+    expect(requests.every(row => row.status === winner)).toBe(true);
+    expect(responses.map(response => response.status)).toEqual([302, 302]);
+    const loser = responses.find(response => new URL(response.headers.get('location')!).searchParams.get('status') === 'warning');
+    expect(loser).toBeDefined();
+    expect(new URL(loser!.headers.get('location')!).searchParams.get('message'))
+      .toContain(winner === 'confirmed' ? 'confirmado' : 'rechazado');
+    expect(await f.activeDates()).toEqual(winner === 'confirmed'
+      ? singleDay ? ['2026-10-20'] : ['2026-10-20', '2026-10-21'] : []);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', requests.map(row => row.id));
+    expect(events?.filter(row => row.event === 'clicked_confirm' || row.event === 'clicked_decline')).toHaveLength(1);
+  });
+
+  it('keeps the confirmed response without a schedule when the assignment write fails', async () => {
+    const f = await fixture();
+    expect((await f.send()).status).toBe(200);
+    expect((await client.from('staffing_test_faults').insert({ job_id: f.jobId, fail_assignment: true })).error).toBeNull();
+    await f.click();
+    expect((await f.requests()).every(row => row.status === 'confirmed')).toBe(true);
+    expect((await client.from('job_assignments').select('*').eq('job_id', f.jobId)).data).toEqual([]);
+    expect(await f.activeDates()).toEqual([]);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
+    expect(events?.some(row => row.event === 'auto_assign_upsert_error')).toBe(true);
+    expect(events?.some(row => row.event === 'auto_assigned_on_confirm')).toBe(false);
+    expect(f.db.externalRequests.some(url => url.includes('manage-flex-crew-assignments'))).toBe(false);
+  });
+
+  it('keeps committed membership and schedule when the external Flex service returns an error', async () => {
+    const f = await fixture();
+    expect((await f.send()).status).toBe(200);
+    f.db.externalStatus = 503;
+    await f.click();
+    expect((await f.requests()).every(row => row.status === 'confirmed')).toBe(true);
+    expect((await client.from('job_assignments').select('*').eq('job_id', f.jobId)).data).toHaveLength(1);
+    expect(await f.activeDates()).toEqual(['2026-10-20', '2026-10-21']);
+    expect(f.db.externalRequests.some(url => url.includes('manage-flex-crew-assignments'))).toBe(true);
+    const { data: events } = await client.from('staffing_events').select('event').in('staffing_request_id', (await f.requests()).map(row => row.id));
+    expect(events?.some(row => row.event === 'auto_assigned_on_confirm')).toBe(true);
   });
 
   it('serializes two overlapping RPC transactions and preserves the first membership scope', async () => {

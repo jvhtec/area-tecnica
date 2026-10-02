@@ -1,4 +1,4 @@
--- Disposable PR989 review database ONLY. No production credentials or delivery.
+-- Disposable staffing review database ONLY. No production credentials or delivery.
 INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, role)
 VALUES ('cb910000-0000-0000-0000-000000000001', 'rest-tech@test.local', '{}', '{}', 'authenticated', 'authenticated'),
        ('cb910000-0000-0000-0000-000000000002', 'rest-manager@test.local', '{}', '{}', 'authenticated', 'authenticated')
@@ -17,6 +17,7 @@ ON CONFLICT (code) DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.staffing_test_faults (
   job_id uuid PRIMARY KEY REFERENCES public.jobs(id) ON DELETE CASCADE,
   fail_date date,
+  fail_assignment boolean NOT NULL DEFAULT false,
   delay_assignment boolean NOT NULL DEFAULT false
 );
 ALTER TABLE public.staffing_test_faults ENABLE ROW LEVEL SECURITY;
@@ -34,6 +35,9 @@ $$;
 CREATE OR REPLACE FUNCTION public.staffing_test_assignment_delay() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 BEGIN
+  IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = NEW.job_id AND fail_assignment) THEN
+    RAISE EXCEPTION 'injected assignment failure';
+  END IF;
   IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = NEW.job_id AND delay_assignment) THEN
     PERFORM pg_catalog.pg_sleep(0.3);
   END IF;

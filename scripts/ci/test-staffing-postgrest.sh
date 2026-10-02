@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Real transaction/concurrent-click tests on the disposable CI Supabase DB.
 set -euo pipefail
+if [[ "${GITHUB_ACTIONS:-}" != 'true' ]]; then
+  echo 'This script mutates the ephemeral GitHub Actions database; refusing a local stack.' >&2
+  exit 1
+fi
 container=supabase_db_syldobdcdsgfgjtbuwxm
 rest=phase2a-staffing-test-rest
 cleanup() { docker rm -f "$rest" >/dev/null 2>&1 || true; }
@@ -20,4 +24,5 @@ for attempt in {1..30}; do
   if curl --fail --silent http://127.0.0.1:18089/ >/dev/null; then break; fi
   sleep 1
 done
+curl --fail --silent http://127.0.0.1:18089/ >/dev/null
 STAFFING_TEST_REST_URL=http://127.0.0.1:18089 npx vitest run tests/assignments/staffing-postgrest.integration.test.ts --maxWorkers=1

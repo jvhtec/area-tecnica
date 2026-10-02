@@ -428,6 +428,24 @@ serve(async (req) => {
       updErr = error;
     }
     
+    if (!updErr && !updRow) {
+      // Another click can win after our pending read. Show the durable result
+      // instead of telling the technician that their response failed to save.
+      const { data: current, error: currentError } = await supabase
+        .from('staffing_requests').select('status').eq('id', rid).maybeSingle();
+      if (!currentError && current && current.status !== 'pending') {
+        const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
+        const expired = current.status === 'expired';
+        return await redirectResponse({
+          title: expired ? 'Enlace caducado' : 'Respuesta registrada',
+          status: 'warning',
+          heading: expired ? 'Solicitud caducada' : 'Respuesta ya registrada',
+          message: expired ? `Esta solicitud para ${phase} ya no está activa.`
+            : `Ya has ${current.status === 'confirmed' ? 'confirmado' : 'rechazado'} ${phase}.`,
+          submessage: expired ? 'Contacta con tu responsable si necesitas un enlace nuevo.' : 'Puedes cerrar esta pestaña.'
+        });
+      }
+    }
     if (updErr || !updRow) {
       console.error('❌ STAFFING STATUS UPDATE FAILED:', { updErr, rid, newStatus });
       return new Response(renderPage({

@@ -23,6 +23,7 @@ export class StaffingDatabase {
   client?: SupabaseClient;
   deliveryStatus = 200;
   externalStatus = 200;
+  externalRequests: string[] = [];
   afterQuery?: (query: { table: string; operation: string; columns: string; rows: Row[] }) => void | Promise<void>;
 
   from(table: string) {
@@ -168,7 +169,10 @@ export function loadStaffingHandler(kind: 'send-staffing-email' | 'staffing-clic
       EdgeRuntime: { waitUntil: (_task: Promise<unknown>) => undefined },
       crypto: webcrypto, TextEncoder, TextDecoder, Uint8Array, URL, URLSearchParams, Request, Response, Headers,
       AbortController, setTimeout, clearTimeout, btoa, atob,
-      fetch: async () => new Response('{}', { status: db.externalStatus }),
+      fetch: async (input: string | URL | Request) => {
+        db.externalRequests.push(String(input));
+        return new Response('{}', { status: db.externalStatus });
+      },
       console: { log: () => undefined, warn: () => undefined, error: () => undefined, info: () => undefined },
     });
     return exports;
