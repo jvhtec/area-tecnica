@@ -685,7 +685,7 @@ Future writer consolidation must inventory every direct matrix, lifecycle and to
 
 [`staffing-campaigns.edge.integration.test.ts`](../../tests/assignments/staffing-campaigns.edge.integration.test.ts) adds 27 opt-in cases against real local Auth, Edge Runtime and PostgreSQL, with provider delivery captured. It supplies actual behavior for P0.20 and campaign controls, role attribution/handoff, held-lock rejection, stale direct recovery, offer capacity and accepted-unassigned reservations in P1.2–9/11/13/15. Auto creation is tested with availability waves disabled; it does not close P1.1/12's automatic wave behavior. The stale-lock case includes an unlocked positive control and preserves the observed A3 sweeper-selector defect.
 
-See the [reproduction and remaining gaps](STAFFING_CAMPAIGN_CHARACTERIZATION_2026-10-03.md). Ordinary CI runs five safety refusal tests but skips the local runtime suite. Initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior, direct matrix persistence and cancellation remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
+See the [reproduction and remaining gaps](STAFFING_CAMPAIGN_CHARACTERIZATION_2026-10-03.md). Ordinary CI runs nine safety/source checks but skips the local runtime suite. Initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior, direct matrix persistence and cancellation remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
 
 ### Phase 1 exit gate
 
