@@ -117,5 +117,24 @@ SELECT ok((SELECT (amount_breakdown->>'seasonal_overtime_only')::boolean FROM ti
 SELECT is((SELECT to_jsonb(t) FROM timesheets t WHERE job_id = 'cc210000-0000-0000-0000-000000000005' AND date = '2026-10-19'), (SELECT snapshot FROM approved_prep_replay), 'seasonal profile change and acceptance preserve previously approved prep');
 UPDATE staffing_requests SET status = 'pending' WHERE id = 'cc310000-0000-0000-0000-000000000003';
 SELECT throws_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000003', ARRAY['2026-10-21']::date[], true, NULL) $$, '22023', 'A confirmed offer response is required', 'unconfirmed requests cannot assign');
+
+-- Lock-order repair preserves authorization and orphan cleanup semantics.
+INSERT INTO jobs (id, title, start_time, end_time, job_type, status)
+VALUES ('cc210000-0000-0000-0000-000000000006', 'Orphan schedule removal', '2026-10-20 08:00+02', '2026-10-20 18:00+02', 'single', 'Confirmado');
+INSERT INTO timesheets (job_id, technician_id, date)
+VALUES ('cc210000-0000-0000-0000-000000000006', 'cc110000-0000-0000-0000-000000000001', '2026-10-20');
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+SELECT set_config('request.jwt.claim.sub', 'cc110000-0000-0000-0000-000000000001', true);
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"cc110000-0000-0000-0000-000000000001"}', true);
+SET LOCAL ROLE authenticated;
+SELECT throws_ok($$ SELECT * FROM remove_assignment_with_timesheets('cc210000-0000-0000-0000-000000000006', 'cc110000-0000-0000-0000-000000000001') $$,
+  '42501', 'permission denied', 'technician removal remains denied before locking');
+RESET ROLE;
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+SELECT results_eq($$ SELECT * FROM remove_assignment_with_timesheets('cc210000-0000-0000-0000-000000000006', 'cc110000-0000-0000-0000-000000000001') $$,
+  $$ VALUES (1, false) $$, 'removal without membership still deletes the orphan schedule and reports counts');
+SELECT results_eq($$ SELECT * FROM remove_assignment_with_timesheets('cc210000-0000-0000-0000-000000000006', 'cc110000-0000-0000-0000-000000000001') $$,
+  $$ VALUES (0, false) $$, 'repeated missing-membership removal remains a no-op');
 SELECT * FROM finish();
 ROLLBACK;

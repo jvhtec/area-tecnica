@@ -25,9 +25,14 @@ BEGIN
 
   -- Serialize even when membership does not exist yet. Re-read membership under
   -- this lock so simultaneous extensions never reset legacy scope/prep-day data.
+  -- Festival cleanup takes its own advisory key AFTER locking membership.
+  -- A separate namespace avoids reversing that existing deletion lock order.
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
-    v_request.job_id::text || ':' || v_request.profile_id::text, 0));
-  SELECT job_type INTO STRICT v_job_type FROM public.jobs WHERE id = v_request.job_id;
+    'staffing-offer:' || v_request.job_id::text || ':' || v_request.profile_id::text, 0));
+  -- Keep parent deletion from holding the job while waiting for membership;
+  -- a new schedule row's foreign key needs this parent key too.
+  SELECT job_type INTO STRICT v_job_type FROM public.jobs
+  WHERE id = v_request.job_id FOR KEY SHARE;
   SELECT department INTO STRICT v_department FROM public.profiles WHERE id = v_request.profile_id;
   SELECT array_agg(d ORDER BY d) INTO v_dates FROM (SELECT DISTINCT unnest(p_dates) AS d) dates;
   IF array_position(v_dates, NULL) IS NOT NULL
@@ -74,6 +79,33 @@ BEGIN
   END IF;
 
   IF v_job_type <> 'dryhire' THEN
+    -- Existing membership updates may skip the technician FK check. Protect
+    -- this parent before adding schedules, but never wait on its deletion
+    -- while holding membership. Take this after assigned_by's auth-user FK
+    -- checks so no new profile/auth-user lock order is introduced.
+    PERFORM 1 FROM public.profiles WHERE id = v_request.profile_id
+    FOR KEY SHARE NOWAIT;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Technician profile no longer exists' USING ERRCODE = 'P0002';
+    END IF;
+
+    -- Repricing can update a row already modified by the upsert, causing its
+    -- unchanged profile FKs to be checked again. Lock the actual existing rows
+    -- before reading their references, then fail fast if a referenced profile
+    -- is being deleted while waiting for those rows.
+    PERFORM 1 FROM public.timesheets t
+    WHERE t.job_id = v_request.job_id AND t.technician_id = v_request.profile_id
+      AND t.date = ANY(v_dates)
+    ORDER BY t.date FOR UPDATE;
+    PERFORM 1 FROM public.profiles p
+    WHERE p.id IN (
+      SELECT ref_id FROM public.timesheets t
+      CROSS JOIN LATERAL unnest(ARRAY[t.created_by, t.approved_by, t.rejected_by]) AS ref_id
+      WHERE t.job_id = v_request.job_id AND t.technician_id = v_request.profile_id
+        AND t.date = ANY(v_dates)
+    )
+    ORDER BY p.id FOR KEY SHARE NOWAIT;
+
     INSERT INTO public.timesheets (job_id, technician_id, date, is_schedule_only, source, is_active)
     SELECT v_request.job_id, v_request.profile_id, d, v_job_type = 'tourdate', 'staffing', true
     FROM unnest(v_dates) AS d
@@ -84,6 +116,18 @@ BEGIN
        OR timesheets.source IS DISTINCT FROM excluded.source
        OR timesheets.is_active IS DISTINCT FROM excluded.is_active
        OR (timesheets.category IS NULL AND excluded.category IS NOT NULL);
+
+    -- A direct writer can insert an attributed row after the initial probe.
+    -- The upsert now holds that actual row; protect its parents before the
+    -- second update can recheck unchanged foreign keys.
+    PERFORM 1 FROM public.profiles p
+    WHERE p.id IN (
+      SELECT ref_id FROM public.timesheets t
+      CROSS JOIN LATERAL unnest(ARRAY[t.created_by, t.approved_by, t.rejected_by]) AS ref_id
+      WHERE t.job_id = v_request.job_id AND t.technician_id = v_request.profile_id
+        AND t.date = ANY(v_dates)
+    )
+    ORDER BY p.id FOR KEY SHARE NOWAIT;
 
     -- The former HTTP upsert mentioned date, firing the prep pricing trigger.
     -- Reactivated drafts may have missed date-type repricing while inactive.
