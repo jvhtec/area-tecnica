@@ -160,25 +160,17 @@ function AppInitWithRouter(): null {
   const {
     forceRefresh,
     isFullySubscribed,
-    isStale,
     requiredSubscriptions,
     routeKey,
     unsubscribedTables,
   } = subscriptionStatus;
   
-  // Handle subscription staleness (only for leader)
-  useEffect(() => {
-    if (isStale && isLeader) {
-      console.log('Subscriptions are stale, refreshing...');
-      forceRefresh();
-      
-      // Notify the user that subscriptions are being refreshed (only leader shows toasts)
-      toast.info('Actualizando datos obsoletos...', {
-        description: 'La conexión estuvo inactiva, actualizando ahora',
-      });
-    }
-  }, [forceRefresh, isStale, isLeader]);
-  
+  // No time-based "stale" refresh here. isStale only means no realtime event
+  // arrived for five minutes — a quiet but healthy connection — and acting on
+  // it rebuilt every channel and refetched every query (with a toast) on the
+  // next navigation after any quiet spell. Real disconnects are handled by the
+  // health check above and by the resume handler.
+
   // Handle route changes with improved subscription management (only for leader)
   useEffect(() => {
     const retryTimers: number[] = [];

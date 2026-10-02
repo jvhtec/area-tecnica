@@ -2,9 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps } from 'react';
+import React, { type ComponentProps } from 'react';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  MatrixCellHoverTooltip,
+  type MatrixCellHoverTooltipHandle,
+} from '@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip';
+import { formatUserName } from '@/utils/userName';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
 
 // Hoisted mocks
@@ -110,6 +115,38 @@ const render = (ui: JSX.Element) => rtlRender(
   <TooltipProvider delayDuration={0}>{ui}</TooltipProvider>
 );
 
+/**
+ * The tooltip is owned by the grid (one MatrixCellHoverTooltip, fed by pointer
+ * delegation), so cell tooltip tests mount the cell inside that same wiring.
+ */
+const renderWithHoverTooltip = (
+  cell: React.ReactElement<ComponentProps<typeof OptimizedMatrixCell>>,
+  profileNamesMap: Map<string, string> = new Map(),
+) => {
+  const tooltipRef = React.createRef<MatrixCellHoverTooltipHandle>();
+  const { technician, assignment, availability, staffingStatusByDateProvided } = cell.props;
+  const resolve = () => ({
+    displayName: formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico',
+    technician,
+    hasAssignment: !!assignment,
+    assignment,
+    isUnavailable: availability?.status === 'unavailable',
+    availability,
+    staffingStatusByDate: staffingStatusByDateProvided ?? null,
+    profileNamesMap,
+  });
+  return render(
+    <div
+      onMouseOver={(event) =>
+        tooltipRef.current?.hover((event.target as HTMLElement).closest<HTMLElement>('[data-matrix-cell]'))
+      }
+    >
+      {cell}
+      <MatrixCellHoverTooltip ref={tooltipRef} resolve={resolve} />
+    </div>,
+  );
+};
+
 const getCellElement = () => {
   // Not `.cursor-pointer`: read-only cells (no edit mode enabled) render
   // cursor-default, so the cell is addressed by its stable data attribute.
@@ -151,7 +188,7 @@ describe('OptimizedMatrixCell', () => {
   it('renders basic cell with technician name in tooltip', async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -390,6 +427,112 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getByTitle('Enviar oferta por WhatsApp')).toBeInTheDocument();
   });
 
+  it.each([
+    { availability_status: 'declined', offer_status: null },
+    { availability_status: 'confirmed', offer_status: 'declined' },
+    { availability_status: 'declined', offer_status: 'pending' },
+    { availability_status: 'pending', offer_status: 'declined' },
+    { availability_status: 'declined', offer_status: 'declined' },
+  ])('keeps declined staffing indicators without any staffing controls: %j', (staffingStatus) => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+        staffingStatusByDateProvided={staffingStatus}
+      />
+    );
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    const declinedBadge = screen.getByText(staffingStatus.availability_status === 'declined' ? 'A:✗' : 'O:✗');
+    expect(declinedBadge.closest('button')).toBeNull();
+    if (!staffingStatus.offer_status || staffingStatus.offer_status === 'declined') {
+      expect(screen.getByText('Rechazada')).toBeInTheDocument();
+    }
+    expect(onClick).not.toHaveBeenCalled();
+    expect(requiredCellProps.sendStaffingEmail).not.toHaveBeenCalled();
+    expect(requiredCellProps.cancelStaffing).not.toHaveBeenCalled();
+  });
+
+  it('preserves assignment confirmation, editing and removal controls when staffing is declined', () => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={{ ...mockAssignment, status: 'invited' }}
+        staffingStatusProvided={{ availability_status: 'declined', offer_status: 'pending' }}
+        allowDirectAssign
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    expect(screen.queryByTitle('Reintentar solicitud de disponibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Cancelar oferta')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar asignación' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'confirm', undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'decline', undefined);
+    fireEvent.click(getCellElement());
+    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'assign', undefined);
+  });
+
+  it('keeps mark-unavailable available on a declined staffing cell', () => {
+    const onClick = vi.fn();
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        staffingStatusByDateProvided={{ availability_status: 'declined', offer_status: null }}
+        allowMarkUnavailable
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    fireEvent.click(getCellElement());
+    expect(onClick).toHaveBeenCalledWith('tech-1', mockDate, 'toggle-unavailable', undefined);
+  });
+
+  it.each(['pending', 'confirmed', 'expired'])('preserves non-declined staffing controls for %s', (status) => {
+    render(
+      <OptimizedMatrixCell
+        {...requiredCellProps}
+        technician={mockTechnician}
+        date={mockDate}
+        staffingStatusByDateProvided={{ availability_status: status, offer_status: status }}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTitle('Reintentar solicitud de disponibilidad')).toBeInTheDocument();
+    expect(screen.getByTitle('Cancelar solicitud de disponibilidad')).toBeInTheDocument();
+    expect(screen.getByTitle('Reintentar oferta')).toBeInTheDocument();
+    expect(screen.getByTitle('Cancelar oferta')).toBeInTheDocument();
+    expect(screen.getByTitle('Enviar oferta (progreso manual)')).toBeInTheDocument();
+    expect(screen.getByTitle('Enviar oferta por WhatsApp (progreso manual)')).toBeInTheDocument();
+  });
+
   // The remove button and the desktop staffing actions share the top-right
   // corner and the actions carry z-10, so they must never both render. The
   // other two gates already excluded assigned cells; canSendOffer did not, so a
@@ -577,7 +720,7 @@ describe('OptimizedMatrixCell', () => {
     const singleDayAssignment = {
       ...mockAssignment,
       single_day: true,
-      assignment_date: '2024-05-20',
+      assignment_date: '2024-05-15',
     };
 
     render(
@@ -595,6 +738,14 @@ describe('OptimizedMatrixCell', () => {
     );
 
     expect(screen.getByText(/Día único:/i)).toBeInTheDocument();
+  });
+
+  it('does not repeat a legacy single-day badge on another scheduled date', () => {
+    render(<OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+      assignment={{ ...mockAssignment, single_day: true, assignment_date: '2024-05-14' }}
+      width={160} height={60} isSelected={false} onSelect={vi.fn()} onClick={vi.fn()} />);
+    expect(screen.queryByText(/Día único:/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Test Concert')).toBeInTheDocument();
   });
 
   it('shows delete button for assignments', () => {
@@ -686,7 +837,7 @@ describe('OptimizedMatrixCell', () => {
     };
     const profileNamesMap = new Map<string, string>([['manager-1', 'Manager Name']]);
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -697,8 +848,8 @@ describe('OptimizedMatrixCell', () => {
         isSelected={false}
         onSelect={vi.fn()}
         onClick={vi.fn()}
-        profileNamesMap={profileNamesMap}
-      />
+      />,
+      profileNamesMap,
     );
 
     await user.hover(getCellElement());
@@ -712,7 +863,7 @@ describe('OptimizedMatrixCell', () => {
   it('normalizes unknown or English assignment statuses to Spanish pending in the tooltip', async () => {
     const user = userEvent.setup();
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -749,7 +900,7 @@ describe('OptimizedMatrixCell', () => {
       offer_created_at: '2026-04-09T11:00:00.000Z',
     };
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}
@@ -760,8 +911,8 @@ describe('OptimizedMatrixCell', () => {
         onSelect={vi.fn()}
         onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
-        profileNamesMap={new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']])}
-      />
+      />,
+      new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']]),
     );
 
     await user.hover(getCellElement());
@@ -793,7 +944,7 @@ describe('OptimizedMatrixCell', () => {
       pending_offer_job_titles: [],
     };
 
-    render(
+    renderWithHoverTooltip(
       <OptimizedMatrixCell
         {...requiredCellProps}
         technician={mockTechnician}

@@ -29,6 +29,7 @@ export type SubscriptionOptions = {
 export type ManagedSubscription = {
   key: string;
   unsubscribe: () => void;
+  isConnected: () => boolean;
   options: SubscriptionOptions;
   ownerRoutes: Set<string>;
   payloadHandlers: Map<symbol, RealtimePayloadHandler>;
@@ -152,6 +153,7 @@ export const createSubscriptionDebugEntries = (
 
 type ForceRefreshSubscriptionsOptions = {
   subscriptions: Map<string, ManagedSubscription>;
+  keysToRefresh?: ReadonlySet<string>;
   tableLastActivity: Map<string, number>;
   snapshotSubscription: (subscription: ManagedSubscription) => PendingManagedSubscription;
   replaySubscription: (subscription: PendingManagedSubscription) => void;
@@ -162,6 +164,7 @@ export const forceRefreshManagedSubscriptions = (
   tables: string[],
   {
     subscriptions,
+    keysToRefresh,
     tableLastActivity,
     snapshotSubscription,
     replaySubscription,
@@ -169,7 +172,13 @@ export const forceRefreshManagedSubscriptions = (
   }: ForceRefreshSubscriptionsOptions,
 ): void => {
   tables.forEach((table) => {
-    const subscriptionKeys = Array.from(subscriptions.keys()).filter((key) => key.startsWith(`${table}::`));
+    const subscriptionKeys = Array.from(subscriptions.keys()).filter((key) =>
+      key.startsWith(`${table}::`) && (!keysToRefresh || keysToRefresh.has(key)),
+    );
+    const selectedQueryKeys = subscriptionKeys.flatMap(key => {
+      const subscription = subscriptions.get(key);
+      return subscription ? [normalizeQueryKey(subscription.options.queryKey)] : [];
+    });
 
     subscriptionKeys.forEach((key) => {
       const subscription = subscriptions.get(key);
@@ -186,13 +195,13 @@ export const forceRefreshManagedSubscriptions = (
       }
     });
 
-    const queryKeysForTable = Array.from(subscriptions.values())
+    const queryKeysForTable = keysToRefresh ? selectedQueryKeys : Array.from(subscriptions.values())
       .filter((subscription) => subscription.options.table === table)
       .map((subscription) => normalizeQueryKey(subscription.options.queryKey));
 
     if (queryKeysForTable.length > 0) {
       queryKeysForTable.forEach(invalidateQuery);
-    } else {
+    } else if (!keysToRefresh) {
       invalidateQuery([table]);
     }
   });

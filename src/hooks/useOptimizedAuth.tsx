@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext, createContext, useMemo, useSyncExternalStore, Fragment, ReactNode } from "react";
+import { useState, useEffect, useCallback, useContext, createContext, useMemo, useSyncExternalStore, useRef, Fragment, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PrivateAuthBoundary } from "@/hooks/optimizedAuthBoundary";
 import { getPrivateDataScope, subscribePrivateDataScope } from "@/lib/private-data-scope";
@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { isNetworkFailure, sessionOrPersisted } from "@/lib/offline-session";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import type { UserRole } from "@/types/user";
 import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
@@ -16,12 +15,17 @@ import { canAccessSoundVision } from "@/utils/permissions";
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from "@/runtime/app-runtime-events";
 import {
   readCachedProfile,
+  writeCachedProfile,
+  isBackgroundProfileRead,
+  keepSameAuthUser,
+  NO_APPLIED_PROFILE,
   PROFILE_CACHE_KEY,
   VALID_USER_ROLES,
   getErrorCode,
   getErrorMessage,
   getMetadataString,
   type AuthContextType,
+  type AppliedProfile,
   type AuthUser,
   type CachedProfile,
   type ProfileData,
@@ -44,7 +48,6 @@ export const useOptimizedAuth = () => {
 export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { refreshSubscriptions, invalidateQueries } = useSubscriptionContext();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -53,6 +56,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [assignableAsTechFlag, setAssignableAsTechFlag] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  // Keep the applied identity after revocation so later reads cannot bootstrap it again.
+  const appliedProfileRef = useRef<AppliedProfile>(NO_APPLIED_PROFILE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tokenManager = TokenManager.getInstance();
@@ -65,6 +70,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const boundary = useMemo(() => new PrivateAuthBoundary(queryClient), [queryClient]);
   const applySession = useCallback((next: Session | null) => {
     if (boundary.acceptSession(next?.user.id ?? null)) {
+      appliedProfileRef.current = NO_APPLIED_PROFILE;
       setUserRole(null);
       setUserDepartment(null);
       setSoundVisionAccessFlag(false);
@@ -72,7 +78,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       setIsProfileLoading(false);
     }
     setSession(next);
-    setUser(next?.user ?? null);
+    // A token refresh keeps the user object, so it re-renders nothing.
+    setUser((previous) => keepSameAuthUser(previous, next?.user ?? null));
     setIsInitialized(true);
   }, [boundary]);
 
@@ -83,22 +90,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     [],
   );
 
-  const setCachedProfile = useCallback((userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) => {
-    try {
-      const profile: CachedProfile = {
-        role,
-        department,
-        soundVisionAccess,
-        assignableAsTech,
-        userId,
-        timestamp: Date.now()
-      };
-      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
-      console.log('✅ Profile cached successfully');
-    } catch (error) {
-      console.error('Error caching profile:', error);
-    }
-  }, []);
+  const setCachedProfile = useCallback(
+    (userId: string, role: string | null, department: string | null, soundVisionAccess: boolean, assignableAsTech: boolean) =>
+      writeCachedProfile({ userId, role, department, soundVisionAccess, assignableAsTech }),
+    [],
+  );
 
   const clearProfileCache = useCallback(() => {
     try {
@@ -114,8 +110,18 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const fetchUserProfile = useCallback(async (userId: string, useCache = true): Promise<ProfileData | null> => {
     const request = boundary.beginProfile(userId);
     if (!request) return null;
+    const background = isBackgroundProfileRead(appliedProfileRef.current, userId);
+    const clearAppliedProfile = (): null => {
+      if (!request.apply(null, null, false, false)) return null;
+      appliedProfileRef.current = { userId, role: null };
+      setUserRole(null);
+      setUserDepartment(null);
+      clearProfileCache();
+      return null;
+    };
     const applyCachedProfile = (cached: CachedProfile): ProfileData | null => {
       if (!request.apply(cached.role, cached.department, Boolean(cached.soundVisionAccess), Boolean(cached.assignableAsTech))) return null;
+      appliedProfileRef.current = { userId, role: cached.role };
       setUserRole(cached.role);
       setUserDepartment(cached.department);
       setSoundVisionAccessFlag(Boolean(cached.soundVisionAccess));
@@ -128,6 +134,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       };
     };
     const applyStaleProfileIfOffline = (failure: unknown): ProfileData | null => {
+      // An explicit denial wins even when navigator.onLine reports offline.
+      if (getErrorCode(failure) === '42501') return clearAppliedProfile();
+      // A failed background read does not replace the profile already in use.
+      if (background) return null;
       if (!isNetworkFailure(failure)) return null;
       const stale = getCachedProfile(userId, true);
       return stale ? applyCachedProfile(stale) : null;
@@ -140,7 +150,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       console.log('🔄 Fetching fresh profile data...');
-      setIsProfileLoading(true);
+      if (!background) setIsProfileLoading(true);
 
       const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: SupabaseErrorLike | null }> => {
         if (!request.isCurrent()) throw new Error("La sesión ha cambiado");
@@ -177,7 +187,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         }
       }
 
-      if (!data && !error) {
+      if (!data && !error && !background) {
         const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
         if (!request.isCurrent()) return null;
         const authUser = authUserData?.user ?? null;
@@ -236,6 +246,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const soundVisionAccess = Boolean(typedData.soundvision_access);
         const assignableAsTech = Boolean(typedData.assignable_as_tech);
         if (!request.apply(typedData.role, typedData.department, soundVisionAccess, assignableAsTech)) return null;
+        appliedProfileRef.current = { userId, role: typedData.role };
         setUserRole(typedData.role);
         setUserDepartment(typedData.department);
         setSoundVisionAccessFlag(soundVisionAccess);
@@ -243,11 +254,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         setCachedProfile(userId, typedData.role, typedData.department, soundVisionAccess, assignableAsTech);
         return { ...typedData, soundvision_access: soundVisionAccess, assignable_as_tech: assignableAsTech } as ProfileData;
       } else {
-        if (!request.apply(null, null, false, false)) return null;
-        setUserRole(null);
-        setUserDepartment(null);
-        setSoundVisionAccessFlag(false);
-        setAssignableAsTechFlag(false);
+        return clearAppliedProfile();
       }
       return data ?? null;
     } catch (error) {
@@ -257,7 +264,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     } finally {
       if (request.isCurrent()) setIsProfileLoading(false);
     }
-  }, [getCachedProfile, setCachedProfile, boundary]);
+  }, [getCachedProfile, setCachedProfile, clearProfileCache, boundary]);
 
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
@@ -323,9 +330,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           });
         }
 
-        refreshSubscriptions();
-        invalidateQueries();
-
         return refreshedSession;
       }
 
@@ -335,7 +339,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.error("Exception in refreshSession:", error);
       return null;
     }
-  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries, clearProfileCache, applySession, boundary]);
+  }, [fetchUserProfile, navigate, user, tokenManager, toast, clearProfileCache, applySession, boundary]);
 
   const resolveCurrentAuditUserId = useCallback(async (): Promise<string | null> => {
     if (user?.id) {
@@ -372,7 +376,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         applySession(newSession);
 
         if (newSession?.user?.id) {
-          // Background profile fetch without blocking UI
+          // Still re-read on TOKEN_REFRESHED, so a role or access change made by
+          // an admin reaches a signed-in user. For a user whose profile is
+          // already applied this is a background read:
+          // no isProfileLoading, so the route guards never swap the page out.
           fetchUserProfile(newSession.user.id, event === 'INITIAL_SESSION').catch(error => {
             console.error('Auth state profile fetch failed:', error);
           });

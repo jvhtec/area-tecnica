@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JobAssignmentMatrix from '../JobAssignmentMatrix';
@@ -127,6 +127,8 @@ const mockDateRange = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
   window.localStorage.clear();
 
   useOptimizedAuthMock.mockReturnValue({
@@ -206,6 +208,8 @@ beforeEach(() => {
     return Promise.resolve({ data: [], error: null });
   });
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('JobAssignmentMatrix', () => {
   it('renders the page with header', async () => {
@@ -456,6 +460,41 @@ describe('JobAssignmentMatrix', () => {
     await waitFor(() => {
       expect(screen.getByText(/trabajos con personal por completar/i)).toBeInTheDocument();
     });
+  });
+
+  it('counts only jobs with Madrid dates today or later, retaining past jobs in the grid', async () => {
+    // UTC is still 1 May; Madrid has already crossed into 2 May.
+    vi.setSystemTime(new Date('2024-05-01T22:30:00Z'));
+    const jobs = [
+      { ...mockJobs[0], id: 'past', title: 'Trabajo pasado', end_time: '2024-05-01T21:59:59Z' },
+      { ...mockJobs[0], id: 'today', title: 'Trabajo de hoy', end_time: '2024-05-01T22:00:00Z' },
+      { ...mockJobs[0], id: 'ongoing', title: 'Trabajo en curso', end_time: '2024-05-02T20:00:00Z' },
+      { ...mockJobs[0], id: 'future', title: 'Trabajo futuro', start_time: '2024-05-03T10:00:00Z', end_time: '2024-05-03T22:00:00Z' },
+      { ...mockJobs[0], id: 'loadout', title: 'Desmontaje futuro', job_date_types: [{ date: '2024-05-03', type: 'desmontaje' }] },
+    ];
+    useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+      if (queryKey[0] === 'optimized-matrix-technicians') return { data: mockTechnicians, isInitialLoading: false };
+      if (queryKey[0] === 'optimized-matrix-jobs') return { data: jobs, isInitialLoading: false };
+      if (queryKey[0] === 'matrix-staffing-summary') return {
+        data: {
+          summaries: jobs.map((job) => ({ job_id: job.id, department: 'sound', roles: [{ role_code: 'foh', quantity: 2 }] })),
+          assignments: [],
+        },
+        isSuccess: true,
+      };
+      return { data: undefined, isLoading: false };
+    });
+    render(<JobAssignmentMatrix />);
+    await userEvent.setup().click(screen.getByRole('button', { name: /Ver recordatorio de staffing/i }));
+
+    expect(screen.getByRole('heading', { name: 'Hay 4 trabajos con personal por completar' })).toBeInTheDocument();
+    expect(screen.queryByText('Trabajo pasado')).not.toBeInTheDocument();
+    for (const title of ['Trabajo de hoy', 'Trabajo en curso', 'Trabajo futuro', 'Desmontaje futuro']) {
+      expect(screen.getByText(title)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId('matrix-jobs')).toHaveTextContent('5');
+    const summaryQuery = useQueryMock.mock.calls.find(([options]) => options.queryKey[0] === 'matrix-staffing-summary')?.[0];
+    expect(summaryQuery.queryKey).toEqual(['matrix-staffing-summary', 'future,loadout,ongoing,today']);
   });
 
   it('shows date range expander on desktop', async () => {

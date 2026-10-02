@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => {
       job_date_types: ["job-date-types-subscription"],
     })),
     forceRefreshSubscriptions: vi.fn(),
+    getSubscriptionStatus: vi.fn<(table: string, queryKey: unknown) => { isConnected: boolean; lastActivity: number }>(
+      () => ({ isConnected: true, lastActivity: Date.now() }),
+    ),
   };
 
   return {
@@ -28,6 +31,7 @@ const mocks = vi.hoisted(() => {
     requestSubscriptions: vi.fn(),
     invalidateQueries: vi.fn(),
     lastRefreshTime: Date.now(),
+    realtimeStatus: "CONNECTED" as "CONNECTED" | "CONNECTING" | "DISCONNECTED",
     coordinator: {
       getIsLeader: vi.fn(() => true),
       requestSubscriptions: vi.fn(),
@@ -45,7 +49,7 @@ vi.mock("@/lib/unified-subscription-manager", () => ({
 
 vi.mock("@/providers/SubscriptionProvider", () => ({
   useSubscriptionContext: () => ({
-    lastRefreshTime: mocks.lastRefreshTime,
+    lastRefreshTime: mocks.lastRefreshTime as number,
     connectionStatus: "connected",
   }),
 }));
@@ -60,6 +64,10 @@ vi.mock("@/hooks/useOptimizedAuth", () => ({
   useOptimizedAuth: () => ({ userRole: "management" }),
 }));
 
+vi.mock("@/lib/enhanced-supabase-client", () => ({
+  getRealtimeConnectionStatus: () => mocks.realtimeStatus,
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     info: vi.fn(),
@@ -68,6 +76,9 @@ vi.mock("sonner", () => ({
 }));
 
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
+import { APP_RUNTIME_EVENTS, emitAppRuntimeEvent } from "@/runtime/app-runtime-events";
+import { toast } from "sonner";
+import { act } from "@testing-library/react";
 
 function Harness(): React.JSX.Element | null {
   useEnhancedRouteSubscriptions();
@@ -91,6 +102,8 @@ const renderHookHarness = (route: string) => {
 describe("useEnhancedRouteSubscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.realtimeStatus = "CONNECTED";
+    mocks.manager.getSubscriptionStatus.mockReturnValue({ isConnected: true, lastActivity: Date.now() });
     mocks.coordinator.getIsLeader.mockReturnValue(true);
     mocks.manager.getSubscriptionsByTable.mockReturnValue({
       profiles: ["profiles-subscription"],
@@ -206,5 +219,129 @@ describe("useEnhancedRouteSubscriptions", () => {
 
     expect(mocks.coordinator.releaseSubscriptions).toHaveBeenCalledWith("/dashboard");
     expect(mocks.manager.cleanupRouteDependentSubscriptions).not.toHaveBeenCalled();
+  });
+
+  const resumeAfter = (hiddenDurationMs: number) => {
+    act(() => {
+      emitAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, { at: Date.now(), hiddenDurationMs });
+    });
+  };
+
+  it("refetches quietly after a long absence, keeping a healthy realtime connection", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds the channels after a long absence only when realtime dropped", async () => {
+    mocks.realtimeStatus = "DISCONNECTED";
+    mocks.manager.getSubscriptionStatus.mockReturnValue({ isConnected: false, lastActivity: 0 });
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledTimes(1);
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("does nothing after a short absence", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(30 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("refreshes and takes route ownership when leadership changes without an election event", async () => {
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.coordinator.requestSubscriptions).toHaveBeenCalled());
+
+    mocks.coordinator.getIsLeader.mockReturnValue(true);
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    expect(mocks.coordinator.releaseSubscriptions).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("does not refresh when leadership was lost without an election event", async () => {
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.coordinator.invalidateQueries).not.toHaveBeenCalled();
+    expect(mocks.manager.forceRefreshSubscriptions).not.toHaveBeenCalled();
+  });
+
+  it("repairs a failed assignments channel even when the aggregate ping status is connected", async () => {
+    mocks.manager.getSubscriptionStatus.mockImplementation((table: string) => ({
+      isConnected: table !== "job_assignments",
+      lastActivity: 0,
+    }));
+    renderHookHarness("/dashboard");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("job_assignments", ["optimized-jobs"]);
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledExactlyOnceWith(["job_assignments"], ["job_assignments-subscription"]);
+    expect(mocks.coordinator.invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks each read model when multiple requirements share a table", async () => {
+    mocks.manager.getSubscriptionStatus.mockImplementation((table, queryKey) => ({
+      isConnected: table !== "logistics_events" || JSON.stringify(queryKey) !== '["transport_driver_assignments"]',
+      lastActivity: 0,
+    }));
+    renderHookHarness("/logistics");
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+
+    resumeAfter(10 * 60 * 1000);
+
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("logistics_events", ["logistics_events"]);
+    expect(mocks.manager.getSubscriptionStatus).toHaveBeenCalledWith("logistics_events", ["transport_driver_assignments"]);
+    expect(mocks.manager.forceRefreshSubscriptions).toHaveBeenCalledExactlyOnceWith(["logistics_events"], ["logistics_events-subscription"]);
+  });
+
+  it("does not re-run its subscription work when the refresh time moves", async () => {
+    // Subscribing marks the manager refreshed, which moves lastRefreshTime;
+    // re-running on that change looped until the tab froze.
+    const queryClient = new QueryClient();
+    const tree = () => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <Harness />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const rendered = render(tree());
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    const callsAfterMount = mocks.manager.subscribeToTable.mock.calls.length;
+
+    mocks.lastRefreshTime = Date.now() + 60_000;
+    rendered.rerender(tree());
+
+    expect(mocks.manager.subscribeToTable.mock.calls.length).toBe(callsAfterMount);
+  });
+
+  it("acts as leader when the coordinator is, even if it missed the election event", async () => {
+    // getIsLeader() is false at first render and true by the time effects run.
+    mocks.coordinator.getIsLeader.mockReturnValueOnce(false).mockReturnValue(true);
+    renderHookHarness("/dashboard");
+
+    await waitFor(() => expect(mocks.manager.registerRouteSubscription).toHaveBeenCalled());
+    expect(mocks.coordinator.requestSubscriptions).not.toHaveBeenCalled();
   });
 });

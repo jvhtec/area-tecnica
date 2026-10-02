@@ -32,6 +32,7 @@ import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix
 import {
   assignmentStatusLabel,
   availabilityStatusLabel,
+  isStaffingDeclined,
   normalizeStatus,
   offerStatusLabel,
 } from '@/components/matrix/optimized-matrix-cell/helpers';
@@ -154,7 +155,7 @@ export const MatrixMobileCellSheet = ({
   cancelStaffing,
   isCancellingStaffing = false,
 }: MatrixMobileCellSheetProps) => {
-  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
+  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string; requestId?: string | null }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | {
     phase: 'availability' | 'offer';
     jobId: string | null;
@@ -206,6 +207,7 @@ export const MatrixMobileCellSheet = ({
   const isInvited = assignmentStatus === 'invited';
   const isDeclined = assignmentStatus === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
+  const staffingDeclined = isStaffingDeclined(staffingStatus);
   const jobId: string | undefined = assignment?.job_id ?? undefined;
 
   const cellState = resolveMatrixCellState({
@@ -237,7 +239,7 @@ export const MatrixMobileCellSheet = ({
     : undefined;
 
   const staffingActions: SheetAction[] = [];
-  if (!hasAssignment && !isUnavailable && !isFridge) {
+  if (!hasAssignment && !isUnavailable && !isFridge && !staffingDeclined) {
     const availabilitySettled = staffingStatus?.availability_status === 'confirmed';
     if (!availabilitySettled) {
       staffingActions.push({
@@ -274,15 +276,16 @@ export const MatrixMobileCellSheet = ({
   }
 
   const inFlightActions: SheetAction[] = [];
-  if (staffingStatus?.availability_status) {
+  if (!staffingDeclined && staffingStatus?.availability_status) {
     inFlightActions.push({
       id: 'retry-availability',
       label: 'Reenviar solicitud de disponibilidad',
       icon: RotateCcw,
       onSelect: () => {
-        const targetJobId = jobId || staffingStatus.availability_job_id;
+        const targetJobId = staffingStatus.availability_job_id || jobId;
         if (targetJobId) {
-          handOff(() => setPendingRetry({ jobId: targetJobId }));
+          const isPending = ['requested', 'pending'].includes(staffingStatus.availability_status ?? '');
+          handOff(() => setPendingRetry({ jobId: targetJobId, requestId: isPending ? staffingStatus.availability_request_id : null }));
         } else {
           run('select-job-for-staffing');
         }
@@ -300,7 +303,7 @@ export const MatrixMobileCellSheet = ({
       },
     });
   }
-  if (staffingStatus?.offer_status) {
+  if (!staffingDeclined && staffingStatus?.offer_status) {
     inFlightActions.push({
       id: 'retry-offer',
       label: 'Reenviar oferta',

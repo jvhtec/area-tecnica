@@ -6,7 +6,16 @@ interface PerformanceMetrics {
   memoryUsage?: number;
 }
 
-export const usePerformanceMonitor = (componentName: string) => {
+interface PerformanceMonitorOptions {
+  /**
+   * Poll heap usage every 5s. Off by default: each sample is a state update,
+   * so a host like the assignment matrix re-rendered its whole tree every 5s
+   * just to record a number nobody reads.
+   */
+  trackMemory?: boolean;
+}
+
+export const usePerformanceMonitor = (componentName: string, { trackMemory = false }: PerformanceMonitorOptions = {}) => {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     renderTime: 0,
     queryTime: 0
@@ -58,11 +67,12 @@ export const usePerformanceMonitor = (componentName: string) => {
     }
   }, [componentName]);
 
-  // Auto-measure memory every 5 seconds
+  // Auto-measure memory every 5 seconds, when asked to
   useEffect(() => {
+    if (!trackMemory) return;
     const interval = setInterval(measureMemoryUsage, 5000);
     return () => clearInterval(interval);
-  }, [measureMemoryUsage]);
+  }, [measureMemoryUsage, trackMemory]);
 
   // Exposed as a getter rather than a metrics field: mirroring the counter into
   // state would re-render every consumer from the cell-render hot path.

@@ -259,85 +259,20 @@
   overflow: hidden;
 }
 
-/* Fixed Corner Header */
-.matrix-corner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 50;
-  background: hsl(var(--card));
-  border-right: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
-  /* Same drop shadow as the technician column so the frozen corner and the
-     frozen column read as one surface floating over the grid. */
-  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
-}
-
-/* Date Headers - Simplified and consistent */
-.matrix-date-headers {
-  position: absolute;
-  top: 0;
-  z-index: 40;
-  background: hsl(var(--card));
-  border-bottom: 1px solid hsl(var(--border));
-  box-shadow: 0 4px 12px -8px hsl(var(--foreground) / 0.25);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.matrix-date-headers::-webkit-scrollbar {
-  display: none;
-}
-
-/* Fixed Technician Column */
-.matrix-technician-column {
-  position: absolute;
-  left: 0;
-  z-index: 30;
-  background: hsl(var(--card));
-  border-right: 1px solid hsl(var(--border));
-  overflow: hidden;
-  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
-}
-
-.matrix-technician-scroll {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-}
-
-.matrix-technician-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.matrix-technician-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.matrix-technician-scroll::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
-}
-
-/* Main Scrollable Area - Simplified */
-.matrix-main-area {
-  position: absolute;
-  background: hsl(var(--background));
-  overflow: hidden;
-}
-
+/* The matrix is a single scroll container (.matrix-main-scroll) holding a
+   canvas sized to the whole grid. The header row and the technician column
+   are sticky inside it, so the browser scrolls them with the grid on the
+   compositor instead of JavaScript copying scroll offsets between three
+   scrollers on every frame. */
 .matrix-main-scroll {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  will-change: scroll-position;
   -webkit-overflow-scrolling: touch;
+  background: hsl(var(--background));
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
@@ -358,40 +293,91 @@
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
+.matrix-canvas {
+  position: relative;
+}
+
+/* Header row: sticks to the top across the full canvas width. */
+.matrix-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+}
+
+/* Frozen corner: sticks to the left inside the sticky header row. */
+.matrix-corner {
+  position: sticky;
+  left: 0;
+  z-index: 50;
+  flex-shrink: 0;
+  background: hsl(var(--card));
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  /* Same drop shadow as the technician column so the frozen corner and the
+     frozen column read as one surface floating over the grid. */
+  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
+}
+
+.matrix-date-headers {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 12px -8px hsl(var(--foreground) / 0.25);
+}
+
+.matrix-body {
+  display: flex;
+}
+
+/* Technician names: stick to the left as the grid scrolls sideways. */
+.matrix-technician-column {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  flex-shrink: 0;
+  background: hsl(var(--card));
+  border-right: 1px solid hsl(var(--border));
+  box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
+}
+
 /* Grid Layout */
 .matrix-grid {
   position: relative;
+  flex-shrink: 0;
   background: hsl(var(--muted) / 0.35);
   contain: layout style paint;
-  will-change: transform;
 }
 
 .matrix-row {
   position: absolute;
+  left: 0;
   width: 100%;
   contain: layout style;
-  content-visibility: auto;
-  contain-intrinsic-size: 72px;
 }
 
+/* Rows and cells are placed with top/left, not translate3d, and deliberately
+   carry no will-change or backface-visibility: those promoted every mounted
+   cell (several hundred, with a fresh row or column of them on each scroll
+   step) to its own compositor layer, which made layerisation and compositing
+   the bulk of every scroll frame. The scroller itself is the one layer the
+   grid needs. Each cell has a fixed inline size, so it is fully contained. */
 .matrix-cell-wrapper {
   position: absolute;
+  top: 0;
   /* Hairlines, not full-strength borders: the redesign reads the grid from the
      status cards inside the cells, so the rules only need to hint at the pitch. */
   border-right: 1px solid hsl(var(--border) / 0.55);
   border-bottom: 1px solid hsl(var(--border) / 0.55);
-  contain: layout style paint;
-  will-change: transform;
-  backface-visibility: hidden;
+  contain: strict;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .matrix-layout {
     font-size: 0.875rem;
-  }
-  .matrix-row {
-    contain-intrinsic-size: 80px;
   }
   .matrix-technician-column,
   .matrix-corner {

@@ -1,29 +1,12 @@
 // @vitest-environment jsdom
-import { render, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tablesQueried: string[] = [];
-
-const makeBuilder = () => {
-  const builder: Record<string, unknown> = {};
-  const chain = () => builder;
-  for (const method of ['select', 'eq', 'in', 'neq', 'gte', 'lte', 'order', 'limit']) {
-    builder[method] = vi.fn(chain);
-  }
-  // Awaiting the builder resolves to an empty result set.
-  builder.then = (resolve: (value: { data: unknown[]; error: null }) => unknown) =>
-    Promise.resolve({ data: [], error: null }).then(resolve);
-  return builder;
-};
+const fromMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/services/dataLayerClient', () => ({
-  dataLayerClient: {
-    from: vi.fn((table: string) => {
-      tablesQueried.push(table);
-      return makeBuilder();
-    }),
-  },
+  dataLayerClient: { from: fromMock, rpc: vi.fn() },
 }));
 
 import { DateHeader } from '@/components/matrix/DateHeader';
@@ -39,7 +22,7 @@ const jobs = [
   },
 ];
 
-const renderHeader = (compact: boolean) => {
+const renderHeader = (props: Partial<React.ComponentProps<typeof DateHeader>> = {}) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
@@ -48,29 +31,39 @@ const renderHeader = (compact: boolean) => {
         width={110}
         jobs={jobs}
         technicianIds={['tech-1']}
-        compact={compact}
+        {...props}
       />
     </QueryClientProvider>,
   );
 };
 
-describe('DateHeader open-slot query', () => {
+describe('DateHeader', () => {
   beforeEach(() => {
-    tablesQueried.length = 0;
+    fromMock.mockReset();
   });
 
-  it('skips the open-slot aggregation in compact mode', async () => {
-    renderHeader(true);
-
-    // The confirmed-count badge still renders in compact mode, so its timesheets
-    // read is expected; only the open-slot aggregation is skipped.
-    await waitFor(() => expect(tablesQueried).toContain('timesheets'));
-    expect(tablesQueried).not.toContain('job_required_roles_summary');
+  it('reads nothing on mount: scrolling sideways mounts a header per column', () => {
+    renderHeader({ confirmedCount: 3 });
+    expect(fromMock).not.toHaveBeenCalled();
   });
 
-  it('runs the open-slot aggregation when the badge can render', async () => {
-    renderHeader(false);
+  it('shows the coverage it is given', () => {
+    renderHeader({ confirmedCount: 4, openSlots: { required: 8, assigned: 6, open: 2 } });
 
-    await waitFor(() => expect(tablesQueried).toContain('job_required_roles_summary'));
+    expect(screen.getByTitle('6 de 8 puestos cubiertos · 2 libres')).toBeInTheDocument();
+    expect(screen.getByText('6/8')).toBeInTheDocument();
+    expect(screen.getByText('75%')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+  });
+
+  it('falls back to the confirmed badge before the slot totals load', () => {
+    renderHeader({ confirmedCount: 5, openSlots: null });
+    expect(screen.getByTitle('Técnicos confirmados en esta fecha')).toHaveTextContent('5');
+  });
+
+  it('labels the Madrid day, with the year on the first of the month', () => {
+    renderHeader({ date: new Date('2026-04-01T10:00:00.000Z'), jobs: [] });
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText(/abr\s+2026/)).toBeInTheDocument();
   });
 });

@@ -93,6 +93,37 @@ export function readCachedProfile(userId: string, allowStale = false, now: numbe
   }
 }
 
+/** Stores the profile readCachedProfile serves back. */
+export function writeCachedProfile(profile: Omit<CachedProfile, "timestamp">, now: number = Date.now()) {
+  try {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ ...profile, timestamp: now }));
+  } catch (error) {
+    console.error('Error caching profile:', error);
+  }
+}
+
+/**
+ * Whose role the provider has applied. A profile read for that same user is a
+ * background refresh: it must not raise isProfileLoading, which the route
+ * guards answer by swapping the whole page for a spinner (what users saw as a
+ * reload on returning to a tab, when a token refresh refetched the profile),
+ * while confirmed missing profiles still clear authorization. Remember the
+ * applied identity even after revocation so later refreshes cannot bootstrap it.
+ */
+export interface AppliedProfile {
+  userId: string | null;
+  role: string | null;
+}
+
+export const NO_APPLIED_PROFILE: AppliedProfile = { userId: null, role: null };
+
+export const isBackgroundProfileRead = (applied: AppliedProfile, userId: string | null | undefined): boolean =>
+  !!userId && applied.userId === userId;
+
+/** Keeps the user object when a refreshed session carries the same, unchanged user. */
+export const keepSameAuthUser = <U extends { id: string; updated_at?: string | null }>(previous: U | null, next: U | null): U | null =>
+  previous && next && previous.id === next.id && previous.updated_at === next.updated_at ? previous : next;
+
 export const VALID_USER_ROLES = new Set<UserRole>([
   "admin",
   "management",

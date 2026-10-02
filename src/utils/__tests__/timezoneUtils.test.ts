@@ -180,3 +180,34 @@ describe("formatMadridDayKey", () => {
     expect(formatMadridDayKey("2026-04-08", "EEE d MMM", { locale: es })).toBe("mié 8 abr");
   });
 });
+
+describe("formatMadridDateKey memoisation", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("follows a Date that is mutated after it was formatted", () => {
+    const date = new Date("2026-03-12T10:00:00Z");
+    expect(formatMadridDateKey(date)).toBe("2026-03-12");
+    date.setTime(Date.parse("2026-03-14T10:00:00Z"));
+    expect(formatMadridDateKey(date)).toBe("2026-03-14");
+  });
+
+  it("keeps the instant boundary exact across Madrid midnight", () => {
+    expect(formatMadridDateKey(new Date("2026-03-12T22:59:59.999Z"))).toBe("2026-03-12");
+    expect(formatMadridDateKey(new Date("2026-03-12T23:00:00.000Z"))).toBe("2026-03-13");
+  });
+
+  it("still throws on an invalid Date", () => {
+    expect(() => formatMadridDateKey(new Date(Number.NaN))).toThrow();
+  });
+
+  it("isMadridToday rolls over at Madrid midnight", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-12T22:59:30Z"));
+    expect(isMadridToday(new Date("2026-03-12T12:00:00Z"))).toBe(true);
+    vi.setSystemTime(new Date("2026-03-12T23:00:00Z"));
+    expect(isMadridToday(new Date("2026-03-12T12:00:00Z"))).toBe(false);
+    expect(isMadridToday(new Date("2026-03-13T12:00:00Z"))).toBe(true);
+  });
+});

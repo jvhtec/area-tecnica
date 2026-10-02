@@ -18,6 +18,9 @@ import {
   readBoundedJsonObject,
 } from "../_shared/http.ts";
 import { classifyTimesheetVerification } from "./timesheetVerification.ts";
+import { resolveNewStaffingDates } from "./requestDates.ts";
+import { PendingStaffingScopeError, preserveLegacyResendScope, resolveStaffingResend } from "./resendScope.ts";
+import { createStaffingRequestToken, persistDateScopedRequests } from "./persistRequests.ts";
 
 // Return a retryable error before creating or delivering any staffing request.
 function scheduleVerificationUnavailableResponse(): Response {
@@ -244,10 +247,6 @@ const DAILY_CAP = parseInt(Deno.env.get("STAFFING_DAILY_CAP") ?? "100", 10);
 const COMPANY_TZ = Deno.env.get('COMPANY_TZ') || 'Europe/Madrid';
 const STAFFING_SYSTEM_ACTOR_ID = Deno.env.get('STAFFING_SYSTEM_ACTOR_ID') || null;
 
-function b64url(u8: Uint8Array) {
-  return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-}
-
 function isUuid(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -340,9 +339,9 @@ serve(createHttpHandler(async (req) => {
     logEvent('info', 'staffing_email.received_staffing_request');
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key, request_origin, campaign_id, department } = body;
-    const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
+    let roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
     const departmentHint = typeof department === 'string' && department.trim().length > 0 ? department.trim() : null;
-    const roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
+    let roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
     const shouldRequireNoConflicts = Boolean(require_no_conflicts);
@@ -353,7 +352,7 @@ serve(createHttpHandler(async (req) => {
       if (Number.isNaN(parsed.getTime())) return null;
       return parsed.toISOString().split('T')[0];
     })() : null;
-    const normalizedDates: string[] = Array.isArray(datesArrayRaw)
+    let normalizedDates: string[] = Array.isArray(datesArrayRaw)
       ? Array.from(new Set((datesArrayRaw as any[])
         .map((d) => {
           if (typeof d !== 'string') return null;
@@ -366,7 +365,6 @@ serve(createHttpHandler(async (req) => {
     if (!normalizedTargetDate && single_day && normalizedDates.length === 1) {
       normalizedTargetDate = normalizedDates[0];
     }
-    const isSingleDayRequest = Boolean(single_day) && Boolean(normalizedTargetDate);
     
     // Enhanced validation logging
     logEvent('info', 'staffing_email.validating_fields');
@@ -509,6 +507,8 @@ serve(createHttpHandler(async (req) => {
             start_time,
             end_time,
             tour_id,
+            job_date_types(type, date),
+            tour_date:tour_dates!jobs_tour_date_id_fkey(date, start_date, end_date, tour_date_type),
             locations(formatted_address, latitude, longitude)
           `)
           .eq("id", job_id)
@@ -636,6 +636,35 @@ serve(createHttpHandler(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+
+      let legacyResendId: string | undefined;
+      let needsLegacySnapshot = false;
+      let resendIds: string[] | undefined;
+      if (typeof body.resend_request_id === 'string' && body.resend_request_id) {
+        try {
+          const scope = await resolveStaffingResend(supabase, body.resend_request_id, job_id, profile_id, phase, job, roleCode);
+          normalizedDates = scope.dates;
+          legacyResendId = scope.legacyRequestId;
+          needsLegacySnapshot = Boolean(scope.needsSnapshot);
+          resendIds = scope.expectedIds;
+          if (phase === 'offer' && scope.roleCode) {
+            if (roleCode && roleCode !== scope.roleCode) throw new PendingStaffingScopeError('El rol ha cambiado. Cancela la oferta anterior y crea una nueva.');
+            roleCode = scope.roleCode;
+            roleCodePatch = { role_code: roleCode };
+          }
+        } catch (error) {
+          if (!(error instanceof PendingStaffingScopeError)) throw error;
+          return new Response(JSON.stringify({ error: error.message, details: { reason: 'pending_request' } }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      } else {
+        normalizedDates = await resolveNewStaffingDates(supabase, job_id, profile_id, job, normalizedDates, normalizedTargetDate);
+      }
+      if (normalizedDates.length === 0) {
+        return new Response(JSON.stringify({ error: 'No hay fechas de trabajo pendientes de solicitar.', details: { reason: 'no_uncovered_dates' } }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      normalizedTargetDate = normalizedDates.length === 1 ? normalizedDates[0] : null;
+      const isSingleDayRequest = normalizedDates.length === 1;
 
       const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
       logEvent('info', 'staffing_email.tech_info');
@@ -953,7 +982,7 @@ serve(createHttpHandler(async (req) => {
                 _technician_id: profile_id,
                 _target_job_id: job_id,
                 _target_date: dateToCheck,
-                _single_day: isSingleDayRequest,
+                _single_day: true,
                 _include_pending: true // Check both confirmed and pending assignments
               }
             );
@@ -1106,259 +1135,30 @@ serve(createHttpHandler(async (req) => {
         return scheduleVerificationUnavailableResponse();
       }
 
-      // Step 3: Determine request id (rid) and batch shape
-      // For batch requests, we may already have a pending row for the first date.
-      // In that case we reuse its id so the confirm link points at a real row.
-      const isBatch = normalizedDates.length > 1;
-      let batchId: string | null = null;
-      let rid: string = crypto.randomUUID();
-      let firstDate: string | null = null;
-      let existingFirstRowId: string | null = null;
-
-      if (isBatch) {
-        firstDate = normalizedDates[0] || null;
-        if (firstDate) {
-          const { data: existingFirst, error: existingFirstErr } = await supabase
-            .from('staffing_requests')
-            .select('id,batch_id')
-            .eq('job_id', job_id)
-            .eq('profile_id', profile_id)
-            .eq('phase', phase)
-            .eq('status', 'pending')
-            .eq('single_day', true)
-            .eq('target_date', firstDate)
-            .maybeSingle();
-
-          if (existingFirstErr) {
-            logEvent('warn', 'staffing_email.failed_to_check_existing_first_batch_row_continuing_with_new_rid');
-          }
-
-          if (existingFirst?.id) {
-            existingFirstRowId = existingFirst.id as string;
-            rid = existingFirstRowId;
-            batchId = ((existingFirst as Record<string, unknown>)?.batch_id as (string | null | undefined)) ?? null;
-          }
+      // Insert a complete snapshot or refresh only an identical pending cycle.
+      if (legacyResendId && needsLegacySnapshot) {
+        try {
+          await preserveLegacyResendScope(supabase, legacyResendId, phase, normalizedDates, roleCode);
+        } catch (error) {
+          if (!(error instanceof PendingStaffingScopeError)) throw error;
+          return new Response(JSON.stringify({ error: error.message, details: { reason: 'pending_request' } }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
-
-      // Step 4: Generate token (must use the final rid)
-      logEvent('info', 'staffing_email.generating_token');
+      const isBatch = normalizedDates.length > 1;
+      const rid = crypto.randomUUID();
       const exp = new Date(Date.now() + 1000*60*60*48).toISOString();
-      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
-        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
-        new TextEncoder().encode(`${rid}:${phase}:${exp}`)));
-      let token = b64url(sig);
-
-      // Store only hash of token bytes
-      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
-      let token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
-      logEvent('info', 'staffing_email.token_generated');
-
-      // Step 5: Insert/update staffing request(s)
-      logEvent('info', 'staffing_email.saving_staffing_request');
-      let insertedId = rid;
-
-      // If multiple dates are provided, create a batch of single-day requests and use one of them for the email link
-      if (isBatch) {
-        if (!batchId) batchId = crypto.randomUUID();
-        if (!firstDate) firstDate = normalizedDates[0] || null;
-        if (!firstDate) {
-          return new Response(JSON.stringify({ error: 'Bad Request', details: { reason: 'Missing first batch date' } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        }
-
-        if (existingFirstRowId) {
-          // Reuse existing row: refresh token + expiry + batch association.
-          const upd = await supabase
-            .from('staffing_requests')
-            .update({
-              requested_by: actorId,
-              token_hash,
-              token_expires_at: exp,
-              updated_at: new Date().toISOString(),
-              batch_id: batchId,
-              idempotency_key: idempotency_key || null,
-              ...roleCodePatch,
-            })
-            .eq('id', existingFirstRowId)
-            .select('id')
-            .maybeSingle();
-
-          if (upd.error) {
-            logEvent('error', 'staffing_email.staffing_request_batch_first_update_error');
-            return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-          }
-        } else {
-          // Insert first date as the clickable rid row
-          const firstInsert = await supabase.from('staffing_requests').insert({
-            id: rid,
-            job_id,
-            profile_id,
-            phase,
-            status: 'pending',
-            requested_by: actorId,
-            token_hash,
-            token_expires_at: exp,
-            single_day: true,
-            target_date: firstDate,
-            batch_id: batchId,
-            idempotency_key: idempotency_key || null,
-            ...roleCodePatch,
-          });
-          if (firstInsert.error) {
-            const code = firstInsert.error.code;
-            const msg = firstInsert.error.message ?? '';
-            const isDuplicate = code === '23505' || /duplicate key/i.test(msg);
-
-            if (isDuplicate) {
-              logEvent('warn', 'staffing_email.batch_first_insert_duplicate_race_reselecting_existing_row_and_updating_token');
-              const { data: existingAfterRace, error: existingAfterRaceErr } = await supabase
-                .from('staffing_requests')
-                .select('id')
-                .eq('job_id', job_id)
-                .eq('profile_id', profile_id)
-                .eq('phase', phase)
-                .eq('status', 'pending')
-                .eq('single_day', true)
-                .eq('target_date', firstDate)
-                .maybeSingle();
-
-              if (existingAfterRaceErr || !existingAfterRace?.id) {
-                logEvent('error', 'staffing_email.staffing_request_batch_duplicate_failed_to_find_existing_row_after_race');
-                return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-              }
-
-              // Reuse the existing row id as insertedId (confirm link)
-              insertedId = existingAfterRace.id as string;
-
-              // IMPORTANT: token is signed with rid, so if we switch to an existing row id
-              // we must re-derive token + token_hash so the confirm link validates.
-              rid = insertedId;
-              const sig2 = new Uint8Array(await crypto.subtle.sign(
-                "HMAC",
-                key,
-                new TextEncoder().encode(`${rid}:${phase}:${exp}`)
-              ));
-              token = b64url(sig2);
-              const digest2 = new Uint8Array(await crypto.subtle.digest("SHA-256", sig2));
-              token_hash = Array.from(digest2).map(x => x.toString(16).padStart(2, '0')).join('');
-
-              const upd = await supabase
-                .from('staffing_requests')
-                .update({
-                  requested_by: actorId,
-                  token_hash,
-                  token_expires_at: exp,
-                  updated_at: new Date().toISOString(),
-                  batch_id: batchId,
-                  idempotency_key: idempotency_key || null,
-                  ...roleCodePatch,
-                })
-                .eq('id', insertedId)
-                .select('id')
-                .maybeSingle();
-
-              if (upd.error) {
-                logEvent('error', 'staffing_email.staffing_request_batch_duplicate_update_error');
-                return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-              }
-            } else {
-              logEvent('error', 'staffing_email.staffing_request_batch_first_insert_error');
-              return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-            }
-          }
-        }
-
-        // Insert remaining dates - use insert with ignoreDuplicates since the unique constraint
-        // is a partial index that upsert's onConflict can't properly match
-        const rest = normalizedDates.slice(1).map(d => ({
-          job_id,
-          profile_id,
-          phase,
-          status: 'pending',
-          requested_by: actorId,
-          token_hash, // placeholder; not used for click on these rows
-          token_expires_at: exp,
-          single_day: true,
-          target_date: d,
-          batch_id: batchId,
-          ...roleCodePatch,
-        }));
-        if (rest.length) {
-          logEvent('info', 'staffing_email.inserting_batch_dates');
-          const up = await supabase
-            .from('staffing_requests')
-            .insert(rest, { ignoreDuplicates: true } as any);
-          if (up.error) {
-            logEvent('warn', 'staffing_email.batch_insert_had_errors');
-          } else {
-            logEvent('info', 'staffing_email.successfully_inserted_batch_dates');
-          }
-        }
-
-        // Ensure all rows for this batch share the same batch_id (ignoreDuplicates won't update existing rows)
-        try {
-          const cohesion = await supabase
-            .from('staffing_requests')
-            .update({ requested_by: actorId, batch_id: batchId, updated_at: new Date().toISOString(), ...roleCodePatch })
-            .eq('job_id', job_id)
-            .eq('profile_id', profile_id)
-            .eq('phase', phase)
-            .eq('status', 'pending')
-            .eq('single_day', true)
-            .in('target_date', normalizedDates);
-          if (cohesion.error) {
-            logEvent('warn', 'staffing_email.batch_id_cohesion_update_returned_error_non_fatal');
-          }
-        } catch (e) {
-          logEvent('warn', 'staffing_email.failed_to_enforce_batch_id_cohesion_non_fatal');
-        }
-      } else {
-        // Single request as before
-        const insertRes = await supabase.from("staffing_requests").insert({
-          id: rid,
-          job_id,
-          profile_id,
-          phase,
-          status: "pending",
-          requested_by: actorId,
-          token_hash,
-          token_expires_at: exp,
-          single_day: isSingleDayRequest,
-          target_date: normalizedTargetDate,
-          idempotency_key: idempotency_key || null,
-          ...roleCodePatch,
-        });
-        if (insertRes.error && insertRes.error.code === "23505") {
-          logEvent('info', 'staffing_email.duplicate_found_updating');
-          // Target the exact pending row shape to avoid touching unrelated requests
-          let updater = supabase
-            .from("staffing_requests")
-            .update({
-              requested_by: actorId,
-              token_hash,
-              token_expires_at: exp,
-              updated_at: new Date().toISOString(),
-              ...roleCodePatch,
-              // keep existing shape; do not convert full-span to single-day or vice versa
-            })
-            .eq("job_id", job_id)
-            .eq("profile_id", profile_id)
-            .eq("phase", phase)
-            .eq("status", "pending")
-            .eq('single_day', !!isSingleDayRequest);
-
-          if (isSingleDayRequest && normalizedTargetDate) {
-            updater = updater.eq('target_date', normalizedTargetDate);
-          }
-
-          const upd = await updater.select("id").maybeSingle();
-          logEvent('info', 'staffing_email.update_result');
-          if (upd.data?.id) insertedId = upd.data.id;
-        } else if (insertRes.error) {
-          logEvent('error', 'staffing_email.staffing_request_insert_error');
-          return new Response(JSON.stringify({ error: "Database error saving request", details: insertRes.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        }
+      const { error: requestError, id: insertedId, token } = await persistDateScopedRequests(supabase, {
+        id: rid, job_id, profile_id, phase, requested_by: actorId,
+        token_expires_at: exp, idempotency_key: idempotency_key || null, ...roleCodePatch,
+      }, normalizedDates, id => createStaffingRequestToken(TOKEN_SECRET, id, phase, exp), legacyResendId, resendIds);
+      if (requestError) {
+        const pendingCollision = requestError.code === '23505';
+        logEvent('error', 'staffing_email.staffing_request_insert_error');
+        return new Response(JSON.stringify({
+          error: pendingCollision ? 'Ya existe una solicitud pendiente para algunas de las fechas seleccionadas.' : 'Database error saving request',
+          details: pendingCollision ? { reason: 'pending_request' } : requestError,
+        }), { status: pendingCollision ? 409 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Optional: generate signed URL for a tour schedule PDF

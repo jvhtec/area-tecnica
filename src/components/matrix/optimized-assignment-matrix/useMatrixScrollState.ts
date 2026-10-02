@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { useDragScroll } from "@/hooks/useDragScroll";
-import { throttle } from "@/utils/throttle";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
 const MAX_AUTO_SCROLL_RETRIES = 5;
@@ -12,7 +11,10 @@ type UseMatrixScrollStateArgs = {
   techniciansLength: number;
   cellWidth: number;
   cellHeight: number;
-  matrixWidth: number;
+  /** Width of the sticky technician column, which covers the scroller's left edge. */
+  technicianWidth: number;
+  /** Height of the sticky date header row, which covers the scroller's top edge. */
+  headerHeight: number;
   mobile: boolean;
   isInitialLoading: boolean;
   canExpandBefore: boolean;
@@ -20,24 +22,41 @@ type UseMatrixScrollStateArgs = {
   onNearEdgeScroll?: (direction: "before" | "after") => void;
 };
 
+/**
+ * Scroll state for the assignment matrix.
+ *
+ * The matrix is one scroll container: the date header row and the technician
+ * column are `position: sticky` inside it, so the browser moves them with the
+ * grid on the compositor. There is no JavaScript on the scroll path beyond
+ * scheduling the virtualised window. (It used to be three scrollers kept in
+ * step from scroll events, which put a forced layout and a sync frame in every
+ * scroll frame and let the headers trail the grid whenever the main thread was
+ * busy.)
+ *
+ * Grid coordinates line up with the scroll offsets: the sticky column and row
+ * cover exactly the canvas area that holds them, so the first visible grid
+ * column is at scrollLeft and the first visible row at scrollTop.
+ */
 export const useMatrixScrollState = ({
   dates,
   techniciansLength,
   cellWidth,
   cellHeight,
-  matrixWidth,
+  technicianWidth,
+  headerHeight,
   mobile,
   isInitialLoading,
   canExpandBefore,
   canExpandAfter,
   onNearEdgeScroll,
 }: UseMatrixScrollStateArgs) => {
+  // The sticky header row and technician column. Not scrollers any more; kept
+  // as refs for the elements the view attaches them to.
   const technicianScrollRef = useRef<HTMLDivElement | null>(null);
-  // `HTMLDivElement | null` (rather than a bare `RefObject`) so `current` stays writable —
-  // the scroll sync assigns to it, and so do the tests.
   const dateHeadersRef = useRef<HTMLDivElement | null>(null);
+  // `HTMLDivElement | null` (rather than a bare `RefObject`) so `current` stays
+  // writable — the tests assign to it.
   const mainScrollRef = useRef<HTMLDivElement | null>(null);
-  const syncInProgressRef = useRef(false);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const previousMainScrollLeftRef = useRef<number | null>(null);
   const lastEdgeTriggerRef = useRef({ t: 0 });
@@ -55,42 +74,17 @@ export const useMatrixScrollState = ({
   const [canNavRight, setCanNavRight] = useState(true);
   const [navStep, setNavStep] = useState(3);
 
-  const overscanRows = mobile ? 6 : 10;
-  const overscanCols = mobile ? 4 : 6;
-
-  const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: string) => {
-    if (syncInProgressRef.current) return;
-
-    syncInProgressRef.current = true;
-
-    requestAnimationFrame(() => {
-      if (!isMountedRef.current) {
-        syncInProgressRef.current = false;
-        return;
-      }
-
-      try {
-        if (source !== "dateHeaders" && dateHeadersRef.current) {
-          dateHeadersRef.current.scrollLeft = scrollLeft;
-        }
-        if (source !== "main" && mainScrollRef.current) {
-          mainScrollRef.current.scrollLeft = scrollLeft;
-        }
-        if (source !== "technician" && technicianScrollRef.current) {
-          technicianScrollRef.current.scrollTop = scrollTop;
-        }
-        if (source !== "main" && mainScrollRef.current) {
-          mainScrollRef.current.scrollTop = scrollTop;
-        }
-      } finally {
-        syncInProgressRef.current = false;
-      }
-    });
-  }, []);
+  // Overscan does not reduce how many cells mount per scroll step (the window
+  // follows the scroll position exactly); it only adds standing DOM that every
+  // style and layout pass walks. A few rows and columns cover a frame of lag.
+  const overscanRows = mobile ? 4 : 5;
+  // Mobile keeps 4: phone columns are few and wide, and a fast swipe outruns a
+  // 2-column margin.
+  const overscanCols = mobile ? 4 : 3;
 
   const updateNavAvailability = useCallback(() => {
     if (!mobile) return;
-    const el = dateHeadersRef.current;
+    const el = mainScrollRef.current;
     if (!el) return;
     const sl = el.scrollLeft;
     const max = el.scrollWidth - el.clientWidth - 1;
@@ -103,17 +97,18 @@ export const useMatrixScrollState = ({
     if (!el) return;
     const scrollTop = el.scrollTop;
     const scrollLeft = el.scrollLeft;
-    const clientH = el.clientHeight;
-    const clientW = el.clientWidth;
+    // The part of the viewport the grid shows, past the sticky row and column.
+    const gridViewportHeight = Math.max(0, el.clientHeight - headerHeight);
+    const gridViewportWidth = Math.max(0, el.clientWidth - technicianWidth);
 
     const rowStart = Math.max(0, Math.floor(scrollTop / cellHeight) - overscanRows);
-    const rowEnd = Math.min(techniciansLength - 1, Math.floor((scrollTop + clientH) / cellHeight) + overscanRows);
+    const rowEnd = Math.min(techniciansLength - 1, Math.floor((scrollTop + gridViewportHeight) / cellHeight) + overscanRows);
     const colStart = Math.max(0, Math.floor(scrollLeft / cellWidth) - overscanCols);
-    const colEnd = Math.min(dates.length - 1, Math.floor((scrollLeft + clientW) / cellWidth) + overscanCols);
+    const colEnd = Math.min(dates.length - 1, Math.floor((scrollLeft + gridViewportWidth) / cellWidth) + overscanCols);
 
     setVisibleRows((prev) => (prev.start !== rowStart || prev.end !== rowEnd ? { start: rowStart, end: rowEnd } : prev));
     setVisibleCols((prev) => (prev.start !== colStart || prev.end !== colEnd ? { start: colStart, end: colEnd } : prev));
-  }, [cellHeight, cellWidth, dates.length, overscanCols, overscanRows, techniciansLength]);
+  }, [cellHeight, cellWidth, dates.length, headerHeight, overscanCols, overscanRows, technicianWidth, techniciansLength]);
 
   const scheduleVisibleWindowUpdate = useCallback(() => {
     if (!hasHandledFirstScrollRef.current) {
@@ -127,111 +122,57 @@ export const useMatrixScrollState = ({
       updateScheduledRef.current = false;
       if (!isMountedRef.current) return;
       updateVisibleWindow();
+      updateNavAvailability();
     });
-  }, [updateVisibleWindow]);
+  }, [updateNavAvailability, updateVisibleWindow]);
 
   useDragScroll(mainScrollRef, {
     enabled: !mobile,
     onScroll: (left, top) => {
-      syncScrollPositions(left, top, "main");
       scheduleVisibleWindowUpdate();
       lastKnownScrollRef.current.left = left;
       lastKnownScrollRef.current.top = top;
     },
   });
 
-  const handleMainScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
 
-    // Recorded before the in-progress guard: events that arrive while a sync
-    // frame is pending are dropped for syncing purposes, but their position is
-    // still the newest one the restore effect must not rewind past.
+    // The newest position, which the restore effect must not rewind past.
     lastKnownScrollRef.current.left = scrollLeft;
     lastKnownScrollRef.current.top = scrollTop;
 
-    if (syncInProgressRef.current) return;
-
     const previousScrollLeft = previousMainScrollLeftRef.current;
-    const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
-    const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
-
-    if (previousScrollLeft !== null && !movedHorizontally) {
-      // Vertical-only scroll. The position was recorded above, otherwise the
-      // restore effect rewinds to a stale row on the next dates change.
-      syncScrollPositions(scrollLeft, scrollTop, "main");
-      scheduleVisibleWindowUpdate();
-      return;
-    }
-
     previousMainScrollLeftRef.current = scrollLeft;
+    const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
 
-    const movingTowardLeftEdge = movedHorizontally && horizontalDelta < 0;
-    const movingTowardRightEdge = movedHorizontally && horizontalDelta > 0;
-    const scrollElement = e.currentTarget;
-    const maxScrollLeft = scrollElement.scrollWidth - scrollElement.clientWidth;
-    const nearLeftEdge = scrollLeft < 200;
-    const nearRightEdge = scrollLeft > maxScrollLeft - 200;
-
-    const now = performance.now();
-    const lastEdgeRef = lastEdgeTriggerRef.current;
-    if (movedHorizontally && now - lastEdgeRef.t > 300) {
-      if (movingTowardLeftEdge && nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
-        onNearEdgeScroll("before");
-        lastEdgeRef.t = now;
-      } else if (movingTowardRightEdge && nearRightEdge && canExpandAfter && onNearEdgeScroll) {
-        onNearEdgeScroll("after");
-        lastEdgeRef.t = now;
+    if (horizontalDelta !== 0 && onNearEdgeScroll) {
+      const scrollElement = e.currentTarget;
+      const maxScrollLeft = scrollElement.scrollWidth - scrollElement.clientWidth;
+      const now = performance.now();
+      const lastEdgeRef = lastEdgeTriggerRef.current;
+      if (now - lastEdgeRef.t > 300) {
+        if (horizontalDelta < 0 && scrollLeft < 200 && canExpandBefore) {
+          onNearEdgeScroll("before");
+          lastEdgeRef.t = now;
+        } else if (horizontalDelta > 0 && scrollLeft > maxScrollLeft - 200 && canExpandAfter) {
+          onNearEdgeScroll("after");
+          lastEdgeRef.t = now;
+        }
       }
     }
 
-    syncScrollPositions(scrollLeft, scrollTop, "main");
     scheduleVisibleWindowUpdate();
-  }, [
-    canExpandAfter,
-    canExpandBefore,
-    onNearEdgeScroll,
-    scheduleVisibleWindowUpdate,
-    syncScrollPositions,
-  ]);
-
-  const handleDateHeadersScrollCore = useCallback((scrollLeft: number) => {
-    if (syncInProgressRef.current) return;
-    syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, "dateHeaders");
-    lastKnownScrollRef.current.left = scrollLeft;
-    updateNavAvailability();
-  }, [syncScrollPositions, updateNavAvailability]);
-
-  const handleTechnicianScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (syncInProgressRef.current) return;
-    const scrollTop = e.currentTarget.scrollTop;
-    syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, "technician");
-    lastKnownScrollRef.current.top = scrollTop;
-    scheduleVisibleWindowUpdate();
-  }, [scheduleVisibleWindowUpdate, syncScrollPositions]);
-
-  const handleMainScroll = handleMainScrollCore;
-  const handleDateHeadersScroll = useMemo(() => {
-    const throttled = throttle(handleDateHeadersScrollCore, 12);
-    const handler = ((e: React.UIEvent<HTMLDivElement>) => {
-      throttled(e.currentTarget.scrollLeft);
-    }) as ((e: React.UIEvent<HTMLDivElement>) => void) & { cancel: () => void };
-    handler.cancel = throttled.cancel;
-    return handler;
-  }, [handleDateHeadersScrollCore]);
+  }, [canExpandAfter, canExpandBefore, onNearEdgeScroll, scheduleVisibleWindowUpdate]);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      syncInProgressRef.current = false;
       updateScheduledRef.current = false;
     };
   }, []);
-
-  useEffect(() => () => {
-    handleDateHeadersScroll.cancel();
-  }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
   const scrollToToday = useCallback(() => {
     if (!mainScrollRef.current || dates.length === 0) {
@@ -248,20 +189,23 @@ export const useMatrixScrollState = ({
     }
 
     const container = mainScrollRef.current;
-    const containerWidth = container.clientWidth;
+    const gridViewportWidth = container.clientWidth - technicianWidth;
 
-    if (containerWidth === 0) {
+    if (gridViewportWidth <= 0) {
       return false;
     }
 
-    let scrollPosition = (todayIndex * cellWidth) - (containerWidth / 2) + (cellWidth / 2);
-    const maxScroll = matrixWidth - containerWidth;
+    // Centre today in the part of the viewport the grid shows.
+    let scrollPosition = todayIndex * cellWidth - gridViewportWidth / 2 + cellWidth / 2;
+    const maxScroll = container.scrollWidth - container.clientWidth;
     scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
     container.scrollLeft = scrollPosition;
-    requestAnimationFrame(() => { /* verify next frame (no-op) */ });
+    // Recorded so the position-restore effect keeps it instead of rewinding.
+    lastKnownScrollRef.current.left = container.scrollLeft;
+    previousMainScrollLeftRef.current = container.scrollLeft;
 
     return true;
-  }, [cellWidth, dates, matrixWidth]);
+  }, [cellWidth, dates, technicianWidth]);
 
   // Crossing the mobile breakpoint changes cellWidth, which invalidates the
   // column the initial scroll landed on — allow it to run again.
@@ -272,7 +216,11 @@ export const useMatrixScrollState = ({
     }
   }, [cellWidth]);
 
-  useEffect(() => {
+  // A layout effect, so the first paint is already at today: run as a passive
+  // effect it landed after the first window was computed for scrollLeft 0,
+  // which mounted the opening columns, dropped today's column when the window
+  // shrank to the screen, and mounted it again after the jump.
+  useLayoutEffect(() => {
     if (autoScrolledRef.current) return;
     if (isInitialLoading || dates.length === 0) return;
 
@@ -287,6 +235,7 @@ export const useMatrixScrollState = ({
       if (success) {
         autoScrolledRef.current = true;
         autoScrolledCellWidthRef.current = cellWidth;
+        updateVisibleWindow();
         return;
       }
 
@@ -296,25 +245,24 @@ export const useMatrixScrollState = ({
       }
     };
 
-    timeoutId = setTimeout(attemptScroll, 50);
+    // Before paint when the scroller already has its size; otherwise retry.
+    attemptScroll();
     return () => {
       cancelled = true;
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
     };
-  }, [cellWidth, dates.length, isInitialLoading, scrollToToday]);
+  }, [cellWidth, dates.length, isInitialLoading, scrollToToday, updateVisibleWindow]);
 
   useEffect(() => {
     updateVisibleWindow();
     hasHandledFirstScrollRef.current = false;
-  }, [dates.length, scheduleVisibleWindowUpdate, techniciansLength, updateVisibleWindow]);
+  }, [dates.length, techniciansLength, updateVisibleWindow]);
 
   useEffect(() => {
     const prev = prevDatesRef.current;
     const main = mainScrollRef.current;
-    const headers = dateHeadersRef.current;
-    const technicianScroller = technicianScrollRef.current;
     if (!main || dates.length === 0) {
       // Record the width even with nothing to restore: leaving it unset makes
       // the next run convert the stored offset from the width it is moving to
@@ -348,17 +296,8 @@ export const useMatrixScrollState = ({
 
     const targetLeft = cellWidth > 0 ? targetColumn * cellWidth : lastLeft;
 
-    const applyScroll = (element: HTMLDivElement | null, value: number) => {
-      if (!element) return;
-      if (Math.abs(element.scrollLeft - value) > 1) {
-        element.scrollLeft = value;
-      }
-    };
-
-    applyScroll(main, targetLeft);
-    applyScroll(headers, targetLeft);
-    if (technicianScroller && Math.abs(technicianScroller.scrollTop - lastTop) > 1) {
-      technicianScroller.scrollTop = lastTop;
+    if (Math.abs(main.scrollLeft - targetLeft) > 1) {
+      main.scrollLeft = targetLeft;
     }
     if (Math.abs(main.scrollTop - lastTop) > 1) {
       main.scrollTop = lastTop;
@@ -376,14 +315,14 @@ export const useMatrixScrollState = ({
   useEffect(() => {
     if (!mobile) return;
     const updateStep = () => {
-      const w = dateHeadersRef.current?.clientWidth || 0;
+      const w = (mainScrollRef.current?.clientWidth || 0) - technicianWidth;
       const cols = Math.max(3, Math.min(4, Math.floor(w / cellWidth)) || 3);
       setNavStep(cols);
     };
     updateStep();
     window.addEventListener("resize", updateStep);
     return () => window.removeEventListener("resize", updateStep);
-  }, [cellWidth, mobile]);
+  }, [cellWidth, mobile, technicianWidth]);
 
   useEffect(() => {
     if (!mobile) return;
@@ -391,13 +330,11 @@ export const useMatrixScrollState = ({
   }, [dates.length, mobile, updateNavAvailability, visibleCols]);
 
   const handleMobileNav = useCallback((dir: "left" | "right") => {
-    const el = dateHeadersRef.current;
     const main = mainScrollRef.current;
-    if (!el || !main) return;
+    if (!main) return;
     const delta = navStep * cellWidth * (dir === "left" ? -1 : 1);
-    const target = Math.max(0, Math.min(el.scrollLeft + delta, el.scrollWidth - el.clientWidth));
-    el.scrollTo({ left: target, behavior: "smooth" });
-    main.scrollTo({ left: target, top: main.scrollTop, behavior: "smooth" as ScrollBehavior });
+    const target = Math.max(0, Math.min(main.scrollLeft + delta, main.scrollWidth - main.clientWidth));
+    main.scrollTo({ left: target, top: main.scrollTop, behavior: "smooth" });
   }, [cellWidth, navStep]);
 
   return {
@@ -409,8 +346,6 @@ export const useMatrixScrollState = ({
     canNavLeft,
     canNavRight,
     handleMobileNav,
-    handleDateHeadersScroll,
-    handleTechnicianScroll,
     handleMainScroll,
   };
 };

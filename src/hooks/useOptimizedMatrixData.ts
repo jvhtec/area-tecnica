@@ -1,18 +1,35 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
-import { formatInTimeZone } from 'date-fns-tz';
 
 
 import { queryKeys } from "@/lib/react-query";
 import { invalidateMatrixHeaderCounts } from "@/lib/matrix-header-counts";
 import { buildSeasonalUnavailability, type SeasonalHouseTechProfile } from "@/utils/seasonalHouseTech";
-import { addMadridCalendarDays } from "@/utils/timezoneUtils";
-const MADRID_TIMEZONE = 'Europe/Madrid';
+import { addMadridCalendarDays, formatMadridDateKey } from "@/utils/timezoneUtils";
+import { throttle } from "@/utils/throttle";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
+import { getErrorMessage } from "@/utils/errorMessage";
+import {
+  applyJobAssignmentChange,
+  applyTimesheetChange,
+  type MatrixQueryScope,
+  type RealtimeChange,
+} from "@/hooks/matrixRealtimePatches";
 const EMPTY_JOBS_FOR_DATE: MatrixJob[] = [];
+// Shared defaults while a query has no data: `= []` in the destructuring made a
+// new array per render, which rebuilt every lookup derived from it and handed
+// each grid row new functions.
+const EMPTY_ASSIGNMENTS: MatrixTimesheetAssignment[] = [];
+const EMPTY_AVAILABILITY: AvailabilityDay[] = [];
+
+// A colleague's change refetches at once; a burst (a tour assignment writes one
+// timesheet per date) adds at most one trailing refetch per window rather than
+// one per row. Leading edge on purpose: updates must never wait for quiet.
+const REALTIME_REFETCH_WINDOW_MS = 250;
 
 function toMadridDateKey(date: Date | undefined): string {
-  return date ? formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') : '';
+  return date ? formatMadridDateKey(date) : '';
 }
 
 /**
@@ -116,16 +133,20 @@ export const buildAssignmentDateMap = (
  */
 export const buildJobsByDate = (jobs: MatrixJob[], dates: Date[]) => {
   const jobsByDate = new Map<string, MatrixJob[]>();
+  // Once per job, not once per job per column.
+  const jobSpans = jobs.map((job) => ({
+    job,
+    startKey: toMadridDateKey(new Date(job.start_time)),
+    endKey: toMadridDateKey(new Date(job.end_time)),
+  }));
 
   dates.forEach((date) => {
     const dateKey = toMadridDateKey(date);
-    jobsByDate.set(dateKey, jobs.filter((job) => {
+    jobsByDate.set(dateKey, jobSpans.filter(({ job, startKey, endKey }) => {
       const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
       if (hasTypedDate) return true;
-      const jobStartKey = toMadridDateKey(new Date(job.start_time));
-      const jobEndKey = toMadridDateKey(new Date(job.end_time));
-      return dateKey >= jobStartKey && dateKey <= jobEndKey;
-    }));
+      return dateKey >= startKey && dateKey <= endKey;
+    }).map(({ job }) => job));
   });
 
   return jobsByDate;
@@ -193,19 +214,27 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   for (let i = 0; i < jobIds.length; i += batchSize) {
     const jobBatch = jobIds.slice(i, i + batchSize);
-    let query = supabase
-      .from('timesheets')
-      .select('job_id, technician_id, date, is_schedule_only, source')
-      .eq('is_active', true)
-      .in('job_id', jobBatch)
-      .in('technician_id', technicianIds)
-      .order('date', { ascending: true })
-      .limit(2000);
+    // Every page: one response stops at PostgREST's max_rows (1000), which
+    // used to drop the later days of a busy range from the grid and from the
+    // date-header counts derived from these rows. Ordered by a unique key so
+    // pages neither overlap nor skip.
+    const readBatch = fetchAllPages<TimesheetAssignmentRow>((from, to) => {
+      let query = supabase
+        .from('timesheets')
+        .select('job_id, technician_id, date, is_schedule_only, source')
+        .eq('is_active', true)
+        .in('job_id', jobBatch)
+        .in('technician_id', technicianIds);
+      if (startIso) query = query.gte('date', startIso);
+      if (endIso) query = query.lte('date', endIso);
+      return query.order('date', { ascending: true }).order('id', { ascending: true }).range(from, to);
+    });
 
-    if (startIso) query = query.gte('date', startIso);
-    if (endIso) query = query.lte('date', endIso);
-
-    promises.push(Promise.resolve(query));
+    // Same per-batch contract as before: a failed batch is logged and skipped.
+    promises.push(readBatch.then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error: { message: getErrorMessage(error), code: getErrorCode(error) } }),
+    ));
   }
 
   // Leverage materialized view for staffing status/cost rollups per job
@@ -217,7 +246,7 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   for (let i = 0; i < jobIds.length; i += assignmentBatchSize) {
     const jobBatch = jobIds.slice(i, i + assignmentBatchSize);
-    assignmentPromises.push(Promise.resolve(
+    const readMetadata = fetchAllPages<AssignmentMetadataRow>((from, to) =>
       supabase
         .from('job_assignments')
         // NOTE: single_day and assignment_date are deprecated after simplification migration
@@ -225,6 +254,11 @@ export const fetchMatrixTimesheetAssignments = async ({
         .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at, assigned_by')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)
+        .order('job_id', { ascending: true }).order('technician_id', { ascending: true }).range(from, to)
+    );
+    assignmentPromises.push(readMetadata.then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error: { message: getErrorMessage(error), code: getErrorCode(error) } }),
     ));
   }
 
@@ -261,6 +295,20 @@ export const fetchMatrixTimesheetAssignments = async ({
   }
 
   const rows: MatrixTimesheetAssignment[] = [];
+  const completeJobIds = new Set([...jobsById.values()].filter(job => {
+    const days = [toMadridDateKey(new Date(job.start_time)), toMadridDateKey(new Date(job.end_time)), ...(job.job_date_types ?? []).map(day => day.date)];
+    return days.every(day => (!startIso || day >= startIso) && (!endIso || day <= endIso));
+  }).map(job => job.id));
+  const scheduledDaysByPair = new Map<string, Set<string>>();
+  timesheetResults.forEach(result => {
+    if (result.error) return;
+    (result.data || []).forEach(row => {
+      const key = `${row.job_id}:${row.technician_id}`;
+      const days = scheduledDaysByPair.get(key) ?? new Set<string>();
+      days.add(row.date);
+      scheduledDaysByPair.set(key, days);
+    });
+  });
 
   timesheetResults.forEach((result) => {
     if (result.error) {
@@ -273,6 +321,7 @@ export const fetchMatrixTimesheetAssignments = async ({
       if (!job) return;
       const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
       const staffing = staffingMap.get(row.job_id);
+      const isSingleScheduledDay = completeJobIds.has(row.job_id) && scheduledDaysByPair.get(`${row.job_id}:${row.technician_id}`)?.size === 1;
       rows.push({
         job_id: row.job_id,
         technician_id: row.technician_id,
@@ -287,7 +336,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         status: meta?.status ?? null,
         assigned_at: meta?.assigned_at ?? null,
         assigned_by: meta?.assigned_by ?? null,
-        single_day: meta?.single_day ?? Boolean(meta?.assignment_date),
+        single_day: Boolean((meta?.single_day ?? Boolean(meta?.assignment_date)) && isSingleScheduledDay && meta?.assignment_date === row.date),
         assignment_date: meta?.assignment_date ?? null,
         sound_role: meta?.sound_role ?? null,
         lights_role: meta?.lights_role ?? null,
@@ -320,7 +369,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Much more optimized assignments query - only fetch what's actually needed
   const {
-    data: allAssignments = [],
+    data: allAssignments = EMPTY_ASSIGNMENTS,
     isLoading: assignmentsInitialLoading,
     isFetching: assignmentsFetching,
   } = useQuery({
@@ -355,7 +404,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   );
 
   const {
-    data: availabilityData = [],
+    data: availabilityData = EMPTY_AVAILABILITY,
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
@@ -514,33 +563,32 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Realtime invalidation for availability changes
   useEffect(() => {
     if (!technicianIds.length) return;
+    const invalidateAvailability = throttle(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
+    }, REALTIME_REFETCH_WINDOW_MS);
     const ch2 = supabase
       .channel('rt-availability-schedules')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, invalidateAvailability)
       .subscribe();
     const ch3 = supabase
       .channel('rt-technician-availability')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, invalidateAvailability)
       .subscribe();
     const ch4 = supabase
       .channel('rt-vacation-requests')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-availability') });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, invalidateAvailability)
       .subscribe();
     return () => {
+      invalidateAvailability.cancel();
       try { supabase.removeChannel(ch2); } catch { /* channel may already be removed */ }
       try { supabase.removeChannel(ch3); } catch { /* channel may already be removed */ }
       try { supabase.removeChannel(ch4); } catch { /* channel may already be removed */ }
     };
   }, [queryClient, technicianIds.length]);
 
-  // Preload technician data for dialogs
-  const prefetchTechnicianData = async (technicianId: string) => {
+  // Preload technician data for dialogs. Stable (useCallback) because it is
+  // handed to every grid row: a fresh function per render re-rendered them all.
+  const prefetchTechnicianData = useCallback(async (technicianId: string) => {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.scope('technician', technicianId),
       queryFn: async () => {
@@ -555,7 +603,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       },
       staleTime: 2 * 60 * 1000, // 2 minutes
     });
-  };
+  }, [queryClient]);
 
   // Memoized helper functions
   const getAssignmentForCell = useMemo(() => {
@@ -589,7 +637,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   }, [jobs, dates]);
 
   // Optimistic update functions
-  const updateAssignmentOptimistically = (technicianId: string, jobId: string, newStatus: string) => {
+  const updateAssignmentOptimistically = useCallback((technicianId: string, jobId: string, newStatus: string) => {
     // Update all cached assignment queries to reflect the new status immediately
     queryClient.setQueriesData<MatrixTimesheetAssignment[]>({ queryKey: queryKeys.scope('optimized-matrix-assignments') }, (old) => {
       if (!old) return old;
@@ -604,7 +652,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         return old;
       }
     });
-  };
+  }, [queryClient]);
 
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = useCallback(async () => {
@@ -618,8 +666,53 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     ]);
   }, [queryClient]);
 
+  // Every job the current range shows, for patches that add a day. Read through
+  // a ref so the realtime channels are not re-created when the range changes.
+  const jobsByIdRef = React.useRef(jobsById);
+  useEffect(() => {
+    jobsByIdRef.current = jobsById;
+  }, [jobsById]);
+
+  /**
+   * Apply a realtime change to every cached matrix query at once, each within
+   * what its own key covers, so a colleague's change shows on arrival rather
+   * than after the refetch round trip. The refetch still follows.
+   */
+  const patchMatrixCaches = useCallback(
+    (apply: (rows: MatrixTimesheetAssignment[], scope: MatrixQueryScope) => MatrixTimesheetAssignment[] | null) => {
+      const cached = queryClient.getQueriesData<MatrixTimesheetAssignment[]>({
+        queryKey: queryKeys.scope('optimized-matrix-assignments'),
+      });
+      cached.forEach(([key, rows]) => {
+        if (!rows) return;
+        const [, keyJobIds, keyTechnicianIds, startKey, endKey] = key as [string, string[], string[], string, string];
+        if (!Array.isArray(keyJobIds) || !Array.isArray(keyTechnicianIds)) return;
+        const jobsInKey = new Map<string, MatrixJob>();
+        keyJobIds.forEach((id) => {
+          const job = jobsByIdRef.current.get(id);
+          if (job) jobsInKey.set(id, job);
+        });
+        const next = apply(rows, {
+          jobsById: jobsInKey,
+          technicianIds: new Set(keyTechnicianIds),
+          startKey,
+          endKey,
+        });
+        if (next && next !== rows) queryClient.setQueryData(key, next);
+      });
+    },
+    [queryClient],
+  );
+
   // Realtime subscription for job_assignments table
   useEffect(() => {
+    const invalidate = throttle(() => {
+      void invalidateAssignmentQueries();
+    }, REALTIME_REFETCH_WINDOW_MS);
+    const onChange = (payload: RealtimeChange) => {
+      patchMatrixCaches((rows) => applyJobAssignmentChange(rows, payload));
+      invalidate();
+    };
     const channel = supabase
       .channel('matrix-job-assignments')
       .on(
@@ -629,20 +722,27 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        () => {
-          // Immediately invalidate and refetch
-          invalidateAssignmentQueries();
-        }
+        onChange
       )
       .subscribe();
 
     return () => {
+      invalidate.cancel();
       supabase.removeChannel(channel);
     };
-  }, [invalidateAssignmentQueries]);
+  }, [invalidateAssignmentQueries, patchMatrixCaches]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
+    const invalidate = throttle(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+      // Confirmed and open-slot badges are counted off timesheets too.
+      void invalidateMatrixHeaderCounts(queryClient);
+    }, REALTIME_REFETCH_WINDOW_MS);
+    const onChange = (payload: RealtimeChange) => {
+      patchMatrixCaches((rows, scope) => applyTimesheetChange(rows, payload, scope));
+      invalidate();
+    };
     const channel = supabase
       .channel('matrix-timesheets')
       .on(
@@ -652,18 +752,15 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'timesheets',
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
-          // Confirmed and open-slot badges are counted off timesheets too.
-          void invalidateMatrixHeaderCounts(queryClient);
-        }
+        onChange
       )
       .subscribe();
 
     return () => {
+      invalidate.cancel();
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, patchMatrixCaches]);
 
   const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
   const isFetching = assignmentsFetching || availabilityFetching;

@@ -43,6 +43,7 @@ export interface MultiDateRemovalState {
 }
 
 export interface MatrixStaffingStatus {
+  availability_request_id?: string | null;
   availability_status: string | null;
   offer_status: string | null;
   availability_job_id?: string | null;
@@ -96,7 +97,6 @@ export interface OptimizedMatrixCellProps {
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: MatrixStaffingStatus | null;
   staffingStatusByDateProvided?: MatrixStaffingStatus | null;
-  profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
   staffingDepartment?: string | null;

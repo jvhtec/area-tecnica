@@ -2,7 +2,7 @@
 import React from 'react';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MADRID_TIMEZONE, formatMadridDateKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
+import { MADRID_TIMEZONE, formatMadridDateKey, formatMadridDayKey, isMadridToday, isMadridWeekend } from '@/utils/timezoneUtils';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar, Clock, Users } from 'lucide-react';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { queryKeys } from "@/lib/react-query";
+import type { MatrixOpenSlots } from "@/hooks/useMatrixHeaderCounts";
 interface DateHeaderProps {
   date: Date;
   width: number;
@@ -23,6 +24,10 @@ interface DateHeaderProps {
     _assigned_count?: number;
   }>;
   technicianIds?: string[];
+  /** Technicians with an active timesheet on this day (see useMatrixHeaderCounts). */
+  confirmedCount?: number;
+  /** Role slots across the day's jobs; null until loaded, and never on mobile. */
+  openSlots?: MatrixOpenSlots | null;
   /** Mobile layout: drops the month/year lines and puts the badges on one row. */
   compact?: boolean;
   onJobClick?: (jobId: string) => void;
@@ -122,9 +127,25 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
   });
 }
 
-const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false, onJobClick }: DateHeaderProps) => {
-  const isTodayHeader = isMadridToday(date);
-  const isWeekendHeader = isMadridWeekend(date);
+const DateHeaderComp = ({
+  date,
+  width,
+  jobs = [],
+  technicianIds,
+  confirmedCount: confirmedForDate = 0,
+  openSlots = null,
+  compact = false,
+  onJobClick,
+}: DateHeaderProps) => {
+  // One Madrid day key, and memoised labels off it, instead of five timezone
+  // conversions per header render.
+  const dateKey = formatMadridDateKey(date);
+  const isTodayHeader = isMadridToday(dateKey);
+  const isWeekendHeader = isMadridWeekend(dateKey);
+  const weekdayLabel = formatMadridDayKey(dateKey, 'EEE', { locale: es });
+  const dayLabel = formatMadridDayKey(dateKey, 'd');
+  const monthLabel = formatMadridDayKey(dateKey, 'MMM', { locale: es });
+  const yearLabel = dayLabel === '1' ? ` ${dateKey.slice(0, 4)}` : '';
   const hasJobs = jobs.length > 0;
 
   const getJobIndicatorColors = () => {
@@ -136,75 +157,6 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
   };
 
   const jobColors = getJobIndicatorColors();
-  const { data: confirmedForDate } = useDateConfirmedCount(date, jobs, technicianIds);
-
-  // Aggregate open slots across jobs on this date (all departments)
-  // Timesheets are source of truth - only count technicians who are actually scheduled
-  const jobIds = React.useMemo(() => (jobs || []).map(j => j.id), [jobs]);
-  const { data: openSlots } = useQuery({
-    queryKey: queryKeys.scope('matrix-open-slots', jobIds.join(',')),
-    queryFn: async () => {
-      if (!jobIds.length) return { required: 0, assigned: 0, open: 0 };
-
-      // First get technicians with timesheets (actually scheduled)
-      const { data: timesheetData } = await dataLayerClient.from('timesheets')
-        .select('technician_id, job_id')
-        .eq('is_active', true)
-        .in('job_id', jobIds);
-
-      // Get unique scheduled technician IDs per job
-      const scheduledTechsByJob = new Map<string, Set<string>>();
-      (timesheetData || []).forEach((t: any) => {
-        if (!scheduledTechsByJob.has(t.job_id)) {
-          scheduledTechsByJob.set(t.job_id, new Set());
-        }
-        scheduledTechsByJob.get(t.job_id)!.add(t.technician_id);
-      });
-
-      const allScheduledTechs = new Set<string>();
-      (timesheetData || []).forEach((t: any) => allScheduledTechs.add(t.technician_id));
-
-      if (allScheduledTechs.size === 0) {
-        // No scheduled technicians, just get required count
-        const { data: req } = await dataLayerClient.from('job_required_roles_summary')
-          .select('total_required, job_id')
-          .in('job_id', jobIds);
-        const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
-        return { required, assigned: 0, open: required };
-      }
-
-      // Get requirements and assignments for scheduled technicians
-      const [{ data: req }, { data: assignments }] = await Promise.all([
-        dataLayerClient.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
-        dataLayerClient.from('job_assignments')
-          .select('job_id, technician_id, sound_role, lights_role, video_role')
-          .in('job_id', jobIds)
-          .in('technician_id', Array.from(allScheduledTechs)),
-      ]);
-
-      const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
-
-      // Count assigned roles only for technicians who are actually scheduled (have timesheets)
-      let assigned = 0;
-      (assignments || []).forEach((a: any) => {
-        const scheduledForJob = scheduledTechsByJob.get(a.job_id);
-        if (scheduledForJob && scheduledForJob.has(a.technician_id)) {
-          if (a.sound_role != null) assigned++;
-          if (a.lights_role != null) assigned++;
-          if (a.video_role != null) assigned++;
-        }
-      });
-
-      const open = Math.max(required - assigned, 0);
-      return { required, assigned, open };
-    },
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
-    // The "libres" badge this feeds is desktop-only, so a compact header would
-    // pay for two table reads per date column and render nothing with them.
-    enabled: hasJobs && !compact,
-  });
-
   // Coverage for the date: how many of the required role slots across the day's
   // jobs are actually filled. Desktop only — openSlots is not fetched in compact
   // mode, where there is no room to draw the bar anyway.
@@ -247,30 +199,28 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
             // column, so mobile shows "Sáb 14" on one line.
             <div className="flex items-baseline gap-1 leading-none">
               <span className="text-xs font-semibold capitalize">
-                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+                {weekdayLabel}
               </span>
               <span className={cn('text-sm font-bold', {
                 'text-primary': isTodayHeader
               })}>
-                {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+                {dayLabel}
               </span>
             </div>
           ) : (
             <>
               <div className="text-xs font-semibold uppercase leading-none tracking-wider text-muted-foreground">
-                {formatInTimeZone(date, MADRID_TIMEZONE, 'EEE', { locale: es })}
+                {weekdayLabel}
               </div>
               <div className="flex items-baseline gap-1 leading-none">
                 <span className={cn('text-lg font-bold leading-none', {
                   'text-primary': isTodayHeader
                 })}>
-                  {formatInTimeZone(date, MADRID_TIMEZONE, 'd')}
+                  {dayLabel}
                 </span>
                 <span className="text-xs lowercase text-muted-foreground">
-                  {formatInTimeZone(date, MADRID_TIMEZONE, 'MMM', { locale: es })}
-                  {formatInTimeZone(date, MADRID_TIMEZONE, 'd') === '1'
-                    ? ` ${formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy')}`
-                    : ''}
+                  {monthLabel}
+                  {yearLabel}
                 </span>
               </div>
 
@@ -330,7 +280,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, compact = false
               </Badge>
               {(compact || !coverage) && (
                 <Badge variant="default" className="h-4 px-1 py-0 text-[10px] leading-none" title="Técnicos confirmados en esta fecha">
-                  {confirmedForDate ?? 0}
+                  {confirmedForDate}
                 </Badge>
               )}
               {!compact && !coverage && openSlots && openSlots.required > 0 && (
@@ -414,46 +364,6 @@ function JobRowWithCounts({ job, technicianIds, onJobClick }: { job: { id: strin
       </div>
     </div>
   );
-}
-
-// Total confirmed/scheduled technicians for a specific date across the provided jobs
-// Timesheets are the source of truth for actual scheduled assignments
-function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technicianIds?: string[]) {
-  // timesheets.date is a Madrid calendar day, so key off the same calendar.
-  const dateStr = formatMadridDateKey(date);
-  const jobIds = (jobs || []).map(j => j.id);
-  return useQuery({
-    queryKey: queryKeys.scope('matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')),
-    queryFn: async () => {
-      if (!jobIds.length) return 0;
-
-      // Query timesheets for the specific date and jobs (source of truth)
-      let query = dataLayerClient.from('timesheets')
-        .select('technician_id')
-        .eq('is_active', true)
-        .in('job_id', jobIds)
-        .eq('date', dateStr);
-
-      if (technicianIds && technicianIds.length > 0) {
-        query = query.in('technician_id', technicianIds);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.warn('Confirmed count error', error);
-        return 0;
-      }
-
-      // Count unique technicians
-      const unique = new Set<string>();
-      (data || []).forEach((r: any) => { if (r.technician_id) unique.add(r.technician_id); });
-      return unique.size;
-    },
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
-    enabled: jobIds.length > 0,
-  });
 }
 
 export const DateHeader = React.memo(DateHeaderComp);

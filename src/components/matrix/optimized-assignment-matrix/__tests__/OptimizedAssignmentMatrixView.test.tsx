@@ -4,6 +4,25 @@ import userEvent from '@testing-library/user-event';
 import { OptimizedAssignmentMatrixView } from '../OptimizedAssignmentMatrixView';
 import type { OptimizedAssignmentMatrixViewProps } from '../OptimizedAssignmentMatrixView';
 
+// The view owns its scroll state; tests drive it through this stand-in.
+const scrollState = vi.hoisted(() => ({
+  current: {} as Record<string, unknown>,
+}));
+const defaultScrollState = () => ({
+  dateHeadersRef: { current: null },
+  technicianScrollRef: { current: null },
+  mainScrollRef: { current: null },
+  visibleCols: { start: 0, end: 2 },
+  visibleRows: { start: 0, end: 1 },
+  canNavLeft: false,
+  canNavRight: false,
+  handleMobileNav: vi.fn(),
+  handleMainScroll: vi.fn(),
+});
+vi.mock('../useMatrixScrollState', () => ({
+  useMatrixScrollState: () => scrollState.current,
+}));
+
 // Mock child components
 vi.mock('../../TechnicianRow', () => ({
   TechnicianRow: ({ technician }: any) => (
@@ -84,11 +103,6 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   CELL_HEIGHT: 60,
   matrixWidth: 480,
   matrixHeight: 120,
-  dateHeadersRef: { current: null },
-  technicianScrollRef: { current: null },
-  mainScrollRef: { current: null },
-  visibleCols: { start: 0, end: 2 },
-  visibleRows: { start: 0, end: 1 },
   dates: mockDates,
   technicians: mockTechnicians,
   orderedTechnicians: mockTechnicians,
@@ -96,12 +110,6 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   allowDirectAssign: false,
   allowMarkUnavailable: false,
   mobile: false,
-  canNavLeft: false,
-  canNavRight: false,
-  handleMobileNav: vi.fn(),
-  handleDateHeadersScroll: vi.fn(),
-  handleTechnicianScroll: vi.fn(),
-  handleMainScroll: vi.fn(),
   cycleTechSort: vi.fn(),
   getSortLabel: () => '',
   isManagementUser: false,
@@ -157,6 +165,7 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
 });
 
 beforeEach(() => {
+  scrollState.current = defaultScrollState();
   vi.clearAllMocks();
 });
 
@@ -230,7 +239,8 @@ describe('OptimizedAssignmentMatrixView', () => {
   });
 
   it('shows mobile navigation buttons in mobile mode', () => {
-    const props = createMockProps({ mobile: true, canNavLeft: true, canNavRight: true });
+    scrollState.current = { ...defaultScrollState(), canNavLeft: true, canNavRight: true };
+    const props = createMockProps({ mobile: true });
     render(<OptimizedAssignmentMatrixView {...props} />);
 
     const leftButton = screen.getByLabelText(/Fechas anteriores/i);
@@ -242,12 +252,8 @@ describe('OptimizedAssignmentMatrixView', () => {
 
   it('handles mobile navigation button clicks', async () => {
     const handleMobileNav = vi.fn();
-    const props = createMockProps({
-      mobile: true,
-      canNavLeft: true,
-      canNavRight: true,
-      handleMobileNav,
-    });
+    scrollState.current = { ...defaultScrollState(), canNavLeft: true, canNavRight: true, handleMobileNav };
+    const props = createMockProps({ mobile: true });
     const user = userEvent.setup();
 
     render(<OptimizedAssignmentMatrixView {...props} />);

@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 
 import { bootstrapApp } from "./support/app";
 
+// The matrix only raises staffing reminders for jobs with a day still ahead, so
+// the fixture job is placed relative to today instead of on a fixed date.
+const futureDay = (offset: number) => {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+};
+
 const baseCandidate = {
   department: "sound",
   skills_score: 80,
@@ -34,8 +43,8 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
         {
           id: "staffing-job-1",
           title: "Staffing Smoke Job",
-          start_time: "2026-06-10T08:00:00.000Z",
-          end_time: "2026-06-11T20:00:00.000Z",
+          start_time: `${futureDay(30)}T08:00:00.000Z`,
+          end_time: `${futureDay(31)}T20:00:00.000Z`,
           color: "#1d4ed8",
           status: "Confirmado",
           job_type: "single",

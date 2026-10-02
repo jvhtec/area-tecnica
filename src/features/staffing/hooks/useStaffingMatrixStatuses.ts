@@ -27,11 +27,13 @@ export interface MatrixJobLite {
 }
 
 interface ByJobStatus {
+  availability_request_id?: string | null
   availability_status: Status
   offer_status: Status
 }
 
 interface ByDateStatus extends ByJobStatus {
+  availability_request_id?: string | null
   availability_job_id?: string | null
   availability_job_title?: string | null
   offer_job_id?: string | null
@@ -67,11 +69,14 @@ interface StaffingEventRow {
   event: string | null
   meta: {
     request_origin?: string | null
+    dates?: string[] | null
+    status?: number | string | null
   } | null
   created_at: string | null
 }
 
 interface LatestByPhaseAccumulator {
+  availability_request_id: string | null
   availability_status: Status
   offer_status: Status
   availability_updated_at: number
@@ -93,6 +98,7 @@ interface LatestByPhaseAccumulator {
 }
 
 const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
+  availability_request_id: null,
   availability_status: null,
   offer_status: null,
   availability_updated_at: 0,
@@ -116,10 +122,11 @@ const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
 export function useStaffingMatrixStatuses(
   technicianIds: string[],
   jobs: MatrixJobLite[],
-  dates: Date[]
+  dates: Date[],
+  scheduledAssignments: ReadonlyArray<{ job_id: string; technician_id: string; date: string; status: string | null }> = []
 ) {
   return useQuery({
-    queryKey: queryKeys.scope('staffing-matrix', technicianIds, jobs.map(j => j.id), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString()),
+    queryKey: queryKeys.scope('staffing-matrix', technicianIds, jobs.map(j => [j.id, j.start_time, j.end_time]), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString(), scheduledAssignments.map(a => [a.job_id, a.technician_id, a.date, a.status])),
     queryFn: async () => {
       if (!technicianIds.length || !jobs.length || !dates.length) {
         return { byJob: new Map<string, ByJobStatus>(), byDate: new Map<string, ByDateStatus>() }
@@ -232,6 +239,13 @@ export function useStaffingMatrixStatuses(
       }
 
       const autoStaffingRequestIds = new Set<string>()
+      for (const row of reqRows) {
+        const status = mapByJob.get(`${row.job_id}-${row.profile_id}`)
+        if (row.phase === 'availability' && row.status === 'pending' && status?.availability_status === 'requested' && !status.availability_request_id) {
+          status.availability_request_id = row.id ?? null
+        }
+      }
+      const requestDates = new Map<string, Set<string>>()
       try {
         const requestIds = Array.from(new Set(reqRows.map((row) => row.id).filter(Boolean) as string[]))
         if (requestIds.length > 0) {
@@ -241,7 +255,7 @@ export function useStaffingMatrixStatuses(
               .from('staffing_events')
               .select('staffing_request_id, event, meta, created_at')
               .in('staffing_request_id', batch)
-              .in('event', ['email_sent', 'whatsapp_sent'])
+              .in('event', ['email_sent', 'whatsapp_sent', 'request_scope'])
               .order('created_at', { ascending: false }))
           ))
           const eventResults = await Promise.all(eventPromises)
@@ -250,9 +264,15 @@ export function useStaffingMatrixStatuses(
               console.warn('Staffing matrix events query error:', res.error)
               return
             }
-            ;((res.data || []) as StaffingEventRow[]).forEach((event) => {
+            // The first delivery with a saved scope defines the request dates;
+            // a resend after an extension must not broaden the same request.
+            ;((res.data || []) as StaffingEventRow[]).slice().reverse().forEach((event) => {
               const requestId = String(event.staffing_request_id || '')
-              if (!requestId || autoStaffingRequestIds.has(requestId)) return
+              if (!requestId) return
+              const delivered = event.event === 'request_scope' || (Number(event.meta?.status) >= 200 && Number(event.meta?.status) < 300)
+              if (delivered && !requestDates.has(requestId) && event.meta?.dates?.length) {
+                requestDates.set(requestId, new Set(event.meta.dates))
+              }
               if (event.meta?.request_origin === 'auto_staffing') {
                 autoStaffingRequestIds.add(requestId)
               }
@@ -264,11 +284,38 @@ export function useStaffingMatrixStatuses(
       }
 
       // Build job lookup with parsed dates for overlap check
-      const jobLookup = new Map<string, { id: string, title: string | null, start: Date, end: Date }>()
+      // Job bounds as Madrid day keys, computed once per job rather than once
+      // per request × technician × date in the loop below.
+      const jobLookup = new Map<string, { id: string, title: string | null, startKey: string, endKey: string }>()
       jobs.forEach(j => {
         const start = j.start_time ? new Date(j.start_time) : new Date()
         const end = j.end_time ? new Date(j.end_time) : new Date()
-        jobLookup.set(j.id, { id: j.id, title: j.title?.trim() || null, start, end })
+        jobLookup.set(j.id, {
+          id: j.id,
+          title: j.title?.trim() || null,
+          startKey: formatMadridDateKey(start),
+          endKey: formatMadridDateKey(end),
+        })
+      })
+      // target_date rows are Madrid calendar days, so key the map the same
+      // way — and the matrix reads these keys back with the same helper.
+      const dateKeys = dates.map(d => formatMadridDateKey(d))
+
+      // Legacy whole-job requests did not persist their dates. Once an offer
+      // was confirmed, active scheduled dates are the available evidence of
+      // accepted coverage; extending the job must not extend that consent.
+      const completedLegacyPairs = new Map<string, number>()
+      reqRows.filter(r => !r.single_day && r.phase === 'offer' && r.status === 'confirmed').forEach(r => {
+        const key = `${r.job_id}:${r.profile_id}`
+        const created = Date.parse(r.created_at ?? r.updated_at ?? '') || 0
+        completedLegacyPairs.set(key, Math.max(completedLegacyPairs.get(key) ?? 0, created))
+      })
+      const scheduledDates = new Map<string, Set<string>>()
+      scheduledAssignments.filter(a => a.status === 'confirmed').forEach(a => {
+        const key = `${a.job_id}:${a.technician_id}`
+        const keys = scheduledDates.get(key) ?? new Set<string>()
+        keys.add(a.date)
+        scheduledDates.set(key, keys)
       })
 
       // Group requests by technician for faster lookups
@@ -283,13 +330,11 @@ export function useStaffingMatrixStatuses(
       // For each technician and visible date, compute latest per-phase over overlapping jobs
       technicianIds.forEach(tid => {
         const reqs = byTech.get(tid) || []
-        dates.forEach(d => {
-          // target_date rows are Madrid calendar days, so key the map the same
-          // way — and the matrix reads these keys back with the same helper.
-          const dStr = formatMadridDateKey(d)
+        if (!reqs.length) return
+        dateKeys.forEach(dStr => {
           // Filter requests based on type:
           // - Single-day requests: exact target_date match (prevents following job reschedules)
-          // - Full-span requests: show on all dates within the job's date range
+          // - Full-span requests: honor a snapshot or completed scheduling first
           const matchingRequests = reqs.filter(r => {
             // Single-day requests with target_date: exact match only
             if (r.single_day && r.target_date) {
@@ -299,12 +344,20 @@ export function useStaffingMatrixStatuses(
 
             // Full-span requests (no target_date): show on all job dates
             if (!r.single_day) {
+              const snapshot = r.id ? requestDates.get(r.id) : undefined
+              if (snapshot) return snapshot.has(dStr)
+              const pair = `${r.job_id}:${r.profile_id}`
+              const completedAt = completedLegacyPairs.get(pair)
+              const created = Date.parse(r.created_at ?? r.updated_at ?? '') || 0
+              const belongsToCompletedCycle = r.status === 'confirmed' && completedAt !== undefined &&
+                (r.phase === 'offer' || created <= completedAt)
+              if (belongsToCompletedCycle) return scheduledDates.get(pair)?.has(dStr) ?? false
               const job = jobLookup.get(r.job_id)
               if (!job) return false
               // dStr is a Madrid day, so the job bounds have to be Madrid days too.
               // Comparing local midnights here put the badge on the neighbouring
               // column in browsers east or west of Madrid.
-              return dStr >= formatMadridDateKey(job.start) && dStr <= formatMadridDateKey(job.end)
+              return dStr >= job.startKey && dStr <= job.endKey
             }
 
             return false
@@ -328,6 +381,7 @@ export function useStaffingMatrixStatuses(
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
+                acc.availability_request_id = r.id ?? null
                 acc.availability_job_title = jobTitle
                 acc.availability_requested_by = r.requested_by ?? null
                 acc.availability_actor_label = r.id && autoStaffingRequestIds.has(r.id)
@@ -364,6 +418,7 @@ export function useStaffingMatrixStatuses(
               availability_status: latest.availability_status as Status,
               offer_status: latest.offer_status as Status,
               availability_job_id: latest.availability_job_id,
+              availability_request_id: latest.availability_request_id,
               availability_job_title: latest.availability_job_title,
               offer_job_id: latest.offer_job_id,
               offer_job_title: latest.offer_job_title,

@@ -39,6 +39,7 @@ const setupManager = async () => {
 const createChannel = (name: string) => {
   const mockChannel = {
     name,
+    state: "closed",
     postgresHandlers: [] as PostgresHandler[],
     statusHandlers: [] as ChannelStatusHandler[],
     on: vi.fn(),
@@ -58,6 +59,7 @@ const createChannel = (name: string) => {
   mockChannel.subscribe.mockImplementation((callback?: (status: string) => void) => {
     if (callback) {
       mockChannel.statusHandlers.push(callback);
+      mockChannel.state = "joined";
       callback("SUBSCRIBED");
     }
     return mockChannel;
@@ -73,6 +75,60 @@ afterEach(() => {
 });
 
 describe("UnifiedSubscriptionManager", () => {
+  it("preserves a healthy sibling channel when only one read model needs repair", async () => {
+    const { manager, channels, removeChannel, queryClient } = await setupManager();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    manager.subscribeToTable("logistics_events", ["logistics_events"]);
+    const calendar = channels.at(-1)!;
+    const aggregate = manager.subscribeToTable("logistics_events", ["transport_driver_assignments"]);
+    const failed = channels.at(-1)!;
+    failed.state = "errored";
+
+    manager.forceRefreshSubscriptions(["logistics_events"], [aggregate.key]);
+
+    expect(removeChannel).toHaveBeenCalledWith(failed);
+    expect(removeChannel).not.toHaveBeenCalledWith(calendar);
+    expect(manager.getSubscriptionStatus("logistics_events", ["logistics_events"]).isConnected).toBe(true);
+    expect(manager.getSubscriptionStatus("logistics_events", ["transport_driver_assignments"]).isConnected).toBe(true);
+    expect(invalidateQueries).toHaveBeenCalledExactlyOnceWith({ queryKey: ['transport_driver_assignments'] });
+  });
+
+  it('does not invalidate or rebuild anything for an empty refresh-key selection', async () => {
+    const { manager, removeChannel, queryClient } = await setupManager();
+    manager.subscribeToTable('logistics_events', ['calendar']);
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    manager.forceRefreshSubscriptions(['logistics_events', 'unregistered_table'], []);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(removeChannel).not.toHaveBeenCalled();
+  });
+
+  it('keeps table-wide invalidation when no refresh-key filter is supplied', async () => {
+    const { manager, queryClient } = await setupManager();
+    manager.subscribeToTable('logistics_events', ['calendar']);
+    manager.subscribeToTable('logistics_events', ['driver-aggregate']);
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    manager.forceRefreshSubscriptions(['logistics_events', 'unregistered_table']);
+    expect(invalidateQueries.mock.calls.map(([options]) => options?.queryKey)).toEqual([
+      ['calendar'], ['driver-aggregate'], ['unregistered_table'],
+    ]);
+  });
+
+  it("checks the required table channel independently of a joined ping channel", async () => {
+    const { manager, channels } = await setupManager();
+    manager.subscribeToTable("job_assignments", ["optimized-jobs"]);
+    const assignments = channels.find((channel) => channel.name.startsWith("job_assignments-"))!;
+    expect(channels.find((channel) => channel.name === "ping")?.state).toBe("joined");
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(true);
+
+    assignments.state = "errored";
+    expect(manager.getConnectionStatus()).toBe("connected");
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(false);
+    assignments.state = "joining";
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(false);
+    assignments.state = "joined";
+    expect(manager.getSubscriptionStatus("job_assignments", ["optimized-jobs"]).isConnected).toBe(true);
+    expect(manager.getSubscriptionStatus("job_assignments", ["other-model"]).isConnected).toBe(false);
+  });
   it("deduplicates query keys with equivalent object properties in a different order", async () => {
     const { manager, channels } = await setupManager();
 
@@ -277,5 +333,33 @@ describe("UnifiedSubscriptionManager", () => {
     manager.cleanupRouteDependentSubscriptions("/matrix:staffing");
 
     expect(removeChannel).toHaveBeenCalledWith(refreshedChannel);
+  });
+
+  it("refetches at once on a colleague's change and coalesces a burst into one trailing refetch", async () => {
+    vi.useFakeTimers();
+    const { manager, queryClient, channels } = await setupManager();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+    manager.subscribeToTable("job_assignments", ["job-assignments"], undefined, "medium");
+    const channel = channels.find((mockChannel) => mockChannel.name.startsWith("job_assignments-"));
+    const emit = () =>
+      channel?.postgresHandlers[0]({ eventType: "UPDATE", table: "job_assignments", new: { id: "a" } });
+
+    emit();
+    // No waiting: the first change refetches immediately.
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+
+    // A burst inside the window adds exactly one trailing refetch.
+    emit();
+    emit();
+    emit();
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
+
+    // Quiet after that: the next change is immediate again.
+    await vi.advanceTimersByTimeAsync(300);
+    emit();
+    expect(invalidateQueries).toHaveBeenCalledTimes(3);
   });
 });

@@ -122,7 +122,45 @@ export const formatMadridDateKey = (date: Date | string): string => {
     if (MADRID_DATE_KEY_PATTERN.test(date)) return date;
     return formatInTimeZone(parseISO(date), MADRID_TIMEZONE, "yyyy-MM-dd");
   }
-  return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
+  return formatInstantAsMadridDateKey(date);
+};
+
+/**
+ * Instant → Madrid day key, memoised by epoch milliseconds. formatInTimeZone
+ * costs ~10µs a call, and the assignment matrix asks for the same few dozen
+ * column days thousands of times per render (every visible cell, several times
+ * over) — ~30ms of formatting per scroll step without this. Keyed by the
+ * timestamp rather than the Date object, so a mutated Date cannot read a stale
+ * entry.
+ */
+const MADRID_DATE_KEY_CACHE_LIMIT = 5000;
+const madridDateKeyCache = new Map<number, string>();
+
+const formatInstantAsMadridDateKey = (date: Date): string => {
+  const time = date.getTime();
+  const cached = madridDateKeyCache.get(time);
+  if (cached !== undefined) return cached;
+  // Formatted before caching, so an invalid Date still throws as it did.
+  const key = formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
+  if (madridDateKeyCache.size >= MADRID_DATE_KEY_CACHE_LIMIT) madridDateKeyCache.clear();
+  madridDateKeyCache.set(time, key);
+  return key;
+};
+
+/**
+ * Today's Madrid day key, recomputed once per wall-clock minute. Madrid's UTC
+ * offset is a whole number of hours, so its midnight always falls on a minute
+ * boundary and the key never goes stale. Formatted directly rather than through
+ * the memo above, which a fresh `new Date()` per call would only fill up.
+ */
+let madridTodayKeyCache: { minute: number; key: string } | null = null;
+const getCachedMadridTodayKey = (): string => {
+  const now = Date.now();
+  const minute = Math.floor(now / 60_000);
+  if (madridTodayKeyCache?.minute !== minute) {
+    madridTodayKeyCache = { minute, key: formatInTimeZone(new Date(now), MADRID_TIMEZONE, "yyyy-MM-dd") };
+  }
+  return madridTodayKeyCache.key;
 };
 
 export const getMadridTodayKey = (reference: Date = new Date()): string =>
@@ -130,6 +168,9 @@ export const getMadridTodayKey = (reference: Date = new Date()): string =>
 
 export const fromMadridDateKey = (dateKey: string, time: string = "00:00:00"): Date =>
   fromZonedTime(`${dateKey}T${time}`, MADRID_TIMEZONE);
+
+const MADRID_DAY_LABEL_CACHE_LIMIT = 5000;
+const madridDayLabelCache = new Map<string, string>();
 
 /**
  * Renders a Madrid day key for display.
@@ -145,7 +186,23 @@ export const formatMadridDayKey = (
   dateKey: string,
   pattern: string,
   options?: Parameters<typeof formatInTimeZone>[3],
-): string => formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+): string => {
+  // A day key, a pattern and a locale always render the same label, so those
+  // are memoised: building one costs two timezone conversions plus a localised
+  // format (~40µs), and grids label the same days over and over. Any other
+  // option skips the cache rather than risk keying on it incompletely.
+  const optionKeys = options ? Object.keys(options) : [];
+  const cacheable = optionKeys.every((key) => key === "locale");
+  if (!cacheable) return formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+
+  const cacheKey = `${dateKey}\u0000${pattern}\u0000${options?.locale?.code ?? ""}`;
+  const cached = madridDayLabelCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const label = formatInTimeZone(fromMadridDateKey(dateKey), MADRID_TIMEZONE, pattern, options);
+  if (madridDayLabelCache.size >= MADRID_DAY_LABEL_CACHE_LIMIT) madridDayLabelCache.clear();
+  madridDayLabelCache.set(cacheKey, label);
+  return label;
+};
 
 /**
  * Turns a Madrid calendar-day key into the local-midnight Date that calendar
@@ -175,7 +232,7 @@ export const madridDateKeyToCalendarDate = (dateKey: string): Date | null => {
 
 /** Madrid-local equivalents of date-fns `isToday` / `isWeekend`. */
 export const isMadridToday = (date: Date | string): boolean =>
-  formatMadridDateKey(date) === formatMadridDateKey(new Date());
+  formatMadridDateKey(date) === getCachedMadridTodayKey();
 
 export const isMadridWeekend = (date: Date | string): boolean => {
   // Read the weekday off the Madrid calendar day rather than the browser's.

@@ -50,12 +50,19 @@ function load(options: {
   fetch: (input: unknown) => Promise<Response>;
   caches: ReturnType<typeof makeCaches>['caches'];
   immediateTimeout?: boolean;
+  /** An already-active worker in the registration, i.e. this install is an update. */
+  active?: boolean;
 }) {
   const code = source.replace('[] /* __PRECACHE_ASSETS__ */', JSON.stringify(options.precache ?? []));
   const listeners = new Map<string, (event: unknown) => void>();
   const self = {
     location: new URL(`${SCOPE}sw.js`),
-    registration: { scope: SCOPE, showNotification: vi.fn(), setAppBadge: vi.fn() },
+    registration: {
+      scope: SCOPE,
+      showNotification: vi.fn(),
+      setAppBadge: vi.fn(),
+      active: options.active ? { state: 'activated' } : null,
+    },
     addEventListener: (name: string, listener: (event: unknown) => void) => listeners.set(name, listener),
     skipWaiting: vi.fn(async () => undefined),
     clients: { claim: vi.fn(async () => undefined), matchAll: vi.fn(async () => []) },
@@ -79,7 +86,7 @@ function load(options: {
     if (awaitBackground) await Promise.all(pending);
     return result;
   };
-  return { run };
+  return { run, self };
 }
 
 const js = (body: string) => new Response(body, { headers: { 'content-type': 'text/javascript' } });
@@ -151,5 +158,22 @@ describe('service worker offline behaviour', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(stores.get(ASSET_CACHE)?.has('/assets/LazyTab-abc.js')).toBe(true);
+  });
+
+  it('takes control straight away on the first install', async () => {
+    const { caches } = makeCaches();
+    const { run, self } = load({ caches, fetch: vi.fn(async () => basic(new Response('ok'))) });
+    await run('install');
+    expect(self.skipWaiting).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves an update waiting instead of taking over open tabs', async () => {
+    const { caches } = makeCaches();
+    const { run, self } = load({ caches, fetch: vi.fn(async () => basic(new Response('ok'))), active: true });
+    await run('install');
+    expect(self.skipWaiting).not.toHaveBeenCalled();
+    // The update toast's "Actualizar" still applies it.
+    await run('message', { data: { type: 'SKIP_WAITING' } });
+    expect(self.skipWaiting).toHaveBeenCalledTimes(1);
   });
 });

@@ -16,13 +16,20 @@ import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
-import { useMatrixScrollState } from '@/components/matrix/optimized-assignment-matrix/useMatrixScrollState';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
+import { useMatrixHeaderCounts } from '@/hooks/useMatrixHeaderCounts';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
 
 
 import { queryKeys } from "@/lib/react-query";
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+
+// The staffing badges are fetched for a block-aligned window of technicians
+// rather than exactly the visible rows: the query is keyed on the id list, so
+// a window that moved with every row scrolled refetched (three round trips)
+// on nearly every scroll step. Aligned blocks only change at a boundary.
+const STAFFING_TECH_BLOCK = 40;
+const STAFFING_TECH_OVERSCAN = 10;
 
 type ProfileNameRow = {
   id: string;
@@ -68,11 +75,11 @@ export const OptimizedAssignmentMatrix = ({
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
 
   // Global selected cell store for Stream Deck integration
-  const {
-    selectCell,
-    clearSelection: clearGlobalSelection,
-    isCellSelected: isGlobalCellSelected
-  } = useSelectedCellStore();
+  // Selected individually: the bare hook subscribes to the whole store, so
+  // every selection change re-rendered the matrix a second time.
+  const selectCell = useSelectedCellStore((state) => state.selectCell);
+  const clearGlobalSelection = useSelectedCellStore((state) => state.clearSelection);
+  const isGlobalCellSelected = useSelectedCellStore((state) => state.isCellSelected);
 
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
@@ -155,29 +162,24 @@ export const OptimizedAssignmentMatrix = ({
   const matrixWidth = dates.length * CELL_WIDTH;
   const matrixHeight = technicians.length * CELL_HEIGHT;
 
-  const {
-    dateHeadersRef,
-    technicianScrollRef,
-    mainScrollRef,
-    visibleCols,
-    visibleRows,
-    canNavLeft,
-    canNavRight,
-    handleMobileNav,
-    handleDateHeadersScroll,
-    handleTechnicianScroll,
-    handleMainScroll,
-  } = useMatrixScrollState({
+  // The scroll position and virtualised window live in the view, so a scroll
+  // step re-renders the grid alone and not this component's data hooks. Only
+  // the staffing badges need to know where the user is, and only per block of
+  // technicians: the view reports the visible rows and this keeps the block.
+  const [staffingBlock, setStaffingBlock] = useState({ start: 0, end: STAFFING_TECH_BLOCK });
+  const handleVisibleRowsChange = useCallback((rows: { start: number; end: number }) => {
+    const start = Math.floor(Math.max(0, rows.start - STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) * STAFFING_TECH_BLOCK;
+    const end = (Math.floor((rows.end + STAFFING_TECH_OVERSCAN) / STAFFING_TECH_BLOCK) + 1) * STAFFING_TECH_BLOCK;
+    setStaffingBlock((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+
+  // Date header counts for the whole range (no per-column queries on scroll).
+  const getHeaderCounts = useMatrixHeaderCounts({
     dates,
-    techniciansLength: technicians.length,
-    cellWidth: CELL_WIDTH,
-    cellHeight: CELL_HEIGHT,
-    matrixWidth,
-    mobile,
-    isInitialLoading,
-    canExpandBefore,
-    canExpandAfter,
-    onNearEdgeScroll,
+    jobs,
+    allAssignments,
+    getJobsForDate,
+    includeOpenSlots: !mobile,
   });
 
   // Build declined job sets per technician for targeted staffing blocking
@@ -350,32 +352,64 @@ export const OptimizedAssignmentMatrix = ({
 
 
 
+  // Independent of selectedCells, so the callback every cell receives stays
+  // stable: depending on the set handed each of the hundreds of memoized cells
+  // a new onSelect on every click, re-rendering the whole visible grid.
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
     const cellKey = `${technicianId}-${formatMadridDateKey(date)}`;
-    const newSelected = new Set(selectedCells);
 
     if (selected) {
-      newSelected.add(cellKey);
       // Update global store for single-cell selection (for Stream Deck shortcuts)
       selectCell(technicianId, date);
-    } else {
-      newSelected.delete(cellKey);
+    } else if (isGlobalCellSelected(technicianId, date)) {
       // Clear global selection if deselecting
-      if (isGlobalCellSelected(technicianId, date)) {
-        clearGlobalSelection();
-      }
+      clearGlobalSelection();
     }
 
-    setSelectedCells(newSelected);
-  }, [selectedCells, selectCell, isGlobalCellSelected, clearGlobalSelection]);
+    setSelectedCells((prev) => {
+      if (prev.has(cellKey) === selected) return prev;
+      const next = new Set(prev);
+      if (selected) next.add(cellKey);
+      else next.delete(cellKey);
+      return next;
+    });
+  }, [selectCell, isGlobalCellSelected, clearGlobalSelection]);
 
   const clearCellSelection = useCallback(() => {
     setSelectedCells(new Set());
     clearGlobalSelection();
   }, [clearGlobalSelection]);
 
-  const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
+  const handleStaffingActionSelected = useCallback(async (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
+      const dateKey = formatMadridDateKey(cellAction.date);
+      const existingDates = allAssignments.filter(a => a.job_id === jobId && a.technician_id === cellAction.technicianId && a.status === 'confirmed');
+      let isAddedDate = existingDates.length > 0 && !existingDates.some(a => a.date === dateKey);
+      if (existingDates.length === 0 && !options?.singleDay) {
+        try {
+          // The grid contains only visible dates. Verify coverage outside it
+          // before defaulting an extension to a whole-job solicitation.
+          isAddedDate = await qc.fetchQuery({
+            queryKey: queryKeys.scope('matrix-staffing-existing-coverage', jobId, cellAction.technicianId, dateKey),
+            staleTime: 0,
+            queryFn: async () => {
+              const [assignment, schedule] = await Promise.all([
+                dataLayerClient.from('job_assignments').select('status').eq('job_id', jobId)
+                  .eq('technician_id', cellAction.technicianId).eq('status', 'confirmed').maybeSingle(),
+                dataLayerClient.from('timesheets').select('date').eq('job_id', jobId)
+                  .eq('technician_id', cellAction.technicianId).eq('is_active', true).neq('date', dateKey).limit(1),
+              ]);
+              if (assignment.error) throw assignment.error;
+              if (schedule.error) throw schedule.error;
+              return assignment.data?.status === 'confirmed' && Boolean(schedule.data?.length);
+            },
+          });
+        } catch {
+          toast({ title: 'No se pudo verificar la cobertura', description: 'Inténtalo de nuevo antes de enviar la solicitud.', variant: 'destructive' });
+          return;
+        }
+      }
+      const singleDay = isAddedDate || !!options?.singleDay;
       // If the technician already declined this job, block staffing for this job only
       const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
       if (declinedSet?.has(jobId)) {
@@ -387,7 +421,7 @@ export const OptimizedAssignmentMatrix = ({
         setOfferChannel(offerPreferredChannel ?? 'email');
         setOfferPreferredChannel(null);
         // Open offer details dialog; do not send immediately
-        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
+        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay });
         return;
       }
       // Availability: pre-check conflicts, then direct-send via intent/preference if set, else ask
@@ -395,7 +429,7 @@ export const OptimizedAssignmentMatrix = ({
         const technicianId = cellAction.technicianId;
         const conflictResult = await checkTimeConflictEnhanced(technicianId, jobId, {
           targetDateIso: formatMadridDateKey(cellAction.date),
-          singleDayOnly: !!options?.singleDay,
+          singleDayOnly: singleDay,
           includePending: true,
         });
         if (conflictResult.hasHardConflict) {
@@ -418,14 +452,14 @@ export const OptimizedAssignmentMatrix = ({
           jobId,
           profileId: technicianId,
           dateIso: formatMadridDateKey(cellAction.date),
-          singleDay: !!options?.singleDay,
+          singleDay,
           channel: defaultChannel
         });
       })();
     } else {
       // no-op
     }
-  }, [cellAction, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel]);
+  }, [cellAction, allAssignments, declinedJobsByTech, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel, setAvailabilityPreferredChannel, qc]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
@@ -436,15 +470,18 @@ export const OptimizedAssignmentMatrix = ({
   }, [updateAssignmentOptimistically]);
 
   // Batched staffing statuses for visible window
-  const visibleTechIds = useMemo(() => {
-    const start = Math.max(0, visibleRows.start - 10);
-    const end = Math.min(orderedTechnicians.length - 1, visibleRows.end + 10);
-    return orderedTechnicians.slice(start, end + 1).map(t => t.id);
-  }, [orderedTechnicians, visibleRows.start, visibleRows.end]);
+  const visibleTechIds = useMemo(
+    () => orderedTechnicians.slice(staffingBlock.start, staffingBlock.end).map(t => t.id),
+    [orderedTechnicians, staffingBlock],
+  );
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
   const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, title: j.title, start_time: j.start_time, end_time: j.end_time })), [jobs]);
-  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
+  const visibleStaffingAssignments = useMemo(() => {
+    const ids = new Set(visibleTechIds);
+    return allAssignments.filter(a => ids.has(a.technician_id));
+  }, [allAssignments, visibleTechIds]);
+  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates, visibleStaffingAssignments);
   const actorIdsForTooltip = useMemo(() => {
     const ids = new Set<string>();
     allAssignments.forEach((assignment) => {
@@ -485,6 +522,9 @@ export const OptimizedAssignmentMatrix = ({
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    // Keep the names already loaded while a wider id set fetches, rather than
+    // dropping every tooltip back to "unknown sender" in the meantime.
+    placeholderData: (previous) => previous,
     enabled: actorIdsForTooltip.length > 0,
   });
 
@@ -636,14 +676,13 @@ export const OptimizedAssignmentMatrix = ({
   const viewProps = {
     isFetching, isInitialLoading,
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
-    dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
+    canExpandBefore, canExpandAfter, onNearEdgeScroll, onVisibleRowsChange: handleVisibleRowsChange,
     dates, technicians, orderedTechnicians,
     fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
     hideStaffingEmailButtons, hideStaffingWhatsappButtons,
-    canNavLeft, canNavRight, handleMobileNav,
-    handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
+    cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
-    getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
+    getJobsForDate, getHeaderCounts, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
     profileNamesMap,
     handleCellSelect, handleCellClick, handleCellPrefetch, handleOptimisticUpdate, incrementCellRender,
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
