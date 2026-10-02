@@ -1,4 +1,4 @@
--- Disposable PR989 review database ONLY. No production credentials or delivery.
+-- Disposable staffing review database ONLY. No production credentials or delivery.
 INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, role)
 VALUES ('cb910000-0000-0000-0000-000000000001', 'rest-tech@test.local', '{}', '{}', 'authenticated', 'authenticated'),
        ('cb910000-0000-0000-0000-000000000002', 'rest-manager@test.local', '{}', '{}', 'authenticated', 'authenticated')
@@ -12,3 +12,84 @@ SELECT code, code, 'management', 'info', false FROM unnest(ARRAY[
   'timesheet.approved'
 ]) AS code
 ON CONFLICT (code) DO NOTHING;
+
+-- Failure/delay injection exists ONLY in this disposable test fixture.
+CREATE TABLE IF NOT EXISTS public.staffing_test_faults (
+  job_id uuid PRIMARY KEY REFERENCES public.jobs(id) ON DELETE CASCADE,
+  fail_date date,
+  fail_assignment boolean NOT NULL DEFAULT false,
+  delay_assignment boolean NOT NULL DEFAULT false,
+  pause_assignment_delete boolean NOT NULL DEFAULT false,
+  pause_timesheet_delete boolean NOT NULL DEFAULT false,
+  pause_job_delete boolean NOT NULL DEFAULT false,
+  pause_profile_delete_id uuid
+);
+ALTER TABLE public.staffing_test_faults ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.staffing_test_faults FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.staffing_test_faults TO service_role;
+CREATE OR REPLACE FUNCTION public.staffing_test_schedule_fault() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = NEW.job_id AND fail_date = NEW.date) THEN
+    RAISE EXCEPTION 'injected schedule failure';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.staffing_test_assignment_delay() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = NEW.job_id AND fail_assignment) THEN
+    RAISE EXCEPTION 'injected assignment failure';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = NEW.job_id AND delay_assignment) THEN
+    PERFORM pg_catalog.pg_sleep(0.3);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS staffing_test_schedule_fault ON public.timesheets;
+CREATE TRIGGER staffing_test_schedule_fault BEFORE INSERT OR UPDATE ON public.timesheets
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_schedule_fault();
+DROP TRIGGER IF EXISTS staffing_test_assignment_delay ON public.job_assignments;
+CREATE TRIGGER staffing_test_assignment_delay BEFORE INSERT OR UPDATE ON public.job_assignments
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_assignment_delay();
+
+-- A separate psql session holds this gate while the real removal RPC acquires
+-- its first row lock. Tests inspect pg_blocking_pids before releasing it.
+CREATE OR REPLACE FUNCTION public.staffing_test_removal_gate() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE
+  v_job_id uuid;
+BEGIN
+  IF TG_TABLE_NAME = 'profiles' THEN
+    IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE pause_profile_delete_id = OLD.id) THEN
+      PERFORM pg_catalog.pg_advisory_xact_lock(198990, 1);
+    END IF;
+    RETURN OLD;
+  END IF;
+  IF TG_TABLE_NAME = 'jobs' THEN v_job_id := OLD.id;
+  ELSE v_job_id := OLD.job_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.staffing_test_faults WHERE job_id = v_job_id
+    AND ((TG_TABLE_NAME = 'job_assignments' AND pause_assignment_delete)
+      OR (TG_TABLE_NAME = 'timesheets' AND pause_timesheet_delete)
+      OR (TG_TABLE_NAME = 'jobs' AND pause_job_delete))) THEN
+    PERFORM pg_catalog.pg_advisory_xact_lock(198990, 1);
+  END IF;
+  RETURN OLD;
+END;
+$$;
+DROP TRIGGER IF EXISTS staffing_test_assignment_removal_gate ON public.job_assignments;
+CREATE TRIGGER staffing_test_assignment_removal_gate BEFORE DELETE ON public.job_assignments
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_removal_gate();
+DROP TRIGGER IF EXISTS staffing_test_timesheet_removal_gate ON public.timesheets;
+CREATE TRIGGER staffing_test_timesheet_removal_gate BEFORE DELETE ON public.timesheets
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_removal_gate();
+DROP TRIGGER IF EXISTS staffing_test_job_removal_gate ON public.jobs;
+CREATE TRIGGER staffing_test_job_removal_gate BEFORE DELETE ON public.jobs
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_removal_gate();
+DROP TRIGGER IF EXISTS staffing_test_profile_removal_gate ON public.profiles;
+CREATE TRIGGER staffing_test_profile_removal_gate BEFORE DELETE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION public.staffing_test_removal_gate();
+NOTIFY pgrst, 'reload schema';

@@ -10,9 +10,9 @@ Preserved outcomes have executable handler checks: availability confirmation nev
 
 Intentional changes: new whole-job solicitations freeze canonical Madrid work dates as existing per-day batch rows; existing confirmed active dates are excluded; accepted dates append without rewriting membership date fields or approved prep data. Added job dates need a new staffing cycle. Pending resends identify the original request and retain its exact pending batch, role and row identities. Supplied credentials must match stored hashes, and query expiry cannot extend stored expiry.
 
-## Independent Astra review and corrections
+## Independent review and corrections
 
-The configured `ocx-gpt-6-astra` reviewer performed read-only adversarial review after the native Astra route exhausted retries. The review corrections have executable regression coverage:
+The reviewer performed read-only adversarial review after the native Astra route exhausted retries. Its requested agent role was `ocx-gpt-6-astra`, but the session execution metadata records `gpt-6.1-sol`, `xhigh` (agent `01a0f955-0a4a-74e3-be60-4188e5211e6f`). The original Astra attribution was incorrect; a requested role does not establish the executed model. The review corrections have executable regression coverage:
 
 - Legacy whole-job resends could leave a second broader active link. Preserve the original row and freeze its existing successful delivery snapshot. If no historical dates exist, the first successful resend freezes current canonical work dates; the original historical span cannot be reconstructed.
 - Matrix resend used a clicked single date for a multi-date pending batch. Carry `resend_request_id` through desktop/mobile and resolve the pending batch on the server.
@@ -26,13 +26,13 @@ The configured `ocx-gpt-6-astra` reviewer performed read-only adversarial review
 
 The initial seven resend regression cases failed against `11e966b3` without these review corrections. The assignment metadata negative control (updating deprecated scope columns) failed four real pgTAP assertions.
 
-Final Astra closure: independently replayed the superseded-resend race (A 409, B 200, one batch hash), reran 28 focused tests, and reported no remaining introduced blockers within this scope. The reviewer did not rerun the mutating real-DB suites; those were independently executed by the orchestrator. This is review evidence, not a zero-risk guarantee.
+Final Sol closure: independently replayed the superseded-resend race (A 409, B 200, one batch hash), reran 28 focused tests, and reported no remaining introduced blockers within this scope. The reviewer did not rerun the mutating real-DB suites; those were independently executed by the orchestrator. This is review evidence, not a zero-risk guarantee.
 
 Fresh CodeRabbit review of `68c7b426` identified three additional valid issues. Assignment metadata now paginates with unique job/technician ordering; a 1,500-pair regression verifies every role and status. Staffing selection verifies confirmed active coverage outside the visible date range before opening a whole-job cycle, and stops on read errors. Legacy unsnapshotted span coverage now iterates Madrid date keys as UTC calendar days; DST and partial-day tests cover the correction. The original helper under `TZ=UTC` reproduced `24,25,25` instead of `24,25,26`; the fixed helper passes in UTC and local Madrid runs. The report date is labelled with both timezones.
 
-Astra's follow-up caught an overnight legacy conflict mismatch after correcting the calendar loop. Conflict detection and timesheet writes now use the same resolved Madrid date list, while membership persistence retains the original `acceptedDates` argument. The failing actual-handler fixture had a job ending at 00:30 Madrid and another booking on that final day; the fix preserves that booking and skips assignment while retaining the confirmed response, as required by the roadmap's response-first contract.
+The Sol follow-up caught an overnight legacy conflict mismatch after correcting the calendar loop. Conflict detection and timesheet writes now use the same resolved Madrid date list, while membership persistence retains the original `acceptedDates` argument. The failing actual-handler fixture had a job ending at 00:30 Madrid and another booking on that final day; the fix preserves that booking and skips assignment while retaining the confirmed response, as required by the roadmap's response-first contract.
 
-Final follow-up closure: Astra independently reran 39 focused tests, confirmed the overnight fix and unchanged membership argument, and found no remaining introduced blockers in that narrow diff.
+Final follow-up closure: Sol independently reran 39 focused tests, confirmed the overnight fix and unchanged membership argument, and found no remaining introduced blockers in that narrow diff.
 
 ## Evidence and its limits
 

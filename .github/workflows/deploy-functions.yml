@@ -1,8 +1,8 @@
 name: Deploy Edge Functions
 
-# Manual-only. Edge Functions are not deployed by merging to main: a deploy is an
-# explicit, human-initiated action, because several functions (create-flex-folders,
-# staffing-orchestrator) have external side effects the moment they go live.
+# This workflow is manual-only. The separate Supabase GitHub integration also
+# deploys on merge when Deploy to production is enabled. Its migration-before-
+# function sequence is outside this workflow; see the PR990 rollout review.
 on:
   workflow_dispatch:
     inputs:
@@ -108,6 +108,13 @@ jobs:
 
           echo "slugs=$resolved" >> "$GITHUB_OUTPUT"
           echo "Resolved: $resolved"
+
+      - name: Verify staffing database prerequisites
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ steps.project.outputs.ref }}
+          SLUGS: ${{ steps.resolve.outputs.slugs }}
+        run: node scripts/ci/check-staffing-deployment.mjs
 
       # verify_jwt is taken from supabase/config.toml by the CLI. Functions with no
       # entry there default to verify_jwt = true; do not pass --no-verify-jwt here,

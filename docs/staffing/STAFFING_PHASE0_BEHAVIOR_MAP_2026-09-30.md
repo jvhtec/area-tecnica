@@ -8,6 +8,8 @@
 
 > This document describes what the staffing and assignment system does at the pinned commit. It is deliberately descriptive, not prescriptive. Historical assignment/staffing audits remain useful context, but they are not authoritative for current behaviour because the workflow has changed materially since they were written.
 
+**Later reviewed deltas:** PR989 restored ranking exclusions and froze date consent; PR990 changes the offer assignment/schedule boundary below. These updates describe the reviewed implementation, not proof of production deployment. The original audit date and snapshot remain above for provenance.
+
 ## 1. Safety boundary
 
 Phase 0 exists to make later work safer.
@@ -240,16 +242,15 @@ Current ordering in `staffing-click`:
 3. activity + best-effort push
 4. resolve role from latest send event
 5. query conflicts using active timesheets
-6. if clean:
-     UPSERT job_assignments(status=confirmed, source=staffing)
-7. UPSERT timesheets for accepted dates
+6. if clean: call assign_staffing_offer
+7. one DB transaction writes membership + all accepted timesheet dates
 8. best-effort assignment push
 9. best-effort Flex add for sound/lights
 10. staffing event: auto_assigned_on_confirm
 11. response page remains successful
 ```
 
-This is **not atomic**.
+**PR990 update (2026-10-02):** membership and accepted timesheets are atomic. The response still commits before that transaction. This deliberately supersedes the original Phase 0 partial-write observation and P0 case 9; see [the Phase 2A review](STAFFING_PHASE2A_ATOMIC_ACCEPTANCE_REVIEW_2026-10-02.md).
 
 Observed reachable outcomes include:
 
@@ -257,8 +258,7 @@ Observed reachable outcomes include:
 | --- | --- | --- | --- | --- |
 | confirmed | confirmed | complete | synced | happy path |
 | confirmed | absent | absent | absent | conflict detected after response, assignment skipped |
-| confirmed | absent | absent | absent | assignment upsert fails |
-| confirmed | confirmed | incomplete/absent | unknown | timesheet upsert fails |
+| confirmed | unchanged | unchanged | absent | assignment or timesheet write fails; internal writes roll back |
 | confirmed | confirmed | complete | unsynced | Flex call fails |
 
 Those are descriptions of current behaviour, not recommendations.
@@ -548,9 +548,9 @@ These are not Phase 0 change requests.
 
 The request is confirmed before conflict checking and assignment. Conflict or assignment failure does not revert it.
 
-### B2. Confirmed assignment can exist without complete timesheets
+### B2. Offer assignment/schedule partial commit — superseded by PR990
 
-Assignment upsert happens before timesheet upsert in the staffing click path.
+PR990 makes membership and accepted-date timesheets one transaction. A failing accepted-date write rolls back both, including changes to existing membership. Direct matrix assignment still has this partial-commit risk (B3); confirmed response without assignment still exists (B1).
 
 ### B3. Direct assignment is multi-write
 
@@ -588,7 +588,15 @@ Both send-time exact-timesheet checking and click-time existing-timesheet lookup
 
 The final replayed `rank_staffing_candidates` definition omits the earlier job-scoped availability and cross-job same-date-decline exclusions. The send-time recommendation guard still enforces them, so the immediate effect is false-positive candidate recommendations rather than an unguarded send.
 
-This is a known regression, not a behavior to preserve. The Phase 1 database suite marks the intended assertions as TODO until a runtime migration restores the filters.
+This was a regression, not a behavior to preserve. PR989 restored the filters in `20261001080000_restore_staffing_candidate_exclusions.sql`; database characterization now asserts them. Click-time query-error handling in B10 remains open.
+
+### B12. Failed accepted offer retains a campaign pipeline slot
+
+`acceptedOffersNotAssigned` counts confirmed, role-attributed offer requests without a non-declined assignment. It contributes to pipeline coverage and reduces new offer capacity. PR990's atomic rollback can now put a timesheet-write failure into this state, where the old partial commit left membership. Failure events do not release the reservation, and an answered link does not retry assignment. Management must reconcile the request and assignment; automatic recovery/alerting is a separate roadmap boundary. See the Phase 2A recovery query.
+
+### B13. Public GET links mutate responses (CARLOS A1)
+
+HEAD is inert, but a valid GET confirm/decline link currently records the response. Email scanners can therefore respond before the technician. Preserve the observed behavior in characterization first; changing to a confirmation page plus POST requires a product decision about the additional interaction. [CARLOS A1](CARLOS_SYSTEM_REVIEW.md) tracks the defect.
 
 ## 13. Current safety net
 
@@ -606,9 +614,7 @@ There is already useful coverage. Relevant tests include:
 
 The current suite is strongest around UI behaviour, conflict helpers, candidate recommendation rules and DB guards.
 
-At this snapshot I did **not** find direct characterization that exercises the complete public offer-click mutation sequence under each partial-failure boundary. Existing Edge Function test files primarily target extracted helpers, while recommendation tests also assert important source/migration contracts.
-
-That gap is the main Phase 1 target.
+PR989/PR990 added actual handler tests against isolated PostgREST and pgTAP tests for offer acceptance, rollback, conflicts, date consent and races. External delivery/authentication are stubbed in those HTTP tests; database caller-role tests run separately. Source assertions remain useful guards but are not behavioral proof. The remaining campaign, direct matrix and cancellation gaps are listed in the tracker below; the full Phase 1 exit gate is not complete.
 
 ## 14. Phase 1 characterization plan
 
@@ -624,7 +630,7 @@ No refactor should begin until these behaviours are executable tests against an 
 6. offer confirm happy path -> confirmed request + confirmed assignment + correct active timesheets;
 7. offer confirm with post-response conflict -> confirmed request + no assignment;
 8. assignment upsert failure after offer confirmation;
-9. timesheet upsert failure after assignment creation;
+9. accepted-date timesheet failure: confirmed response retained, membership and schedule writes rolled back (PR990 intentionally replaces the old partial commit);
 10. Flex failure after successful DB assignment;
 11. batch confirmation updates only matching pending batch rows;
 12. duplicate click does not transition a non-pending request;
@@ -636,6 +642,7 @@ No refactor should begin until these behaviours are executable tests against an 
 18. full removal deletes assignment + timesheets atomically;
 19. technician cannot modify payroll-sensitive assignment columns;
 20. invited assignment currently contributes to campaign filled count.
+21. public link methods (CARLOS A1): characterize today's GET mutation and inert HEAD first; a future confirmation-page/POST change must prove GET/HEAD are inert and a valid POST records one response.
 
 ### P1 — campaign characterization
 
@@ -653,6 +660,26 @@ No refactor should begin until these behaviours are executable tests against an 
 12. auto availability wave respects capacity and deterministic idempotency key;
 13. auto offer handoff respects role capacity;
 14. all roles filled transitions campaign to completed exactly once.
+15. failed accepted offer reserves pipeline capacity; characterize manager recovery before changing reservation or retry policy.
+
+### Coverage tracker (PR990, 2026-10-02)
+
+Keep this tracker current when changing a boundary. **DB-backed** means actual PostgreSQL/PostgREST behavior; **mocked** means an executable handler/hook against a fake data layer; **source/helper** cannot establish a full workflow. Remove or rewrite a source assertion only after a behavioral replacement covers the same contract.
+
+| Cases | Test files | Evidence / remaining work |
+| --- | --- | --- |
+| P0 1–5 | `send-staffing-email/__tests__/preservedMutationContracts.test.ts`, `dateCoverageHandlers.test.ts` | Mocked handler behavior; real external delivery not tested |
+| P0 6–10 | `tests/assignments/staffing-postgrest.integration.test.ts`, `supabase/tests/database/staffing_offer_atomic.sql` | DB-backed handler/SQL behavior; external services stubbed |
+| P0 11–12 | `staffing-postgrest.integration.test.ts`, `preservedMutationContracts.test.ts` | DB-backed batch/CAS races and mocked sequential replay |
+| P0 13 | `src/features/staffing/hooks/__tests__/useStaffing.phase1.test.tsx`, `staffing-phase1-characterization.test.ts` | Mocked hook + source assertion; real cancellation gap |
+| P0 14–17 | `tests/assignments/critical-paths.test.ts`, `staffing-phase1-characterization.test.ts` | Mocked direct-write behavior + source assertions; real dialog persistence gap |
+| P0 18–19 | `supabase/tests/database/staffing_assignment_lifecycle_characterization.sql`, `staffing_rls_characterization.sql`, `staffing_offer_atomic.sql`, `tests/assignments/staffing-removal-locks.integration.test.ts` | DB-backed lifecycle, caller authorization and deletion ordering; not every direct writer |
+| P0 20 | `staffing-phase1-characterization.test.ts` | Source assertion only; invited-count behavioral gap |
+| P0 21 / CARLOS A1 | `staffing-click/index.ts` method guard; `CARLOS_SYSTEM_REVIEW.md` | Observed implementation; GET/POST public-method behavioral gap |
+| P1 1–9, 11–15 | `staffing-phase1-characterization.test.ts`, `staffing-orchestrator/__tests__/*` | Source/helper evidence; real orchestrator tick, role attribution and recovery gaps |
+| P1 10 / B11 | `supabase/tests/database/staffing_candidate_ranking_characterization.sql` | DB-backed ranking exclusions; not a full campaign tick |
+
+Future writer consolidation must inventory every direct matrix, lifecycle and tour writer in section 10 and define their common locking protocol. PR990's pair lock covers only acceptance and the timesheet-removal RPC.
 
 ### Phase 1 exit gate
 
@@ -692,7 +719,7 @@ These are questions, not findings to “fix” during stabilization:
 - Should idempotency represent “request persisted” or “message successfully delivered”?
 - Should Flex synchronization failure affect assignment success?
 - Should conflict-check infrastructure fail closed when its own query fails?
-- Should one transactional command eventually own assignment + timesheet creation?
+- PR990 resolves the transaction question narrowly for accepted offers; direct writers remain a later decision.
 
 Those decisions belong after Phase 1 has made the current behaviour reproducible.
 
