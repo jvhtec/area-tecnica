@@ -636,3 +636,108 @@ export async function getJobFlexEquipmentTargets(jobId: string): Promise<JobFlex
     return dbTargets;
   }
 }
+
+export interface FlexPullsheetTransportLine {
+  description: string;
+  quantity: number;
+  itemBarcode: string | null;
+  itemLengthCm: number | null;
+  itemWidthCm: number | null;
+  itemHeightCm: number | null;
+  noteText: string | null;
+  isVirtual: boolean;
+}
+
+function parseFlexDecimal(value: string | null | undefined): number | null {
+  const normalized = value?.trim().replace(',', '.');
+  if (!normalized || !/^[+-]?\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseFlexBoolean(value: string | null | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
+}
+
+function childText(node: Element, tagName: string): string | null {
+  for (const child of Array.from(node.children)) {
+    if (child.tagName === tagName) {
+      const value = child.textContent?.trim() ?? '';
+      return value.length > 0 ? value : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse the normal equipment-list data producer output used by Flex Pull Sheets.
+ *
+ * The producer's condensed records are intentionally preferred: repeated model
+ * lines have already been aggregated by Flex, while virtual/category rows can
+ * still be discarded deterministically here.
+ */
+export function parseFlexPullsheetTransportXml(xml: string): FlexPullsheetTransportLine[] {
+  const parser = new DOMParser();
+  const document = parser.parseFromString(xml, 'application/xml');
+  if (document.querySelector('parsererror')) {
+    throw new Error('Flex equipment-list producer returned invalid XML');
+  }
+
+  const condensed = [
+    ...Array.from(document.querySelectorAll('report > condensedRecord')),
+    ...Array.from(document.querySelectorAll('report > condensedRecords > record')),
+    ...Array.from(document.querySelectorAll('report > condensedRecords > condensedRecord')),
+  ];
+  const sourceNodes = condensed.length > 0
+    ? condensed
+    : Array.from(document.querySelectorAll('report > record'));
+
+  const rows: FlexPullsheetTransportLine[] = [];
+  for (const node of sourceNodes) {
+    const quantity = parseFlexDecimal(childText(node, 'quantity'));
+    const description = childText(node, 'description') ?? '';
+    if (!quantity || quantity <= 0 || description.length === 0) continue;
+
+    rows.push({
+      description,
+      quantity,
+      itemBarcode: childText(node, 'itemBarcode'),
+      itemLengthCm: parseFlexDecimal(childText(node, 'itemLength')),
+      itemWidthCm: parseFlexDecimal(childText(node, 'itemWidth')),
+      itemHeightCm: parseFlexDecimal(childText(node, 'itemHeight')),
+      noteText: childText(node, 'noteText'),
+      isVirtual: parseFlexBoolean(childText(node, 'isVirtual')),
+    });
+  }
+
+  return rows;
+}
+
+/**
+ * Load the material lines from a Flex Pull Sheet through the read-only
+ * equipment-list data producer. No PRODUCER_MODE is supplied: normal mode is
+ * required because that is what populates condensedRecords.
+ */
+export async function getPullsheetTransportLines(
+  pullsheetElementId: string,
+): Promise<FlexPullsheetTransportLine[]> {
+  const response = await flexApiFetch(
+    `/data-producer/equipment-list/${encodeURIComponent(pullsheetElementId)}`,
+    {
+      method: 'GET',
+      headers: {
+        accept: 'application/xml, text/xml;q=0.9, */*;q=0.1',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load Pull Sheet equipment for truck planning: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return parseFlexPullsheetTransportXml(await response.text())
+    .filter((line) => !line.isVirtual);
+}
