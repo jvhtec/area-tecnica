@@ -1,0 +1,64 @@
+name: Staffing Edge behavior
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  staffing_runtime:
+    name: Real staffing Edge behavior (manual diagnostic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 20
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: 2.107.0
+
+      - name: Cache npm downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Pull reviewed runtime images
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/ci/pull-staffing-images.sh
+
+      - name: Provision, run actual behavior and retire owned resources
+        run: |
+          set -euo pipefail
+          python3 -B scripts/ci/run-staffing-runtime.py \
+            --root "$RUNNER_TEMP/staffing-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --checkout "$GITHUB_WORKSPACE" \
+            --cli "$(realpath "$(command -v supabase)")" \
+            --node "$(realpath "$(command -v node)")" \
+            --base-port 55800
+
+      - name: Retain safe case counts and teardown result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staffing-runtime-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/staffing-runtime-${{ github.run_id }}-${{ github.run_attempt }}/public-result.json
+          if-no-files-found: warn
+          retention-days: 14

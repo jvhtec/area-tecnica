@@ -220,3 +220,9 @@ npm audit                           # 11 dev/build-tree vulns
 > GitHub releases. This is an **environment/network artifact, not a repo defect** —
 > `--ignore-scripts` installs cleanly and all gates pass. CI (with normal network) is
 > unaffected.
+
+> October 3, 2026 update: the `--ignore-scripts` result above is historical.
+> Current installs require the [braces security postinstall](../patches/README.md).
+> Skipping scripts leaves the backport unapplied and governance fails. After a
+> restricted install, explicitly run `node scripts/apply-braces-backport.mjs`
+> and `npm run governance`; verify any other required native tooling separately.
