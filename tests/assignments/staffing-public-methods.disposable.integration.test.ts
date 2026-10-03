@@ -35,7 +35,7 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST)('actual public staffi
     const id = await h.request(jobId, tech.id, 'availability', 'pending', null);
     const bytes = randomBytes(32);
     const token = bytes.toString('base64url');
-    const expiry = '2028-01-01T00:00:00Z';
+    const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     expect((await h.client.from('staffing_requests').update({
       token_hash: createHash('sha256').update(bytes).digest('hex'), token_expires_at: expiry,
     }).eq('id', id)).error).toBeNull();

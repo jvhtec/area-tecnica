@@ -169,7 +169,7 @@ export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'h
     const id = randomUUID();
     expect((await client.from('staffing_requests').insert({ id, job_id: jobId, profile_id: profileId,
       phase, status, role_code: phase === 'offer' ? role : null, target_date: date, single_day: true,
-      token_hash: randomUUID(), token_expires_at: '2028-01-01T00:00:00Z', updated_at: updatedAt })).error).toBeNull();
+      token_hash: randomUUID(), token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), updated_at: updatedAt })).error).toBeNull();
     if (role) expect((await client.from('staffing_events').insert({ staffing_request_id: id,
       event: 'email_sent', meta: { role }, created_at: '2026-10-01T08:00:00Z' })).error).toBeNull();
     return id;
