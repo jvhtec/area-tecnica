@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { expect } from 'vitest';
+import { edgeSnapshot } from './edgeSnapshot';
 
 const database = 'supabase_db_dev-history';
 const localUrl = 'http://127.0.0.1:54441';
-const coreTables = ['jobs', 'staffing_requests', 'job_assignments', 'timesheets', 'profiles', 'activity_log'];
+const coreTables = ['jobs', 'staffing_requests', 'job_assignments', 'timesheets', 'profiles', 'activity_log', 'notification_inbox', 'push_delivery_attempts'];
 // setup.ts replaces global fetch before each unit test. Keep the original
 // transport explicitly for this opt-in integration suite and every SDK client.
 const realFetch = globalThis.fetch;
@@ -15,7 +15,7 @@ function docker(...args: string[]) {
   return execFileSync('docker', args, { encoding: 'utf8', timeout: 15_000 });
 }
 
-export function localCampaignHarness() {
+export function localCampaignHarness(extraHandlers: string[] = []) {
   if (process.env.STAFFING_EDGE_TEST_URL !== localUrl) throw new Error('Only the isolated historical localhost gateway is permitted');
   const anon = process.env.STAFFING_EDGE_TEST_ANON_KEY!;
   const service = process.env.STAFFING_EDGE_TEST_SERVICE_KEY!;
@@ -34,23 +34,24 @@ export function localCampaignHarness() {
   }
   // The local runtime serves a copied snapshot. Refuse stale code instead of
   // claiming tests covered the checkout when only the private copy was run.
-  // Include the separately invoked sender and its complete local import closure
-  // (http also imports cors). Update this list when either handler adds imports.
-  for (const file of ['staffing-orchestrator/index.ts', 'staffing-orchestrator/policyUtils.ts',
-    'staffing-orchestrator/orchestrationUtils.ts', 'staffing-orchestrator/campaignFinalization.ts',
-    '_shared/pushBroadcast.ts', '_shared/structuredLogger.ts',
-    'send-staffing-email/index.ts', 'send-staffing-email/messageUtils.ts',
-    'send-staffing-email/timesheetVerification.ts', 'send-staffing-email/requestDates.ts',
-    'send-staffing-email/resendScope.ts', 'send-staffing-email/persistRequests.ts',
-    '_shared/brevo.ts', '_shared/auth.ts', '_shared/joins.ts',
-    '_shared/corporateEmailTemplate.ts', '_shared/http.ts', '_shared/cors.ts']) {
+  // Include separately invoked handlers and recursively follow their imports.
+  const sources = edgeSnapshot(['staffing-orchestrator/index.ts',
+    'send-staffing-email/index.ts', 'notify-staffing-cancellation/index.ts', 'push/index.ts', ...extraHandlers]);
+  // One Docker invocation avoids 87+ separate Windows process launches. Paths
+  // are arguments, never interpolated shell code; NUL frames are checked.
+  const paths = [...sources.keys()].map(file => `/local/functions/${file}`);
+  const frames = docker('exec', 'supabase_edge_runtime_dev-history', 'sh', '-c',
+    'for file do printf "%s\\000" "$file"; cat "$file" || exit 1; printf "\\000"; done', 'sh', ...paths).split('\0');
+  if (frames.length !== paths.length * 2 + 1 || frames.at(-1) !== '') throw new Error('Invalid local source snapshot framing');
+  for (const [index, [file, expected]] of [...sources].entries()) {
+    if (expected.includes('\0') || frames[index * 2] !== paths[index]) throw new Error('Invalid local source snapshot path');
     const normalize = (text: string) => text.replace(/\r\n/g, '\n').trimEnd();
-    const source = docker('exec', 'supabase_edge_runtime_dev-history', 'cat', `/local/functions/${file}`)
+    const source = frames[index * 2 + 1]
       .replace(/^import '\.\.\/\.\.\/outbound.ts';\r?\n/, '');
-    const expected = readFileSync(new URL(`../../../supabase/functions/${file}`, import.meta.url), 'utf8');
     if (normalize(source) !== normalize(expected)) throw new Error(`Local runtime source is stale: ${file}. Sync its public source before testing.`);
   }
-  const client = createClient(localUrl, service, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: realFetch } });
+  const client = createClient(localUrl, service, { auth: { persistSession: false, autoRefreshToken: false,
+    detectSessionInUrl: false, storageKey: `local-service-${randomUUID()}` }, global: { fetch: realFetch } });
   const jobs = new Set<string>();
   const users = new Set<string>();
   const marker = `[LOCAL CAMPAIGN TEST ${randomUUID()}]`;
@@ -78,10 +79,11 @@ export function localCampaignHarness() {
     expect((await client.from('profiles').update({ role, department, first_name: 'Local', last_name: 'Campaign',
       phone: '+34999000001', default_timesheet_category: 'tecnico',
       waha_endpoint: role === 'management' ? 'https://local-waha.invalid' : null }).eq('id', id)).error).toBeNull();
-    const auth = createClient(localUrl, anon, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: realFetch } });
+    const auth = createClient(localUrl, anon, { auth: { persistSession: false, autoRefreshToken: false,
+      detectSessionInUrl: false, storageKey: `local-user-${id}` }, global: { fetch: realFetch } });
     const signedIn = await auth.auth.signInWithPassword({ email, password });
     expect(signedIn.error).toBeNull();
-    return { id, token: signedIn.data.session!.access_token };
+    return { id, token: signedIn.data.session!.access_token, client: auth };
   }
 
   async function job(quantity = 1) {
@@ -130,6 +132,9 @@ export function localCampaignHarness() {
 
   async function cleanJobs() {
     if (jobs.size) {
+      // Push inbox rows can target historical managers, so user deletion alone
+      // is insufficient. Their attempt rows cascade with the owned inbox items.
+      expect((await client.from('notification_inbox').delete().in('meta->>jobId', [...jobs])).error).toBeNull();
       // Both the random IDs and this run's title must match before removal.
       const result = await client.from('jobs').delete().in('id', [...jobs]).eq('title', marker);
       expect(result.error).toBeNull();

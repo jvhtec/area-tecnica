@@ -671,10 +671,11 @@ Keep this tracker current when changing a boundary. **DB-backed** means actual P
 | P0 1–5 | `send-staffing-email/__tests__/preservedMutationContracts.test.ts`, `dateCoverageHandlers.test.ts` | Mocked handler behavior; real external delivery not tested |
 | P0 6–10 | `tests/assignments/staffing-postgrest.integration.test.ts`, `supabase/tests/database/staffing_offer_atomic.sql` | DB-backed handler/SQL behavior; external services stubbed |
 | P0 11–12 | `staffing-postgrest.integration.test.ts`, `preservedMutationContracts.test.ts` | DB-backed batch/CAS races and mocked sequential replay |
-| P0 13 | `src/features/staffing/hooks/__tests__/useStaffing.phase1.test.tsx`, `staffing-phase1-characterization.test.ts` | Mocked hook + source assertion; real cancellation gap |
-| P0 14–17 | `tests/assignments/critical-paths.test.ts`, `staffing-phase1-characterization.test.ts` | Mocked direct-write behavior + source assertions; real dialog persistence gap |
+| P0 13 | `tests/assignments/staffing-cancellation.local.integration.test.tsx`, `src/features/staffing/hooks/__tests__/useStaffing.phase1.test.tsx` | Eight opt-in real hook/Auth/RLS/Edge cases; phase/status/date/tuple scope, replay, notification channel, cache/event and membership preservation |
+| P0 14–15, 17 | `tests/assignments/matrix-dialog.local.integration.test.tsx`, `tests/assignments/critical-paths.test.ts` | Eight opt-in real dialog/services/Auth/RLS/SQL cases; exact full/single/sparse/add/replace coverage and single/last-date removal |
+| P0 16 | `staffing-phase1-characterization.test.ts`, `critical-paths.test.ts` | Source/mocked partial-commit behavior only; actual dialog failure injection still requires a disposable clone |
 | P0 18–19 | `supabase/tests/database/staffing_assignment_lifecycle_characterization.sql`, `staffing_rls_characterization.sql`, `staffing_offer_atomic.sql`, `tests/assignments/staffing-removal-locks.integration.test.ts` | DB-backed lifecycle, caller authorization and deletion ordering; not every direct writer |
-| P0 20 | `staffing-phase1-characterization.test.ts` | Source assertion only; invited-count behavioral gap |
+| P0 20 | `staffing-campaigns.edge.integration.test.ts` | Opt-in real-runtime invited-without-schedule and declined controls |
 | P0 21 / CARLOS A1 | `staffing-click/index.ts` method guard; `CARLOS_SYSTEM_REVIEW.md` | Observed implementation; GET/POST public-method behavioral gap |
 | P1 1–9, 11–15 | `staffing-phase1-characterization.test.ts`, `staffing-orchestrator/__tests__/*` | Source/helper evidence; real orchestrator tick, role attribution and recovery gaps |
 | P1 10 / B11 | `supabase/tests/database/staffing_candidate_ranking_characterization.sql` | DB-backed ranking exclusions; not a full campaign tick |
@@ -685,7 +686,9 @@ Future writer consolidation must inventory every direct matrix, lifecycle and to
 
 [`staffing-campaigns.edge.integration.test.ts`](../../tests/assignments/staffing-campaigns.edge.integration.test.ts) adds 27 opt-in cases against real local Auth, Edge Runtime and PostgreSQL, with provider delivery captured. It supplies actual behavior for P0.20 and campaign controls, role attribution/handoff, held-lock rejection, stale direct recovery, offer capacity and accepted-unassigned reservations in P1.2–9/11/13/15. Auto creation is tested with availability waves disabled; it does not close P1.1/12's automatic wave behavior. The stale-lock case includes an unlocked positive control and preserves the observed A3 sweeper-selector defect.
 
-See the [reproduction and remaining gaps](STAFFING_CAMPAIGN_CHARACTERIZATION_2026-10-03.md). Ordinary CI runs ten safety/source/cleanup checks but skips the local runtime suite. Initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior, direct matrix persistence and cancellation remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
+Two further suites add eight real cancellation-hook cases and eight real direct-matrix cases, bringing the combined local run to 43 cases. All three compare eight historical tables before/after owned-fixture cleanup, including notification inbox and push attempts. The source gate follows the actual local import closure of every invoked handler. See the [reproduction and remaining gaps](STAFFING_CAMPAIGN_CHARACTERIZATION_2026-10-03.md).
+
+Ordinary CI runs nineteen safety/source/cleanup/observation checks but skips the local runtime suites. Direct matrix failure injection, initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior and public-method coverage remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
 
 ### Phase 1 exit gate
 
