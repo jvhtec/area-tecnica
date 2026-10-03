@@ -28,3 +28,12 @@ export type {
   RemoveAssignmentDateInput,
   RemoveDirectAssignmentInput,
 } from '@/features/assignments/commands/types';
+export {
+  fetchAssignmentConsistencyIssues,
+  fetchAssignmentSideEffectBacklog,
+  retryAssignmentSideEffects,
+} from '@/features/assignments/commands/reconciliation';
+export type {
+  AssignmentConsistencyIssue,
+  AssignmentSideEffectBacklogRow,
+} from '@/features/assignments/commands/reconciliation';

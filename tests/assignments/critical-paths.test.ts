@@ -10,13 +10,11 @@ const {
   useQueryMock,
   checkTimeConflictEnhancedMock,
   toggleTimesheetDayMock,
-  removeTimesheetAssignmentMock,
   syncTimesheetCategoriesMock,
 } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
   checkTimeConflictEnhancedMock: vi.fn(),
   toggleTimesheetDayMock: vi.fn(),
-  removeTimesheetAssignmentMock: vi.fn(),
   syncTimesheetCategoriesMock: vi.fn(),
 }));
 
@@ -51,10 +49,6 @@ vi.mock("@/services/toggleTimesheetDay", () => ({
   toggleTimesheetDay: toggleTimesheetDayMock,
 }));
 
-vi.mock("@/services/removeTimesheetAssignment", () => ({
-  removeTimesheetAssignment: removeTimesheetAssignmentMock,
-}));
-
 vi.mock("@/services/syncTimesheetCategories", () => ({
   syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
@@ -73,13 +67,6 @@ async function getActualToggleTimesheetDay() {
     "@/services/toggleTimesheetDay",
   );
   return actual.toggleTimesheetDay;
-}
-
-async function getActualRemoveTimesheetAssignment() {
-  const actual = await vi.importActual<typeof import("@/services/removeTimesheetAssignment")>(
-    "@/services/removeTimesheetAssignment",
-  );
-  return actual.removeTimesheetAssignment;
 }
 
 async function getActualSyncTimesheetCategories() {
@@ -301,10 +288,6 @@ beforeEach(() => {
 
   checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
   toggleTimesheetDayMock.mockResolvedValue(undefined);
-  removeTimesheetAssignmentMock.mockResolvedValue({
-    deleted_assignment: true,
-    deleted_timesheets: 0,
-  });
   syncTimesheetCategoriesMock.mockResolvedValue(undefined);
 });
 
@@ -374,24 +357,6 @@ describe("Assignments Critical Paths", () => {
         p_date: "2026-12-01",
         p_present: true,
         p_source: "matrix",
-      });
-    });
-
-    it("returns the deleted assignment and timesheet counts from the RPC result", async () => {
-      mockSupabase.rpc.mockResolvedValueOnce({
-        data: [{ deleted_timesheets: 2, deleted_assignment: true }],
-        error: null,
-      });
-
-      const removeTimesheetAssignment = await getActualRemoveTimesheetAssignment();
-      const result = await removeTimesheetAssignment({
-        jobId: "job-1",
-        technicianId: "tech-1",
-      });
-
-      expect(result).toEqual({
-        deleted_timesheets: 2,
-        deleted_assignment: true,
       });
     });
 

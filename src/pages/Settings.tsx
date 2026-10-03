@@ -27,6 +27,7 @@ import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
 import { WahaEndpointSettings } from '@/components/settings/WahaEndpointSettings'
 import { RealtimeDebugPanel } from '@/components/settings/RealtimeDebugPanel'
+import { AssignmentReconciliationPanel } from '@/components/settings/AssignmentReconciliationPanel'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -132,6 +133,7 @@ const Settings = () => {
     'dryhire-folders': false,
     'skill-role-mappings': false,
     'version-info': false,
+    'assignment-reconciliation': false,
   });
 
   return (
@@ -307,6 +309,18 @@ const Settings = () => {
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'dryhire-folders': open }))}
               >
                 <DryHireFolderManager />
+              </CollapsibleCard>
+            )}
+
+            {(userRole === 'admin' || userRole === 'management') && (
+              <CollapsibleCard
+                id="assignment-reconciliation"
+                title="Reconciliación de asignaciones"
+                description="Sincronizaciones con Flex y notificaciones pendientes tras asignar, y diagnóstico de coherencia de asignaciones."
+                isOpen={collapsibleStates['assignment-reconciliation']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'assignment-reconciliation': open }))}
+              >
+                {collapsibleStates['assignment-reconciliation'] && <AssignmentReconciliationPanel />}
               </CollapsibleCard>
             )}
 
