@@ -4,10 +4,10 @@ This increment adds executable evidence for existing campaigns, manager cancella
 
 ## Reproduce
 
-Start the private historical stack described in its local `README.md`, then run from the repository in PowerShell:
+Start the private historical stack described in its local `README.md`, then run from the repository in PowerShell. Replace `<absolute-path-to-your-local-status.env>` with the path to your private local stack's `status.env`:
 
 ```powershell
-./scripts/test-staffing-edge-local.ps1 -CredentialsPath C:/Users/Javi/AppData/Local/AreaTecnica/dev-history/status.env
+./scripts/test-staffing-edge-local.ps1 -CredentialsPath '<absolute-path-to-your-local-status.env>'
 ```
 
 The path contains local demo keys and remains outside Git. The runner restores its process environment afterward and runs the four runtime suites sequentially. `-TestFile` accepts one or more suite paths for a focused reproduction. The suites reject hosted URLs, non-demo credentials, external routing, additional runtime/database/capture networks, stale copies of the invoked handlers, and an unavailable private drain protocol. A TypeScript AST walk follows local imports/re-exports from orchestrator, sender, cancellation notifier and push (87 modules), plus Flex for matrix cases (90). One argument-based, NUL-framed Docker read checks every source path and body. Sixty-eight regular unit tests cover refusal paths, framing, a matching-source positive control, filesystem access under jsdom, cleanup ordering, transport observation, runtime fencing and navigation before/after the fixture month. Three stale-sender cases failed against the original six-module gate and passed after expanding it. The activity-cleanup control failed against the original ordering and passed after moving cleanup before the remaining-job assertion.
@@ -29,10 +29,10 @@ Campaign HTTP calls also track pending requests and latch transport/body-read fa
 
 ## Disposable-clone reproduction and safety
 
-A separate runner exercises partial-write faults and public capability links against a faithful, masked disposable clone:
+A separate runner exercises partial-write faults and public capability links against a faithful, masked disposable clone. Replace the credential placeholder with your local `status.env` path and the manifest placeholder with the path to your owned disposable clone's manifest:
 
 ```powershell
-./scripts/test-staffing-disposable-local.ps1 -CredentialsPath C:/Users/Javi/AppData/Local/AreaTecnica/dev-history/status.env -ManifestPath C:/Users/Javi/AppData/Local/AreaTecnica/dev-history/release-pr990/matrix-fault-clone-state.json
+./scripts/test-staffing-disposable-local.ps1 -CredentialsPath '<absolute-path-to-your-local-status.env>' -ManifestPath '<absolute-path-to-your-owned-disposable-manifest.json>'
 ```
 
 Provisioning and credentials remain private. The manifest describes a separately labelled clone with seven services, five fresh Docker volumes, an internal network and one loopback gateway. Admission checks live ownership, exact networks and mounts, and plain local volume storage without backing options. A label alone is insufficient: local bind-backed or remote-driver volumes are rejected. API and fault SQL use the same frozen target; SQL names the container's local PostgreSQL socket explicitly. Every SQL call receives the current fence guard and rechecks it after Docker inspection, immediately before launching `psql`. A control that exhausts the deadline during inspection refuses SQL and permits retry under a fresh fence; removing that check makes the control fail. The persistent historical harness remains a fixed entry point without fault injection. Both runners use the same source, transport and runtime-fence implementation.
