@@ -20,7 +20,8 @@ class Bootstrap:
         self.plan = json.loads(read_source(self.root / "plan.json"))
         self.identity = self.plan["identity"]
         self.journal = Journal(self.root / "journal.json", self.identity)
-        if self.journal.load()["phase"] != expected_phase:
+        phases = expected_phase if isinstance(expected_phase, tuple) else (expected_phase,)
+        if self.journal.load()["phase"] not in phases:
             raise RuntimeError("Private project phase does not permit this operation")
         self.network = self.plan["network"]
         self.database = self.plan["database"]

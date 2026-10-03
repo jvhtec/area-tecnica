@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent / "staffing_runtime"))
 from bootstrap import Bootstrap
 from plan import prepare
 from migrations import Migrations
+from services import Services
 
 
 def main():
@@ -27,10 +28,18 @@ def main():
     migrate = commands.add_parser("migrate", help="Replay snapshotted migrations on the same isolated empty database, without reset")
     migrate.add_argument("--root", type=Path, required=True)
     migrate.add_argument("--resume-ingress", action="store_true", help="Reconcile only the known terminal pre-SQL Windows bind-alias failure")
+    services = commands.add_parser("services", help="Provision owned local Auth/REST/gateway without fixtures or Edge admission")
+    services.add_argument("--root", type=Path, required=True)
+    check_services = commands.add_parser("verify-services", help="Observe and verify the recorded terminal Auth/REST/gateway launch")
+    check_services.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "prepare":
         plan = prepare(args.root, args.checkout, args.cli, args.node, args.base_port)
         print(json.dumps({"identity": plan["identity"], "phase": "sources-prepared", "migrationFiles": len(plan["migrations"]), "dockerMutations": False}))
+    elif args.command in ("services", "verify-services"):
+        driver = Services(args.root, verify_only=args.command == "verify-services")
+        driver.finish() if args.command == "verify-services" else driver.run()
+        print(json.dumps({"phase": "auth-rest-ready", "fixtureAdmission": False, "edgeProvisioned": False}))
     elif args.command == "migrate":
         Migrations(args.root, resume_ingress=args.resume_ingress).run()
         print(json.dumps({"phase": "isolated-schema-applied", "databaseRecreated": False, "cron": "off"}))
