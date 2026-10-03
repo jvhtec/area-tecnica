@@ -174,9 +174,9 @@ describe('verified braces depth remediation', () => {
     writeFileSync(path, JSON.stringify(lock));
     expect(() => verifiedBracesRemediation(raw, production, root)).toThrow();
   });
-  it('checks newly declared consumers through actual Node resolution', () => {
+  it.each(['dependencies', 'optionalDependencies', 'peerDependencies'])('checks new %s consumers through actual Node resolution', declaration => {
     const { root } = fixture(), original = fixture(false), path = join(root, 'package-lock.json'), lock = JSON.parse(readFileSync(path));
-    lock.packages['node_modules/new-consumer'] = { dev: true, dependencies: { braces: '^3.0.3' } };
+    lock.packages['node_modules/new-consumer'] = { dev: true, [declaration]: { braces: '^3.0.3' } };
     writeFileSync(path, JSON.stringify(lock));
     cpSync(original.directory, join(root, 'node_modules', 'new-consumer', 'node_modules', 'braces'), { recursive: true });
     expect(() => verifiedBracesRemediation(audit(), cleanAudit(), root)).toThrow(/unverified braces copy/);

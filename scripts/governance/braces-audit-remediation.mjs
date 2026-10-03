@@ -22,7 +22,8 @@ export function verifiedBracesRemediation(report, productionReport, root) {
   if (bracePaths.length !== 1 || bracePaths[0] !== 'node_modules/braces' || lock.packages[bracePaths[0]].version !== '3.0.3') {
     throw new Error('Backport remediation refuses additional or unreviewed braces instances');
   }
-  const consumers = Object.entries(lock.packages).filter(([, entry]) => entry.dependencies?.braces);
+  const consumers = Object.entries(lock.packages).filter(([, entry]) =>
+    entry.dependencies?.braces || entry.optionalDependencies?.braces || entry.peerDependencies?.braces);
   if (!consumers.length) throw new Error('Backport remediation requires known braces consumers');
   for (const [path] of consumers) {
     const resolver = createRequire(join(root, path, 'index.js'));
