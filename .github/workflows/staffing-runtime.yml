@@ -1,10 +1,6 @@
 name: Staffing Edge behavior
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +9,7 @@ permissions:
 
 jobs:
   staffing_runtime:
-    name: Real staffing Edge behavior
+    name: Real staffing Edge behavior (manual diagnostic)
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
