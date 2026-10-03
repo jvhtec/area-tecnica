@@ -598,6 +598,20 @@ This was a regression, not a behavior to preserve. PR989 restored the filters in
 
 HEAD is inert, but a valid GET confirm/decline link currently records the response. Email scanners can therefore respond before the technician. Preserve the observed behavior in characterization first; changing to a confirmation page plus POST requires a product decision about the additional interaction. [CARLOS A1](CARLOS_SYSTEM_REVIEW.md) tracks the defect.
 
+### B14. Cancelling an accepted offer preserves crew and schedules
+
+The real cancellation-hook case leaves the existing confirmed assignment and timesheets unchanged while expiring the confirmed offer request. Cancelling the request therefore does not remove the technician from the job. **Product question:** should cancellation only withdraw the request, or should management explicitly choose a separate crew-removal action? Preserve the current separation until that decision is made.
+
+### B15. Cancellation replay sends another notice
+
+A repeated cancellation returns hook success with zero changed rows and sends another successful cancellation notice. The real-runtime case records two `email_cancel_notice_sent` events for the same request. **Product question:** should replay be silent, or should resending require an explicit action and delivery idempotency rule?
+
+### B16. Missing cancellation tuple reports hook success
+
+Cancelling a job/profile/phase tuple with no request returns hook success with zero changed rows, while the notification handler returns `404 / No staffing request found to notify`. **Product question:** should an absent tuple be an acknowledged no-op, or should management see that there was no request to cancel? Decide the UI and notification outcome together; zero-row success alone also does not establish caller authorization.
+
+These three outcomes are characterized in `tests/assignments/staffing-cancellation.local.integration.test.tsx`, with the actual hook, Auth, RLS and notification handler. Their runtime cases remain opt-in local evidence; ordinary CI does not execute them.
+
 ## 13. Current safety net
 
 There is already useful coverage. Relevant tests include:
@@ -662,24 +676,26 @@ No refactor should begin until these behaviours are executable tests against an 
 14. all roles filled transitions campaign to completed exactly once.
 15. failed accepted offer reserves pipeline capacity; characterize manager recovery before changing reservation or retry policy.
 
-### Coverage tracker (PR990, 2026-10-02)
+### Coverage tracker (PR990 / PR992, updated 2026-10-03)
 
-Keep this tracker current when changing a boundary. **DB-backed** means actual PostgreSQL/PostgREST behavior; **mocked** means an executable handler/hook against a fake data layer; **source/helper** cannot establish a full workflow. Remove or rewrite a source assertion only after a behavioral replacement covers the same contract.
+Keep this tracker current when changing a boundary. **DB-backed** means actual PostgreSQL/PostgREST behavior; **mocked** means an executable handler/hook against a fake data layer; **source/helper** cannot establish a full workflow. Remove or rewrite a source assertion only after a behavioral replacement covers the same contract **and runs in CI**. An opt-in local replacement alone does not protect subsequent PRs.
 
-| Cases | Test files | Evidence / remaining work |
-| --- | --- | --- |
-| P0 1–5 | `send-staffing-email/__tests__/preservedMutationContracts.test.ts`, `dateCoverageHandlers.test.ts` | Mocked handler behavior; real external delivery not tested |
-| P0 6–10 | `tests/assignments/staffing-postgrest.integration.test.ts`, `supabase/tests/database/staffing_offer_atomic.sql` | DB-backed handler/SQL behavior; external services stubbed |
-| P0 11–12 | `staffing-postgrest.integration.test.ts`, `preservedMutationContracts.test.ts` | DB-backed batch/CAS races and mocked sequential replay |
-| P0 13 | `tests/assignments/staffing-cancellation.local.integration.test.tsx`, `src/features/staffing/hooks/__tests__/useStaffing.phase1.test.tsx` | Eight opt-in real hook/Auth/RLS/Edge cases; phase/status/date/tuple scope, replay, notification channel, cache/event and membership preservation |
-| P0 14–15, 17 | `tests/assignments/matrix-dialog.local.integration.test.tsx`, `tests/assignments/critical-paths.test.ts` | Eight opt-in real dialog/services/Auth/RLS/SQL cases; exact full/single/sparse/add/replace coverage and single/last-date removal |
-| P0 16 | `tests/assignments/matrix-failure.disposable.integration.test.tsx` | Three opt-in real dialog/Auth/RLS/RPC cases on a labelled disposable clone: success, partial write with retained dialog/no success effects, exact technician denial |
-| P0 18–19 | `supabase/tests/database/staffing_assignment_lifecycle_characterization.sql`, `staffing_rls_characterization.sql`, `staffing_offer_atomic.sql`, `tests/assignments/staffing-removal-locks.integration.test.ts` | DB-backed lifecycle, caller authorization and deletion ordering; not every direct writer |
-| P0 20 | `staffing-campaigns.edge.integration.test.ts` | Opt-in real-runtime invited-without-schedule and declined controls |
-| P0 21 / CARLOS A1 | `tests/assignments/staffing-public-methods.disposable.integration.test.ts` | Fifteen real availability capability-link cases: legacy/path HEAD, GET/POST URL response/replay, invalid/expired tokens and ignored POST body. Offer/browser-navigation coverage and A1 product fix remain pending |
-| P1 1–9, 11–13, 15 | `staffing-phase1-characterization.test.ts`, `staffing-orchestrator/__tests__/*` | Source/helper evidence supplemented by the historical local campaign cases below; automatic waves and initial CAS contention remain gaps |
-| P1 14 | `tests/assignments/staffing-completion.disposable.integration.test.ts` | Two real-runtime completion cases: exact push dispatch/200 persistence, 503 observed by the caller best effort, cleared lock/no next run and inert replay; twelve-table clone/history restoration |
-| P1 10 / B11 | `supabase/tests/database/staffing_candidate_ranking_characterization.sql` | DB-backed ranking exclusions; not a full campaign tick |
+| Cases | Test files | Evidence / remaining work | Runs in CI |
+| --- | --- | --- | --- |
+| P0 1–5 | `send-staffing-email/__tests__/preservedMutationContracts.test.ts`, `dateCoverageHandlers.test.ts` | Mocked handler behavior; real external delivery not tested | Yes, mocked handlers |
+| P0 6–10 | `tests/assignments/staffing-postgrest.integration.test.ts`, `supabase/tests/database/staffing_offer_atomic.sql` | DB-backed handler/SQL behavior; external services stubbed | Yes, PostgREST and pgTAP |
+| P0 11–12 | `staffing-postgrest.integration.test.ts`, `preservedMutationContracts.test.ts` | DB-backed batch/CAS races and mocked sequential replay | Yes, PostgREST and mocked handlers |
+| P0 13 | `tests/assignments/staffing-cancellation.local.integration.test.tsx`, `src/features/staffing/hooks/__tests__/useStaffing.phase1.test.tsx` | Eight opt-in real hook/Auth/RLS/Edge cases; phase/status/date/tuple scope, replay, notification channel, cache/event and membership preservation | Mocked hook only; eight runtime cases skipped |
+| P0 14–15, 17 | `tests/assignments/matrix-dialog.local.integration.test.tsx`, `tests/assignments/critical-paths.test.ts` | Eight opt-in real dialog/services/Auth/RLS/SQL cases; exact full/single/sparse/add/replace coverage and single/last-date removal | Mocked components only; eight runtime cases skipped |
+| P0 16 | `tests/assignments/matrix-failure.disposable.integration.test.tsx` | Three opt-in real dialog/Auth/RLS/RPC cases on a labelled disposable clone: success, partial write with retained dialog/no success effects, exact technician denial | No, three runtime cases skipped |
+| P0 18–19 | `supabase/tests/database/staffing_assignment_lifecycle_characterization.sql`, `staffing_rls_characterization.sql`, `staffing_offer_atomic.sql`, `tests/assignments/staffing-removal-locks.integration.test.ts` | DB-backed lifecycle, caller authorization and deletion ordering; not every direct writer | Yes, pgTAP and PostgREST |
+| P0 20 | `staffing-campaigns.edge.integration.test.ts` | Opt-in real-runtime invited-without-schedule and declined controls | Source/helper checks only; runtime cases skipped |
+| P0 21 / CARLOS A1 | `tests/assignments/staffing-public-methods.disposable.integration.test.ts` | Fifteen real availability capability-link cases: legacy/path HEAD, GET/POST URL response/replay, invalid/expired tokens and ignored POST body. Offer/browser-navigation coverage and A1 product fix remain pending | No, fifteen runtime cases skipped |
+| P1 1–9, 11–13, 15 | `staffing-phase1-characterization.test.ts`, `staffing-orchestrator/__tests__/*` | Source/helper evidence supplemented by the historical local campaign cases below; automatic waves and initial CAS contention remain gaps | Source/helper checks only; 27 campaign runtime cases skipped |
+| P1 14 | `tests/assignments/staffing-completion.disposable.integration.test.ts` | Two real-runtime completion cases: exact push dispatch/200 persistence, 503 observed by the caller best effort, cleared lock/no next run and inert replay; twelve-table clone/history restoration | No, two runtime cases skipped |
+| P1 10 / B11 | `supabase/tests/database/staffing_candidate_ranking_characterization.sql` | DB-backed ranking exclusions; not a full campaign tick | Yes, pgTAP |
+
+The CI-backed database evidence comes from `.github/workflows/tests.yml`'s `rls_rpc_security_tests` job: it applies migrations, runs pgTAP and invokes `scripts/ci/test-staffing-postgrest.sh` for the HTTP acceptance/removal cases. It does not currently provision the private Auth/Edge/capture protocol needed by the 65 local runtime cases. The two local cleanup-fence cases account for the remaining runtime cases outside the product rows above.
 
 Future writer consolidation must inventory every direct matrix, lifecycle and tour writer in section 10 and define their common locking protocol. PR990's pair lock covers only acceptance and the timesheet-removal RPC.
 
