@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent / "staffing_runtime"))
 from bootstrap import Bootstrap
 from plan import prepare
+from migrations import Migrations
 
 
 def main():
@@ -23,10 +24,16 @@ def main():
     bootstrap.add_argument("--root", type=Path, required=True)
     verify = commands.add_parser("verify-bootstrap", help="Observe recorded terminal bootstrap resources without relaunching")
     verify.add_argument("--root", type=Path, required=True)
+    migrate = commands.add_parser("migrate", help="Replay snapshotted migrations on the same isolated empty database, without reset")
+    migrate.add_argument("--root", type=Path, required=True)
+    migrate.add_argument("--resume-ingress", action="store_true", help="Reconcile only the known terminal pre-SQL Windows bind-alias failure")
     args = parser.parse_args()
     if args.command == "prepare":
         plan = prepare(args.root, args.checkout, args.cli, args.node, args.base_port)
         print(json.dumps({"identity": plan["identity"], "phase": "sources-prepared", "migrationFiles": len(plan["migrations"]), "dockerMutations": False}))
+    elif args.command == "migrate":
+        Migrations(args.root, resume_ingress=args.resume_ingress).run()
+        print(json.dumps({"phase": "isolated-schema-applied", "databaseRecreated": False, "cron": "off"}))
     else:
         driver = Bootstrap(args.root)
         if args.command == "verify-bootstrap":

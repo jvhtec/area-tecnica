@@ -15,13 +15,13 @@ from plan import CLI_VERSION, EXCLUDES, private_write, read_source
 
 
 class Bootstrap:
-    def __init__(self, root):
+    def __init__(self, root, expected_phase="sources-prepared", allow_migrations=False):
         self.root = Path(root)
         self.plan = json.loads(read_source(self.root / "plan.json"))
         self.identity = self.plan["identity"]
         self.journal = Journal(self.root / "journal.json", self.identity)
-        if self.journal.load()["phase"] != "sources-prepared":
-            raise RuntimeError("Only a freshly prepared project may bootstrap")
+        if self.journal.load()["phase"] != expected_phase:
+            raise RuntimeError("Private project phase does not permit this operation")
         self.network = self.plan["network"]
         self.database = self.plan["database"]
         if self.network != "supabase_network_" + self.identity or self.database != "supabase_db_" + self.identity:
@@ -39,7 +39,7 @@ class Bootstrap:
                 raise ValueError("Unexpected service metadata")
             if hashlib.sha256(read_source(project / "supabase" / ".temp" / name)).hexdigest() != digest:
                 raise ValueError("Service metadata changed")
-        if (project / "supabase" / "migrations").exists() or (project / "supabase" / ".temp" / "project-ref").exists():
+        if (not allow_migrations and (project / "supabase" / "migrations").exists()) or (project / "supabase" / ".temp" / "project-ref").exists():
             raise ValueError("Bootstrap must have no application migrations or remote link")
 
     def docker(self, *args, timeout=30):
@@ -55,6 +55,14 @@ class Bootstrap:
         if not isinstance(value, list) or len(value) != 1:
             raise ValueError("Ambiguous Docker observation")
         return value[0]
+
+    def docker_logs(self, cid):
+        # Docker preserves stderr streams from a container. Read both channels
+        # privately when classifying a known terminal failure.
+        result = subprocess.run(["docker", "logs", cid], capture_output=True, timeout=15)
+        if result.returncode:
+            raise RuntimeError("Container diagnostic observation failed")
+        return result.stdout + result.stderr
 
     def mutate(self, operation, kind, name, args, observe):
         operation_id = self.journal.begin(operation, {"kind": kind, "name": name})
@@ -75,7 +83,7 @@ class Bootstrap:
             if output:
                 raise RuntimeError("Existing bootstrap resource or ambiguous name; refusing reuse")
 
-    def verify_db(self, cid, internal):
+    def verify_db(self, cid, internal, members=None):
         db = self.observe("container", cid)
         if db["Id"] != cid or db["Name"] != "/" + self.database or not db["State"]["Running"] or db["Config"]["Labels"].get("com.supabase.cli.project") != self.identity:
             raise ValueError("Database identity failed")
@@ -83,7 +91,7 @@ class Bootstrap:
         if db["Image"] != expected_image:
             raise ValueError("Database image version mismatch")
         net = self.observe("network", self.network)
-        if net["Internal"] != internal or net["Labels"].get("com.supabase.cli.project") != self.identity or set(net["Containers"]) != {cid}:
+        if net["Internal"] != internal or net["Labels"].get("com.supabase.cli.project") != self.identity or set(net["Containers"]) != (members if members is not None else {cid}):
             raise ValueError("Bootstrap network ownership or membership failed")
         if set(db["NetworkSettings"]["Networks"]) != {self.network} or db["NetworkSettings"]["Networks"][self.network]["NetworkID"] != net["Id"]:
             raise ValueError("Database routing failed")
@@ -98,6 +106,22 @@ class Bootstrap:
             raise ValueError("Database volume backing failed")
         return db, net
 
+    def recorded_id(self, operation):
+        ledger = self.journal.load()
+        self.journal._clear(ledger)
+        entries = [entry for entry in ledger["operations"] if entry["operation"] == operation and entry["state"] == "succeeded"]
+        if len(entries) != 1:
+            raise RuntimeError("Expected one recorded resource operation")
+        return entries[0]["observation"]["id"]
+
+    def cli_environment(self):
+        environment = os.environ.copy()
+        for key in list(environment):
+            if key.startswith("SUPABASE_") or key.startswith("PG"):
+                del environment[key]
+        environment["SUPABASE_INTERNAL_IMAGE_REGISTRY"] = "public.ecr.aws"
+        return environment
+
     def sql(self, cid, query):
         return self.docker("exec", cid, "psql", "-h", "/var/run/postgresql", "-XqAt", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres", "-c", query)
 
@@ -111,14 +135,9 @@ class Bootstrap:
                     lambda _: {"id": self.observe("network", self.network)["Id"], "internal": False})
         operation_id = self.journal.begin("bootstrap-empty-database", {"kind": "container", "name": self.database})
         try:
-            environment = os.environ.copy()
-            for key in list(environment):
-                if key.startswith("SUPABASE_") or key.startswith("PG"):
-                    del environment[key]
-            environment["SUPABASE_INTERNAL_IMAGE_REGISTRY"] = "public.ecr.aws"
             with (self.root / "database-bootstrap.log").open("xb") as log:
                 result = subprocess.run([str(self.cli), "--workdir", self.plan["project"], "start", "-x", EXCLUDES],
-                                        env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=180)
+                                        env=self.cli_environment(), stdout=log, stderr=subprocess.STDOUT, timeout=180)
             if result.returncode:
                 raise RuntimeError("Empty database bootstrap failed; inspect existing journal before recovery")
             cid = self.observe("container", self.database)["Id"]
