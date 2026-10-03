@@ -148,7 +148,8 @@ REVOKE ALL ON FUNCTION public.get_assignment_command_metrics(timestamptz) FROM P
 GRANT EXECUTE ON FUNCTION public.get_assignment_command_metrics(timestamptz) TO authenticated, service_role;
 
 -- Read-only membership/schedule consistency diagnostics over jobs that end on
--- or after p_from (default: 30 days ago). Deliberately no repair action: an
+-- or after p_from (default: 30 days ago), excluding dry-hire jobs (no crew).
+-- Deliberately no repair action: an
 -- explicit repair command is added only if production evidence shows a need.
 CREATE FUNCTION public.get_assignment_consistency_issues(
   p_from date DEFAULT NULL,
@@ -173,7 +174,8 @@ BEGIN
   END IF;
   RETURN QUERY
   WITH scoped_jobs AS (
-    SELECT j.id, j.job_type FROM public.jobs j WHERE j.end_time >= v_from
+    -- Dry-hire jobs carry no crew and are outside these checks entirely.
+    SELECT j.id FROM public.jobs j WHERE j.end_time >= v_from AND j.job_type <> 'dryhire'
   ),
   active AS (
     SELECT t.job_id, t.technician_id, pg_catalog.array_agg(t.date ORDER BY t.date) AS dates
@@ -182,13 +184,13 @@ BEGIN
     GROUP BY t.job_id, t.technician_id
   ),
   issues AS (
-    -- Membership that schedules nobody (dry hires are assignment-only).
+    -- Membership that schedules nobody.
     SELECT 'membership_without_schedule'::text AS issue, a.job_id, a.technician_id,
            pg_catalog.jsonb_build_object('status', a.status, 'assignment_source', a.assignment_source) AS details
     FROM public.job_assignments a
     JOIN scoped_jobs sj ON sj.id = a.job_id
     LEFT JOIN active s ON s.job_id = a.job_id AND s.technician_id = a.technician_id
-    WHERE s.job_id IS NULL AND sj.job_type <> 'dryhire'
+    WHERE s.job_id IS NULL
       AND a.status IS DISTINCT FROM 'declined'
     UNION ALL
     -- Active schedule without membership.

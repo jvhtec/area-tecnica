@@ -53,12 +53,19 @@ surface (`tests/assignments/matrix-direct-write-guard.test.ts` enforces it).
 | `conflict` | Active schedule on another job on a newly added day (checked under the technician lock). `details.conflicts` has the `check_technician_conflicts` shape | Existing conflict warning; "Forzar" resends with `p_conflict_policy = 'allow'` (recorded as `conflict_override`) |
 | `last_date` | Date removal of the last day | Matrix falls back to whole removal using the returned token |
 | `assignment_not_found` | Role/status change on a pair without membership | Toast |
+| `dryhire_job` | Dry-hire jobs have no crew by definition | Toast |
 | `job_not_found`, `technician_not_found`, `role_department_mismatch`, `invalid_job_span` | Entity/role validation | Toast |
 
 Malformed calls raise `22023`; unauthorized calls raise `42501`. Anything
 after the first write raises and rolls the whole command back.
 
 ## 2. Invariants the commands guarantee
+
+**Dry hire is out of scope everywhere.** Dry-hire jobs have no crew by
+definition: the commands refuse them (`dryhire_job`), their schedule rows are
+never a conflict for other jobs (commands and offer acceptance), and the
+consistency diagnostics skip them. Removal commands still accept a dry-hire
+pair so legacy rows can be cleaned up.
 
 - One membership per job/technician; membership and the requested active
   schedule commit together or not at all (including category sync).
@@ -83,9 +90,13 @@ after the first write raises and rolls the whole command back.
 4. `job_assignments` rows `FOR UPDATE` (sorted by job id);
 5. technician profile `FOR KEY SHARE NOWAIT`, then timesheet rows in date order.
 
-`assign_staffing_offer`, `remove_assignment_with_timesheets` and (since this
-change) `toggle_timesheet_day` start at step 2 and never take step 1 after
-it, so no cycle exists. `manage_assignment_lifecycle` locks membership with
+`assign_staffing_offer` takes step 1 too (since `20261003214000`): offer
+acceptance re-checks cross-job conflicts under the technician key and raises
+`P0409 assignment_conflict` before any write, which `staffing-click` records
+as `auto_assign_skipped_conflict` — the same outcome as its own pre-check, so
+an acceptance and a direct booking on another job for the same day can never
+both commit. `remove_assignment_with_timesheets` and `toggle_timesheet_day`
+start at step 2 and never take step 1 after it, so no cycle exists. `manage_assignment_lifecycle` locks membership with
 `NOWAIT` and fails fast (`assignment_locked`) instead of waiting.
 
 ## 4. Idempotency and stale writes
@@ -146,7 +157,7 @@ schedule for a job/technician pair now goes through a command:
 | Job card: whole removal | `JobAssignmentDialog` → `useJobAssignmentsRealtime.removeAssignment` → `remove_direct_assignment` | **Converged** |
 | Job card: role change | `JobAssignmentDialog` → `change_assignment_role` | **Converged** |
 | Department mobile add | `MobileAssignmentsDialog` → `useJobAssignmentsRealtime.addAssignment` → `apply_direct_assignment` (add mode; membership **and** days) | **Converged** |
-| Offer acceptance | `staffing-click` → `assign_staffing_offer` | Same lock contract (step 2+); Carlos deferred per roadmap §10 |
+| Offer acceptance | `staffing-click` → `assign_staffing_offer` | Same lock contract including the technician key; cross-job conflicts enforced under it (`P0409`). Campaign UX deferred per roadmap §10 |
 | Day toggle RPC | `toggle_timesheet_day` | Takes the pair key; no app caller left |
 
 `tests/assignments/matrix-direct-write-guard.test.ts` pins every converged
@@ -166,11 +177,12 @@ Outside assignment state (deliberately not commands):
 
 ## 8. Rollout
 
-1. `supabase db push --dry-run` against linked production; check the four
+1. `supabase db push --dry-run` against linked production; check the five
    migrations (`20261003210000`, `20261003211000`, `20261003212000`,
-   `20261003213000`), their grants and the new table.
-2. Apply migrations, then deploy the client. The old client keeps working
-   (existing RPCs keep their signatures and results).
+   `20261003213000`, `20261003214000`), their grants and the new table.
+2. Deploy `staffing-click` first (it handles `P0409`; the old database never
+   raises it), then apply the migrations, then deploy the client. The old
+   client keeps working (existing RPCs keep their signatures and results).
 3. Verify with `get_assignment_command_metrics()` and
    `get_assignment_consistency_issues()`; watch the reconciliation backlog.
 4. Run the PR #992 synthetic runtime as the controlled preflight
@@ -180,11 +192,13 @@ Outside assignment state (deliberately not commands):
 ## 9. Tests
 
 - pgTAP: `direct_assignment_command.sql`, `assignment_removal_commands.sql`,
-  `assignment_command_reconciliation.sql`, `assignment_role_status_commands.sql`.
+  `assignment_command_reconciliation.sql`, `assignment_role_status_commands.sql`,
+  `staffing_offer_conflict_under_lock.sql`.
 - Real concurrency (two psql backends, CI `rls_rpc_security_tests` job):
   `tests/assignments/direct-assignment-commands.integration.test.ts` — stale
   managers, same-day cross-job race, concurrent retry, offer acceptance, move
-  vs removal, confirmation vs same-day booking. Run locally with
+  vs removal, confirmation vs same-day booking, offer acceptance vs a direct
+  booking elsewhere on the same day. Run locally with
   `STAFFING_TEST_DB_CONTAINER=<container> ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL=<container>`.
 - Unit/component: `src/features/assignments/commands/__tests__`,
   `AssignJobDialog.test.tsx`, `useMatrixCellAssignmentRemoval.phase1.test.tsx`,

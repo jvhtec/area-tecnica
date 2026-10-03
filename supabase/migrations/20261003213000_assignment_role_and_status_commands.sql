@@ -54,6 +54,7 @@ DECLARE
   v_role text := NULLIF(NULLIF(pg_catalog.btrim(p_role), ''), 'none');
   v_source text := COALESCE(NULLIF(pg_catalog.btrim(p_source), ''), 'job-card');
   v_prefix text;
+  v_job_type text;
   v_request jsonb;
   v_hash text;
   v_ledger public.assignment_commands%ROWTYPE;
@@ -106,11 +107,15 @@ BEGIN
       DETAIL = 'This command id was already used for a different assignment command.';
   END IF;
 
-  PERFORM 1 FROM public.jobs WHERE id = p_job_id FOR KEY SHARE;
+  SELECT job_type INTO v_job_type FROM public.jobs WHERE id = p_job_id FOR KEY SHARE;
   SELECT * INTO v_existing FROM public.job_assignments
   WHERE job_id = p_job_id AND technician_id = p_technician_id FOR UPDATE;
   v_prior := public.assignment_state_snapshot(p_job_id, p_technician_id);
 
+  IF v_job_type = 'dryhire' THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+      v_actor, v_source, v_request, v_hash, 'dryhire_job', 'Dry-hire jobs have no crew', NULL, v_prior->>'state_token');
+  END IF;
   IF v_existing.id IS NULL THEN
     RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
       v_actor, v_source, v_request, v_hash, 'assignment_not_found',
@@ -253,6 +258,7 @@ DECLARE
   v_prior jsonb;
   v_after jsonb;
   v_delete_mode text;
+  v_job_type text;
   v_lifecycle jsonb;
   v_outcome text;
   v_side_effects jsonb := '[]'::jsonb;
@@ -294,11 +300,15 @@ BEGIN
       DETAIL = 'This command id was already used for a different assignment command.';
   END IF;
 
-  PERFORM 1 FROM public.jobs WHERE id = p_job_id FOR KEY SHARE;
+  SELECT job_type INTO v_job_type FROM public.jobs WHERE id = p_job_id FOR KEY SHARE;
   SELECT * INTO v_existing FROM public.job_assignments
   WHERE job_id = p_job_id AND technician_id = p_technician_id FOR UPDATE;
   v_prior := public.assignment_state_snapshot(p_job_id, p_technician_id);
 
+  IF v_job_type = 'dryhire' THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+      v_actor, v_source, v_request, v_hash, 'dryhire_job', 'Dry-hire jobs have no crew', NULL, v_prior->>'state_token');
+  END IF;
   IF v_existing.id IS NULL THEN
     RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
       v_actor, v_source, v_request, v_hash, 'assignment_not_found',

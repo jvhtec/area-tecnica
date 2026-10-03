@@ -26,7 +26,10 @@ ON CONFLICT (code) DO NOTHING;
 INSERT INTO jobs (id, title, start_time, end_time, job_type, status) VALUES
   ('de210000-0000-0000-0000-000000000001', 'Role job', '2026-12-07 08:00:00+01', '2026-12-08 20:00:00+01', 'single', 'Confirmado'),
   ('de210000-0000-0000-0000-000000000002', 'Clash job', '2026-12-07 08:00:00+01', '2026-12-07 20:00:00+01', 'single', 'Confirmado'),
-  ('de210000-0000-0000-0000-000000000003', 'Tour job', '2026-12-14 08:00:00+01', '2026-12-14 20:00:00+01', 'single', 'Confirmado');
+  ('de210000-0000-0000-0000-000000000003', 'Tour job', '2026-12-14 08:00:00+01', '2026-12-14 20:00:00+01', 'single', 'Confirmado'),
+  ('de210000-0000-0000-0000-000000000004', 'Dryhire job', '2026-12-14 08:00:00+01', '2026-12-14 20:00:00+01', 'dryhire', 'Confirmado');
+INSERT INTO job_assignments (job_id, technician_id, status) VALUES
+  ('de210000-0000-0000-0000-000000000004', 'de110000-0000-0000-0000-000000000002', 'invited');
 
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claim.sub', 'de110000-0000-0000-0000-000000000002', true);
@@ -128,6 +131,12 @@ SELECT ok((SELECT value->'assignment' = 'null'::jsonb AND value->'lifecycle'->>'
 INSERT INTO results SELECT 'decline_missing', public.set_assignment_status('de310000-0000-0000-0000-000000000014', 'de210000-0000-0000-0000-000000000003',
   'de110000-0000-0000-0000-000000000002', 'decline');
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'decline_missing'), 'assignment_not_found', 'status change needs a membership');
+INSERT INTO results SELECT 'dryhire_status', public.set_assignment_status('de310000-0000-0000-0000-000000000015', 'de210000-0000-0000-0000-000000000004',
+  'de110000-0000-0000-0000-000000000002', 'confirm');
+INSERT INTO results SELECT 'dryhire_role', public.change_assignment_role('de310000-0000-0000-0000-000000000016', 'de210000-0000-0000-0000-000000000004',
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R');
+SELECT ok((SELECT bool_and(value->>'code' = 'dryhire_job') FROM results WHERE name IN ('dryhire_status', 'dryhire_role')),
+  'dry-hire jobs are excluded from status and role commands');
 RESET ROLE;
 
 SELECT * FROM finish();

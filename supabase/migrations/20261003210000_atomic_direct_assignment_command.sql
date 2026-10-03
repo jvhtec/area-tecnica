@@ -448,6 +448,12 @@ BEGIN
       v_actor, v_source, v_request, v_hash, 'job_not_found', 'The job no longer exists', NULL, NULL);
   END IF;
 
+  -- Dry-hire jobs have no crew by definition: never a direct-assignment target.
+  IF v_job_type = 'dryhire' THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
+      v_actor, v_source, v_request, v_hash, 'dryhire_job', 'Dry-hire jobs have no crew', NULL, NULL);
+  END IF;
+
   SELECT department INTO v_department FROM public.profiles WHERE id = p_technician_id;
   IF NOT FOUND THEN
     RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
@@ -523,8 +529,9 @@ BEGIN
 
   -- Conflicts are enforced here, under the technician lock, against the dates
   -- this command newly schedules. The job being moved away from is not a
-  -- conflict: it is removed in this same transaction. Hard = another active
-  -- schedule whose membership is not merely invited; soft = invited.
+  -- conflict: it is removed in this same transaction, and dry-hire jobs carry
+  -- no crew. Hard = another active schedule whose membership is not merely
+  -- invited; soft = invited.
   WITH clashes AS (
     SELECT j.id, j.title, j.start_time, j.end_time, ts.date,
            CASE WHEN ja.status = 'invited' THEN 'pending' ELSE 'confirmed' END AS kind
@@ -536,6 +543,7 @@ BEGIN
       AND ts.is_active
       AND ts.job_id <> p_job_id
       AND ts.job_id IS DISTINCT FROM p_from_job_id
+      AND j.job_type <> 'dryhire'
       AND ts.date = ANY (v_to_add)
   ),
   per_job AS (
@@ -686,7 +694,7 @@ BEGIN
     END IF;
 
     INSERT INTO public.timesheets (job_id, technician_id, date, created_by, is_schedule_only, source, is_active)
-    SELECT p_job_id, p_technician_id, d, v_actor, v_job_type IN ('dryhire', 'tourdate'), v_source, true
+    SELECT p_job_id, p_technician_id, d, v_actor, v_job_type = 'tourdate', v_source, true
     FROM pg_catalog.unnest(v_to_add) AS d
     ON CONFLICT (job_id, technician_id, date) DO UPDATE SET
       is_active = true,

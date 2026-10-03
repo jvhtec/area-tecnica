@@ -672,52 +672,64 @@ serve(async (req) => {
               p_single_day: acceptedDates?.length === 1,
               p_role: chosenRole,
             });
-            if (assignmentError) {
+            if (assignmentError?.code === 'P0409') {
+              // The database re-checked the schedule under the technician lock
+              // and found work that committed after the check above. Same
+              // outcome as that check: skip auto-assignment, keep the response.
+              console.warn('⚠️ Auto-assign skipped: conflict detected under lock', assignmentError.details);
               await supabase.from('staffing_events').insert({
                 staffing_request_id: rid,
-                event: 'auto_assign_upsert_error',
-                meta: { message: assignmentError.message }
+                event: 'auto_assign_skipped_conflict',
+                meta: { source: 'database', conflicts: assignmentError.details ?? null }
               });
-              throw new Error(assignmentError.message);
-            }
-            await supabase.from('staffing_events').insert({
-              staffing_request_id: rid,
-              event: 'auto_assign_upsert_ok',
-              meta: { role: chosenRole, department: prof.department }
-            });
-
-            try {
-              await fetch(`${SUPABASE_URL}/functions/v1/push`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${SERVICE_ROLE}`
-                },
-                body: JSON.stringify({ action: 'broadcast', type: 'job.assignment.confirmed', job_id: row.job_id, recipient_id: row.profile_id, recipient_name: techName })
+            } else {
+              if (assignmentError) {
+                await supabase.from('staffing_events').insert({
+                  staffing_request_id: rid,
+                  event: 'auto_assign_upsert_error',
+                  meta: { message: assignmentError.message }
+                });
+                throw new Error(assignmentError.message);
+              }
+              await supabase.from('staffing_events').insert({
+                staffing_request_id: rid,
+                event: 'auto_assign_upsert_ok',
+                meta: { role: chosenRole, department: prof.department }
               });
-            } catch (_) { /* non-blocking */ }
 
-            // 5) Try to add to Flex crew for sound/lights (best-effort)
-            try {
-              if (prof.department === 'sound' || prof.department === 'lights') {
-                const dept = prof.department;
-                await fetch(`${SUPABASE_URL}/functions/v1/manage-flex-crew-assignments`, {
+              try {
+                await fetch(`${SUPABASE_URL}/functions/v1/push`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${SERVICE_ROLE}`
                   },
-                  body: JSON.stringify({ job_id: row.job_id, technician_id: row.profile_id, department: dept, action: 'add' })
+                  body: JSON.stringify({ action: 'broadcast', type: 'job.assignment.confirmed', job_id: row.job_id, recipient_id: row.profile_id, recipient_name: techName })
                 });
+              } catch (_) { /* non-blocking */ }
+
+              // 5) Try to add to Flex crew for sound/lights (best-effort)
+              try {
+                if (prof.department === 'sound' || prof.department === 'lights') {
+                  const dept = prof.department;
+                  await fetch(`${SUPABASE_URL}/functions/v1/manage-flex-crew-assignments`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SERVICE_ROLE}`
+                    },
+                    body: JSON.stringify({ job_id: row.job_id, technician_id: row.profile_id, department: dept, action: 'add' })
+                  });
+                }
+              } catch (_) {
+                // non-blocking
               }
-            } catch (_) {
-              // non-blocking
+              await supabase.from('staffing_events').insert({
+                staffing_request_id: rid,
+                event: 'auto_assigned_on_confirm',
+                meta: { role: chosenRole, department: prof.department }
+              });
             }
-            await supabase.from('staffing_events').insert({
-              staffing_request_id: rid,
-              event: 'auto_assigned_on_confirm',
-              meta: { role: chosenRole, department: prof.department }
-            });
           }
           } // End of conflict check else block
       } catch (autoAssignErr) {

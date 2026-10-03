@@ -47,7 +47,8 @@ INSERT INTO jobs (id, title, start_time, end_time, job_type, status) VALUES
   -- Ends at 00:30 Madrid on the 11th (23:30 UTC on the 10th): full coverage must include the 11th.
   ('da210000-0000-0000-0000-000000000003', 'Direct overnight', '2026-11-09 18:00:00+01', '2026-11-11 00:30:00+01', 'single', 'Confirmado'),
   ('da210000-0000-0000-0000-000000000004', 'Direct other', '2026-11-02 08:00:00+01', '2026-11-05 20:00:00+01', 'single', 'Confirmado'),
-  ('da210000-0000-0000-0000-000000000005', 'Direct tourdate', '2026-11-02 08:00:00+01', '2026-11-02 20:00:00+01', 'tourdate', 'Confirmado');
+  ('da210000-0000-0000-0000-000000000005', 'Direct tourdate', '2026-11-02 08:00:00+01', '2026-11-02 20:00:00+01', 'tourdate', 'Confirmado'),
+  ('da210000-0000-0000-0000-000000000006', 'Direct dryhire', '2026-11-02 08:00:00+01', '2026-11-05 20:00:00+01', 'dryhire', 'Confirmado');
 
 -- Act as a management user (actor attribution comes from auth.uid()).
 CREATE FUNCTION pg_temp.act_as(p_user uuid) RETURNS void LANGUAGE plpgsql AS $$
@@ -281,6 +282,20 @@ SELECT is((SELECT value->>'code' FROM results WHERE name = 'mismatch'), 'role_de
 INSERT INTO results SELECT 'missing_job', pg_temp.apply('da310000-0000-0000-0000-000000000023', 'da210000-0000-0000-0000-0000000000ff',
   'da110000-0000-0000-0000-000000000003', 'LGT-BRD-R', 'invited', 'single', ARRAY['2026-11-02']::date[]);
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'missing_job'), 'job_not_found', 'a missing job is a rejection, not an error');
+
+-- Dry-hire jobs have no crew: never a target, and never a conflict source.
+INSERT INTO results SELECT 'dryhire', pg_temp.apply('da310000-0000-0000-0000-000000000026', 'da210000-0000-0000-0000-000000000006',
+  'da110000-0000-0000-0000-000000000003', 'LGT-BRD-R', 'invited', 'single', ARRAY['2026-11-02']::date[]);
+SELECT is((SELECT value->>'code' FROM results WHERE name = 'dryhire'), 'dryhire_job', 'dry-hire jobs cannot receive crew');
+RESET ROLE;
+SELECT is((SELECT count(*) FROM job_assignments WHERE job_id = 'da210000-0000-0000-0000-000000000006'), 0::bigint, 'dry-hire rejection writes nothing');
+-- A legacy dry-hire schedule row on the 5th must not block another job.
+INSERT INTO timesheets (job_id, technician_id, date, is_schedule_only)
+VALUES ('da210000-0000-0000-0000-000000000006', 'da110000-0000-0000-0000-000000000003', '2026-11-05', true);
+SET LOCAL ROLE authenticated;
+SELECT is((pg_temp.apply('da310000-0000-0000-0000-000000000027', 'da210000-0000-0000-0000-000000000001',
+  'da110000-0000-0000-0000-000000000003', 'LGT-BRD-R', 'invited', 'single', ARRAY['2026-11-05']::date[])->>'outcome'), 'committed',
+  'dry-hire schedule rows are not conflicts');
 
 -- Tour dates keep schedule-only rows; lights roles plan a lights Flex add.
 INSERT INTO results SELECT 'tourdate', pg_temp.apply('da310000-0000-0000-0000-000000000024', 'da210000-0000-0000-0000-000000000005',

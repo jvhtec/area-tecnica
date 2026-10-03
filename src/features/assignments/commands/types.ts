@@ -16,6 +16,7 @@ export const REJECTION_CODES = [
   'invalid_job_span',
   'last_date',
   'assignment_not_found',
+  'dryhire_job',
 ] as const;
 export type AssignmentRejectionCode = (typeof REJECTION_CODES)[number];
 

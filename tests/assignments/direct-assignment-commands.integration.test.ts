@@ -26,7 +26,7 @@ const sql = (value: string | null) => (value === null ? 'NULL' : `'${value.repla
 describe.skipIf(!permitted)('assignment commands under real concurrency', () => {
   let observer: PsqlSession;
   const techId = randomUUID();
-  const jobs = Array.from({ length: 8 }, () => randomUUID());
+  const jobs = Array.from({ length: 10 }, () => randomUUID());
 
   const session = async (name: string) => {
     const s = new PsqlSession(container!);
@@ -132,6 +132,10 @@ describe.skipIf(!permitted)('assignment commands under real concurrency', () => 
     const requestId = randomUUID();
     await observer.query(`INSERT INTO public.staffing_requests (id, job_id, profile_id, phase, status, token_hash, token_expires_at)
       VALUES (${sql(requestId)}, ${sql(jobs[4])}, ${sql(techId)}, 'offer', 'confirmed', 'hash', now() + interval '48 hours');`);
+    // Earlier cases booked these days elsewhere; acceptance now refuses that
+    // (covered by the cross-job case below), so free them for this race.
+    await observer.query(`UPDATE public.timesheets SET is_active = false WHERE technician_id = ${sql(techId)}
+      AND date IN ('2026-12-01', '2026-12-02');`);
     const { first, second } = await race(
       applyCall({ job: jobs[4], dates: ['2026-12-01'], status: 'invited', policy: 'allow' }),
       s => s.query(`SELECT public.assign_staffing_offer(${sql(requestId)}, ARRAY['2026-12-02']::date[], false, 'SND-FOH-R');`),
@@ -169,5 +173,22 @@ describe.skipIf(!permitted)('assignment commands under real concurrency', () => 
     expect(parse(first).outcome).toBe('committed');
     expect(parse(second)).toMatchObject({ ok: false, code: 'conflict' });
     expect(await observer.query(`SELECT status FROM public.job_assignments WHERE job_id = ${sql(jobs[6])};`)).toBe('invited');
+  });
+
+  it('an offer acceptance and a direct booking elsewhere for the same day cannot both commit', async () => {
+    const requestId = randomUUID();
+    await observer.query(`INSERT INTO public.staffing_requests (id, job_id, profile_id, phase, status, token_hash, token_expires_at)
+      VALUES (${sql(requestId)}, ${sql(jobs[8])}, ${sql(techId)}, 'offer', 'confirmed', 'hash', now() + interval '48 hours');`);
+    // Free 2026-12-04 so the only possible clash is the race itself.
+    await observer.query(`UPDATE public.timesheets SET is_active = false WHERE technician_id = ${sql(techId)} AND date = '2026-12-04';`);
+    const { first, second } = await race(
+      applyCall({ job: jobs[9], dates: ['2026-12-04'], policy: 'allow' }),
+      s => s.query(`SELECT public.assign_staffing_offer(${sql(requestId)}, ARRAY['2026-12-04']::date[], true, 'SND-FOH-R');`)
+        .then(output => output, (error: unknown) => `ERROR ${String(error)}`),
+    );
+    expect(parse(first).outcome).toBe('committed');
+    expect(second).toContain('P0409');
+    expect(await observer.query(`SELECT count(*) FROM public.job_assignments WHERE job_id = ${sql(jobs[8])};`)).toBe('0');
+    expect(await scheduleOf(jobs[8])).toBe('');
   });
 });

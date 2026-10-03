@@ -16,6 +16,7 @@ const MESSAGES: Record<AssignmentCommandCode, string> = {
   invalid_job_span: 'El trabajo no tiene fechas válidas para asignarlo completo.',
   last_date: 'Es el último día de la asignación: elimina la asignación completa.',
   assignment_not_found: 'La asignación ya no existe.',
+  dryhire_job: 'Los trabajos de dry hire no llevan personal asignado.',
   permission_denied: 'No tienes permiso para modificar asignaciones.',
   invalid_request: 'La solicitud de asignación no es válida.',
   command_id_reused: 'Esta operación ya se usó para otro cambio. Vuelve a intentarlo.',
