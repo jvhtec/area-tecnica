@@ -67,8 +67,8 @@ def environment_bytes(value):
 
 
 class Services(Bootstrap):
-    def __init__(self, root, verify_only=False):
-        phase = ("auth-rest-awaiting-verification", "auth-rest-ready") if verify_only else "isolated-schema-applied"
+    def __init__(self, root, verify_only=False, expected_phase=None):
+        phase = expected_phase or (("auth-rest-awaiting-verification", "auth-rest-ready") if verify_only else "isolated-schema-applied")
         super().__init__(root, expected_phase=phase, allow_migrations=True)
         self.cid = self.recorded_id("start-isolated-database")
         self.network_id = self.recorded_id("create-internal-network")

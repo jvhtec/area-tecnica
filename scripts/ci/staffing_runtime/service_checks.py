@@ -9,11 +9,11 @@ from plan import private_write, read_source
 from services import IMAGES, digest, environment_bytes
 
 
-def verify_services(driver):
+def verify_services(driver, extra_members=()):
     sources, keys = driver.read_sources()
     ids = {kind: driver.recorded_id("create-" + kind + "-service") for kind in IMAGES}
     ingress_id = driver.recorded_id("create-service-ingress")
-    db = driver.verify_database(members={driver.cid, *ids.values()})
+    db = driver.verify_database(members={driver.cid, *ids.values(), *extra_members})
     ingress = driver.observe("network", ingress_id)
     if ingress["Id"] != ingress_id or ingress["Name"] != driver.ingress or ingress["Internal"] or ingress["Driver"] != "bridge" or ingress["Scope"] != "local" or ingress["Labels"].get("local.staffing-ci") != driver.identity or set(ingress["Containers"]) != {ids["gateway"]}:
         raise ValueError("Service ingress ownership or membership failed")

@@ -10,6 +10,9 @@ from bootstrap import Bootstrap
 from plan import prepare
 from migrations import Migrations
 from services import Services
+from cache import Cache
+from edge import Edge
+from reference import install_reference
 
 
 def main():
@@ -32,10 +35,28 @@ def main():
     services.add_argument("--root", type=Path, required=True)
     check_services = commands.add_parser("verify-services", help="Observe and verify the recorded terminal Auth/REST/gateway launch")
     check_services.add_argument("--root", type=Path, required=True)
+    cache = commands.add_parser("cache", help="Compile the Edge dependency graph on a separate credential-free build network")
+    cache.add_argument("--root", type=Path, required=True)
+    cache.add_argument("--node", type=Path, required=True)
+    for name in ["edge", "verify-edge"]:
+        command = commands.add_parser(name, help="Launch or verify owned offline Edge/capture before fixture admission")
+        command.add_argument("--root", type=Path, required=True)
+    reference = commands.add_parser("reference", help="Install the non-personal reference catalog under verified Edge completion admission")
+    reference.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "prepare":
         plan = prepare(args.root, args.checkout, args.cli, args.node, args.base_port)
         print(json.dumps({"identity": plan["identity"], "phase": "sources-prepared", "migrationFiles": len(plan["migrations"]), "dockerMutations": False}))
+    elif args.command == "reference":
+        install_reference(args.root)
+        print(json.dumps({"phase": "edge-runtime-ready", "referenceCatalogInstalled": True, "personalData": False}))
+    elif args.command in ("edge", "verify-edge"):
+        driver = Edge(args.root, verify_only=args.command == "verify-edge")
+        driver.finish() if args.command == "verify-edge" else driver.run()
+        print(json.dumps({"phase": "edge-runtime-ready", "fixturesLoaded": False, "externalNetwork": False}))
+    elif args.command == "cache":
+        Cache(args.root, args.node).run()
+        print(json.dumps({"phase": "edge-cache-ready", "credentialsPassed": False, "handlersExecuted": False}))
     elif args.command in ("services", "verify-services"):
         driver = Services(args.root, verify_only=args.command == "verify-services")
         driver.finish() if args.command == "verify-services" else driver.run()

@@ -79,7 +79,7 @@ The disposable completion suite adds two cases (P1.14). Filled roles transition 
 
 ## Limits and remaining roadmap work
 
-The [synthetic runtime increment](STAFFING_SYNTHETIC_RUNTIME_2026-10-03.md) adds public source staging, owned CI-target admission, gateway completion accounting and native protocol probes. The same 27 campaign, eight matrix and three matrix-failure cases now also pass on an empty synthetic stack. Service/cache provisioning and GitHub Actions execution remain pending; these local results do not retire any source guard.
+The [synthetic runtime increment](STAFFING_SYNTHETIC_RUNTIME_2026-10-03.md) adds public source staging, owned CI-target admission, gateway completion accounting, dependency caching and portable Auth/REST/Edge/capture provisioning. The same 27 campaign, eight matrix and three matrix-failure cases now also pass through that controller on an empty synthetic stack with the non-personal reference catalog. Owned teardown and GitHub Actions runtime execution remain pending; these local results do not retire any source guard.
 
 The runtime suites are **opt-in local evidence**. Ordinary CI runs seventy-five safety/cleanup/observation/calendar/fence/clone/owned-control checks and reports these 65 runtime cases as skipped; a skipped suite is not runtime verification. Reproduction requires the private stack's drain protocol as well as copied handler source, plus the completion protocol described above. CI provisioning of an isolated Auth/Edge/capture stack remains separate work. The existing CI PostgREST acceptance/lock and pgTAP suites continue unchanged.
 
