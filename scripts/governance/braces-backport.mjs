@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, ftruncateSync, fsyncSync, lstatSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,9 +8,30 @@ export const backport = JSON.parse(readFileSync(patchPath, 'utf8'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
 function regular(path) {
-  const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink()) throw new Error('Backport requires regular installed files');
-  return readFileSync(path);
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const before = fstatSync(fd);
+    if (!before.isFile()) throw new Error('Backport requires regular installed files');
+    const bytes = readFileSync(fd), after = fstatSync(fd), named = lstatSync(path);
+    if (named.isSymbolicLink() || before.dev !== named.dev || before.ino !== named.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error('Installed backport file changed while reading');
+    return bytes;
+  } finally { closeSync(fd); }
+}
+
+function writeReviewed(path, text, expected) {
+  // Open without truncation and validate the descriptor before modifying it.
+  const fd = openSync(path, constants.O_RDWR | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const info = fstatSync(fd), named = lstatSync(path);
+    if (!info.isFile() || named.isSymbolicLink() || info.dev !== named.dev || info.ino !== named.ino || hash(readFileSync(fd)) !== expected) throw new Error('Installed source changed before backport write');
+    const bytes = Buffer.from(text);
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
+    ftruncateSync(fd, bytes.length);
+    fsyncSync(fd);
+    const final = lstatSync(path);
+    if (final.isSymbolicLink() || final.dev !== info.dev || final.ino !== info.ino) throw new Error('Installed source path changed during backport write');
+  } finally { closeSync(fd); }
 }
 
 function packageRoot(root) {
@@ -55,9 +76,9 @@ export function applyBackport(root) {
       text = text.replace(before, () => after);
     }
     if (hash(Buffer.from(text)) !== expected.patchedSha256) throw new Error('Security backport output differs from reviewed bytes');
-    writes.push({ path, text });
+    writes.push({ path, text, expected: digest });
   }
-  for (const { path, text } of writes) writeFileSync(path, text);
+  for (const { path, text, expected } of writes) writeReviewed(path, text, expected);
   verifyInstalledBackport(root);
   return true;
 }

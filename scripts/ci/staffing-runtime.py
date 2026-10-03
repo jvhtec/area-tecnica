@@ -13,6 +13,7 @@ from services import Services
 from cache import Cache
 from edge import Edge
 from reference import install_reference
+from teardown import Teardown
 
 
 def main():
@@ -43,8 +44,13 @@ def main():
         command.add_argument("--root", type=Path, required=True)
     reference = commands.add_parser("reference", help="Install the non-personal reference catalog under verified Edge completion admission")
     reference.add_argument("--root", type=Path, required=True)
+    teardown = commands.add_parser("teardown", help="Retire only the verified empty ready stack; retain uncertain outcomes and private evidence")
+    teardown.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "prepare":
+    if args.command == "teardown":
+        Teardown(args.root).run()
+        print(json.dumps({"phase": "runtime-retired", "ownedResourcesRemoved": True, "privateEvidenceRetained": True}))
+    elif args.command == "prepare":
         plan = prepare(args.root, args.checkout, args.cli, args.node, args.base_port)
         print(json.dumps({"identity": plan["identity"], "phase": "sources-prepared", "migrationFiles": len(plan["migrations"]), "dockerMutations": False}))
     elif args.command == "reference":
