@@ -1,0 +1,108 @@
+{
+  "package": "braces",
+  "version": "3.0.3",
+  "advisory": "GHSA-vfj7-8cjw-p6xm",
+  "source": "https://github.com/micromatch/braces/pull/72",
+  "sourceCommit": "28d440b5dd449dbf1fe6f3506cf94ecca4d02660",
+  "files": {
+    "lib/compile.js": {
+      "originalSha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+      "patchedSha256": "b651f7715e6db8942ce61d3394357b4d81c8ece88240aa31a458ea1165edd195",
+      "edits": [
+        {
+          "before": "\nconst fill = require('fill-range');\nconst utils = require('./utils');\n\nconst compile = (ast, options = {}) => {\n  const walk = (node, parent = {}) => {\n    const invalidBlock = utils.isInvalidBrace(parent);\n    const invalidNode = node.invalid === true && options.escapeInvalid === true;\n    const invalid = invalidBlock === true || invalidNode === true;\n",
+          "after": "\nconst fill = require('fill-range');\nconst utils = require('./utils');\nconst { MAX_DEPTH } = require('./constants');\n\nconst compile = (ast, options = {}) => {\n  const maxDepth = Number.isFinite(options.maxDepth) ? Math.min(MAX_DEPTH, options.maxDepth) : MAX_DEPTH;\n\n  const walk = (node, parent = {}, depth = 0) => {\n    if (node.nodes && depth > maxDepth) {\n      throw new RangeError(`AST depth (${depth}), exceeds max depth (${maxDepth})`);\n    }\n    const invalidBlock = utils.isInvalidBrace(parent);\n    const invalidNode = node.invalid === true && options.escapeInvalid === true;\n    const invalid = invalidBlock === true || invalidNode === true;\n"
+        },
+        {
+          "before": "\n    if (node.nodes) {\n      for (const child of node.nodes) {\n        output += walk(child, node);\n      }\n    }\n\n    return output;\n  };\n\n  return walk(ast);\n};\n\nmodule.exports = compile;",
+          "after": "\n    if (node.nodes) {\n      for (const child of node.nodes) {\n        output += walk(child, node, child.nodes ? depth + 1 : depth);\n      }\n    }\n\n    return output;\n  };\n\n  return walk(ast, {}, ast.type === 'root' ? 0 : 1);\n};\n\nmodule.exports = compile;"
+        }
+      ]
+    },
+    "lib/constants.js": {
+      "originalSha256": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+      "patchedSha256": "f9fb688959232eee3e6ad7906a5b0e3234815db49ee857ef86983d65b917dc7c",
+      "edits": [
+        {
+          "before": "'use strict';\n\nmodule.exports = {\n  MAX_LENGTH: 10000,\n\n  // Digits",
+          "after": "'use strict';\n\nmodule.exports = {\n  MAX_DEPTH: 100,\n  MAX_LENGTH: 10000,\n\n  // Digits"
+        }
+      ]
+    },
+    "lib/expand.js": {
+      "originalSha256": "41ccc196ebfa7b7781a634e721eb744e4e7bcb54cba427a7e3d6806a1b9e58f7",
+      "patchedSha256": "7ea3e14c2b2b256ef244fd3d83b8fcaa20aa2232b4e6d768c3bb6ab567f66cf5",
+      "edits": [
+        {
+          "before": "const fill = require('fill-range');\nconst stringify = require('./stringify');\nconst utils = require('./utils');\n\nconst append = (queue = '', stash = '', enclose = false) => {\n  const result = [];\n",
+          "after": "const fill = require('fill-range');\nconst stringify = require('./stringify');\nconst utils = require('./utils');\nconst { MAX_DEPTH } = require('./constants');\n\nconst append = (queue = '', stash = '', enclose = false) => {\n  const result = [];\n"
+        },
+        {
+          "before": "  return utils.flatten(result);\n};\n\nconst expand = (ast, options = {}) => {\n  const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;\n\n  const walk = (node, parent = {}) => {\n    node.queue = [];\n\n    let p = parent;\n    let q = parent.queue;\n\n    while (p.type !== 'brace' && p.type !== 'root' && p.parent) {\n      p = p.parent;\n      q = p.queue;\n    }\n\n    if (node.invalid || node.dollar) {\n      q.push(append(q.pop(), stringify(node, options)));\n",
+          "after": "  return utils.flatten(result);\n};\n\nconst queueOwner = node => {\n  if (node.type === 'brace' || node.type === 'root' || !node.parent) return node;\n\n  const seen = new Set();\n  while (node.type !== 'brace' && node.type !== 'root' && node.parent) {\n    if (seen.has(node)) {\n      throw new RangeError('AST parent chain contains a cycle');\n    }\n    seen.add(node);\n    node = node.parent;\n  }\n  return node;\n};\n\nconst expand = (ast, options = {}) => {\n  const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;\n  const maxDepth = Number.isFinite(options.maxDepth) ? Math.min(MAX_DEPTH, options.maxDepth) : MAX_DEPTH;\n\n  const walk = (node, parent = {}, depth = 0) => {\n    if (node.nodes && depth > maxDepth) {\n      throw new RangeError(`AST depth (${depth}), exceeds max depth (${maxDepth})`);\n    }\n    node.queue = [];\n\n    const q = queueOwner(parent).queue;\n\n    if (node.invalid || node.dollar) {\n      q.push(append(q.pop(), stringify(node, options)));\n"
+        },
+        {
+          "before": "    }\n\n    const enclose = utils.encloseBrace(node);\n    let queue = node.queue;\n    let block = node;\n\n    while (block.type !== 'brace' && block.type !== 'root' && block.parent) {\n      block = block.parent;\n      queue = block.queue;\n    }\n\n    for (let i = 0; i < node.nodes.length; i++) {\n      const child = node.nodes[i];\n",
+          "after": "    }\n\n    const enclose = utils.encloseBrace(node);\n    const queue = queueOwner(node).queue;\n\n    for (let i = 0; i < node.nodes.length; i++) {\n      const child = node.nodes[i];\n"
+        },
+        {
+          "before": "      }\n\n      if (child.nodes) {\n        walk(child, node);\n      }\n    }\n\n    return queue;\n  };\n\n  return utils.flatten(walk(ast));\n};\n\nmodule.exports = expand;",
+          "after": "      }\n\n      if (child.nodes) {\n        walk(child, node, child.nodes ? depth + 1 : depth);\n      }\n    }\n\n    return queue;\n  };\n\n  return utils.flatten(walk(ast, {}, ast.type === 'root' ? 0 : 1));\n};\n\nmodule.exports = expand;"
+        }
+      ]
+    },
+    "lib/parse.js": {
+      "originalSha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+      "patchedSha256": "72aabaadaa555cdfbd07fbd7c7f743373e4dc8eec04a97550cc57bbeec30eb6c",
+      "edits": [
+        {
+          "before": " */\n\nconst {\n  MAX_LENGTH,\n  CHAR_BACKSLASH, /* \\ */\n  CHAR_BACKTICK, /* ` */\n",
+          "after": " */\n\nconst {\n  MAX_DEPTH,\n  MAX_LENGTH,\n  CHAR_BACKSLASH, /* \\ */\n  CHAR_BACKTICK, /* ` */\n"
+        },
+        {
+          "before": "\n  const opts = options || {};\n  const max = typeof opts.maxLength === 'number' ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;\n  if (input.length > max) {\n    throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);\n  }\n",
+          "after": "\n  const opts = options || {};\n  const max = typeof opts.maxLength === 'number' ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;\n  const maxDepth = Number.isFinite(opts.maxDepth) ? Math.min(MAX_DEPTH, opts.maxDepth) : MAX_DEPTH;\n  if (input.length > max) {\n    throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);\n  }\n"
+        },
+        {
+          "before": "  const length = input.length;\n  let index = 0;\n  let depth = 0;\n  let value;\n\n  /**\n",
+          "after": "  const length = input.length;\n  let index = 0;\n  let depth = 0;\n  let nesting = 0;\n  let value;\n\n  /**\n"
+        },
+        {
+          "before": "     */\n\n    if (value === CHAR_LEFT_PARENTHESES) {\n      block = push({ type: 'paren', nodes: [] });\n      stack.push(block);\n      push({ type: 'text', value });\n",
+          "after": "     */\n\n    if (value === CHAR_LEFT_PARENTHESES) {\n      if (nesting + 1 > maxDepth) {\n        throw new SyntaxError(`Input depth (${nesting + 1}), exceeds max depth (${maxDepth})`);\n      }\n      nesting++;\n      block = push({ type: 'paren', nodes: [] });\n      stack.push(block);\n      push({ type: 'text', value });\n"
+        },
+        {
+          "before": "      }\n      block = stack.pop();\n      push({ type: 'text', value });\n      block = stack[stack.length - 1];\n      continue;\n    }\n",
+          "after": "      }\n      block = stack.pop();\n      push({ type: 'text', value });\n      nesting--;\n      block = stack[stack.length - 1];\n      continue;\n    }\n"
+        },
+        {
+          "before": "     */\n\n    if (value === CHAR_LEFT_CURLY_BRACE) {\n      depth++;\n\n      const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;\n",
+          "after": "     */\n\n    if (value === CHAR_LEFT_CURLY_BRACE) {\n      if (nesting + 1 > maxDepth) {\n        throw new SyntaxError(`Input depth (${nesting + 1}), exceeds max depth (${maxDepth})`);\n      }\n      nesting++;\n      depth++;\n\n      const dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;\n"
+        },
+        {
+          "before": "\n      push({ type, value });\n      depth--;\n\n      block = stack[stack.length - 1];\n      continue;",
+          "after": "\n      push({ type, value });\n      depth--;\n      nesting--;\n\n      block = stack[stack.length - 1];\n      continue;"
+        }
+      ]
+    },
+    "lib/stringify.js": {
+      "originalSha256": "379f22d77bfa1478341ccd49c5e4267464aabcbba03558bab332aac23fc6f23a",
+      "patchedSha256": "b2cc4ab4afb4a42ac58d871937b9d380ede5bbc644a466b1b544cc7401d3b9dc",
+      "edits": [
+        {
+          "before": "'use strict';\n\nconst utils = require('./utils');\n\nmodule.exports = (ast, options = {}) => {\n  const stringify = (node, parent = {}) => {\n    const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);\n    const invalidNode = node.invalid === true && options.escapeInvalid === true;\n    let output = '';\n",
+          "after": "'use strict';\n\nconst utils = require('./utils');\nconst { MAX_DEPTH } = require('./constants');\n\nmodule.exports = (ast, options = {}) => {\n  const maxDepth = Number.isFinite(options.maxDepth) ? Math.min(MAX_DEPTH, options.maxDepth) : MAX_DEPTH;\n\n  const stringify = (node, parent = {}, depth = 0) => {\n    if (node.nodes && depth > maxDepth) {\n      throw new RangeError(`AST depth (${depth}), exceeds max depth (${maxDepth})`);\n    }\n    const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);\n    const invalidNode = node.invalid === true && options.escapeInvalid === true;\n    let output = '';\n"
+        },
+        {
+          "before": "\n    if (node.nodes) {\n      for (const child of node.nodes) {\n        output += stringify(child);\n      }\n    }\n    return output;\n  };\n\n  return stringify(ast);\n};\n",
+          "after": "\n    if (node.nodes) {\n      for (const child of node.nodes) {\n        output += stringify(child, undefined, child.nodes ? depth + 1 : depth);\n      }\n    }\n    return output;\n  };\n\n  return stringify(ast, {}, ast.type === 'root' ? 0 : 1);\n};\n"
+        }
+      ]
+    }
+  },
+  "unchangedFiles": {
+    "index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+    "package.json": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+    "lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7"
+  }
+}
