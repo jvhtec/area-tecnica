@@ -636,6 +636,69 @@ export type Database = {
         }
         Relationships: []
       }
+      assignment_commands: {
+        Row: {
+          actor_id: string | null
+          command_id: string
+          command_type: string
+          created_at: string
+          error_code: string | null
+          from_job_id: string | null
+          job_id: string
+          outcome: string
+          prior_state_token: string | null
+          request: Json
+          request_hash: string
+          result: Json
+          result_state_token: string | null
+          side_effects: Json
+          side_effects_status: string
+          side_effects_updated_at: string | null
+          source: string
+          technician_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          command_id: string
+          command_type: string
+          created_at?: string
+          error_code?: string | null
+          from_job_id?: string | null
+          job_id: string
+          outcome: string
+          prior_state_token?: string | null
+          request: Json
+          request_hash: string
+          result: Json
+          result_state_token?: string | null
+          side_effects?: Json
+          side_effects_status?: string
+          side_effects_updated_at?: string | null
+          source: string
+          technician_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          command_id?: string
+          command_type?: string
+          created_at?: string
+          error_code?: string | null
+          from_job_id?: string | null
+          job_id?: string
+          outcome?: string
+          prior_state_token?: string | null
+          request?: Json
+          request_hash?: string
+          result?: Json
+          result_state_token?: string | null
+          side_effects?: Json
+          side_effects_status?: string
+          side_effects_updated_at?: string | null
+          source?: string
+          technician_id?: string
+        }
+        Relationships: []
+      }
       assignment_notifications: {
         Row: {
           created_at: string | null
@@ -12509,6 +12572,26 @@ export type Database = {
         }
         Returns: number
       }
+      apply_direct_assignment: {
+        Args: {
+          p_actor_id?: string
+          p_command_id: string
+          p_conflict_policy?: string
+          p_coverage: string
+          p_dates?: string[]
+          p_expected_from_state_token?: string
+          p_expected_state_token?: string
+          p_from_job_id?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_mode?: string
+          p_role: string
+          p_source?: string
+          p_status: string
+          p_technician_id: string
+        }
+        Returns: Json
+      }
       approve_job_expense: {
         Args: {
           p_approved: boolean
@@ -12562,6 +12645,40 @@ export type Database = {
           p_vehicle_id: string
         }
         Returns: Json
+      }
+      assignment_command_reject: {
+        Args: {
+          p_actor_id: string
+          p_code: string
+          p_command_id: string
+          p_command_type: string
+          p_details: Json
+          p_from_job_id: string
+          p_job_id: string
+          p_message: string
+          p_prior_state_token: string
+          p_request: Json
+          p_request_hash: string
+          p_source: string
+          p_technician_id: string
+        }
+        Returns: Json
+      }
+      assignment_flex_departments: {
+        Args: { p_assignment: Json; p_fallback_department: string }
+        Returns: string[]
+      }
+      assignment_remove_membership_locked: {
+        Args: { p_job_id: string; p_technician_id: string }
+        Returns: Json
+      }
+      assignment_state_snapshot: {
+        Args: { p_job_id: string; p_technician_id: string }
+        Returns: Json
+      }
+      assignment_state_token: {
+        Args: { p_job_id: string; p_technician_id: string }
+        Returns: string
       }
       attempt_whatsapp_send: {
         Args: {
@@ -12881,6 +12998,29 @@ export type Database = {
           timesheet_count: number
         }[]
       }
+      get_assignment_command_metrics: {
+        Args: { p_since?: string }
+        Returns: {
+          command_type: string
+          commands: number
+          error_code: string
+          outcome: string
+          side_effects_status: string
+        }[]
+      }
+      get_assignment_command_state: {
+        Args: { p_job_id: string; p_technician_id: string }
+        Returns: Json
+      }
+      get_assignment_consistency_issues: {
+        Args: { p_from?: string; p_limit?: number }
+        Returns: {
+          details: Json
+          issue: string
+          job_id: string
+          technician_id: string
+        }[]
+      }
       get_assignment_matrix_staffing: {
         Args: never
         Returns: {
@@ -12903,6 +13043,21 @@ export type Database = {
           offer_status: string
           offer_updated_at: string
           profile_id: string
+        }[]
+      }
+      get_assignment_side_effect_backlog: {
+        Args: { p_limit?: number; p_pending_grace?: string }
+        Returns: {
+          actor_id: string
+          command_id: string
+          command_type: string
+          created_at: string
+          job_id: string
+          side_effects: Json
+          side_effects_status: string
+          side_effects_updated_at: string
+          source: string
+          technician_id: string
         }[]
       }
       get_billable_hours_for_job: {
@@ -13474,6 +13629,10 @@ export type Database = {
           soft_conflict: boolean
         }[]
       }
+      record_assignment_side_effects: {
+        Args: { p_command_id: string; p_results: Json }
+        Returns: Json
+      }
       record_push_target_health: {
         Args: { p_channel: string; p_success: boolean; p_target: string }
         Returns: undefined
@@ -13483,12 +13642,37 @@ export type Database = {
         Returns: undefined
       }
       refresh_v_job_staffing_summary: { Args: never; Returns: undefined }
+      remove_assignment_date: {
+        Args: {
+          p_actor_id?: string
+          p_command_id: string
+          p_date: string
+          p_expected_state_token?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_source?: string
+          p_technician_id: string
+        }
+        Returns: Json
+      }
       remove_assignment_with_timesheets: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: {
           deleted_assignment: boolean
           deleted_timesheets: number
         }[]
+      }
+      remove_direct_assignment: {
+        Args: {
+          p_actor_id?: string
+          p_command_id: string
+          p_expected_state_token?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_source?: string
+          p_technician_id: string
+        }
+        Returns: Json
       }
       remove_technician_payout_override: {
         Args: { _job_id: string; _technician_id: string }
