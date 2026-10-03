@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { expect } from 'vitest';
 import { edgeSnapshot } from './edgeSnapshot';
+import { localRequestSafety } from './localRequestSafety';
 
 const database = 'supabase_db_dev-history';
 const localUrl = 'http://127.0.0.1:54441';
@@ -55,6 +56,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   const jobs = new Set<string>();
   const users = new Set<string>();
   const marker = `[LOCAL CAMPAIGN TEST ${randomUUID()}]`;
+  const requests = localRequestSafety();
 
   function fingerprint() {
     return coreTables.map(table => docker('exec', database, 'psql', '-XqAt', '-U', 'postgres', '-d', 'postgres', '-c',
@@ -62,14 +64,17 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function api(action: string, body: Record<string, unknown>, token: string = service) {
-    const response = await realFetch(`${localUrl}/functions/v1/staffing-orchestrator?action=${action}`, {
-      method: 'POST', headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(40_000),
+    return requests.run(async () => {
+      const response = await realFetch(`${localUrl}/functions/v1/staffing-orchestrator?action=${action}`, {
+        method: 'POST', headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(40_000),
+      });
+      return { status: response.status, body: await response.json() };
     });
-    return { status: response.status, body: await response.json() };
   }
 
   async function user(role = 'technician', department = 'sound') {
+    requests.assertSafe();
     const email = `campaign-${randomUUID()}@example.invalid`;
     const password = randomUUID() + randomUUID();
     const created = await client.auth.admin.createUser({ email, password, email_confirm: true });
@@ -87,6 +92,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function job(quantity = 1) {
+    requests.assertSafe();
     const id = randomUUID();
     jobs.add(id);
     expect((await client.from('jobs').insert({ id, title: marker, job_type: 'single', status: 'Confirmado',
@@ -131,6 +137,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function cleanJobs() {
+    requests.assertSafe();
     if (jobs.size) {
       // Push inbox rows can target historical managers, so user deletion alone
       // is insufficient. Their attempt rows cascade with the owned inbox items.
@@ -150,6 +157,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function cleanUsers() {
+    requests.assertSafe();
     const failures: string[] = [];
     for (const id of users) {
       const result = await client.auth.admin.deleteUser(id);
@@ -159,5 +167,6 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
     if (failures.length) throw new Error(`Could not remove ${failures.length} owned local test users; remaining IDs: ${failures.join(',')}`);
   }
 
-  return { client, api, user, job, start, campaign, roles, request, assignment, cleanJobs, cleanUsers, fingerprint, localUrl };
+  return { client, api, user, job, start, campaign, roles, request, assignment, cleanJobs, cleanUsers, fingerprint, localUrl,
+    assertCleanupSafe: requests.assertSafe };
 }

@@ -688,7 +688,7 @@ Future writer consolidation must inventory every direct matrix, lifecycle and to
 
 Two further suites add eight real cancellation-hook cases and eight real direct-matrix cases, bringing the combined local run to 43 cases. All three compare eight historical tables before/after owned-fixture cleanup, including notification inbox and push attempts. The source gate follows the actual local import closure of every invoked handler. See the [reproduction and remaining gaps](STAFFING_CAMPAIGN_CHARACTERIZATION_2026-10-03.md).
 
-Ordinary CI runs nineteen safety/source/cleanup/observation checks but skips the local runtime suites. Direct matrix failure injection, initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior and public-method coverage remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
+Ordinary CI runs twenty-eight safety/source/cleanup/observation/calendar checks but skips the local runtime suites. Campaign requests block cleanup and new fixtures while pending or after transport failure; calendar navigation works before and after its fixture month. Direct matrix failure injection, initial simultaneous CAS contention, availability wave/ranking behavior, exact completion-push behavior and public-method coverage remain gaps. This evidence does not complete the Phase 1 exit gate or authorize a counting/recovery redesign.
 
 ### Phase 1 exit gate
 

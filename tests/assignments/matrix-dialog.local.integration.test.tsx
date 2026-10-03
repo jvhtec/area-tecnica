@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localCampaignHarness } from './helpers/localCampaignHarness';
 import { trackLocalFunctions } from './helpers/trackLocalFunctions';
+import { navigateCalendarMonth } from './helpers/navigateCalendarMonth';
 
 const binding = vi.hoisted(() => ({ client: null as unknown as SupabaseClient }));
 // The legacy dataLayerClient captures this export during module initialization.
@@ -122,9 +123,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real matrix dialog persist
     await ui.user.click(screen.getByRole('tab', { name: 'Varios Días' }));
     // This picker opens at today's month. Navigate its actual controls rather
     // than freezing the clock used by real Auth and HTTP timeouts.
-    for (let month = 0; month < 24 && !screen.queryByText('October 2027'); month++) {
-      await ui.user.click(screen.getByRole('button', { name: 'Go to next month' }));
-    }
+    await navigateCalendarMonth(ui.user, new Date(2027, 9, 1));
     expect(screen.getByText('October 2027')).toBeInTheDocument();
   }
 

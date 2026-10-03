@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localCampaignHarness } from './helpers/localCampaignHarness';
+import * as requestSafety from './helpers/localRequestSafety';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
@@ -103,5 +104,24 @@ describe('local campaign fixture safety gates', () => {
     await h.job();
     await expect(h.cleanJobs()).rejects.toThrow();
     expect(activityDelete).toHaveBeenCalledOnce();
+  });
+
+  it('refuses fixture creation and all cleanup after a campaign transport timeout', async () => {
+    command.mockImplementation((...args) => snapshotResponse(args[1] as string[]));
+    const guard = requestSafety.localRequestSafety();
+    const observer = vi.spyOn(requestSafety, 'localRequestSafety').mockReturnValue(guard);
+    const client = { from: vi.fn(), auth: { admin: { createUser: vi.fn(), deleteUser: vi.fn() } } };
+    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>);
+    try {
+      const h = localCampaignHarness();
+      await expect(guard.run(async () => { throw new Error('campaign timeout'); })).rejects.toThrow('campaign timeout');
+      expect(() => h.assertCleanupSafe()).toThrow('Owned fixtures retained');
+      for (const action of [h.job, h.user, h.cleanJobs, h.cleanUsers]) {
+        await expect(action()).rejects.toThrow('Owned fixtures retained');
+      }
+      expect(client.from).not.toHaveBeenCalled();
+      expect(client.auth.admin.createUser).not.toHaveBeenCalled();
+      expect(client.auth.admin.deleteUser).not.toHaveBeenCalled();
+    } finally { observer.mockRestore(); }
   });
 });

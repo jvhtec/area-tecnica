@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { localCampaignHarness } from './helpers/localCampaignHarness';
 import { holdCampaignRole } from './helpers/campaignRowLock';
 
@@ -22,9 +22,11 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     tech = await h.user();
     alternate = await h.user();
   }, 60_000);
+  beforeEach(() => { h?.assertCleanupSafe(); });
   afterEach(async () => { await h?.cleanJobs(); }, 30_000);
   afterAll(async () => {
     if (!h) return;
+    h.assertCleanupSafe();
     const failures: unknown[] = [];
     for (const cleanup of [h.cleanJobs, h.cleanUsers]) {
       try { await cleanup(); } catch (error) { failures.push(error); }
@@ -162,6 +164,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     const role = (await h.roles(campaign.id))[0];
     const release = await holdCampaignRole(role.id);
     const winner = h.api('tick', { campaign_id: campaign.id }).catch(() => ({ status: 0, body: {} }));
+    let winnerResult: Awaited<typeof winner>;
     try {
       const deadline = Date.now() + 10_000;
       while (!(await h.campaign(campaign.id)).run_lock) {
@@ -171,8 +174,8 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
       const loser = await h.api('tick', { campaign_id: campaign.id });
       expect(loser.status).toBe(429);
       expect(loser.body.error).toBe('Campaign already running, please wait');
-    } finally { await release(); }
-    expect((await winner).status).toBe(200);
+    } finally { await release(); winnerResult = await winner; }
+    expect(winnerResult.status).toBe(200);
     expect(await h.campaign(campaign.id)).toMatchObject({ run_lock: null, status: 'active' });
     expect((await h.roles(campaign.id))[0]).toMatchObject({ stage: 'availability', wave_number: 0 });
   }, 40_000);
