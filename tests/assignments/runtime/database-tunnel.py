@@ -20,6 +20,7 @@ class Relay(socketserver.BaseRequestHandler):
         except (OSError,TimeoutError):return
 
 class Server(socketserver.ThreadingTCPServer):
+    address_family=socket.AF_INET
     allow_reuse_address=True
     daemon_threads=True
 
