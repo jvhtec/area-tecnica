@@ -34,7 +34,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real manager cancellation 
   }, 90_000);
   beforeEach(() => {
     if (cleanupUnsafe) throw new Error('Local transport failure requires runtime quiescence before further fixtures');
-    h?.assertCleanupSafe();
+    h?.assertFixtureSafe();
   });
   afterEach(async () => {
     if (cleanupUnsafe) return;

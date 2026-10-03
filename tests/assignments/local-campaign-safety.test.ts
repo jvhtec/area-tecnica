@@ -151,10 +151,18 @@ describe('local campaign fixture safety gates', () => {
     await expect(h.cleanJobs()).rejects.toThrow();
     expect(h.cleanupSafe).toBe(true);
     expect(() => h.assertCleanupSafe()).not.toThrow();
+    expect(() => h.assertFixtureSafe()).toThrow('require successful cleanup');
+    for (const action of [h.job, h.user, () => h.request('job', 'user', 'offer', 'pending'),
+      () => h.assignment('job', 'user', 'invited'), () => h.api('start', {})]) {
+      await expect(action()).rejects.toThrow('require successful cleanup');
+    }
     await h.cleanUsers();
     expect(deleteUser).toHaveBeenCalledWith('owned-user');
+    expect(() => h.assertFixtureSafe()).toThrow('require successful cleanup');
     await h.cleanJobs();
     expect(remaining).toHaveBeenCalledTimes(2);
+    expect(() => h.assertFixtureSafe()).not.toThrow();
+    await h.job();
   });
 
   it('retains both callback and release errors while poisoning safety only on failed release', async () => {
@@ -169,5 +177,28 @@ describe('local campaign fixture safety gates', () => {
       expect(h.cleanupSafe).toBe(false);
       await expect(h.cleanUsers()).rejects.toThrow('Owned fixtures retained');
     } finally { fence.mockRestore(); }
+  });
+
+  it('does not clear a retained-user guard when job cleanup succeeds', async () => {
+    command.mockImplementation((...args) => snapshotResponse(args[1] as string[]));
+    const deleteUser = vi.fn().mockResolvedValueOnce({ error: { message: 'completed deletion denial' } })
+      .mockResolvedValue({ error: null });
+    const client = {
+      auth: { admin: { createUser: vi.fn().mockResolvedValue({ error: null, data: { user: { id: 'owned-user' } } }), deleteUser },
+        signInWithPassword: vi.fn().mockResolvedValue({ error: null, data: { session: { access_token: 'local-token' } } }) },
+      from: vi.fn(() => ({ insert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) })),
+    };
+    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>);
+    const h = localCampaignHarness();
+    await h.user();
+    await expect(h.cleanUsers()).rejects.toThrow('remaining IDs: owned-user');
+    expect(h.cleanupSafe).toBe(true);
+    await h.cleanJobs();
+    await expect(h.job()).rejects.toThrow('require successful cleanup');
+    await expect(h.user()).rejects.toThrow('require successful cleanup');
+    await h.cleanUsers();
+    expect(() => h.assertFixtureSafe()).not.toThrow();
+    await h.job();
   });
 });

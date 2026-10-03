@@ -60,6 +60,15 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   const jobs = new Set<string>();
   const users = new Set<string>();
   const marker = `[LOCAL CAMPAIGN TEST ${randomUUID()}]`;
+  let jobsNeedCleanup = false;
+  let usersNeedCleanup = false;
+  function assertRetainedClear() {
+    if (jobsNeedCleanup || usersNeedCleanup) throw new Error('Retained owned fixtures require successful cleanup before further fixture creation');
+  }
+  function assertFixtureSafe() {
+    requests.assertSafe();
+    assertRetainedClear();
+  }
   async function fenced<T>(cleanup: (assertFresh: () => void) => Promise<T>) {
     requests.assertSafe();
     let cleanupFailure: { error: unknown } | undefined;
@@ -85,6 +94,9 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function api(action: string, body: Record<string, unknown>, token: string = service) {
+    // Concurrent tick requests are intentional; only retained cleanup blocks
+    // an API action. requests.run separately rejects transport uncertainty.
+    assertRetainedClear();
     return requests.run(async () => {
       const response = await realFetch(`${localUrl}/functions/v1/staffing-orchestrator?action=${action}`, {
         method: 'POST', headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -95,7 +107,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function user(role = 'technician', department = 'sound') {
-    requests.assertSafe();
+    assertFixtureSafe();
     const email = `campaign-${randomUUID()}@example.invalid`;
     const password = randomUUID() + randomUUID();
     const created = await client.auth.admin.createUser({ email, password, email_confirm: true });
@@ -113,7 +125,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function job(quantity = 1) {
-    requests.assertSafe();
+    assertFixtureSafe();
     const id = randomUUID();
     jobs.add(id);
     expect((await client.from('jobs').insert({ id, title: marker, job_type: 'single', status: 'Confirmado',
@@ -144,6 +156,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function request(jobId: string, profileId: string, phase: string, status: string, role: string | null = 'SND-FOH-T', date = '2027-10-20', updatedAt = new Date().toISOString()) {
+    assertFixtureSafe();
     const id = randomUUID();
     expect((await client.from('staffing_requests').insert({ id, job_id: jobId, profile_id: profileId,
       phase, status, role_code: phase === 'offer' ? role : null, target_date: date, single_day: true,
@@ -154,11 +167,13 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function assignment(jobId: string, profileId: string, status: string, role = 'SND-FOH-T') {
+    assertFixtureSafe();
     expect((await client.from('job_assignments').insert({ job_id: jobId, technician_id: profileId, status, sound_role: role })).error).toBeNull();
   }
 
   async function cleanJobs() {
-    return fenced(async assertFresh => {
+    jobsNeedCleanup = true;
+    await fenced(async assertFresh => {
       if (jobs.size) {
         // Push inbox rows can target historical managers, so user deletion alone
         // is insufficient. Their attempt rows cascade with the owned inbox items.
@@ -179,10 +194,12 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
         jobs.clear();
       }
     });
+    jobsNeedCleanup = false;
   }
 
   async function cleanUsers() {
-    return fenced(async assertFresh => {
+    usersNeedCleanup = true;
+    await fenced(async assertFresh => {
       const failures: string[] = [];
       for (const id of users) {
         assertFresh();
@@ -192,9 +209,10 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
       }
       if (failures.length) throw new Error(`Could not remove ${failures.length} owned local test users; remaining IDs: ${failures.join(',')}`);
     });
+    usersNeedCleanup = false;
   }
 
   return { client, api, user, job, start, campaign, roles, request, assignment, cleanJobs, cleanUsers, fingerprint, localUrl,
     get cleanupSafe() { return requests.cleanupSafe; },
-    assertCleanupSafe: requests.assertSafe, prepare: () => fenced(async () => undefined), withCleanupFence: fenced };
+    assertCleanupSafe: requests.assertSafe, assertFixtureSafe, prepare: () => fenced(async () => undefined), withCleanupFence: fenced };
 }

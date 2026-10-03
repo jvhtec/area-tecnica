@@ -23,7 +23,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     tech = await h.user();
     alternate = await h.user();
   }, 60_000);
-  beforeEach(() => { h?.assertCleanupSafe(); });
+  beforeEach(() => { h?.assertFixtureSafe(); });
   afterEach(async () => { await h?.cleanJobs(); }, 100_000);
   afterAll(async () => {
     if (!h) return;
