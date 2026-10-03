@@ -18,24 +18,27 @@ export function disposableCampaignHarness(extraHandlers: string[] = []) {
     async beforeJobDelete(marker, assertFresh) {
       if (!installed) return;
       assertFresh();
-      await sql(`DELETE FROM local_matrix_fault.owned_dates WHERE marker='${marker}';`);
+      await sql(`DELETE FROM local_matrix_fault.owned_dates WHERE marker='${marker}';`, assertFresh);
     },
   });
   const target = h.target as ReturnType<typeof readDisposableCampaignTarget>;
   const ownedMarker = h.marker;
-  async function sql(query: string) {
+  async function sql(query: string, assertFresh: () => void) {
     // Docker CLI interruption cannot prove remote psql completion. Preserve
     // fixtures and latch uncertainty on any driver failure, independently of
     // the completed callback classification in the runtime fence.
+    await h.runGuardedMutation(async () => { verifyDisposableCampaignTarget(target, docker); });
+    // Inspections are synchronous but individually bounded; their cumulative
+    // time can exceed the fence. A known deadline refusal stays retryable.
+    assertFresh();
     return h.runGuardedMutation(async () => {
-      verifyDisposableCampaignTarget(target, docker);
       return docker('exec', target.database, 'psql', '-h','/var/run/postgresql', '-XqAt', '-v','ON_ERROR_STOP=1', '-U','postgres','-d','postgres','-c', query).trim();
     });
   }
   async function prepare() {
     await h.prepare();
-    await h.withCleanupFence(async () => {
-      if (await sql("SELECT count(*) FROM pg_namespace WHERE nspname='local_matrix_fault';") !== '0') {
+    await h.withCleanupFence(async assertFresh => {
+      if (await sql("SELECT count(*) FROM pg_namespace WHERE nspname='local_matrix_fault';", assertFresh) !== '0') {
         throw new Error('Existing disposable fault guard requires manual owned-fixture recovery');
       }
     });
@@ -50,29 +53,29 @@ export function disposableCampaignHarness(extraHandlers: string[] = []) {
       if (!installed) {
         assertFresh();
         const fixture = readFileSync(resolve('tests/assignments/fixtures/matrix-disposable-fault.sql'), 'utf8');
-        await sql(fixture.replace('__OWNED_MARKER__', ownedMarker));
+        await sql(fixture.replace('__OWNED_MARKER__', ownedMarker), assertFresh);
         installed = true;
         // Prove the temporary privileged lookup has no API-role entry point.
         expect(await sql(`SELECT bool_or(
           has_schema_privilege(name,'local_matrix_fault','USAGE') OR
           has_table_privilege(name,'local_matrix_fault.owned_dates','SELECT') OR
           has_function_privilege(name,'local_matrix_fault.reject_owned_date()','EXECUTE'))
-          FROM unnest(ARRAY['anon','authenticated','service_role']) AS api_role(name);`)).toBe('f');
+          FROM unnest(ARRAY['anon','authenticated','service_role']) AS api_role(name);`, assertFresh)).toBe('f');
       }
       assertFresh();
       expect(await sql(`INSERT INTO local_matrix_fault.owned_dates(job_id,technician_id,caller_id,fail_date,marker)
         SELECT id,'${technicianId}','${callerId}','${date}',title FROM public.jobs
-        WHERE id='${jobId}' AND title='${ownedMarker}' RETURNING job_id;`)).toBe(jobId);
+        WHERE id='${jobId}' AND title='${ownedMarker}' RETURNING job_id;`, assertFresh)).toBe(jobId);
     });
   }
   async function finish() {
     if (!installed) return;
     h.assertFixtureSafe();
     await h.withCleanupFence(async assertFresh => {
-      expect(await sql(`SELECT obj_description(oid,'pg_namespace') FROM pg_namespace WHERE nspname='local_matrix_fault';`)).toBe(ownedMarker);
-      expect(await sql('SELECT count(*) FROM local_matrix_fault.owned_dates;')).toBe('0');
+      expect(await sql(`SELECT obj_description(oid,'pg_namespace') FROM pg_namespace WHERE nspname='local_matrix_fault';`, assertFresh)).toBe(ownedMarker);
+      expect(await sql('SELECT count(*) FROM local_matrix_fault.owned_dates;', assertFresh)).toBe('0');
       assertFresh();
-      await sql('BEGIN; DROP TRIGGER local_matrix_owned_date_failure ON public.timesheets; DROP SCHEMA local_matrix_fault CASCADE; COMMIT;');
+      await sql('BEGIN; DROP TRIGGER local_matrix_owned_date_failure ON public.timesheets; DROP SCHEMA local_matrix_fault CASCADE; COMMIT;', assertFresh);
       installed = false;
     });
   }
