@@ -15,6 +15,7 @@ export const REJECTION_CODES = [
   'role_department_mismatch',
   'invalid_job_span',
   'last_date',
+  'assignment_not_found',
 ] as const;
 export type AssignmentRejectionCode = (typeof REJECTION_CODES)[number];
 
@@ -153,4 +154,18 @@ export interface RemoveDirectAssignmentInput {
 
 export interface RemoveAssignmentDateInput extends RemoveDirectAssignmentInput {
   date: string;
+}
+
+export type AssignmentRoleDepartment = 'sound' | 'lights' | 'video' | 'production';
+
+export interface ChangeAssignmentRoleInput extends RemoveDirectAssignmentInput {
+  department: AssignmentRoleDepartment;
+  /** Role code, or null/'none' to clear the department role. */
+  role: string | null;
+  syncCategory?: boolean;
+}
+
+export interface SetAssignmentStatusInput extends RemoveDirectAssignmentInput {
+  action: 'confirm' | 'decline';
+  notes?: string | null;
 }

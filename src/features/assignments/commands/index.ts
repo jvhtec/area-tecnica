@@ -1,10 +1,12 @@
 export {
   applyDirectAssignment,
+  changeAssignmentRole,
   createAssignmentCommandId,
   getAssignmentCommandState,
   removeAssignmentDate,
   removeDirectAssignment,
   requireCommitted,
+  setAssignmentStatus,
 } from '@/features/assignments/commands/client';
 export {
   AssignmentCommandError,
@@ -24,9 +26,12 @@ export type {
   AssignmentCommandState,
   AssignmentConflictDetails,
   AssignmentCoverage,
+  AssignmentRoleDepartment,
   AssignmentSideEffect,
+  ChangeAssignmentRoleInput,
   RemoveAssignmentDateInput,
   RemoveDirectAssignmentInput,
+  SetAssignmentStatusInput,
 } from '@/features/assignments/commands/types';
 export {
   fetchAssignmentConsistencyIssues,

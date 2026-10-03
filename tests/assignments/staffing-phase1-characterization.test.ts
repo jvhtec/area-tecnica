@@ -21,6 +21,9 @@ const driverAssignmentMigration = readRepoFile(
   "supabase/migrations/20260924134000_driver_assignment_delivery.sql",
 );
 const productionSchema = readRepoFile("supabase/migrations/00000000000000_production_schema.sql");
+const roleStatusMigration = readRepoFile(
+  "supabase/migrations/20261003213000_assignment_role_and_status_commands.sql",
+);
 const directAssignmentMigration = readRepoFile(
   "supabase/migrations/20261003210000_atomic_direct_assignment_command.sql",
 );
@@ -219,12 +222,12 @@ describe("Staffing Phase 1 characterization", () => {
   });
 
   describe("assignment lifecycle RPC usage", () => {
-    it("routes assignment confirm/decline through manage_assignment_lifecycle", () => {
-      expect(assignmentStatusDialog).toContain(
-        "dataLayerClient.rpc('manage_assignment_lifecycle'",
-      );
-      expect(assignmentStatusDialog).toContain(
-        "p_delete_mode: isTourAssignment ? 'hard' : 'soft'",
+    it("routes manager confirm/decline through the status command, which wraps manage_assignment_lifecycle", () => {
+      expect(assignmentStatusDialog).toContain("setAssignmentStatus(");
+      expect(assignmentStatusDialog).not.toContain("manage_assignment_lifecycle");
+      expect(roleStatusMigration).toContain("v_lifecycle := public.manage_assignment_lifecycle(");
+      expect(roleStatusMigration).toContain(
+        "v_delete_mode := CASE WHEN v_existing.assignment_source = 'tour' THEN 'hard' ELSE 'soft' END;",
       );
     });
 

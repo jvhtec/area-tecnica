@@ -14,6 +14,8 @@ transactions; it sends one command and treats the result as authoritative.
 | `apply_direct_assignment` | Create, modify (add/replace days, role, status) or **move** (`p_from_job_id`) a job/technician assignment | `AssignJobDialog` |
 | `remove_direct_assignment` | Remove membership + every day (+ non-final Hoja staff/contacts) | Matrix cell removal, `AssignJobDialog`, job-card removal |
 | `remove_assignment_date` | Remove one active day; refuses the last day of a membership (`last_date`) | Matrix cell removal |
+| `change_assignment_role` | Set or clear one department role column; recategorizes/reprices unapproved active days | Job-card role selectors (`JobAssignmentDialog`) |
+| `set_assignment_status` | Manager confirm/decline; wraps `manage_assignment_lifecycle` after the shared locks (tour memberships hard-deleted on decline, decided server-side) | `AssignmentStatusDialog` |
 | `get_assignment_command_state` | Membership, active days and the **state token** for a pair | dialogs, before a command |
 
 All are `SECURITY DEFINER`, executable by `authenticated` but authorized
@@ -50,6 +52,7 @@ surface (`tests/assignments/matrix-direct-write-guard.test.ts` enforces it).
 | `stale_state` | The pair changed after the dialog loaded its token | Toast + refetch; the user re-decides |
 | `conflict` | Active schedule on another job on a newly added day (checked under the technician lock). `details.conflicts` has the `check_technician_conflicts` shape | Existing conflict warning; "Forzar" resends with `p_conflict_policy = 'allow'` (recorded as `conflict_override`) |
 | `last_date` | Date removal of the last day | Matrix falls back to whole removal using the returned token |
+| `assignment_not_found` | Role/status change on a pair without membership | Toast |
 | `job_not_found`, `technician_not_found`, `role_department_mismatch`, `invalid_job_span` | Entity/role validation | Toast |
 
 Malformed calls raise `22023`; unauthorized calls raise `42501`. Anything
@@ -103,7 +106,9 @@ it, so no cycle exists. `manage_assignment_lifecycle` locks membership with
 ## 5. Side effects and reconciliation
 
 Committed commands return a `side_effects` plan (Flex add/remove per
-department, `job.assignment.direct` / `assignment.removed` notification).
+department; `job.assignment.direct`, `job.assignment.confirmed` or
+`assignment.removed` notification). A role change plans a Flex add/remove only
+when a sound/lights role appears or is cleared.
 `runAssignmentSideEffects` executes it after commit and reports each outcome
 with `record_assignment_side_effects`. Failures and plans that never reported
 back (5-minute grace) appear in `get_assignment_side_effect_backlog` and in
@@ -130,25 +135,40 @@ recategorized.
 
 ## 7. Writer inventory (M0)
 
+Every client path that changes assignment membership, role, status or
+schedule for a job/technician pair now goes through a command:
+
 | Writer | Path | Status |
 | --- | --- | --- |
 | Assign/modify/move dialog | `AssignJobDialog` → `apply_direct_assignment` / `remove_direct_assignment` | **Converged** |
+| Matrix confirm/decline | `AssignmentStatusDialog` → `set_assignment_status` | **Converged** |
 | Matrix cell removal (day / whole) | `useMatrixCellAssignmentRemoval` → `remove_assignment_date` / `remove_direct_assignment` | **Converged** |
-| Job-card whole removal | `useJobAssignmentsRealtime.removeAssignment` → `remove_direct_assignment` | **Converged** |
-| Offer acceptance | `staffing-click` → `assign_staffing_offer` | Same lock contract (step 2+) |
-| Status confirm/decline/cancel | `AssignmentStatusDialog`, technician app → `manage_assignment_lifecycle` | Compatible (NOWAIT); not command-ledgered |
-| Day toggle RPC | `toggle_timesheet_day` | Takes the pair key now; no client caller in Matrix |
-| Department mobile add | `MobileAssignmentsDialog` → `useJobAssignmentsRealtime.addAssignment` (direct insert, membership only) | Not converged (out of Matrix scope) |
-| Job assignment role edits | `JobAssignmentDialog` (direct `sound/lights/video_role` updates + category sync) | Not converged |
-| Job deletion | `deleteJobAssignments` (whole job) | Out of scope (job lifecycle) |
-| Invoice receipt | `PayoutsDueFortnights` (`invoice_received_*` only) | Out of scope (non-schedule columns) |
-| Tour cascade, festival shifts, Carlos campaigns | DB triggers / edge functions | Deferred per roadmap §10 |
+| Job card: whole removal | `JobAssignmentDialog` → `useJobAssignmentsRealtime.removeAssignment` → `remove_direct_assignment` | **Converged** |
+| Job card: role change | `JobAssignmentDialog` → `change_assignment_role` | **Converged** |
+| Department mobile add | `MobileAssignmentsDialog` → `useJobAssignmentsRealtime.addAssignment` → `apply_direct_assignment` (add mode; membership **and** days) | **Converged** |
+| Offer acceptance | `staffing-click` → `assign_staffing_offer` | Same lock contract (step 2+); Carlos deferred per roadmap §10 |
+| Day toggle RPC | `toggle_timesheet_day` | Takes the pair key; no app caller left |
+
+`tests/assignments/matrix-direct-write-guard.test.ts` pins every converged
+surface: no chained `insert/update/delete/upsert` on `job_assignments` or
+`timesheets`, no per-date toggles, legacy removal, lifecycle RPC, browser
+category sync or direct Flex crew calls.
+
+Outside assignment state (deliberately not commands):
+
+| Writer | Why |
+| --- | --- |
+| Timesheet page (`useTimesheets`: create/delete rows, hours, signatures), hourly-rate overrides (`useTechnicianRateModeDates`), payout approval | Payroll records of an existing assignment; a drift they cause shows up in `get_assignment_consistency_issues` |
+| Job date type off/travel (`DateTypeContextMenu`) | Job-calendar operation that voids/restores a whole date for every technician |
+| Job deletion (`deleteJobAssignments`, `background-job-deletion`) | The job itself goes away; foreign keys cascade |
+| Invoice receipt (`PayoutsDueFortnights`), reminder stamps | Non-assignment columns |
+| Tour cascade, festival shifts, staffing campaigns | DB triggers / edge functions; deferred per roadmap §10 |
 
 ## 8. Rollout
 
-1. `supabase db push --dry-run` against linked production; check the three
-   migrations (`20261003210000`, `20261003211000`, `20261003212000`), their
-   grants and the new table.
+1. `supabase db push --dry-run` against linked production; check the four
+   migrations (`20261003210000`, `20261003211000`, `20261003212000`,
+   `20261003213000`), their grants and the new table.
 2. Apply migrations, then deploy the client. The old client keeps working
    (existing RPCs keep their signatures and results).
 3. Verify with `get_assignment_command_metrics()` and
@@ -160,11 +180,11 @@ recategorized.
 ## 9. Tests
 
 - pgTAP: `direct_assignment_command.sql`, `assignment_removal_commands.sql`,
-  `assignment_command_reconciliation.sql`.
+  `assignment_command_reconciliation.sql`, `assignment_role_status_commands.sql`.
 - Real concurrency (two psql backends, CI `rls_rpc_security_tests` job):
   `tests/assignments/direct-assignment-commands.integration.test.ts` — stale
   managers, same-day cross-job race, concurrent retry, offer acceptance, move
-  vs removal. Run locally with
+  vs removal, confirmation vs same-day booking. Run locally with
   `STAFFING_TEST_DB_CONTAINER=<container> ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL=<container>`.
 - Unit/component: `src/features/assignments/commands/__tests__`,
   `AssignJobDialog.test.tsx`, `useMatrixCellAssignmentRemoval.phase1.test.tsx`,

@@ -9,9 +9,11 @@ vi.mock('@/lib/supabase', () => ({
 import {
   AssignmentCommandError,
   applyDirectAssignment,
+  changeAssignmentRole,
   classifyAssignmentRpcError,
   requireCommitted,
   runAssignmentSideEffects,
+  setAssignmentStatus,
   type AssignmentCommandResult,
 } from '@/features/assignments/commands';
 
@@ -118,6 +120,24 @@ describe('applyDirectAssignment', () => {
   });
 });
 
+describe('role and status commands', () => {
+  it('maps a role clear onto a null role for the department column', async () => {
+    rpcMock.mockResolvedValue({ data: result(), error: null });
+    await changeAssignmentRole({ commandId: 'cmd-2', jobId: 'job-1', technicianId: 'tech-1', department: 'lights', role: 'none', syncCategory: false });
+    expect(rpcMock).toHaveBeenCalledWith('change_assignment_role', expect.objectContaining({
+      p_command_id: 'cmd-2', p_department: 'lights', p_role: undefined, p_sync_category: false, p_source: 'job-card',
+    }));
+  });
+
+  it('sends confirm/decline with notes as metadata', async () => {
+    rpcMock.mockResolvedValue({ data: result(), error: null });
+    await setAssignmentStatus({ commandId: 'cmd-3', jobId: 'job-1', technicianId: 'tech-1', action: 'decline', notes: 'Sin disponibilidad' });
+    expect(rpcMock).toHaveBeenCalledWith('set_assignment_status', expect.objectContaining({
+      p_action: 'decline', p_metadata: { notes: 'Sin disponibilidad' }, p_source: 'matrix',
+    }));
+  });
+});
+
 describe('classifyAssignmentRpcError', () => {
   it.each([
     [{ code: '22023', message: 'bad' }, 'invalid_request'],
@@ -166,6 +186,18 @@ describe('runAssignmentSideEffects', () => {
         { index: 1, status: 'succeeded' },
       ],
     });
+  });
+
+  it('sends the confirmation notification for a status command', async () => {
+    vi.useRealTimers();
+    invokeMock.mockResolvedValue({ error: null });
+    rpcMock.mockResolvedValue({ data: {}, error: null });
+    await runAssignmentSideEffects('cmd-1', committed([
+      { kind: 'notification', action: 'job.assignment.confirmed', job_id: 'job-1', status: 'pending' },
+    ]), { recipientName: 'Pat' });
+    expect(invokeMock).toHaveBeenCalledWith('push', { body: {
+      action: 'broadcast', type: 'job.assignment.confirmed', job_id: 'job-1', recipient_id: 'tech-1', recipient_name: 'Pat',
+    } });
   });
 
   it('skips effects that already succeeded and records nothing when there is nothing to do', async () => {

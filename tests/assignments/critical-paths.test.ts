@@ -10,12 +10,10 @@ const {
   useQueryMock,
   checkTimeConflictEnhancedMock,
   toggleTimesheetDayMock,
-  syncTimesheetCategoriesMock,
 } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
   checkTimeConflictEnhancedMock: vi.fn(),
   toggleTimesheetDayMock: vi.fn(),
-  syncTimesheetCategoriesMock: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -49,10 +47,6 @@ vi.mock("@/services/toggleTimesheetDay", () => ({
   toggleTimesheetDay: toggleTimesheetDayMock,
 }));
 
-vi.mock("@/services/syncTimesheetCategories", () => ({
-  syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
-}));
-
 import { AssignJobDialog, getAssignableJobDateKeys } from "@/components/matrix/AssignJobDialog";
 
 async function getActualConflictCheck() {
@@ -67,13 +61,6 @@ async function getActualToggleTimesheetDay() {
     "@/services/toggleTimesheetDay",
   );
   return actual.toggleTimesheetDay;
-}
-
-async function getActualSyncTimesheetCategories() {
-  const actual = await vi.importActual<typeof import("@/services/syncTimesheetCategories")>(
-    "@/services/syncTimesheetCategories",
-  );
-  return actual.syncTimesheetCategoriesForAssignment;
 }
 
 const baseJob = {
@@ -288,7 +275,6 @@ beforeEach(() => {
 
   checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
   toggleTimesheetDayMock.mockResolvedValue(undefined);
-  syncTimesheetCategoriesMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -358,49 +344,6 @@ describe("Assignments Critical Paths", () => {
         p_present: true,
         p_source: "matrix",
       });
-    });
-
-    it("updates active timesheets and recalculates each affected row when roles change", async () => {
-      const updateBuilder = createMockQueryBuilder({
-        data: [{ id: "ts-1" }, { id: "ts-2" }],
-        error: null,
-      });
-
-      mockSupabase.from.mockImplementation((table: string) => {
-        if (table === "timesheets") {
-          return updateBuilder;
-        }
-        return createMockQueryBuilder();
-      });
-
-      const syncTimesheetCategoriesForAssignment = await getActualSyncTimesheetCategories();
-      await syncTimesheetCategoriesForAssignment({
-        jobId: "job-1",
-        technicianId: "tech-1",
-        soundRole: "SND-FOH-R",
-      });
-
-      expect(updateBuilder.update).toHaveBeenCalledWith({ category: "responsable" });
-      expect(mockSupabase.rpc).toHaveBeenNthCalledWith(1, "compute_timesheet_amount_2025", {
-        _timesheet_id: "ts-1",
-        _persist: true,
-      });
-      expect(mockSupabase.rpc).toHaveBeenNthCalledWith(2, "compute_timesheet_amount_2025", {
-        _timesheet_id: "ts-2",
-        _persist: true,
-      });
-    });
-
-    it("skips category sync when no valid role code is provided", async () => {
-      const syncTimesheetCategoriesForAssignment = await getActualSyncTimesheetCategories();
-      await syncTimesheetCategoriesForAssignment({
-        jobId: "job-1",
-        technicianId: "tech-1",
-        soundRole: "legacy-foh",
-      });
-
-      expect(mockSupabase.from).not.toHaveBeenCalled();
-      expect(mockSupabase.rpc).not.toHaveBeenCalled();
     });
   });
 
@@ -504,7 +447,6 @@ describe("Assignments Critical Paths", () => {
       expect(updateMock).not.toHaveBeenCalled();
       expect(deleteMock).not.toHaveBeenCalled();
       expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
-      expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
       expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
     });
   });

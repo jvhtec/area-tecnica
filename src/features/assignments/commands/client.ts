@@ -10,6 +10,8 @@ import {
   type ApplyDirectAssignmentInput,
   type AssignmentCommandResult,
   type AssignmentCommandState,
+  type ChangeAssignmentRoleInput,
+  type SetAssignmentStatusInput,
   type RemoveAssignmentDateInput,
   type RemoveDirectAssignmentInput,
 } from '@/features/assignments/commands/types';
@@ -98,6 +100,31 @@ export function removeAssignmentDate(input: RemoveAssignmentDateInput): Promise<
     p_date: input.date,
     p_expected_state_token: input.expectedStateToken ?? undefined,
     p_source: input.source ?? 'matrix',
+  }));
+}
+
+export function changeAssignmentRole(input: ChangeAssignmentRoleInput): Promise<AssignmentCommandResult> {
+  return execute(() => supabase.rpc('change_assignment_role', {
+    p_command_id: input.commandId,
+    p_job_id: input.jobId,
+    p_technician_id: input.technicianId,
+    p_department: input.department,
+    p_role: input.role && input.role !== 'none' ? input.role : undefined,
+    p_sync_category: input.syncCategory ?? true,
+    p_expected_state_token: input.expectedStateToken ?? undefined,
+    p_source: input.source ?? 'job-card',
+  }));
+}
+
+export function setAssignmentStatus(input: SetAssignmentStatusInput): Promise<AssignmentCommandResult> {
+  return execute(() => supabase.rpc('set_assignment_status', {
+    p_command_id: input.commandId,
+    p_job_id: input.jobId,
+    p_technician_id: input.technicianId,
+    p_action: input.action,
+    p_expected_state_token: input.expectedStateToken ?? undefined,
+    p_source: input.source ?? 'matrix',
+    p_metadata: input.notes ? { notes: input.notes } : undefined,
   }));
 }
 

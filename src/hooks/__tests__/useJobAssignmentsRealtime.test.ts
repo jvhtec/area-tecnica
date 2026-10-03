@@ -11,11 +11,6 @@ const realtimeMocks = vi.hoisted(() => ({
   useRealtimeQueryMock: vi.fn(),
 }));
 
-const flexMocks = vi.hoisted(() => ({
-  manageFlexCrewAssignmentMock: vi.fn(),
-  useFlexCrewAssignmentsMock: vi.fn(),
-}));
-
 const toastMocks = vi.hoisted(() => ({
   errorMock: vi.fn(),
   successMock: vi.fn(),
@@ -29,10 +24,6 @@ vi.mock("@/hooks/useRealtimeQuery", () => ({
   useRealtimeQuery: realtimeMocks.useRealtimeQueryMock,
 }));
 
-vi.mock("@/hooks/useFlexCrewAssignments", () => ({
-  useFlexCrewAssignments: flexMocks.useFlexCrewAssignmentsMock,
-}));
-
 vi.mock("sonner", () => ({
   toast: {
     error: toastMocks.errorMock,
@@ -41,7 +32,6 @@ vi.mock("sonner", () => ({
 }));
 
 import {
-  buildAssignmentInsertPayload,
   mergeTimesheetAssignmentsForDisplay,
   useJobAssignmentsRealtime,
 } from "@/hooks/useJobAssignmentsRealtime";
@@ -71,69 +61,13 @@ beforeEach(() => {
     manualRefresh: realtimeMocks.manualRefreshMock,
     isRefreshing: false,
   });
-  flexMocks.useFlexCrewAssignmentsMock.mockReturnValue({
-    manageFlexCrewAssignment: flexMocks.manageFlexCrewAssignmentMock,
-  });
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('buildAssignmentInsertPayload', () => {
-  it('normalizes role values and defaults single-day fields', () => {
-    const fixedDate = new Date('2025-03-01T12:00:00Z');
-    vi.useFakeTimers().setSystemTime(fixedDate);
-
-    const payload = buildAssignmentInsertPayload(
-      'job-1',
-      'tech-1',
-      'none',
-      'lx-main',
-      'manager-1',
-      undefined
-    );
-
-    expect(payload).toMatchObject({
-      job_id: 'job-1',
-      technician_id: 'tech-1',
-      sound_role: null,
-      lights_role: 'lx-main',
-      assigned_by: 'manager-1',
-      single_day: false,
-      assignment_date: null,
-    });
-    expect(payload.assigned_at).toBe(fixedDate.toISOString());
-  });
-
-  it('captures single-day metadata when provided', () => {
-    const fixedDate = new Date('2025-04-15T08:30:00Z');
-    vi.useFakeTimers().setSystemTime(fixedDate);
-
-    const payload = buildAssignmentInsertPayload(
-      'job-2',
-      'tech-99',
-      'mix',
-      'none',
-      'manager-2',
-      {
-        singleDay: true,
-        singleDayDate: '2025-04-20',
-      }
-    );
-
-    expect(payload).toMatchObject({
-      job_id: 'job-2',
-      technician_id: 'tech-99',
-      sound_role: 'mix',
-      lights_role: null,
-      assigned_by: 'manager-2',
-      single_day: true,
-      assignment_date: '2025-04-20',
-    });
-    expect(payload.assigned_at).toBe(fixedDate.toISOString());
-  });
-
+describe('mergeTimesheetAssignmentsForDisplay', () => {
   it('merges timesheet presence with assignment metadata and sorted work dates', () => {
     const assignments = mergeTimesheetAssignmentsForDisplay({
       jobId: 'job-1',
@@ -200,7 +134,7 @@ describe('buildAssignmentInsertPayload', () => {
 });
 
 describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
-  it("restores the jobs cache when adding an assignment fails", async () => {
+  it("adds through the atomic command and restores the jobs cache when it fails", async () => {
     const queryClient = createRollbackQueryClient();
     const previousJobs = [
       { id: "job-1", job_assignments: [] },
@@ -208,14 +142,7 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
     ];
     queryClient.setQueryData(["jobs"], previousJobs);
 
-    const insertBuilder = createMockQueryBuilder({
-      data: null,
-      error: { message: "insert failed" },
-    });
-    mockSupabase.from.mockImplementation((table: string) => {
-      if (table === "job_assignments") return insertBuilder;
-      return createMockQueryBuilder();
-    });
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "permission denied" } });
 
     const { result } = renderHook(() => useJobAssignmentsRealtime("job-1"), {
       wrapper: createWrapper(queryClient),
@@ -225,13 +152,19 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
       await result.current.addAssignment("tech-1", "foh", "none");
     });
 
-    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
-      job_id: "job-1",
-      technician_id: "tech-1",
-      sound_role: "foh",
+    // Membership + full schedule in one command; no direct table insert.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("apply_direct_assignment", expect.objectContaining({
+      p_job_id: "job-1",
+      p_technician_id: "tech-1",
+      p_role: "foh",
+      p_coverage: "full",
+      p_mode: "add",
+      p_conflict_policy: "reject",
+      p_source: "department-dialog",
     }));
+    expect(mockSupabase.from).not.toHaveBeenCalledWith("job_assignments");
     expect(queryClient.getQueryData(["jobs"])).toEqual(previousJobs);
-    expect(toastMocks.errorMock).toHaveBeenCalledWith("Failed to add assignment");
+    expect(toastMocks.errorMock).toHaveBeenCalledWith("No tienes permiso para modificar asignaciones.");
   });
 
   it("removes through the atomic command and restores the jobs cache when it fails", async () => {

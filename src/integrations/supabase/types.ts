@@ -12672,6 +12672,7 @@ export type Database = {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: Json
       }
+      assignment_role_category: { Args: { p_roles: string[] }; Returns: string }
       assignment_state_snapshot: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: Json
@@ -12758,6 +12759,21 @@ export type Database = {
       can_write_job_document_storage: {
         Args: { p_path: string }
         Returns: boolean
+      }
+      change_assignment_role: {
+        Args: {
+          p_actor_id?: string
+          p_command_id: string
+          p_department: string
+          p_expected_state_token?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_role: string
+          p_source?: string
+          p_sync_category?: boolean
+          p_technician_id: string
+        }
+        Returns: Json
       }
       check_technician_conflicts: {
         Args: {
@@ -13887,6 +13903,19 @@ export type Database = {
           p_request_id: string
           p_unload_date: string
           p_unload_time: string
+        }
+        Returns: Json
+      }
+      set_assignment_status: {
+        Args: {
+          p_action: string
+          p_actor_id?: string
+          p_command_id: string
+          p_expected_state_token?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_source?: string
+          p_technician_id: string
         }
         Returns: Json
       }

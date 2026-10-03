@@ -22,6 +22,14 @@ import { labelForCode } from '@/utils/roles';
 import { queryKeys } from "@/lib/react-query";
 import { getErrorName } from '@/utils/errorMessage';
 import { getPrivateDataScope } from '@/lib/private-data-scope';
+import {
+  AssignmentCommandError,
+  createAssignmentCommandId,
+  reconcileAssignmentViews,
+  requireCommitted,
+  runAssignmentSideEffects,
+  setAssignmentStatus,
+} from '@/features/assignments/commands';
 interface AssignmentStatusDialogProps {
   open: boolean;
   onClose: () => void;
@@ -36,16 +44,6 @@ const ASSIGNMENT_QUERY_KEYS = [
   ['optimized-matrix-assignments'],
   ['matrix-assignments'],
 ] as const;
-
-type AssignmentLifecycleResult = {
-  success?: boolean;
-  message?: string;
-  error?: string;
-};
-
-const readAssignmentLifecycleResult = (value: unknown): AssignmentLifecycleResult => (
-  value && typeof value === 'object' ? value as AssignmentLifecycleResult : {}
-);
 
 export const AssignmentStatusDialog = ({
   open,
@@ -79,35 +77,21 @@ export const AssignmentStatusDialog = ({
       jobId,
       techId,
       actionType,
-      isTourAssignment
     }: {
       jobId: string;
       techId: string;
       actionType: 'confirm' | 'decline';
-      isTourAssignment: boolean;
     }) => {
-      // Use atomic RPC for transactional safety
-      const { data, error } = await dataLayerClient.rpc('manage_assignment_lifecycle', {
-        p_job_id: jobId,
-        p_technician_id: techId,
-        p_action: actionType,
-        p_delete_mode: isTourAssignment ? 'hard' : 'soft',
-        p_metadata: { notes, source: 'matrix_dialog' }
-      });
-
-      if (error) {
-        console.error('RPC error:', error);
-        throw new Error(error.message || 'Database operation failed');
-      }
-
-      const result = readAssignmentLifecycleResult(data);
-      if (!result.success) {
-        const errorMessage = result.message || result.error || 'Operation failed';
-        console.error('RPC returned failure:', result);
-        throw new Error(errorMessage);
-      }
-
-      return result;
+      // One command under the shared assignment locks; the database decides
+      // tour hard-deletes and enforces conflicts on confirmation.
+      return requireCommitted(await setAssignmentStatus({
+        commandId: createAssignmentCommandId(),
+        jobId,
+        technicianId: techId,
+        action: actionType,
+        notes,
+        source: 'matrix-dialog',
+      }));
     },
 
     // Save previous cache state BEFORE mutation
@@ -173,8 +157,12 @@ export const AssignmentStatusDialog = ({
       }
 
       // Show error to user
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      toast.error(`Error al actualizar la asignación: ${errorMessage}`);
+      if (err instanceof AssignmentCommandError) {
+        toast.error(err.message);
+      } else {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        toast.error(`Error al actualizar la asignación: ${errorMessage}`);
+      }
     },
 
     // On success, invalidate queries to refetch from server
@@ -189,19 +177,11 @@ export const AssignmentStatusDialog = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
 
-      // Send push notification for confirmations
-      if (variables.actionType === 'confirm') {
-        const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
-        dataLayerClient.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type: 'job.assignment.confirmed',
-            job_id: variables.jobId,
-            recipient_id: variables.techId,
-            recipient_name: recipientName || undefined
-          }
-        }).catch(() => { /* Ignore push errors */ });
-      }
+      // Post-commit plan (confirmation notification), recorded for retry.
+      const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
+      void runAssignmentSideEffects(data.command_id, data, { technicianDepartment: technician?.department, recipientName })
+        .catch((error: unknown) => console.error('Assignment status side effects could not run', error));
+      reconcileAssignmentViews(queryClient, { technicianId: variables.techId, jobIds: [variables.jobId] });
 
       // Show success message
       const statusText = variables.actionType === 'confirm' ? 'confirmada' : 'rechazada';
@@ -219,21 +199,11 @@ export const AssignmentStatusDialog = ({
       return;
     }
 
-    // Check if tour assignment to determine delete mode
-    const { data: jobAssignment } = await dataLayerClient.from('job_assignments')
-      .select('assignment_source')
-      .eq('job_id', assignment.job_id)
-      .eq('technician_id', technicianId)
-      .maybeSingle();
-
-    const isTourAssignment = jobAssignment?.assignment_source === 'tour';
-
     // Execute the mutation
     assignmentMutation.mutate({
       jobId: assignment.job_id,
       techId: technicianId,
       actionType: action,
-      isTourAssignment
     });
   }, [assignment?.job_id, technicianId, action, assignmentMutation]);
 

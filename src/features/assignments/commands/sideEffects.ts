@@ -45,6 +45,15 @@ const notificationBody = (
       departments,
     };
   }
+  if (effect.action === 'job.assignment.confirmed') {
+    return {
+      action: 'broadcast',
+      type: 'job.assignment.confirmed',
+      job_id: effect.job_id,
+      recipient_id: result.technician_id,
+      recipient_name: context.recipientName?.trim() || undefined,
+    };
+  }
   const assignment = result.assignment;
   const departments = getAssignmentNotificationDepartments(assignment, context.technicianDepartment);
   const scoped = assignment?.single_day ?? false;

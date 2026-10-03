@@ -5,15 +5,15 @@ import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
-import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import {
   AssignmentCommandError,
+  applyDirectAssignment,
   createAssignmentCommandId,
+  reconcileAssignmentViews,
   removeDirectAssignment,
   requireCommitted,
   runAssignmentSideEffects,
 } from "@/features/assignments/commands";
-import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -132,34 +132,6 @@ export const mergeTimesheetAssignmentsForDisplay = ({
       _timesheet_dates: timesheetDates,
     };
   });
-};
-
-export const buildAssignmentInsertPayload = (
-  jobId: string,
-  technicianId: string,
-  soundRole: string,
-  lightsRole: string,
-  assignedBy: string | null,
-  options?: AssignmentInsertOptions
-) => {
-  const normalizedSound = soundRole !== "none" ? soundRole : null;
-  const normalizedLights = lightsRole !== "none" ? lightsRole : null;
-  const shouldFlagSingleDay = !!options?.singleDay && !!options?.singleDayDate;
-  const isConfirmed = !!options?.addAsConfirmed;
-
-  return {
-    job_id: jobId,
-    technician_id: technicianId,
-    sound_role: normalizedSound,
-    lights_role: normalizedLights,
-    assigned_by: assignedBy,
-    assigned_at: new Date().toISOString(),
-    status: isConfirmed ? 'confirmed' : 'invited',
-    response_time: isConfirmed ? new Date().toISOString() : null,
-    single_day: shouldFlagSingleDay,
-    // Standardized: use only assignment_date
-    assignment_date: shouldFlagSingleDay ? options?.singleDayDate ?? null : null,
-  };
 };
 
 export const useJobAssignmentsRealtime = (jobId: string) => {
@@ -343,114 +315,82 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     };
   }, [jobId, subscriptionManager]);
 
-  const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
+  /**
+   * Department direct assignment. One atomic command creates membership AND
+   * schedule (these lists display timesheets), never removes existing days
+   * ('add' mode), and rejects a conflict that appeared after the available
+   * technician list was loaded. Flex/push run after commit.
+   */
   const addAssignment = async (
     technicianId: string,
     soundRole: string,
     lightsRole: string,
     options?: AssignmentInsertOptions
   ) => {
+    const role = [soundRole, lightsRole].find((value) => value && value !== 'none');
+    if (!role) {
+      toast.error("Selecciona un rol para la asignación");
+      return;
+    }
+    const singleDayDate = options?.singleDay ? options.singleDayDate ?? null : null;
     const previousJobs = queryClient.getQueryData(['jobs']);
-    let assignmentPersisted = false;
+
+    // Optimistic cache update for 'jobs' list so cards update instantly
+    queryClient.setQueryData(['jobs'], (old: unknown) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((job) => {
+        if (!isRecord(job) || job.id !== jobId) return job;
+        const optimist = {
+          job_id: jobId,
+          technician_id: technicianId,
+          sound_role: soundRole !== 'none' ? soundRole : null,
+          lights_role: lightsRole !== 'none' ? lightsRole : null,
+          single_day: Boolean(singleDayDate),
+          assignment_date: singleDayDate,
+          assigned_at: new Date().toISOString(),
+          assigned_by: null,
+          profiles: { first_name: '', last_name: '' },
+        };
+        const current = Array.isArray(job.job_assignments) ? job.job_assignments : [];
+        return { ...job, job_assignments: [...current, optimist] };
+      });
+    });
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const assignedBy = authData?.user?.id ?? null;
-      const payload = buildAssignmentInsertPayload(
+      const result = requireCommitted(await applyDirectAssignment({
+        commandId: createAssignmentCommandId(),
         jobId,
         technicianId,
-        soundRole,
-        lightsRole,
-        assignedBy,
-        options
-      );
+        role,
+        status: options?.addAsConfirmed ? 'confirmed' : 'invited',
+        coverage: singleDayDate ? 'single' : 'full',
+        dates: singleDayDate ? [singleDayDate] : undefined,
+        mode: 'add',
+        conflictPolicy: 'reject',
+        source: 'department-dialog',
+      }));
 
-      // Optimistic cache update for 'jobs' list so cards update instantly
-      queryClient.setQueryData(['jobs'], (old: unknown) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((job) => {
-          if (!isRecord(job) || job.id !== jobId) return job;
-          const optimist = {
-            job_id: jobId,
-            technician_id: technicianId,
-            sound_role: payload.sound_role,
-            lights_role: payload.lights_role,
-            single_day: payload.single_day,
-            assignment_date: payload.assignment_date ?? null,
-            assigned_at: payload.assigned_at,
-            assigned_by: payload.assigned_by,
-            profiles: { first_name: '', last_name: '' },
-          };
-          const current = Array.isArray(job.job_assignments) ? job.job_assignments : [];
-          return { ...job, job_assignments: [...current, optimist] };
-        });
-      });
+      const { data: techProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, department')
+        .eq('id', technicianId)
+        .maybeSingle();
+      void runAssignmentSideEffects(result.command_id, result, {
+        technicianDepartment: techProfile?.department,
+        recipientName: techProfile ? `${techProfile.first_name ?? ''} ${techProfile.last_name ?? ''}` : null,
+      }).then((summary) => {
+        if (summary.failed > 0) {
+          toast.error("La asignación se guardó, pero falló la sincronización con Flex o la notificación. Queda registrado para reintentar.");
+        }
+      }, (error: unknown) => console.error('Assignment side effects could not run', error));
 
-      const { error } = await supabase
-        .from('job_assignments')
-        .insert(payload);
-
-      if (error) {
-        console.error('Error adding assignment:', error);
-        queryClient.setQueryData(['jobs'], previousJobs);
-        toast.error("Failed to add assignment");
-        return;
-      }
-      assignmentPersisted = true;
-
-      // Send push notification for direct assignment
-      try {
-        // Fetch technician name for notification
-        const { data: techProfile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('id', technicianId)
-          .single();
-
-        const recipientName = techProfile
-          ? `${techProfile.first_name ?? ''} ${techProfile.last_name ?? ''}`.trim()
-          : undefined;
-        const assignmentDepartments = getAssignmentNotificationDepartments(payload);
-
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type: 'job.assignment.direct',
-            job_id: jobId,
-            recipient_id: technicianId,
-            recipient_name: recipientName || undefined,
-            assignment_status: options?.addAsConfirmed ? 'confirmed' : 'invited',
-            target_date: options?.singleDayDate ? `${options.singleDayDate}T00:00:00Z` : undefined,
-            single_day: payload.single_day,
-            department: assignmentDepartments[0],
-            departments: assignmentDepartments,
-          }
-        });
-      } catch (pushError) {
-        // Non-blocking: if push fails, assignment still succeeded
-        console.warn('Push notification failed:', pushError);
-      }
-
-      // Add to Flex crew calls if applicable
-      if (soundRole && soundRole !== 'none') {
-        await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
-      }
-      
-      if (lightsRole && lightsRole !== 'none') {
-        await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
-      }
-
-      toast.success("Assignment added successfully");
-      // Invalidate jobs so JobCard lists refresh assignments relation
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      toast.success(result.outcome === 'noop' ? "La asignación ya existía" : "Asignación añadida");
+      reconcileAssignmentViews(queryClient, { technicianId, jobIds: [jobId] });
     } catch (error: unknown) {
       console.error('Error in addAssignment:', error);
-      if (!assignmentPersisted) {
-        queryClient.setQueryData(['jobs'], previousJobs);
-      }
-      toast.error("Failed to add assignment");
+      queryClient.setQueryData(['jobs'], previousJobs);
+      toast.error(error instanceof AssignmentCommandError ? error.message : "No se pudo añadir la asignación");
     }
   };
 

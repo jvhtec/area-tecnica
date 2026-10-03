@@ -26,7 +26,7 @@ const sql = (value: string | null) => (value === null ? 'NULL' : `'${value.repla
 describe.skipIf(!permitted)('assignment commands under real concurrency', () => {
   let observer: PsqlSession;
   const techId = randomUUID();
-  const jobs = Array.from({ length: 6 }, () => randomUUID());
+  const jobs = Array.from({ length: 8 }, () => randomUUID());
 
   const session = async (name: string) => {
     const s = new PsqlSession(container!);
@@ -155,5 +155,19 @@ describe.skipIf(!permitted)('assignment commands under real concurrency', () => 
     expect(await observer.query(`SELECT count(*) FROM public.job_assignments WHERE job_id = ${sql(jobs[5])};`)).toBe('0');
     expect(await scheduleOf(jobs[5])).toBe('');
     expect(await scheduleOf(jobs[0])).toBe('2026-12-01,2026-12-04');
+  });
+
+  it('a manager confirmation and a same-day booking elsewhere cannot both commit', async () => {
+    await observer.query(applyCall({ job: jobs[6], dates: ['2026-12-03'], policy: 'allow' }));
+    // Clear the earlier same-day schedule so the confirmation alone is valid.
+    await observer.query(`DELETE FROM public.job_assignments WHERE technician_id = ${sql(techId)}
+      AND job_id <> ${sql(jobs[6])} AND job_id IN (SELECT job_id FROM public.timesheets WHERE technician_id = ${sql(techId)} AND date = '2026-12-03');`);
+    const { first, second } = await race(
+      applyCall({ job: jobs[7], dates: ['2026-12-03'], policy: 'allow' }),
+      s => s.query(`SELECT public.set_assignment_status(${sql(randomUUID())}, ${sql(jobs[6])}, ${sql(techId)}, 'confirm');`),
+    );
+    expect(parse(first).outcome).toBe('committed');
+    expect(parse(second)).toMatchObject({ ok: false, code: 'conflict' });
+    expect(await observer.query(`SELECT status FROM public.job_assignments WHERE job_id = ${sql(jobs[6])};`)).toBe('invited');
   });
 });
