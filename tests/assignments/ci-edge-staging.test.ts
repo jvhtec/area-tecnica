@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -10,9 +10,10 @@ import { edgeSnapshot } from './helpers/edgeSnapshot';
 
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
+  return { ...actual, openSync: vi.fn(actual.openSync), readFileSync: vi.fn(actual.readFileSync) };
 });
 const actualRead = (await vi.importActual<typeof import('node:fs')>('node:fs')).readFileSync;
+const actualOpen = (await vi.importActual<typeof import('node:fs')>('node:fs')).openSync;
 const repositoryDirectory = '../../';
 const repository = fileURLToPath(new URL(repositoryDirectory, import.meta.url));
 const prefix = 'staffing-edge-stage-test-';
@@ -38,6 +39,7 @@ function fixture() {
 }
 afterEach(() => {
   vi.mocked(readFileSync).mockImplementation(actualRead);
+  vi.mocked(openSync).mockImplementation(actualOpen);
   for (const root of temporaryRoots.splice(0)) {
     // Only remove this test's explicit absolute temp roots; never follow a root link.
     if (!isAbsolute(root) || dirname(root) !== resolve(tmpdir()) || !basename(root).startsWith(prefix) || lstatSync(root).isSymbolicLink()) throw new Error('Unsafe test cleanup target');
@@ -118,8 +120,43 @@ describe('staffing Edge source staging', () => {
   it('refuses source changes detected during preflight instead of copying stale bytes', () => {
     const options = fixture(), changing = join(options.checkoutRoot, 'supabase/functions/push/index.ts');
     let reads = 0;
-    vi.mocked(readFileSync).mockImplementation((path, encoding) => {
+    vi.mocked(openSync).mockImplementation((path, flags, mode) => {
       if (path === changing && ++reads === 2) writeFileSync(changing, 'export const changed = true;');
+      return actualOpen(path, flags, mode);
+    });
+    expect(() => stageStaffingEdge(options)).toThrow('Source changed during staging preflight');
+    expect(existsSync(options.outputDirectory)).toBe(false);
+  });
+
+  it('refuses a source replaced by a symlink at open without staging its target', () => {
+    const options = fixture(), changing = join(options.checkoutRoot, 'supabase/functions/push/index.ts');
+    const external = join(options.root, 'external.ts');
+    writeFileSync(external, 'export const external = true;');
+    let replaced = false;
+    vi.mocked(openSync).mockImplementation((path, flags, mode) => {
+      if (path === changing && !replaced) {
+        replaced = true;
+        rmSync(changing);
+        symlinkSync(external, changing, 'file');
+      }
+      return actualOpen(path, flags, mode);
+    });
+    expect(() => stageStaffingEdge(options)).toThrow();
+    expect(replaced).toBe(true);
+    expect(existsSync(options.outputDirectory)).toBe(false);
+    expect(actualRead(external, 'utf8')).toBe('export const external = true;');
+  });
+
+  it('refuses a source changed while its descriptor is being read', () => {
+    const options = fixture(), changing = join(options.checkoutRoot, 'supabase/functions/push/index.ts');
+    let changingFd: number | undefined;
+    vi.mocked(openSync).mockImplementation((path, flags, mode) => {
+      const fd = actualOpen(path, flags, mode);
+      if (path === changing) changingFd = fd;
+      return fd;
+    });
+    vi.mocked(readFileSync).mockImplementation((path, encoding) => {
+      if (typeof path === 'number' && path === changingFd) writeFileSync(changing, 'export const changedDuringRead = true;');
       return actualRead(path, encoding);
     });
     expect(() => stageStaffingEdge(options)).toThrow('Source changed during staging preflight');

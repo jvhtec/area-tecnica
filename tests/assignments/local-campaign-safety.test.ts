@@ -14,9 +14,51 @@ vi.mock('./helpers/withLocalRuntimeFence', () => ({ withLocalRuntimeFence: (_run
 const command = vi.mocked(execFileSync);
 const jwt = (role: string, iss = 'supabase-demo') => `header.${Buffer.from(JSON.stringify({ role, iss })).toString('base64url')}.signature`;
 
+function historicalMetadata(parts: string[]): string | undefined {
+  const names = ['supabase_db_dev-history', 'supabase_edge_runtime_dev-history', 'history-delivery-capture',
+    'supabase_kong_dev-history', 'supabase_auth_dev-history', 'supabase_rest_dev-history'];
+  const cid = (index: number) => index.toString(16).padStart(64, '0');
+  const network = 'area-tecnica-history', ingress = 'supabase_network_dev-history';
+  if (parts[0] === 'network') {
+    const internal = parts.at(-1) === network;
+    return JSON.stringify([{ Id: cid(internal ? 20 : 21), Name: internal ? network : ingress,
+      Internal: internal, Driver: 'bridge', Scope: 'local',
+      Containers: Object.fromEntries(names.flatMap((name, index) => internal || index === 3 ? [[cid(index + 1), { Name: name }]] : [])) }]);
+  }
+  if (parts[0] === 'inspect') {
+    const index = names.findIndex((name, index) => parts.at(-1) === name || parts.at(-1) === cid(index + 1));
+    if (index < 0) throw new Error('Unknown historical mock container');
+    const gateway = index === 3;
+    const ports = gateway ? { '8000/tcp': [{ HostIp: '127.0.0.1', HostPort: '54441' }] }
+      : index === 0 ? { '5432/tcp': [{ HostIp: '127.0.0.1', HostPort: '54442' }] } : {};
+    return JSON.stringify({ Id: cid(index + 1), Name: `/${names[index]}`, State: { Running: true },
+      Config: { Labels: { 'com.supabase.cli.project': 'dev-history' } },
+      HostConfig: { NetworkMode: network, PublishAllPorts: false, PortBindings: ports },
+      NetworkSettings: { Ports: ports, Networks: { [network]: { NetworkID: cid(20), Aliases: [names[index]] },
+        ...(gateway ? { [ingress]: { NetworkID: cid(21), Aliases: [names[index]] } } : {}) } } });
+  }
+  if (parts[2] !== 'wget') return;
+  const specs = [
+    ['auth-v1', names[4], 9999, '/', '/auth/v1/'], ['rest-v1', names[5], 3000, '/', '/rest/v1/'],
+    ['functions-v1', names[1], 8081, '/', '/functions/v1/'],
+    ['auth-v1-open', names[4], 9999, '/verify', '/auth/v1/verify'],
+    ['auth-v1-open-callback', names[4], 9999, '/callback', '/auth/v1/callback'],
+    ['auth-v1-open-authorize', names[4], 9999, '/authorize', '/auth/v1/authorize'],
+    ['well-known-oauth', names[4], 9999, '/.well-known/oauth-authorization-server', '/.well-known/oauth-authorization-server'],
+  ];
+  const endpoint = parts.at(-1)!;
+  const data = endpoint.includes('/services?') ? specs.map(([name, host, port, path], index) =>
+    ({ id: `service-${index}`, name, host, port, path, protocol: 'http', enabled: true }))
+    : endpoint.includes('/routes?') ? specs.map(([name, , , , path], index) =>
+      ({ id: `route-${index}`, name, paths: [path], service: { id: `service-${index}` }, strip_path: true,
+        hosts: null, methods: null, regex_priority: 0, headers: null, snis: null, sources: null, destinations: null,
+        path_handling: 'v0', preserve_host: false, protocols: ['http', 'https'] })) : [];
+  return JSON.stringify({ data, next: null });
+}
+
 function snapshotResponse(parts: string[], staleFile?: string, adapter = false) {
-  if (parts[0] === 'network') return JSON.stringify([{ Internal: true }]);
-  if (parts[0] === 'inspect') return JSON.stringify([{ NetworkSettings: { Networks: { 'area-tecnica-history': {} } } }]);
+  const metadata = historicalMetadata(parts);
+  if (metadata !== undefined) return metadata;
   return parts.filter(part => part.startsWith('/local/functions/')).map(path => {
     const file = path.slice('/local/functions/'.length);
     const prefix = adapter && file.endsWith('/index.ts') ? "import '../../outbound.ts';\n" : '';
@@ -56,8 +98,8 @@ describe('local campaign fixture safety gates', () => {
     expect(command).toHaveBeenCalledTimes(1);
   });
   it('rejects a runtime/database/capture attached to an additional network', () => {
-    command.mockReturnValueOnce(JSON.stringify([{ Internal: true }]))
-      .mockReturnValue(JSON.stringify([{ NetworkSettings: { Networks: { 'area-tecnica-history': {}, bridge: {} } } }]));
+    command.mockReturnValueOnce(historicalMetadata(['network', 'inspect', 'area-tecnica-history'])!)
+      .mockReturnValue(JSON.stringify({ NetworkSettings: { Networks: { 'area-tecnica-history': {}, bridge: {} } } }));
     expect(() => localCampaignHarness()).toThrow('only the isolated network');
     expect(command).toHaveBeenCalledTimes(2);
   });
@@ -79,7 +121,7 @@ describe('local campaign fixture safety gates', () => {
     command.mockImplementation((...args) => {
       const parts = args[1] as string[];
       const response = snapshotResponse(parts);
-      return parts[0] === 'exec' ? response.slice(0, -1) : response;
+      return parts[0] === 'exec' && parts[2] === 'sh' ? response.slice(0, -1) : response;
     });
     expect(() => localCampaignHarness()).toThrow('Invalid local source snapshot framing');
     expect(createClient).not.toHaveBeenCalled();

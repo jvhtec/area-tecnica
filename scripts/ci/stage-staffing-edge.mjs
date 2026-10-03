@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL, URL } from 'node:url';
 import ts from 'typescript';
@@ -46,6 +46,29 @@ function destinationReady(path) {
   } catch (error) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error;
   }
+}
+
+/** Read and validate the same open file, so a pathname swap cannot redirect a
+ * checked read. Nonblocking open also avoids hanging on a substituted FIFO.
+ * @param {string} path
+ */
+function sourceBytes(path) {
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile()) throw new Error('Staging source must be a regular file');
+    noLinks(path);
+    const bytes = readFileSync(fd);
+    const after = fstatSync(fd, { bigint: true });
+    const named = lstatSync(path, { bigint: true });
+    if (!named.isFile() || before.dev !== named.dev || before.ino !== named.ino ||
+        before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs ||
+        after.size !== named.size || after.mtimeNs !== named.mtimeNs || after.ctimeNs !== named.ctimeNs) {
+      throw new Error('Source changed during staging preflight');
+    }
+    noLinks(path);
+    return bytes;
+  } finally { closeSync(fd); }
 }
 
 /** @param {string} file @param {Buffer} bytes @param {(specifier: string) => void} visit */
@@ -128,9 +151,7 @@ export function stageStaffingEdge({ outputDirectory, checkoutRoot = defaultCheck
   function read(path) {
     if (inputs.has(path)) return /** @type {Buffer} */ (inputs.get(path));
     if (!inside(checkout, path)) throw new Error('Source escapes checkout');
-    noLinks(path);
-    if (!lstatSync(path).isFile()) throw new Error('Staging source must be a regular file');
-    const bytes = readFileSync(path); inputs.set(path, bytes); return bytes;
+    const bytes = sourceBytes(path); inputs.set(path, bytes); return bytes;
   }
   const manifest = jwtManifest(read(join(checkout, 'supabase/config.toml')));
   const entrypoints = new Set(STAFFING_EDGE_ROOTS.map(name => join(functions, name, 'index.ts')));
@@ -163,8 +184,7 @@ export function stageStaffingEdge({ outputDirectory, checkoutRoot = defaultCheck
   // Recheck the entire read set and destination before creating directories or
   // files. Refuse a changed checkout instead of silently staging stale bytes.
   for (const [path, bytes] of inputs) {
-    noLinks(path);
-    if (!lstatSync(path).isFile() || !readFileSync(path).equals(bytes)) throw new Error('Source changed during staging preflight');
+    if (!sourceBytes(path).equals(bytes)) throw new Error('Source changed during staging preflight');
   }
   destinationReady(output);
   mkdirSync(dirname(output), { recursive: true });

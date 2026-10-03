@@ -8,6 +8,7 @@ import { withLocalRuntimeFence } from './withLocalRuntimeFence';
 import { observeLocalTransport } from './observeLocalTransport';
 import { readDisposableCampaignTarget, verifyDisposableCampaignTarget } from './disposableCampaignTarget';
 import { readCiCampaignTarget, verifyCiCampaignTarget } from './ciCampaignTarget';
+import { historicalCampaignTarget, verifyHistoricalCampaignTarget } from './historicalCampaignTarget';
 
 const validatedTargets = new WeakSet<object>();
 export function assertValidatedCampaignTarget(target: { database: string }) {
@@ -30,8 +31,7 @@ export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'h
   if (process.env.STAFFING_CI_MANIFEST !== undefined && process.env.STAFFING_DISPOSABLE_MANIFEST !== undefined) {
     throw new Error('CI and disposable manifests cannot be combined');
   }
-  const target = options.mode === 'historical' ? Object.freeze({ database: 'supabase_db_dev-history', url: 'http://127.0.0.1:54441',
-    edge: 'supabase_edge_runtime_dev-history', capture: 'history-delivery-capture', network: 'area-tecnica-history' })
+  const target = options.mode === 'historical' ? Object.freeze({ ...historicalCampaignTarget })
     : options.mode === 'ci' ? readCiCampaignTarget() : readDisposableCampaignTarget();
   const { database, url: localUrl } = target;
   if (process.env.STAFFING_EDGE_TEST_URL !== localUrl) throw new Error(options.mode === 'historical'
@@ -45,16 +45,7 @@ export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'h
   }
   if (options.mode === 'ci') verifyCiCampaignTarget(target as ReturnType<typeof readCiCampaignTarget>, docker);
   else if (options.mode === 'disposable') verifyDisposableCampaignTarget(target as ReturnType<typeof readDisposableCampaignTarget>, docker);
-  else {
-    const network = JSON.parse(docker('network', 'inspect', target.network))[0];
-    if (!network.Internal) throw new Error('Historical network must have no external route');
-    for (const container of [database, target.edge, target.capture]) {
-      const inspected = JSON.parse(docker('inspect', '--type', 'container', container))[0];
-      if (Object.keys(inspected.NetworkSettings.Networks).join() !== target.network) {
-        throw new Error('Database, runtime and capture must use only the isolated network');
-      }
-    }
-  }
+  else verifyHistoricalCampaignTarget(docker);
   // The local runtime serves a copied snapshot. Refuse stale code instead of
   // claiming tests covered the checkout when only the private copy was run.
   // Include separately invoked handlers and recursively follow their imports.
