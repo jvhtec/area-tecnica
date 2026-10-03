@@ -8,7 +8,7 @@ export function trackLocalFunctions(client: SupabaseClient) {
   const functions = client.functions;
   const invoke = functions.invoke.bind(functions);
   const calls: Array<{ name: string; body: unknown; result: ReturnType<typeof invoke> }> = [];
-  let cleanupSafe = true;
+  let transportComplete = true;
   const getter = vi.spyOn(client, 'functions', 'get').mockReturnValue(functions);
   const method = vi.spyOn(functions, 'invoke').mockImplementation((name, options) => {
     // Do not abort an in-flight handler and mistake client settlement for
@@ -20,13 +20,15 @@ export function trackLocalFunctions(client: SupabaseClient) {
   });
   return {
     calls,
-    get cleanupSafe() { return cleanupSafe; },
+    // This proves HTTP completion only. Fixture deletion separately requires
+    // the local runtime fence to drain deferred work and hold admission closed.
+    get transportComplete() { return transportComplete; },
     async drain() {
-      cleanupSafe = false;
+      transportComplete = false;
       const settled = await Promise.allSettled(calls.map(call => call.result));
-      cleanupSafe = settled.every(result => result.status === 'fulfilled' &&
+      transportComplete = settled.every(result => result.status === 'fulfilled' &&
         (!result.value.error || result.value.error.name === 'FunctionsHttpError'));
-      if (!cleanupSafe) throw new Error('Function transport did not complete; quiesce the isolated runtime before cleaning owned fixtures');
+      if (!transportComplete) throw new Error('Function transport did not complete; quiesce the isolated runtime before cleaning owned fixtures');
     },
     restore() { method.mockRestore(); getter.mockRestore(); },
   };

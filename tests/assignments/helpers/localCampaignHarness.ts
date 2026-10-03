@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { expect } from 'vitest';
 import { edgeSnapshot } from './edgeSnapshot';
 import { localRequestSafety } from './localRequestSafety';
+import { withLocalRuntimeFence } from './withLocalRuntimeFence';
 
 const database = 'supabase_db_dev-history';
 const localUrl = 'http://127.0.0.1:54441';
@@ -57,6 +58,10 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   const users = new Set<string>();
   const marker = `[LOCAL CAMPAIGN TEST ${randomUUID()}]`;
   const requests = localRequestSafety();
+  async function fenced<T>(cleanup: (assertFresh: () => void) => Promise<T>) {
+    requests.assertSafe();
+    return requests.run(() => withLocalRuntimeFence({ url: localUrl, anon, service, fetch: realFetch }, cleanup));
+  }
 
   function fingerprint() {
     return coreTables.map(table => docker('exec', database, 'psql', '-XqAt', '-U', 'postgres', '-d', 'postgres', '-c',
@@ -137,36 +142,42 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   async function cleanJobs() {
-    requests.assertSafe();
-    if (jobs.size) {
-      // Push inbox rows can target historical managers, so user deletion alone
-      // is insufficient. Their attempt rows cascade with the owned inbox items.
-      expect((await client.from('notification_inbox').delete().in('meta->>jobId', [...jobs])).error).toBeNull();
-      // Both the random IDs and this run's title must match before removal.
-      const result = await client.from('jobs').delete().in('id', [...jobs]).eq('title', marker);
-      expect(result.error).toBeNull();
-      // Activity deliberately has no cascading job FK. Include rows created by
-      // sender success and by assignment deletion before any assertion about
-      // surviving fixture jobs can prevent cleanup. Retain IDs for retries.
-      expect((await client.from('activity_log').delete().in('job_id', [...jobs])).error).toBeNull();
-      const remaining = await client.from('jobs').select('id').in('id', [...jobs]);
-      expect(remaining.error).toBeNull();
-      expect(remaining.data).toEqual([]);
-      jobs.clear();
-    }
+    return fenced(async assertFresh => {
+      if (jobs.size) {
+        // Push inbox rows can target historical managers, so user deletion alone
+        // is insufficient. Their attempt rows cascade with the owned inbox items.
+        assertFresh();
+        expect((await client.from('notification_inbox').delete().in('meta->>jobId', [...jobs])).error).toBeNull();
+        // Both the random IDs and this run's title must match before removal.
+        assertFresh();
+        const result = await client.from('jobs').delete().in('id', [...jobs]).eq('title', marker);
+        expect(result.error).toBeNull();
+        // Activity deliberately has no cascading job FK. Include rows created by
+        // sender success and by assignment deletion before any assertion about
+        // surviving fixture jobs can prevent cleanup. Retain IDs for retries.
+        assertFresh();
+        expect((await client.from('activity_log').delete().in('job_id', [...jobs])).error).toBeNull();
+        const remaining = await client.from('jobs').select('id').in('id', [...jobs]);
+        expect(remaining.error).toBeNull();
+        expect(remaining.data).toEqual([]);
+        jobs.clear();
+      }
+    });
   }
 
   async function cleanUsers() {
-    requests.assertSafe();
-    const failures: string[] = [];
-    for (const id of users) {
-      const result = await client.auth.admin.deleteUser(id);
-      if (result.error) failures.push(id);
-      else users.delete(id);
-    }
-    if (failures.length) throw new Error(`Could not remove ${failures.length} owned local test users; remaining IDs: ${failures.join(',')}`);
+    return fenced(async assertFresh => {
+      const failures: string[] = [];
+      for (const id of users) {
+        assertFresh();
+        const result = await client.auth.admin.deleteUser(id);
+        if (result.error) failures.push(id);
+        else users.delete(id);
+      }
+      if (failures.length) throw new Error(`Could not remove ${failures.length} owned local test users; remaining IDs: ${failures.join(',')}`);
+    });
   }
 
   return { client, api, user, job, start, campaign, roles, request, assignment, cleanJobs, cleanUsers, fingerprint, localUrl,
-    assertCleanupSafe: requests.assertSafe };
+    assertCleanupSafe: requests.assertSafe, prepare: () => fenced(async () => undefined), withCleanupFence: fenced };
 }

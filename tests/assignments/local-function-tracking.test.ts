@@ -31,10 +31,10 @@ describe('local Edge test observation safety', () => {
       expect(observer.calls).toHaveLength(1);
       if (outcome === 'reject') {
         await expect(observer.drain()).rejects.toThrow('Function transport did not complete');
-        expect(observer.cleanupSafe).toBe(false);
+        expect(observer.transportComplete).toBe(false);
       } else {
         await observer.drain();
-        expect(observer.cleanupSafe).toBe(true);
+        expect(observer.transportComplete).toBe(true);
         expect((await observer.calls[0].result).error?.context.status).toBe(403);
       }
     } finally { observer.restore(); }
@@ -51,13 +51,13 @@ describe('local Edge test observation safety', () => {
     const invocation = client.functions.invoke('push', { body: { action: 'broadcast' } });
     const drain = observer.drain();
     try {
-      expect(observer.cleanupSafe).toBe(false);
+      expect(observer.transportComplete).toBe(false);
       await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-      expect(observer.cleanupSafe).toBe(false);
+      expect(observer.transportComplete).toBe(false);
     } finally {
       respond(new Response(JSON.stringify({ status: 'skipped' }), { headers: { 'Content-Type': 'application/json' } }));
       await invocation; await drain; observer.restore();
     }
-    expect(observer.cleanupSafe).toBe(true);
+    expect(observer.transportComplete).toBe(true);
   });
 });

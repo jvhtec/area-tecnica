@@ -26,6 +26,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real manager cancellation 
 
   beforeAll(async () => {
     h = localCampaignHarness();
+    await h.prepare();
     baseline = h.fingerprint();
     manager = await h.user('management');
     tech = await h.user();
@@ -33,20 +34,25 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real manager cancellation 
   }, 90_000);
   beforeEach(() => {
     if (cleanupUnsafe) throw new Error('Local transport failure requires runtime quiescence before further fixtures');
+    h?.assertCleanupSafe();
   });
   afterEach(async () => {
     if (cleanupUnsafe) return;
     // Set this before waiting: a Vitest hook timeout need not reject drain().
     cleanupUnsafe = true;
-    try { await background?.drain(); cleanupUnsafe = false; }
+    try {
+      cleanup(); queryClient?.clear();
+      await background?.drain();
+      await h?.cleanJobs();
+      cleanupUnsafe = false;
+    }
     finally {
       cleanup();
       queryClient?.clear();
       background?.restore();
       background = undefined;
-      if (!cleanupUnsafe) await h?.cleanJobs();
     }
-  }, 45_000);
+  }, 100_000);
   afterAll(async () => {
     if (!h) return;
     if (cleanupUnsafe) throw new Error('Owned fixtures retained: local function transport needs quiescence before cleanup');
@@ -56,7 +62,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real manager cancellation 
     }
     try { if (baseline) expect(h.fingerprint()).toEqual(baseline); } catch (error) { failures.push(error); }
     if (failures.length) throw new AggregateError(failures, 'Local cancellation fixture cleanup or preservation failed');
-  }, 90_000);
+  }, 200_000);
 
   function mount(client = manager.client, observedJobId = '') {
     binding.client = client;

@@ -7,6 +7,9 @@ import * as requestSafety from './helpers/localRequestSafety';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
+// Unit tests exercise ownership/order gates; real runtime fencing is tested
+// separately and is mandatory in every opt-in integration run.
+vi.mock('./helpers/withLocalRuntimeFence', () => ({ withLocalRuntimeFence: (_runtime: unknown, action: (check: () => void) => Promise<unknown>) => action(() => undefined) }));
 const command = vi.mocked(execFileSync);
 const jwt = (role: string, iss = 'supabase-demo') => `header.${Buffer.from(JSON.stringify({ role, iss })).toString('base64url')}.signature`;
 

@@ -15,6 +15,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
 
   beforeAll(async () => {
     h = localCampaignHarness();
+    await h.prepare();
     const health = await fetch(`${h.localUrl}/functions/v1/_local-health`);
     expect(await health.json()).toMatchObject({ runtime: 'isolated-local' });
     baseline = h.fingerprint();
@@ -23,7 +24,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     alternate = await h.user();
   }, 60_000);
   beforeEach(() => { h?.assertCleanupSafe(); });
-  afterEach(async () => { await h?.cleanJobs(); }, 30_000);
+  afterEach(async () => { await h?.cleanJobs(); }, 100_000);
   afterAll(async () => {
     if (!h) return;
     h.assertCleanupSafe();
@@ -33,7 +34,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     }
     try { if (baseline) expect(h.fingerprint()).toEqual(baseline); } catch (error) { failures.push(error); }
     if (failures.length) throw new AggregateError(failures, 'Local fixture cleanup or preservation failed');
-  }, 60_000);
+  }, 200_000);
 
   it('requires real management auth for start and the service key for tick', async () => {
     const job = await h.job();

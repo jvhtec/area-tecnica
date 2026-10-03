@@ -1,7 +1,8 @@
 param([Parameter(Mandatory=$true)][string]$CredentialsPath, [string[]]$TestFile = @(
   'tests/assignments/staffing-campaigns.edge.integration.test.ts',
   'tests/assignments/staffing-cancellation.local.integration.test.tsx',
-  'tests/assignments/matrix-dialog.local.integration.test.tsx'
+  'tests/assignments/matrix-dialog.local.integration.test.tsx',
+  'tests/assignments/runtime-fence.local.integration.test.ts'
 ))
 $ErrorActionPreference = 'Stop'
 $repoPath = Split-Path -Parent $PSScriptRoot
