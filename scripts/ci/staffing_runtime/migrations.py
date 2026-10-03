@@ -77,6 +77,17 @@ class Migrations(Bootstrap):
         if tunnel["Name"] != "/" + self.tunnel:
             raise ValueError("Migration tunnel container name failed")
         if not tunnel["State"]["Running"]:
+            state = tunnel["State"]
+            exit_code = state.get("ExitCode")
+            error = state.get("Error")
+            if exit_code == 1 and not error:
+                raise ValueError("Migration tunnel process exited with code 1")
+            if exit_code == 126:
+                raise ValueError("Migration tunnel process could not execute")
+            if exit_code == 127:
+                raise ValueError("Migration tunnel executable was not found")
+            if error:
+                raise ValueError("Migration tunnel failed during container start")
             raise ValueError("Migration tunnel container is not running")
         if tunnel["Image"] != image:
             raise ValueError("Migration tunnel image identity failed")
