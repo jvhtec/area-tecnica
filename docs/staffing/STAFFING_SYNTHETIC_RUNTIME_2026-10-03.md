@@ -1,0 +1,37 @@
+# Synthetic staffing runtime characterization
+
+This test-infrastructure increment supports the Phase 1 exit gate. It changes no production handler, migration, request status, campaign count, authorization or assignment semantics. GitHub CI provisioning remains pending; local execution is not CI evidence.
+
+## Projection and admission
+
+`node scripts/ci/stage-staffing-edge.mjs --output <absolute-empty-directory>` stages the current checkout outside the repository. It follows TypeScript imports, re-exports and literal dynamic imports from orchestrator, sender, cancellation notifier, push and Flex. The current closure contains 90 production modules. Only five entrypoints receive the leading test import; all other production bytes are preserved. Twenty-six filesystem controls cover source escapes, symlinks, ambiguous imports, changed inputs, overwrite refusal and matching-source behavior.
+
+Public test-only main/worker/outbound assets, modern/legacy probes and a five-handler JWT manifest accompany the projection. Missing `verify_jwt` declarations retain the default `true`. The target adapter checks live container/network IDs, labels, image identities, exact loopback bindings, plain local volumes, permitted read-only mounts, runtime asset bytes and JWT exposure. Optional database ingress is checked separately. Row-lock and fault SQL revalidate the same frozen target immediately before execution.
+
+`STAFFING_CI_MANIFEST` selects this target for existing campaign, matrix and disposable matrix-failure suites. It cannot be combined with a disposable manifest. CI mode never reads the historical database. Credentials stay outside Git; the demo issuer and exact local URL are checked.
+
+## Completion boundary
+
+Workers track foreground callbacks, registered `waitUntil` tasks, outbound work, invocation IDs and boot identity. Callback failures are diagnostics; deferred failures and transport uncertainty refuse cleanup. All outbound requests pass through the fixed local gateway. Known email/WhatsApp requests reach an in-memory sink; other external destinations are refused. Redirects are disabled. Gateway provenance and complete bounded reply receipt are required before returning to production code, so transport errors are observed below application catch blocks. JSON syntax errors after complete receipt are distinct from transport errors.
+
+The gateway counts data requests through complete upstream receipt and downstream reply handling. Strict HTTP framing gates its reserved completion marker. Fully received application 500/503 responses are certified. Timeout, truncation or other failure before certified receipt latches uncertainty even after active requests reach zero. Exact authenticated state/drain/release/bootstrap and capture gate controls are excluded from data accounting.
+
+Drain holds an Edge admission lease, verifies every worker's completion/affinity, and compares stable gateway snapshots. Early missing acknowledgment retries while foreground execution changes; stable mismatch fails closed. Release is serialized, rechecks the same lease after awaiting and repeats completion proof for cleanup's own REST requests. Worker/gateway replacement cannot silently erase evidence.
+
+Pinned `per_worker` retires idle workers halfway through their wall-clock budget. The test-only 4,800,000 ms budget allows 40 minutes before retirement for a bounded 35-minute CI job. Unavailable workers still refuse cleanup. An earlier short-budget native retirement demonstrated that refusal; a 40-minute endurance test was not performed.
+
+## Observed local evidence
+
+The separate synthetic stack uses actual PostgreSQL with all 251 migrations, GoTrue, PostgREST and Edge Runtime 1.76.2. Cron is disabled; database/runtime/capture have no external route. No historical dump or personal data is imported.
+
+Six native protocol cases passed, covering five production-worker bootstrap acknowledgments, protected/inherited route refusal, modern/legacy deferred gates, completed errors, ignored/cancelled replies, nested calls, REST under the lease and mismatched release. Three native negative batches passed for both serving APIs: swallowed abort, truncated reply and gateway timeout retain cleanup refusal after the gateway becomes idle. Poisoned empty processes were retired by verified IDs between batches; no live uncertainty latch was cleared.
+
+The existing 27 campaign, eight direct-matrix and three matrix-failure cases passed on synthetic data with their existing outcomes. These duplicate the corresponding historical/disposable product contracts, rather than adding 38 distinct roadmap cases. Two setup failures were preserved: missing job activity codes, then a missing timesheet-submitted code. The complete non-personal reference fixture follows product catalog visibility/severity/toast/template defaults and leaves existing migration rows unchanged. Production triggers remain enabled.
+
+Every successful suite restored twelve tracked application tables and Auth users to emptiness. Original historical/clone fingerprints and container identities were unchanged. The owned matrix fault schema was removed. Ordinary Vitest passed 3,489 tests and skipped 95 opt-in cases. New public controls contribute 171 checks; sixteen separate Python gateway controls passed. Strict integration/application types and focused lint passed. Governance structural gates passed; dependency advisory 1240992 still has five high development dependency entries and no approved time-bound exception.
+
+## Remaining work
+
+Source staging and runtime assets are public. Service provisioning, offline cache construction, owned cleanup and the GitHub Actions job still need a portable controller and actual CI execution. Source assertions must remain until their behavioral replacements run in CI.
+
+The broader roadmap gaps remain: automatic waves/ranking/deterministic keys, initial CAS contention, offer capability methods/result navigation, full TTL/cancellation boundaries, direct-writer locking inventory and owned wave/journal recovery evidence. This increment does not authorize counting, reservation, cancellation or recovery changes.

@@ -709,6 +709,8 @@ Ordinary CI runs seventy-five safety/source/cleanup/observation/calendar/fence/c
 
 ### Phase 1 exit gate
 
+The [synthetic runtime increment](STAFFING_SYNTHETIC_RUNTIME_2026-10-03.md) reproduces 38 existing campaign/matrix contracts on synthetic data and verifies native completion refusal for handled transport failures. Its source projection and target/runtime controls are public; the CI service/cache/cleanup controller and actual GitHub job are still open work. Coverage rows above remain local-only until that job runs.
+
 Before architectural work:
 
 - all P0 cases above are automated and green;

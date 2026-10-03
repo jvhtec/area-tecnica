@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { expect } from 'vitest';
 import { campaignHarnessCore } from './campaignHarnessCore';
 import { readDisposableCampaignTarget, verifyDisposableCampaignTarget } from './disposableCampaignTarget';
+import { readCiCampaignTarget, verifyCiCampaignTarget } from './ciCampaignTarget';
 import { observeLocalAssignmentWrites } from './observeLocalAssignmentWrites';
 
 const tables = ['jobs','staffing_requests','job_assignments','timesheets','profiles','activity_log','notification_inbox','push_delivery_attempts'];
@@ -13,7 +14,8 @@ const docker = (...args: string[]) => execFileSync('docker', args, { encoding:'u
 export function disposableCampaignHarness(extraHandlers: string[] = []) {
   let installed = false;
   let transport: ReturnType<typeof observeLocalAssignmentWrites>;
-  const h = campaignHarnessCore(extraHandlers, { mode:'disposable',
+  const ci = process.env.STAFFING_CI_MANIFEST !== undefined;
+  const h = campaignHarnessCore(extraHandlers, { mode: ci ? 'ci' : 'disposable',
     wrapFetch(fetch) { transport = observeLocalAssignmentWrites(fetch); return transport.fetch; },
     async beforeJobDelete(marker, assertFresh) {
       if (!installed) return;
@@ -21,13 +23,16 @@ export function disposableCampaignHarness(extraHandlers: string[] = []) {
       await sql(`DELETE FROM local_matrix_fault.owned_dates WHERE marker='${marker}';`, assertFresh);
     },
   });
-  const target = h.target as ReturnType<typeof readDisposableCampaignTarget>;
+  const target = h.target;
   const ownedMarker = h.marker;
   async function sql(query: string, assertFresh: () => void) {
     // Docker CLI interruption cannot prove remote psql completion. Preserve
     // fixtures and latch uncertainty on any driver failure, independently of
     // the completed callback classification in the runtime fence.
-    await h.runGuardedMutation(async () => { verifyDisposableCampaignTarget(target, docker); });
+    await h.runGuardedMutation(async () => {
+      if (ci) verifyCiCampaignTarget(target as ReturnType<typeof readCiCampaignTarget>, docker);
+      else verifyDisposableCampaignTarget(target as ReturnType<typeof readDisposableCampaignTarget>, docker);
+    });
     // Inspections are synchronous but individually bounded; their cumulative
     // time can exceed the fence. A known deadline refusal stays retryable.
     assertFresh();
@@ -81,6 +86,7 @@ export function disposableCampaignHarness(extraHandlers: string[] = []) {
   }
   // Read-only preservation of the original stack; mutation uses only target.database.
   function historicalFingerprint() {
+    if (ci) return h.fingerprint();
     return tables.map(table => docker('exec','supabase_db_dev-history','psql','-h','/var/run/postgresql','-XqAt','-U','postgres','-d','postgres','-c',
       `SELECT count(*) || ':' || md5(coalesce(string_agg(to_jsonb(t)::text,'|' ORDER BY t.id),'')) FROM public.${table} t;`).trim());
   }

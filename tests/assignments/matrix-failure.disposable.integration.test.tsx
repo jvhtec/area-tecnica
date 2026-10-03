@@ -24,7 +24,7 @@ import { AssignJobDialog, type AssignableJob, type ExistingAssignment } from '@/
 import { fromMadridDateKey } from '@/utils/timezoneUtils';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 
-describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST)('disposable clone real matrix partial-write evidence (P0.16)', () => {
+describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFING_CI_MANIFEST)('disposable clone real matrix partial-write evidence (P0.16)', () => {
   let h: ReturnType<typeof disposableCampaignHarness>;
   let manager: Awaited<ReturnType<typeof h.user>>;
   let tech: Awaited<ReturnType<typeof h.user>>;

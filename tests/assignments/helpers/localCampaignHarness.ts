@@ -1,6 +1,6 @@
 import { campaignHarnessCore } from './campaignHarnessCore';
 
-/** Fixed historical target; fault fixtures use the separate disposable entry point. */
+/** Historical by default; CI requires its separately validated manifest. */
 export function localCampaignHarness(extraHandlers: string[] = []) {
-  return campaignHarnessCore(extraHandlers, { mode: 'historical' });
+  return campaignHarnessCore(extraHandlers, { mode: process.env.STAFFING_CI_MANIFEST !== undefined ? 'ci' : 'historical' });
 }

@@ -1,9 +1,14 @@
 import { spawn } from 'node:child_process';
+import { assertValidatedCampaignTarget } from './campaignHarnessCore';
 
 /** Hold only a synthetic campaign-role row, so a real tick keeps its run lock. */
-export async function holdCampaignRole(id: string) {
+export async function holdCampaignRole(id: string, target?: { database: string }) {
   if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error('Expected a fixture UUID');
-  const process = spawn('docker', ['exec', '-i', 'supabase_db_dev-history', 'psql', '-XqAt',
+  if (target) assertValidatedCampaignTarget(target);
+  else if (globalThis.process.env.STAFFING_CI_MANIFEST !== undefined || globalThis.process.env.STAFFING_DISPOSABLE_MANIFEST !== undefined) {
+    throw new Error('A validated target is required for synthetic campaign locks');
+  }
+  const process = spawn('docker', ['exec', '-i', target?.database ?? 'supabase_db_dev-history', 'psql', '-XqAt',
     '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres'], { stdio: ['pipe', 'pipe', 'pipe'] });
   let output = '';
   let errors = '';

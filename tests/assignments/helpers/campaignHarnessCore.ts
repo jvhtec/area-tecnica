@@ -7,6 +7,13 @@ import { localRequestSafety } from './localRequestSafety';
 import { withLocalRuntimeFence } from './withLocalRuntimeFence';
 import { observeLocalTransport } from './observeLocalTransport';
 import { readDisposableCampaignTarget, verifyDisposableCampaignTarget } from './disposableCampaignTarget';
+import { readCiCampaignTarget, verifyCiCampaignTarget } from './ciCampaignTarget';
+
+const validatedTargets = new WeakSet<object>();
+export function assertValidatedCampaignTarget(target: { database: string }) {
+  if (!validatedTargets.has(target)) throw new Error('Expected a validated campaign target');
+  if ('services' in target) verifyCiCampaignTarget(target as ReturnType<typeof readCiCampaignTarget>, docker);
+}
 
 const coreTables = ['jobs', 'staffing_requests', 'job_assignments', 'timesheets', 'profiles', 'activity_log', 'notification_inbox', 'push_delivery_attempts'];
 // setup.ts replaces global fetch before each unit test. Keep the original
@@ -17,14 +24,18 @@ function docker(...args: string[]) {
   return execFileSync('docker', args, { encoding: 'utf8', timeout: 15_000, maxBuffer: 64 * 1024 * 1024 });
 }
 
-export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'historical' | 'disposable';
+export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'historical' | 'disposable' | 'ci';
   beforeJobDelete?: (marker: string, assertFresh: () => void) => Promise<void>; wrapFetch?: (fetch: typeof globalThis.fetch) => typeof globalThis.fetch }) {
-  if (!['historical','disposable'].includes(options.mode)) throw new Error('Unknown local campaign target mode');
-  const target = options.mode === 'historical' ? { database: 'supabase_db_dev-history', url: 'http://127.0.0.1:54441',
-    edge: 'supabase_edge_runtime_dev-history', capture: 'history-delivery-capture', network: 'area-tecnica-history' } : readDisposableCampaignTarget();
+  if (!['historical','disposable','ci'].includes(options.mode)) throw new Error('Unknown local campaign target mode');
+  if (process.env.STAFFING_CI_MANIFEST !== undefined && process.env.STAFFING_DISPOSABLE_MANIFEST !== undefined) {
+    throw new Error('CI and disposable manifests cannot be combined');
+  }
+  const target = options.mode === 'historical' ? Object.freeze({ database: 'supabase_db_dev-history', url: 'http://127.0.0.1:54441',
+    edge: 'supabase_edge_runtime_dev-history', capture: 'history-delivery-capture', network: 'area-tecnica-history' })
+    : options.mode === 'ci' ? readCiCampaignTarget() : readDisposableCampaignTarget();
   const { database, url: localUrl } = target;
   if (process.env.STAFFING_EDGE_TEST_URL !== localUrl) throw new Error(options.mode === 'historical'
-    ? 'Only the isolated historical localhost gateway is permitted' : 'Only the owned disposable localhost gateway is permitted');
+    ? 'Only the isolated historical localhost gateway is permitted' : `Only the owned ${options.mode} localhost gateway is permitted`);
   const anon = process.env.STAFFING_EDGE_TEST_ANON_KEY!;
   const service = process.env.STAFFING_EDGE_TEST_SERVICE_KEY!;
   for (const [key, role] of [[anon, 'anon'], [service, 'service_role']]) {
@@ -32,7 +43,8 @@ export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'h
     const claims = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString());
     if (claims.iss !== 'supabase-demo' || claims.role !== role) throw new Error('Refusing credentials that are not local demo keys');
   }
-  if (options.mode === 'disposable') verifyDisposableCampaignTarget(target as ReturnType<typeof readDisposableCampaignTarget>, docker);
+  if (options.mode === 'ci') verifyCiCampaignTarget(target as ReturnType<typeof readCiCampaignTarget>, docker);
+  else if (options.mode === 'disposable') verifyDisposableCampaignTarget(target as ReturnType<typeof readDisposableCampaignTarget>, docker);
   else {
     const network = JSON.parse(docker('network', 'inspect', target.network))[0];
     if (!network.Internal) throw new Error('Historical network must have no external route');
@@ -61,6 +73,7 @@ export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'h
       .replace(/^import '\.\.\/\.\.\/outbound.ts';\r?\n/, '');
     if (normalize(source) !== normalize(expected)) throw new Error(`Local runtime source is stale: ${file}. Sync its public source before testing.`);
   }
+  validatedTargets.add(target);
   const requests = localRequestSafety();
   const observed = observeLocalTransport(realFetch, requests);
   const observedFetch = options.wrapFetch?.(observed) ?? observed;

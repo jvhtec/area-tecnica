@@ -163,7 +163,7 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('campaign characterization 
     const job = await h.job();
     const { campaign } = await h.start(job, manager.token);
     const role = (await h.roles(campaign.id))[0];
-    const release = await holdCampaignRole(role.id);
+    const release = await holdCampaignRole(role.id, h.target);
     const winner = h.api('tick', { campaign_id: campaign.id }).catch(() => ({ status: 0, body: {} }));
     let winnerResult: Awaited<typeof winner>;
     try {
