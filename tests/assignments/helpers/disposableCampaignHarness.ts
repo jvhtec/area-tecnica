@@ -7,7 +7,7 @@ import { readDisposableCampaignTarget, verifyDisposableCampaignTarget } from './
 import { observeLocalAssignmentWrites } from './observeLocalAssignmentWrites';
 
 const tables = ['jobs','staffing_requests','job_assignments','timesheets','profiles','activity_log','notification_inbox','push_delivery_attempts'];
-const docker = (...args: string[]) => execFileSync('docker', args, { encoding:'utf8', timeout:15_000 });
+const docker = (...args: string[]) => execFileSync('docker', args, { encoding:'utf8', timeout:15_000, maxBuffer:64 * 1024 * 1024 });
 
 /** Faults require a separately labelled disposable clone, never the historical entry point. */
 export function disposableCampaignHarness(extraHandlers: string[] = []) {
