@@ -180,6 +180,12 @@ in CI to make the number visible (currently not gated).
   `npm ci --legacy-peer-deps --ignore-scripts` for CI/tooling that doesn't need image
   processing. Worth pinning `sharp`'s install or making it optional.
 
+  October 3, 2026 update: that install recommendation predates the
+  [braces security postinstall](../patches/README.md). `--ignore-scripts` alone
+  now leaves the fix unapplied and fails governance. After a restricted install,
+  explicitly run `node scripts/apply-braces-backport.mjs` and `npm run governance`,
+  and verify any other required native tooling separately.
+
 ### CQ-09 — Low — Assorted lint warnings worth clearing
 
 From the 1,770 warnings, beyond `any`: **96** `react-hooks/exhaustive-deps` (stale-closure

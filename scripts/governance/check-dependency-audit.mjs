@@ -8,6 +8,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { verifiedBracesRemediation } from "./braces-audit-remediation.mjs";
+import { validateAuditReport } from "./audit-report.mjs";
 
 const repoRoot = process.cwd();
 const baselinePath = join(
@@ -43,10 +45,9 @@ function runAudit(args = []) {
   }
 
   try {
-    return JSON.parse(output);
+    return validateAuditReport(JSON.parse(output));
   } catch (error) {
-    console.error(output);
-    throw new Error(`Failed to parse npm audit JSON: ${error.message}`);
+    throw new Error(`Failed to validate npm audit JSON: ${error.message}`);
   }
 }
 
@@ -250,7 +251,18 @@ function writeSummary(snapshot, failures = { newAdvisoryIds: [], increasedSeveri
   console.log(lines.join("\n"));
 }
 
-const snapshot = collectAuditSnapshot(runAudit());
+const rawReport = runAudit();
+const rawSnapshot = collectAuditSnapshot(rawReport);
+const productionReport = runAudit(["--omit=dev"]);
+let remediation;
+try {
+  remediation = verifiedBracesRemediation(rawReport, productionReport, repoRoot);
+} catch (error) {
+  writeSummary(rawSnapshot);
+  console.error(`Dependency remediation verification failed: ${error.message}`);
+  process.exit(1);
+}
+const snapshot = collectAuditSnapshot(remediation.report);
 
 if (shouldWriteBaseline) {
   mkdirSync(dirname(baselinePath), { recursive: true });
@@ -264,9 +276,16 @@ if (shouldWriteBaseline) {
 const baseline = readBaseline();
 const failures = compareToBaseline(snapshot, baseline);
 const exceptionFailures = validateExceptions(snapshot, baseline);
-const productionSnapshot = collectAuditSnapshot(runAudit(["--omit=dev"]));
+const productionSnapshot = collectAuditSnapshot(productionReport);
 const productionFailures = productionExposureFailures(productionSnapshot, baseline);
-writeSummary(snapshot, failures);
+writeSummary(rawSnapshot);
+const remediationSummary = remediation.remediated.map(entry => `Verified backport remediation ${entry.advisoryId}: ${entry.packages.join(", ")}. ${entry.reason}`);
+if (remediation.remediated.length) remediationSummary.push(`Unresolved vulnerabilities: ${snapshot.total}; baseline remains unchanged.`);
+if (remediationSummary.length) {
+  console.log(remediationSummary.join("\n"));
+  if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${remediationSummary.join("\n\n")}\n`, { flag: "a" });
+}
+if (failures.newAdvisoryIds.length || failures.increasedSeverityCounts.length) writeSummary(snapshot, failures);
 
 if (exceptionFailures.length > 0 || productionFailures.length > 0) {
   console.error([...exceptionFailures, ...productionFailures].join("\n"));

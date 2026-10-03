@@ -218,6 +218,9 @@ jobs:
       - name: Run Vitest suite
         run: npm run test:run
 
+      - name: Test synthetic runtime ownership journal and planner
+        run: python3 -B -m unittest discover -s scripts/ci/staffing_runtime -p 'test_*.py' -v
+
   build:
     name: npm run build
     runs-on: ubuntu-latest
