@@ -24,7 +24,7 @@ import { AssignJobDialog, type AssignableJob, type ExistingAssignment } from '@/
 import { fromMadridDateKey } from '@/utils/timezoneUtils';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 
-describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFING_CI_MANIFEST)('disposable clone real matrix partial-write evidence (P0.16)', () => {
+describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFING_CI_MANIFEST)('disposable clone real matrix atomic-write evidence (P0.16)', () => {
   let h: ReturnType<typeof disposableCampaignHarness>;
   let manager: Awaited<ReturnType<typeof h.user>>;
   let tech: Awaited<ReturnType<typeof h.user>>;
@@ -154,7 +154,7 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     } finally { window.removeEventListener('assignment-updated', event); }
   }, 45_000);
 
-  it('one failed RPC retains membership and only the successful selected date, leaving the dialog open', async () => {
+  it('one failed date rolls back the whole command: no membership, no day, dialog stays open', async () => {
     const item = await job();
     await h.armFault(item.id,tech.id,manager.id,'2027-10-22');
     const event = vi.fn(); window.addEventListener('assignment-updated', event);
@@ -164,31 +164,25 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
       await ui.user.click(screen.getByRole('gridcell', { name: '22' }));
       await ui.user.click(screen.getByRole('button', { name: /^Asignar trabajo$/ }));
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-        'Error al asignar el trabajo: Error al crear hojas de hora para las fechas: 2027-10-22'), { timeout: 15_000 });
+        'No se pudo completar la operación de asignación.'), { timeout: 15_000 });
       await waitFor(() => expect(screen.getByRole('button', { name: /^Asignar trabajo$/ })).toBeEnabled());
       await background!.drain();
-      // A normal dialog close is delayed by 100ms. Keep all observers and the
-      // real component mounted past that window before claiming absence.
       await act(async () => { await new Promise(resolve => window.setTimeout(resolve, 175)); });
       await background!.drain();
-      expect(rpc.mock.calls.filter(([name]) => name==='toggle_timesheet_day').map(([,args]) => args?.p_date).sort())
-        .toEqual(['2027-10-20','2027-10-22']);
+      // One atomic command; the browser no longer issues per-date writes.
+      const commands = rpc.mock.calls.filter(([name]) => name==='apply_direct_assignment');
+      expect(commands).toHaveLength(1);
+      expect(commands[0][1]).toMatchObject({ p_coverage:'multi', p_dates:['2027-10-20','2027-10-22'] });
+      expect(rpc.mock.calls.filter(([name]) => name==='toggle_timesheet_day')).toEqual([]);
       const trace = h.transportEvents.filter(event => event.jobId === item.id);
-      const committedMembership = trace.findIndex(event => event.kind==='complete' && event.path==='/rest/v1/job_assignments' && event.status===201);
-      const dispatchedDates = trace.map((event,index)=>({event,index})).filter(({event}) => event.kind==='dispatch' && event.path==='/rest/v1/rpc/toggle_timesheet_day');
-      const firstCompletedDate = trace.findIndex(event => event.kind==='complete' && event.path==='/rest/v1/rpc/toggle_timesheet_day');
-      expect(committedMembership).toBeGreaterThanOrEqual(0);
-      expect(dispatchedDates).toHaveLength(2);
-      expect(dispatchedDates.map(({event})=>event.date).sort()).toEqual(['2027-10-20','2027-10-22']);
-      expect(committedMembership).toBeLessThan(dispatchedDates[0].index);
-      expect(dispatchedDates[1].index).toBeLessThan(firstCompletedDate);
+      expect(trace.filter(event => event.path==='/rest/v1/job_assignments')).toEqual([]);
       const completed = await Promise.all(rpc.mock.results.filter(result=>result.type==='return').map(result=>result.value));
       const rejected = completed.filter(result=>result.error);
       expect(rejected).toHaveLength(1);
       expect(rejected[0].error).toMatchObject({ code:'P0001',message:'LOCAL_MATRIX_OWNED_DATE_FAILURE' });
-      expect(await dates(item.id)).toEqual(['2027-10-20']);
-      expect(await assignment(item.id)).toMatchObject({ single_day:true,assignment_date:'2027-10-20',status:'invited',
-        assignment_source:'direct',sound_role:'SND-FOH-R',assigned_by:manager.id });
+      expect(await dates(item.id)).toEqual([]);
+      const membership = await h.client.from('job_assignments').select('job_id').eq('job_id',item.id).eq('technician_id',tech.id);
+      expect(membership.error).toBeNull(); expect(membership.data).toEqual([]);
       expect(ui.close).not.toHaveBeenCalled();
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(toast.success).not.toHaveBeenCalled(); expect(event).not.toHaveBeenCalled();

@@ -1,35 +1,42 @@
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
-import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
-import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
-import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
+import {
+  AssignmentCommandError,
+  applyDirectAssignment,
+  assignmentCommandMessage,
+  assignmentCommandStateKey,
+  createAssignmentCommandId,
+  getAssignmentCommandState,
+  isRejectionCode,
+  reconcileAssignmentViews,
+  removeDirectAssignment,
+  requireCommitted,
+  runAssignmentSideEffects,
+  type ApplyDirectAssignmentInput,
+  type AssignmentCommandResult,
+} from '@/features/assignments/commands';
 import { normalizeDateKey } from '@/utils/assignmentWorkDates';
-import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { codeForLabel, isRoleCode, roleOptionsForDiscipline } from '@/utils/roles';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 
 import { AssignJobDialogView } from "@/components/matrix/AssignJobDialogView";
 import {
-  checkAssignmentConflicts,
+  conflictWarningFromRejection,
   type AssignmentConflictWarning,
 } from "@/components/matrix/assignJobConflicts";
 import {
   getAssignableJobDateKeys,
-  getErrorCode,
   getErrorMessage,
   parseDateKey,
   sortDateKeys,
   type AssignJobDialogProps,
   type CoverageMode,
-  type JobAssignmentUpdate
 } from "@/components/matrix/assignJobDialogTypes";
 import { queryKeys } from "@/lib/react-query";
-import { addMadridCalendarDays } from "@/utils/timezoneUtils";
 
 export { getAssignableJobDateKeys } from "@/components/matrix/assignJobDialogTypes";
 export type {
@@ -116,22 +123,25 @@ export const AssignJobDialog = ({
     [date, singleDate],
   );
 
-  // Fetch existing timesheets for this job+technician.
-  // This is needed even when existingAssignment is undefined (adding a new day to an existing job).
-  const { data: existingTimesheets, isLoading: isLoadingExistingTimesheets } = useQuery({
-    queryKey: queryKeys.scope('existing-timesheets', selectedJobId, technicianId),
+  // Authoritative state of the selected pair: membership, active days and the
+  // expected-state token sent back with the command. Needed even when
+  // existingAssignment is undefined (adding a day to an already assigned job).
+  const { data: selectedState, isLoading: isLoadingSelectedState } = useQuery({
+    queryKey: assignmentCommandStateKey(selectedJobId, technicianId),
     enabled: open && !!selectedJobId && !!technicianId,
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('timesheets')
-        .select('date')
-        .eq('job_id', selectedJobId)
-        .eq('technician_id', technicianId)
-        .eq('is_active', true);
-      if (error) throw error;
-      return data?.map(t => t.date) || [];
-    },
+    queryFn: () => getAssignmentCommandState(selectedJobId, technicianId),
     staleTime: 10_000,
   });
+  // State of the job a reassignment moves away from (same query when equal).
+  const sourceJobId = existingAssignment?.job_id ?? '';
+  const { data: sourceState, isLoading: isLoadingSourceState } = useQuery({
+    queryKey: assignmentCommandStateKey(sourceJobId, technicianId),
+    enabled: open && !!sourceJobId && !!technicianId,
+    queryFn: () => getAssignmentCommandState(sourceJobId, technicianId),
+    staleTime: 10_000,
+  });
+  const existingTimesheets = selectedState?.dates;
+  const isLoadingExistingTimesheets = isLoadingSelectedState;
 
   const hasExistingTimesheetsForSelectedJob = (existingTimesheets?.length ?? 0) > 0;
   const isModifyingSelectedJob = isModifyingSameJobByContext || hasExistingTimesheetsForSelectedJob;
@@ -176,6 +186,55 @@ export const AssignJobDialog = ({
     }
   }, [preSelectedJobId]);
 
+  const queryClient = useQueryClient();
+  // One command id per decision. A transport retry of the same decision reuses
+  // it, so the database replays an already committed result instead of
+  // applying it twice; any definitive outcome or a changed decision starts over.
+  const pendingCommandRef = useRef<{ fingerprint: string; id: string } | null>(null);
+  const commandIdFor = (fingerprint: string) => {
+    if (pendingCommandRef.current?.fingerprint !== fingerprint) {
+      pendingCommandRef.current = { fingerprint, id: createAssignmentCommandId() };
+    }
+    return pendingCommandRef.current.id;
+  };
+
+  const moveFromJobId = existingAssignment && existingAssignment.job_id !== selectedJobId
+    ? existingAssignment.job_id
+    : null;
+
+  const refreshPair = () => reconcileAssignmentViews(queryClient, {
+    technicianId,
+    jobIds: [selectedJobId, existingAssignment?.job_id],
+  });
+
+  const reportCommandFailure = (error: unknown, fallbackPrefix: string) => {
+    if (!(error instanceof AssignmentCommandError)) {
+      pendingCommandRef.current = null;
+      toast.error(`${fallbackPrefix}: ${getErrorMessage(error)}`);
+      return;
+    }
+    // Network/unknown failures may have committed server-side: keep the id so
+    // the next click replays instead of repeating. Everything else is final.
+    if (!error.retryable && error.code !== 'unknown') pendingCommandRef.current = null;
+    if (error.code === 'stale_state' || error.code === 'concurrent_write') refreshPair();
+    toast.error(error.message);
+  };
+
+  const runSideEffectsInBackground = (result: AssignmentCommandResult) => {
+    if (result.side_effects.length === 0) return;
+    const recipientName = technician ? `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim() : null;
+    void runAssignmentSideEffects(result.command_id, result, {
+      technicianDepartment: technician?.department,
+      recipientName,
+    }).then((summary) => {
+      if (summary.failed > 0) {
+        toast.error('El cambio se guardó, pero falló la sincronización con Flex o la notificación. Queda registrado para reintentar.');
+      }
+    }, (error: unknown) => {
+      console.error('Assignment side effects could not run', error);
+    });
+  };
+
   const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
       toast.error('Por favor selecciona un trabajo y un rol');
@@ -187,441 +246,77 @@ export const AssignJobDialog = ({
       return;
     }
 
-    if (isAssigning) {
-      console.log('Assignment already in progress, ignoring duplicate click');
+    if (isAssigning) return;
+
+    if (isLoadingExistingTimesheets || (moveFromJobId && isLoadingSourceState)) {
+      toast.error('Cargando el estado de la asignación, por favor espera...');
       return;
     }
 
-    // Wait for existing timesheets query to complete when we need it
-    if (isLoadingExistingTimesheets) {
-      console.log('Waiting for existing timesheets to load...');
-      toast.error('Cargando hojas de hora existentes, por favor espera...');
-      return;
-    }
-
-    if (!skipConflictCheck) {
-      const conflict = await checkAssignmentConflicts({
-        technicianId,
-        selectedJobId,
-        coverageMode,
-        multiDates,
-        assignmentDate,
-      });
-      if (conflict) {
-        setConflictWarning(conflict);
+    let dates: string[] | undefined;
+    if (coverageMode === 'multi') {
+      dates = sortDateKeys((multiDates || []).map((multiDate) => toPickerDateKey(multiDate)));
+      if (dates.length === 0) {
+        toast.error('Selecciona al menos una fecha');
         return;
       }
+    } else if (coverageMode === 'single') {
+      dates = [assignmentDate];
     }
 
+    const input: Omit<ApplyDirectAssignmentInput, 'commandId'> = {
+      jobId: selectedJobId,
+      technicianId,
+      role: selectedRole,
+      status: assignAsConfirmed ? 'confirmed' : 'invited',
+      coverage: coverageMode,
+      dates,
+      mode: modificationMode,
+      expectedStateToken: selectedState?.state_token ?? null,
+      fromJobId: moveFromJobId,
+      expectedFromStateToken: moveFromJobId ? sourceState?.state_token ?? null : null,
+      // Conflicts are enforced by the database under the technician lock; an
+      // override is an explicit second decision after seeing the warning.
+      conflictPolicy: skipConflictCheck ? 'allow' : 'reject',
+      source: 'assignment-dialog',
+    };
+    const commandId = commandIdFor(JSON.stringify(input));
+
     setIsAssigning(true);
-    console.log('Starting assignment:', { selectedJobId, selectedRole, technicianId, isReassignment });
-
-    const timeoutId = window.setTimeout(() => {
-      console.error('Assignment timeout after 10 seconds');
-      setIsAssigning(false);
-      toast.error('La asignación expiró - por favor intenta de nuevo');
-    }, 10000);
-
     try {
-      const soundRole = technician.department === 'sound' ? selectedRole : 'none';
-      const lightsRole = technician.department === 'lights' ? selectedRole : 'none';
-      const videoRole = technician.department === 'video' ? selectedRole : 'none';
+      const result = await applyDirectAssignment({ ...input, commandId });
+      pendingCommandRef.current = null;
 
-      console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
-
-      if (isReassignment && !isModifyingSameJobByContext) {
-        const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
-
-        if (!deleted_assignment) {
-          const { error: deleteError } = await dataLayerClient.from('job_assignments')
-            .delete()
-            .eq('job_id', existingAssignment.job_id)
-            .eq('technician_id', technicianId);
-
-          if (deleteError) {
-            console.error('Error removing old assignment after RPC fallback:', deleteError);
-            throw deleteError;
-          }
+      if (!result.ok) {
+        const warning = conflictWarningFromRejection(result, coverageMode);
+        if (warning) {
+          setConflictWarning(warning);
+          return;
         }
-
-        const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
-        if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
-          await Promise.allSettled(departmentsToRemove.map(async (department) => {
-            try {
-              const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
-                body: {
-                  job_id: existingAssignment.job_id,
-                  technician_id: technicianId,
-                  department,
-                  action: 'remove'
-                }
-              });
-
-              if (flexError) {
-                console.error(`Error removing from Flex crew (${department}):`, flexError);
-              }
-            } catch (flexError) {
-              console.error(`Failed to remove from Flex crew (${department}):`, flexError);
-            }
-          }));
-        }
+        if (result.code === 'stale_state') refreshPair();
+        toast.error(assignmentCommandMessage(isRejectionCode(result.code) ? result.code : 'unknown'));
+        return;
       }
 
-      const basePayload = {
-        job_id: selectedJobId,
-        technician_id: technicianId,
-        sound_role: soundRole !== 'none' ? soundRole : null,
-        lights_role: lightsRole !== 'none' ? lightsRole : null,
-        video_role: videoRole !== 'none' ? videoRole : null,
-        assigned_by: (await dataLayerClient.auth.getUser()).data.user?.id,
-        assigned_at: new Date().toISOString(),
-        status: assignAsConfirmed ? 'confirmed' : 'invited',
-        response_time: assignAsConfirmed ? new Date().toISOString() : null,
-        assignment_source: 'direct' as const,
-      } as const;
-
-      const coverageDates: string[] = await (async () => {
-        if (coverageMode === 'multi') {
-          const uniqueKeys = sortDateKeys((multiDates || []).map((multiDate) => toPickerDateKey(multiDate)));
-          if (uniqueKeys.length === 0) {
-            throw new Error('Selecciona al menos una fecha');
-          }
-          return uniqueKeys;
-        }
-        if (coverageMode === 'single' && assignmentDate) {
-          return [assignmentDate];
-        }
-        if (coverageMode === 'full') {
-          // For full job coverage, get all dates from job start to end
-          const { data: jobData } = await dataLayerClient.from('jobs')
-            .select('start_time, end_time')
-            .eq('id', selectedJobId)
-            .single();
-
-          if (jobData) {
-            const startKey = normalizeDateKey(jobData.start_time);
-            const endKey = normalizeDateKey(jobData.end_time);
-            if (!startKey || !endKey) return [];
-            const dates: string[] = [];
-
-            let cursorKey = startKey;
-            while (cursorKey <= endKey) {
-              dates.push(cursorKey);
-              cursorKey = addMadridCalendarDays(cursorKey, 1);
-            }
-            return dates;
-          }
-        }
-        return [];
-      })();
-
-      // Before writing, check if an assignment already exists for this job + technician
-      const { data: existingRow } = await dataLayerClient.from('job_assignments')
-        .select('job_id, technician_id, single_day, assignment_date, status, response_time')
-        .eq('job_id', selectedJobId)
-        .eq('technician_id', technicianId)
-        .maybeSingle();
-
-      // For multi-date selection, keep the base row single-day scoped without implying full job coverage.
-      const desiredSingleDay = coverageMode !== 'full';
-      const desiredAssignmentDate = desiredSingleDay ? coverageDates[0] ?? null : null;
-      const preserveExistingScopedDate =
-        Boolean(existingRow) &&
-        isModifyingSelectedJob &&
-        modificationMode === 'add' &&
-        coverageMode !== 'full' &&
-        Boolean(existingRow?.assignment_date);
-      const nextSingleDay = preserveExistingScopedDate ? existingRow?.single_day ?? desiredSingleDay : desiredSingleDay;
-      const nextAssignmentDate = preserveExistingScopedDate
-        ? existingRow?.assignment_date ?? desiredAssignmentDate
-        : desiredAssignmentDate;
-
-      if (existingRow) {
-        // Update the existing base row (whole job or single) to align with the requested coverage
-        const updatePayload: JobAssignmentUpdate = {
-          sound_role: basePayload.sound_role,
-          lights_role: basePayload.lights_role,
-          video_role: basePayload.video_role,
-          assigned_by: basePayload.assigned_by,
-          assigned_at: basePayload.assigned_at,
-          // Do not downgrade a confirmed assignment to invited
-          status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
-          response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? existingRow.response_time ?? null : null,
-          single_day: nextSingleDay,
-          assignment_date: nextAssignmentDate,
-          assignment_source: basePayload.assignment_source,
-        };
-
-        console.log('Updating existing assignment with data:', updatePayload);
-        const { error } = await dataLayerClient.from('job_assignments')
-          .update(updatePayload)
-          .eq('job_id', selectedJobId)
-          .eq('technician_id', technicianId);
-        if (error) throw error;
+      refreshPair();
+      setConflictWarning(null);
+      if (result.outcome === 'noop') {
+        toast.success('La asignación ya estaba así: no había cambios que guardar');
       } else {
-        const row = { ...basePayload, single_day: desiredSingleDay, assignment_date: desiredAssignmentDate };
-        console.log('Inserting assignment row:', row);
-        const { error: insErr } = await dataLayerClient.from('job_assignments').insert(row);
-        if (insErr) {
-          if (insErr.code === '23505') {
-            console.warn('Duplicate on insert. Updating existing base row.');
-            const { error: updErr } = await dataLayerClient.from('job_assignments')
-              .update({
-                sound_role: row.sound_role,
-                lights_role: row.lights_role,
-                video_role: row.video_role,
-                assigned_by: row.assigned_by,
-                assigned_at: row.assigned_at,
-                status: row.status,
-                response_time: row.response_time,
-                single_day: row.single_day,
-                assignment_date: row.assignment_date,
-                assignment_source: row.assignment_source,
-              })
-              .eq('job_id', selectedJobId)
-              .eq('technician_id', technicianId);
-            if (updErr) throw updErr;
-          } else {
-            throw insErr;
-          }
-        }
+        const statusText = result.assignment?.status === 'confirmed' ? 'confirmado' : 'invitado';
+        toast.success(
+          `${isReassignment ? 'Reasignado' : 'Asignado'} ${technician.first_name} ${technician.last_name} a ${selectedJob?.title} (${statusText})`
+        );
       }
-
-      // Handle timesheet updates based on whether we're modifying the selected job
-      let existingDates: string[] = [];
-      if (isModifyingSelectedJob) {
-        const { data: freshTimesheets, error: freshTimesheetsError } = await dataLayerClient.from('timesheets')
-          .select('date')
-          .eq('job_id', selectedJobId)
-          .eq('technician_id', technicianId)
-          .eq('is_active', true);
-
-        if (freshTimesheetsError) throw freshTimesheetsError;
-        existingDates = freshTimesheets?.map((t) => t.date) || [];
-      } else {
-        existingDates = existingTimesheets || [];
+      if (result.warnings.length > 0) {
+        toast.error('La asignación se guardó, pero no se pudo recalcular el importe de algún parte');
       }
-
-      // Smart timesheet management based on modification mode
-      if (isModifyingSelectedJob) {
-        if (modificationMode === 'add') {
-          // Add mode: Keep existing dates + add new ones
-          const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
-          console.log('Add mode - creating timesheets for new dates:', datesToCreate);
-
-          // Use Promise.allSettled for parallel execution with failure handling
-          const results = await Promise.allSettled(datesToCreate.map(dateIso =>
-            toggleTimesheetDay({
-              jobId: selectedJobId,
-              technicianId,
-              dateIso,
-              present: true,
-              source: 'assignment-dialog'
-            })
-          ));
-
-          const failures = results
-            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
-            .filter(({ result }) => result.status === 'rejected');
-
-          if (failures.length > 0) {
-            console.error('Some timesheets failed to create in add mode:', failures);
-            const failedDates = failures.map(({ date }) => date).join(', ');
-            throw new Error(`Error al añadir hojas de hora para las fechas: ${failedDates}`);
-          }
-        } else {
-          // Replace mode: Remove dates not in new coverage, add missing ones
-          console.log('Replace mode - replacing timesheets. Old:', existingDates, 'New:', coverageDates);
-
-          // Delete dates that are no longer needed (parallel execution with failure handling)
-          const datesToRemove = existingDates.filter(d => !coverageDates.includes(d));
-          const removeResults = await Promise.allSettled(datesToRemove.map(dateIso =>
-            toggleTimesheetDay({
-              jobId: selectedJobId,
-              technicianId,
-              dateIso,
-              present: false,
-              source: 'assignment-dialog'
-            })
-          ));
-
-          const removeFailures = removeResults
-            .map((result, idx) => ({ result, date: datesToRemove[idx] }))
-            .filter(({ result }) => result.status === 'rejected');
-
-          if (removeFailures.length > 0) {
-            console.error('Some timesheets failed to remove in replace mode:', removeFailures);
-            const failedDates = removeFailures.map(({ date }) => date).join(', ');
-            throw new Error(`Error al eliminar hojas de hora para las fechas: ${failedDates}`);
-          }
-
-          // Create dates that don't exist yet (parallel execution with failure handling)
-          const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
-          const createResults = await Promise.allSettled(datesToCreate.map(dateIso =>
-            toggleTimesheetDay({
-              jobId: selectedJobId,
-              technicianId,
-              dateIso,
-              present: true,
-              source: 'assignment-dialog'
-            })
-          ));
-
-          const createFailures = createResults
-            .map((result, idx) => ({ result, date: datesToCreate[idx] }))
-            .filter(({ result }) => result.status === 'rejected');
-
-          if (createFailures.length > 0) {
-            console.error('Some timesheets failed to create in replace mode:', createFailures);
-            const failedDates = createFailures.map(({ date }) => date).join(', ');
-            throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
-          }
-        }
-      } else {
-        // Not modifying same job - delete all existing and create new (current behavior)
-        console.log('Different job or new assignment - replacing all timesheets');
-        const { error: deleteError } = await dataLayerClient.from('timesheets')
-          .delete()
-          .eq('job_id', selectedJobId)
-          .eq('technician_id', technicianId);
-
-        if (deleteError) {
-          console.error('Error deleting existing timesheets:', deleteError);
-          throw new Error(`No se pudieron eliminar las hojas de hora existentes: ${deleteError.message}`);
-        }
-
-        // Use Promise.allSettled for parallel execution with failure handling
-        const results = await Promise.allSettled(coverageDates.map(dateIso =>
-          toggleTimesheetDay({
-            jobId: selectedJobId,
-            technicianId,
-            dateIso,
-            present: true,
-            source: 'assignment-dialog'
-          })
-        ));
-
-        const failures = results
-          .map((result, idx) => ({ result, date: coverageDates[idx] }))
-          .filter(({ result }) => result.status === 'rejected');
-
-        if (failures.length > 0) {
-          console.error('Some timesheets failed to create:', failures);
-          const failedDates = failures.map(({ date }) => date).join(', ');
-          throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
-        }
-      }
-
-      // Verification: ensure at least one assignment row now exists for this job/tech
-      const verifyQuery = dataLayerClient.from('job_assignments')
-        .select('job_id')
-        .eq('job_id', selectedJobId)
-        .eq('technician_id', technicianId)
-        .limit(1);
-      const { data: verifyData, error: verifyErr } = await verifyQuery;
-      if (verifyErr) throw verifyErr;
-      if (!verifyData || verifyData.length === 0) {
-        throw new Error('La asignación no se guardó');
-      }
-
-      try {
-        await syncTimesheetCategoriesForAssignment({
-          jobId: selectedJobId,
-          technicianId,
-          soundRole: basePayload.sound_role,
-          lightsRole: basePayload.lights_role,
-          videoRole: basePayload.video_role,
-        });
-      } catch (syncError) {
-        console.error('Error syncing timesheet category after assignment update:', syncError);
-        toast.error('La asignación se guardó, pero no se pudo sincronizar la categoría de partes');
-      }
-
-      console.log('Assignment created successfully, now handling Flex crew assignments...');
-
-      try {
-        if (soundRole && soundRole !== 'none') {
-          const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
-            body: {
-              job_id: selectedJobId,
-              technician_id: technicianId,
-              department: 'sound',
-              action: 'add'
-            }
-          });
-
-          if (flexError) {
-            console.error('Error adding to Flex crew (sound):', flexError);
-          }
-        }
-
-        if (lightsRole && lightsRole !== 'none') {
-          const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
-            body: {
-              job_id: selectedJobId,
-              technician_id: technicianId,
-              department: 'lights',
-              action: 'add'
-            }
-          });
-
-          if (flexError) {
-            console.error('Error adding to Flex crew (lights):', flexError);
-          }
-        }
-      } catch (flexError) {
-        console.error('Error with Flex crew assignments:', flexError);
-      }
-
-      const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
-      console.log('Assignment completed successfully');
-      window.clearTimeout(timeoutId);
-      toast.success(
-        `${isReassignment ? 'Reasignado' : 'Asignado'} ${technician.first_name} ${technician.last_name} a ${selectedJob?.title} (${statusText})`
-      );
-
-      const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
-      const assignmentDepartments = getAssignmentNotificationDepartments(basePayload, technician.department);
-      try {
-        void dataLayerClient.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type: 'job.assignment.direct',
-            job_id: selectedJobId,
-            recipient_id: technicianId,
-            recipient_name: recipientName || undefined,
-            assignment_status: assignAsConfirmed ? 'confirmed' : 'invited',
-            target_date: coverageMode === 'single' ? `${assignmentDate}T00:00:00Z` : undefined,
-            single_day: coverageMode !== 'full',
-            department: assignmentDepartments[0],
-            departments: assignmentDepartments,
-          }
-        });
-      } catch (_) {
-        /* best-effort push notification; ignore delivery failures */
-      }
-
-      window.dispatchEvent(new CustomEvent('assignment-updated', {
-        detail: { technicianId, jobId: selectedJobId }
-      }));
-
-      setTimeout(() => {
-        onClose();
-      }, 100);
+      runSideEffectsInBackground(result);
+      onClose();
     } catch (error: unknown) {
-      window.clearTimeout(timeoutId);
       console.error('Error assigning job:', error);
-
-      const errorMessage = getErrorMessage(error);
-      if (getErrorCode(error) === '23505') {
-        toast.error('Este técnico ya está asignado a este trabajo');
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('network')) {
-        toast.error('Error de red - por favor verifica tu conexión e intenta de nuevo');
-      } else {
-        toast.error(`Error al asignar el trabajo: ${errorMessage}`);
-      }
+      reportCommandFailure(error, 'Error al asignar el trabajo');
     } finally {
-      window.clearTimeout(timeoutId);
       setIsAssigning(false);
     }
   };
@@ -633,45 +328,28 @@ export const AssignJobDialog = ({
   const handleRemoveAssignment = async () => {
     if (!existingAssignment) return;
     if (isRemoving) return;
+    if (isLoadingSourceState) {
+      toast.error('Cargando el estado de la asignación, por favor espera...');
+      return;
+    }
+    const input = {
+      jobId: existingAssignment.job_id,
+      technicianId,
+      expectedStateToken: sourceState?.state_token ?? null,
+      source: 'assignment-dialog',
+    };
+    const commandId = commandIdFor(JSON.stringify({ remove: input }));
+
     setIsRemoving(true);
     try {
-      const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
-
-      if (!deleted_assignment) {
-        const { error } = await dataLayerClient.from('job_assignments')
-          .delete()
-          .eq('job_id', existingAssignment.job_id)
-          .eq('technician_id', technicianId);
-        if (error) throw error;
-      }
-
-      const departmentsToRemove = determineFlexDepartmentsForAssignment(existingAssignment, technician?.department);
-      if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
-        await Promise.allSettled(departmentsToRemove.map(async (department) => {
-          try {
-            const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
-              body: {
-                job_id: existingAssignment.job_id,
-                technician_id: technicianId,
-                department,
-                action: 'remove'
-              }
-            });
-
-            if (flexError) {
-              console.error(`Error removing from Flex crew (${department}):`, flexError);
-            }
-          } catch (flexError) {
-            console.error(`Failed to remove from Flex crew (${department}):`, flexError);
-          }
-        }));
-      }
-
+      const result = requireCommitted(await removeDirectAssignment({ ...input, commandId }));
+      pendingCommandRef.current = null;
+      refreshPair();
+      runSideEffectsInBackground(result);
       toast.success('Asignación eliminada');
-      window.dispatchEvent(new CustomEvent('assignment-updated', { detail: { technicianId, jobId: existingAssignment.job_id } }));
       onClose();
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error));
+      reportCommandFailure(error, 'Error al eliminar la asignación');
     } finally {
       setIsRemoving(false);
     }

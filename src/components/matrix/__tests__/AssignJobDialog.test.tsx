@@ -2,101 +2,54 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { createMockQueryBuilder } from '@/test/mockSupabase';
 import { AssignJobDialog } from '../AssignJobDialog';
 import { fromMadridDateKey } from '@/utils/timezoneUtils';
+import type { AssignmentCommandResult } from '@/features/assignments/commands';
 
 const {
   useQueryMock,
-  checkTimeConflictEnhancedMock,
-  insertMock,
-  deleteMock,
-  fromMock,
-  authGetUserMock,
-  functionsInvokeMock,
+  applyMock,
+  removeMock,
+  sideEffectsMock,
+  createIdMock,
   toastFn,
-  toggleTimesheetDayMock,
-  removeTimesheetAssignmentMock,
-  syncTimesheetCategoriesMock,
 } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
-  checkTimeConflictEnhancedMock: vi.fn(),
-  insertMock: vi.fn(),
-  deleteMock: vi.fn(),
-  fromMock: vi.fn(),
-  authGetUserMock: vi.fn(),
-  functionsInvokeMock: vi.fn(),
+  applyMock: vi.fn(),
+  removeMock: vi.fn(),
+  sideEffectsMock: vi.fn(),
+  createIdMock: vi.fn(),
   toastFn: Object.assign(vi.fn(), {
     error: vi.fn(),
     success: vi.fn(),
   }),
-  toggleTimesheetDayMock: vi.fn(),
-  removeTimesheetAssignmentMock: vi.fn(),
-  syncTimesheetCategoriesMock: vi.fn(),
 }));
-
-type ConflictCheckResult = {
-  hasHardConflict: boolean;
-  hasSoftConflict: boolean;
-  hardConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
-  softConflicts: Array<{ id: string; title: string; start_time: string; end_time: string; status: string }>;
-  unavailabilityConflicts: Array<{ date: string; reason: string; source: string; notes?: string }>;
-};
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
     useQuery: useQueryMock,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });
 
-vi.mock('@/utils/technicianAvailability', async () => {
-  const actual = await vi.importActual<typeof import('@/utils/technicianAvailability')>('@/utils/technicianAvailability');
+vi.mock('@/features/assignments/commands', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/assignments/commands')>();
   return {
     ...actual,
-    checkTimeConflictEnhanced: checkTimeConflictEnhancedMock,
+    applyDirectAssignment: applyMock,
+    removeDirectAssignment: removeMock,
+    runAssignmentSideEffects: sideEffectsMock,
+    createAssignmentCommandId: createIdMock,
+    getAssignmentCommandState: vi.fn(),
   };
 });
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: fromMock,
-    auth: {
-      getUser: authGetUserMock,
-    },
-    functions: {
-      invoke: functionsInvokeMock,
-    },
-  },
-}));
-
-vi.mock('@/services/dataLayerClient', () => ({
-  dataLayerClient: {
-    from: fromMock,
-    auth: {
-      getUser: authGetUserMock,
-    },
-    functions: {
-      invoke: functionsInvokeMock,
-    },
-  },
-}));
+vi.mock('@/services/dataLayerClient', () => ({ dataLayerClient: {} }));
 
 vi.mock('sonner', () => ({
   toast: toastFn,
-}));
-
-vi.mock('@/services/toggleTimesheetDay', () => ({
-  toggleTimesheetDay: toggleTimesheetDayMock,
-}));
-
-vi.mock('@/services/removeTimesheetAssignment', () => ({
-  removeTimesheetAssignment: removeTimesheetAssignmentMock,
-}));
-
-vi.mock('@/services/syncTimesheetCategories', () => ({
-  syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
 
 const baseJob = {
@@ -107,226 +60,234 @@ const baseJob = {
   status: 'scheduled',
 };
 
+const otherJob = { ...baseJob, id: 'job-2', title: 'Other Event' };
+
 const defaultTechnician = {
   first_name: 'Pat',
   last_name: 'Jones',
   department: 'sound',
 };
 
+const stateFor = (jobId: string) => ({
+  exists: jobId === 'job-2',
+  assignment: null,
+  dates: [],
+  state_token: `token-${jobId}`,
+});
+
+const committed = (overrides: Partial<AssignmentCommandResult> = {}): AssignmentCommandResult => ({
+  ok: true,
+  outcome: 'committed',
+  command_id: 'cmd-1',
+  job_id: 'job-1',
+  technician_id: 'tech-1',
+  state_token: 'token-after',
+  replayed: false,
+  assignment: {
+    id: 'assignment-1', status: 'invited', sound_role: 'SND-FOH-R', lights_role: null, video_role: null,
+    production_role: null, single_day: true, assignment_date: '2024-05-01', assignment_source: 'direct',
+  },
+  dates: ['2024-05-01'],
+  side_effects: [{ kind: 'flex', action: 'add', job_id: 'job-1', department: 'sound', status: 'pending' }],
+  warnings: [],
+  ...overrides,
+});
+
+const conflictRejection: AssignmentCommandResult = {
+  ok: false,
+  outcome: 'rejected',
+  code: 'conflict',
+  command_id: 'cmd-1',
+  job_id: 'job-1',
+  technician_id: 'tech-1',
+  state_token: 'token-job-1',
+  replayed: false,
+  assignment: null,
+  dates: [],
+  side_effects: [],
+  warnings: [],
+  details: {
+    target_date: '2024-05-01',
+    conflict_dates: ['2024-05-01'],
+    conflicts: {
+      hasHardConflict: true,
+      hasSoftConflict: false,
+      hardConflicts: [{
+        id: 'conflict-1', title: 'Overlapping Show', start_time: '2024-05-01T08:00:00Z',
+        end_time: '2024-05-01T20:00:00Z', status: 'confirmed',
+      }],
+      softConflicts: [],
+      unavailabilityConflicts: [],
+    },
+  },
+};
+
+let idCounter = 0;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  useQueryMock.mockImplementation(({ queryKey }: { queryKey: any[] }) => {
-    const key = queryKey[0];
-    if (key === 'technician') {
-      return { data: defaultTechnician, isLoading: false };
-    }
-    if (key === 'existing-timesheets') {
-      return { data: [], isLoading: false };
+  idCounter = 0;
+  createIdMock.mockImplementation(() => `cmd-${++idCounter}`);
+  useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    if (queryKey[0] === 'technician') return { data: defaultTechnician, isLoading: false };
+    if (queryKey[0] === 'assignment-command-state') {
+      return queryKey[1] ? { data: stateFor(queryKey[1]), isLoading: false } : { data: undefined, isLoading: false };
     }
     return { data: undefined, isLoading: false };
   });
-  insertMock.mockResolvedValue({ error: null });
-  deleteMock.mockResolvedValue({ error: null });
-  toggleTimesheetDayMock.mockResolvedValue(undefined);
-  removeTimesheetAssignmentMock.mockResolvedValue({ deleted_assignment: true, deleted_timesheets: 0 });
-  syncTimesheetCategoriesMock.mockResolvedValue(undefined);
-  fromMock.mockImplementation((table: string) => {
-    if (table === 'job_assignments') {
-      return {
-        select: vi.fn((columns: string) => {
-          if (columns === 'job_id') {
-            return createMockQueryBuilder({
-              data: [{ job_id: baseJob.id }],
-              error: null,
-            });
-          }
-
-          return createMockQueryBuilder({
-            data: null,
-            error: null,
-          });
-        }),
-        insert: insertMock,
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-        update: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-      };
-    }
-
-    if (table === 'timesheets') {
-      return {
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-      };
-    }
-
-    if (table === 'jobs') {
-      return {
-        select: vi.fn(() =>
-          createMockQueryBuilder({
-            data: {
-              start_time: baseJob.start_time,
-              end_time: baseJob.end_time,
-            },
-            error: null,
-          }),
-        ),
-      };
-    }
-
-    return {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    };
-  });
-  authGetUserMock.mockResolvedValue({ data: { user: { id: 'manager-1' } } });
-  functionsInvokeMock.mockResolvedValue({ data: null, error: null });
+  applyMock.mockResolvedValue(committed());
+  removeMock.mockResolvedValue(committed({ assignment: null, dates: [], side_effects: [] }));
+  sideEffectsMock.mockResolvedValue({ attempted: 1, failed: 0, recorded: true });
 });
 
 afterEach(() => {
   cleanup();
 });
 
-describe('AssignJobDialog conflict handling', () => {
-  it('prompts for confirmation when a conflict is detected before proceeding', async () => {
-    const conflictResult: ConflictCheckResult = {
-      hasHardConflict: true,
-      hasSoftConflict: false,
-      hardConflicts: [{
-        id: 'conflict-1',
-        title: 'Overlapping Show',
-        start_time: '2024-05-01T08:00:00Z',
-        end_time: '2024-05-01T20:00:00Z',
-        status: 'confirmed',
-      }],
-      softConflicts: [],
-      unavailabilityConflicts: [],
-    };
-    checkTimeConflictEnhancedMock.mockResolvedValue(conflictResult);
+const pickRole = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('combobox'));
+  await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
+};
 
+describe('AssignJobDialog direct-assignment command', () => {
+  it('sends one atomic command with the loaded state token and runs side effects after commit', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-
     render(
-      <AssignJobDialog
-        open
-        onClose={onClose}
-        technicianId="tech-1"
-        date={new Date('2024-05-01T00:00:00Z')}
-        availableJobs={[baseJob]}
-        preSelectedJobId="job-1"
-      />
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-06-01T00:00:00Z')}
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
     );
 
-    await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
-
+    await pickRole(user);
     await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
 
-    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
-    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-1', 'job-1', expect.objectContaining({ includePending: true }));
-    expect(insertMock).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: /volver/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(applyMock).toHaveBeenCalledTimes(1);
+    expect(applyMock.mock.calls[0][0]).toMatchObject({
+      commandId: 'cmd-1',
+      jobId: 'job-1',
+      technicianId: 'tech-1',
+      role: 'SND-FOH-R',
+      status: 'invited',
+      coverage: 'full',
+      expectedStateToken: 'token-job-1',
+      fromJobId: null,
+      conflictPolicy: 'reject',
     });
-    expect(insertMock).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
-    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /forzar asignación de todos modos/i }));
-
-    await waitFor(() => {
-      expect(insertMock).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
-    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledTimes(2);
+    expect(sideEffectsMock).toHaveBeenCalledWith('cmd-1', expect.objectContaining({ ok: true }),
+      expect.objectContaining({ technicianDepartment: 'sound', recipientName: 'Pat Jones' }));
+    expect(toastFn.success).toHaveBeenCalledWith(expect.stringContaining('(invitado)'));
   });
 
-  it('creates the assignment immediately when no conflict exists', async () => {
-    const noConflictResult: ConflictCheckResult = {
-      hasHardConflict: false,
-      hasSoftConflict: false,
-      hardConflicts: [],
-      softConflicts: [],
-      unavailabilityConflicts: [],
-    };
-    checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
-
+  it('shows the authoritative conflict and overrides only with a new explicit decision', async () => {
+    applyMock.mockResolvedValueOnce(conflictRejection).mockResolvedValueOnce(conflictRejection);
     const user = userEvent.setup();
     const onClose = vi.fn();
-
     render(
-      <AssignJobDialog
-        open
-        onClose={onClose}
-        technicianId="tech-2"
-        date={new Date('2024-06-01T00:00:00Z')}
-        availableJobs={[baseJob]}
-        preSelectedJobId="job-1"
-      />
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-05-01T00:00:00Z')}
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
     );
 
-    await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
+    await pickRole(user);
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(sideEffectsMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /volver/i }));
+    await waitFor(() => expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /forzar asignación de todos modos/i }));
 
-    await waitFor(() => {
-      expect(insertMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(applyMock).toHaveBeenCalledTimes(3);
+    expect(applyMock.mock.calls[2][0]).toMatchObject({ conflictPolicy: 'allow' });
+    // Each definitive outcome ends the decision, so every attempt has its own id.
+    expect(applyMock.mock.calls.map(([input]) => input.commandId)).toEqual(['cmd-1', 'cmd-2', 'cmd-3']);
+  });
+
+  it('reuses the command id after a network failure so the retry replays instead of repeating', async () => {
+    const { AssignmentCommandError } = await import('@/features/assignments/commands');
+    applyMock.mockRejectedValueOnce(new AssignmentCommandError('network'));
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-06-01T00:00:00Z')}
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
+    );
+
+    await pickRole(user);
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    await waitFor(() => expect(toastFn.error).toHaveBeenCalledWith(expect.stringMatching(/error de red/i)));
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(applyMock.mock.calls.map(([input]) => input.commandId)).toEqual(['cmd-1', 'cmd-1']);
+  });
+
+  it('keeps the dialog open and explains a stale state rejection', async () => {
+    applyMock.mockResolvedValueOnce({ ...conflictRejection, code: 'stale_state', details: {} });
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-06-01T00:00:00Z')}
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
+    );
+
+    await pickRole(user);
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    await waitFor(() => expect(toastFn.error).toHaveBeenCalledWith(expect.stringMatching(/otra persona ha modificado/i)));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(sideEffectsMock).not.toHaveBeenCalled();
+  });
+
+  it('moves a reassignment in the same command instead of deleting first', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-05-01T00:00:00Z')}
+        availableJobs={[baseJob, otherJob]} preSelectedJobId="job-1"
+        existingAssignment={{
+          id: 'assignment-2', job_id: 'job-2', technician_id: 'tech-1', status: 'invited', sound_role: 'SND-FOH-R',
+          lights_role: null, video_role: null, production_role: null, single_day: false, assignment_date: null,
+          assigned_at: '2024-04-01T00:00:00Z', assigned_by: null, assignment_source: 'direct', response_time: null,
+          use_tour_multipliers: false, external_technician_name: null, invoice_received_at: null, invoice_received_by: null,
+        }} />
+    );
+
+    await user.click(screen.getByRole('button', { name: /reasignar trabajo|asignar trabajo/i }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(applyMock.mock.calls[0][0]).toMatchObject({
+      jobId: 'job-1',
+      fromJobId: 'job-2',
+      expectedStateToken: 'token-job-1',
+      expectedFromStateToken: 'token-job-2',
     });
-    expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-2', 'job-1', expect.objectContaining({ includePending: true }));
-    expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument();
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
+    expect(removeMock).not.toHaveBeenCalled();
   });
 
   // Everything the pickers hold is a calendar day — a local midnight standing
   // for a date — because that is what react-day-picker renders and returns.
   // Keying those with formatDateKey converts them as instants into Madrid, so a
   // picked day was submitted one early east of Madrid. This pins the day that
-  // actually reaches the row; it fails if the picker layer goes back to
-  // formatDateKey while holding calendar values.
+  // actually reaches the command.
   it('submits the technician\'s own day for multi-day coverage', async () => {
-    checkTimeConflictEnhancedMock.mockResolvedValue({
-      hasHardConflict: false,
-      hasSoftConflict: false,
-      hardConflicts: [],
-      softConflicts: [],
-      unavailabilityConflicts: [],
-    });
-
     const user = userEvent.setup();
-
     render(
-      <AssignJobDialog
-        open
-        onClose={vi.fn()}
-        technicianId="tech-3"
+      <AssignJobDialog open onClose={vi.fn()} technicianId="tech-3"
         // The matrix passes the instant of Madrid midnight, not a local one.
         date={fromMadridDateKey('2024-05-01')}
-        availableJobs={[baseJob]}
-        preSelectedJobId="job-1"
-      />
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
     );
 
-    await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
-
+    await pickRole(user);
     await user.click(screen.getByRole('tab', { name: /varios días/i }));
     await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
 
-    await waitFor(() => {
-      expect(insertMock).toHaveBeenCalledTimes(1);
-    });
-    expect(insertMock.mock.calls[0][0]).toMatchObject({
-      assignment_date: '2024-05-01',
-      single_day: true,
-    });
+    await waitFor(() => expect(applyMock).toHaveBeenCalledTimes(1));
+    expect(applyMock.mock.calls[0][0]).toMatchObject({ coverage: 'multi', dates: ['2024-05-01'] });
   });
 });

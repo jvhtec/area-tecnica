@@ -25,6 +25,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   return {
     ...actual,
     useQuery: useQueryMock,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   };
 });
 
@@ -109,6 +110,29 @@ const noConflictResult = {
   softConflicts: [],
   unavailabilityConflicts: [],
 };
+
+const commandState = (dates: string[]) => ({
+  exists: dates.length > 0,
+  assignment: null,
+  dates,
+  state_token: `token-${dates.join("|")}`,
+});
+
+const committedResult = {
+  ok: true,
+  outcome: "committed",
+  command_id: "cmd-1",
+  job_id: "job-1",
+  technician_id: "tech-1",
+  state_token: "token-after",
+  replayed: false,
+  assignment: null,
+  dates: [],
+  side_effects: [],
+  warnings: [],
+};
+
+const applyCalls = () => mockSupabase.rpc.mock.calls.filter(([name]) => name === "apply_direct_assignment");
 
 const configureDialogSupabase = ({
   existingAssignmentRow = null,
@@ -212,8 +236,8 @@ const renderAssignmentDialog = async ({
       if (key === "technician") {
         return { data: defaultTechnician, isLoading: false };
       }
-      if (key === "existing-timesheets") {
-        return { data: existingTimesheetDates, isLoading: false };
+      if (key === "assignment-command-state") {
+        return { data: commandState(existingTimesheetDates), isLoading: false };
       }
       return { data: undefined, isLoading: false };
     });
@@ -258,8 +282,8 @@ beforeEach(() => {
     if (key === "technician") {
       return { data: defaultTechnician, isLoading: false };
     }
-    if (key === "existing-timesheets") {
-      return { data: [], isLoading: false };
+    if (key === "assignment-command-state") {
+      return { data: commandState([]), isLoading: false };
     }
     return { data: undefined, isLoading: false };
   });
@@ -269,7 +293,11 @@ beforeEach(() => {
     error: null,
   });
   mockSupabase.functions.invoke.mockResolvedValue({ data: null, error: null });
-  mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
+  mockSupabase.rpc.mockImplementation((name: string) => Promise.resolve(
+    name === "apply_direct_assignment"
+      ? { data: committedResult, error: null }
+      : { data: { side_effects_status: "succeeded" }, error: null },
+  ));
 
   checkTimeConflictEnhancedMock.mockResolvedValue(noConflictResult);
   toggleTimesheetDayMock.mockResolvedValue(undefined);
@@ -427,55 +455,35 @@ describe("Assignments Critical Paths", () => {
       ).toEqual(["2026-06-08", "2026-06-09", "2026-06-11"]);
     });
 
-    it("creates a single-day assignment and toggles only the selected date", async () => {
-      const { insertMock } = configureDialogSupabase();
+    it("creates a single-day assignment through one atomic command", async () => {
+      const { insertMock, updateMock, deleteMock } = configureDialogSupabase();
 
       await renderAssignmentDialog({
         date: new Date("2026-12-02T00:00:00Z"),
         switchToSingleDay: true,
       });
 
-      await waitFor(() => {
-        expect(insertMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            job_id: "job-1",
-            technician_id: "tech-1",
-            sound_role: "SND-FOH-R",
-            single_day: true,
-            assignment_date: "2026-12-02",
-          }),
-        );
+      await waitFor(() => expect(applyCalls()).toHaveLength(1));
+      expect(applyCalls()[0][1]).toMatchObject({
+        p_job_id: "job-1",
+        p_technician_id: "tech-1",
+        p_role: "SND-FOH-R",
+        p_status: "invited",
+        p_coverage: "single",
+        p_dates: ["2026-12-02"],
+        p_conflict_policy: "reject",
+        p_expected_state_token: "token-",
       });
-      expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith(
-        "tech-1",
-        "job-1",
-        expect.objectContaining({
-          targetDateIso: "2026-12-02",
-          singleDayOnly: true,
-          includePending: true,
-        }),
-      );
-      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(1);
-      expect(toggleTimesheetDayMock).toHaveBeenCalledWith({
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
+      // Conflict enforcement, membership and schedule all live in the command.
+      expect(checkTimeConflictEnhancedMock).not.toHaveBeenCalled();
+      expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
+      expect(insertMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(deleteMock).not.toHaveBeenCalled();
     });
 
-    it("keeps existing scoped assignment metadata when adding a prep date", async () => {
-      const { updateMock } = configureDialogSupabase({
-        existingAssignmentRow: {
-          job_id: "job-1",
-          technician_id: "tech-1",
-          single_day: true,
-          assignment_date: "2026-12-01",
-          status: "invited",
-        },
-        existingTimesheetDates: ["2026-12-01"],
-      });
+    it("adds a prep date to an existing scoped assignment in add mode", async () => {
+      configureDialogSupabase({ existingTimesheetDates: ["2026-12-01"] });
 
       await renderAssignmentDialog({
         date: new Date("2026-12-02T00:00:00Z"),
@@ -483,35 +491,17 @@ describe("Assignments Critical Paths", () => {
         existingTimesheetDates: ["2026-12-01"],
       });
 
-      await waitFor(() => {
-        expect(updateMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            single_day: true,
-            assignment_date: "2026-12-01",
-          }),
-        );
-      });
-      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(1);
-      expect(toggleTimesheetDayMock).toHaveBeenCalledWith({
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
+      await waitFor(() => expect(applyCalls()).toHaveLength(1));
+      expect(applyCalls()[0][1]).toMatchObject({
+        p_coverage: "single",
+        p_dates: ["2026-12-02"],
+        p_mode: "add",
+        p_expected_state_token: "token-2026-12-01",
       });
     });
 
     it("preselects existing timesheet dates when using multi-day add mode", async () => {
-      configureDialogSupabase({
-        existingAssignmentRow: {
-          job_id: "job-1",
-          technician_id: "tech-1",
-          single_day: true,
-          assignment_date: "2026-12-01",
-          status: "invited",
-        },
-        existingTimesheetDates: ["2026-12-01", "2026-12-02"],
-      });
+      configureDialogSupabase({ existingTimesheetDates: ["2026-12-01", "2026-12-02"] });
 
       await renderAssignmentDialog({
         date: new Date("2026-12-01T00:00:00Z"),
@@ -525,100 +515,32 @@ describe("Assignments Critical Paths", () => {
       });
     });
 
-    it("creates full-job coverage across every job date", async () => {
-      const { insertMock } = configureDialogSupabase();
+    it("leaves full-job coverage to the database span", async () => {
+      configureDialogSupabase();
 
       await renderAssignmentDialog();
 
-      await waitFor(() => {
-        expect(insertMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            job_id: "job-1",
-            technician_id: "tech-1",
-            sound_role: "SND-FOH-R",
-            single_day: false,
-            assignment_date: null,
-          }),
-        );
-      });
-      expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith(
-        "tech-1",
-        "job-1",
-        expect.objectContaining({ includePending: true }),
-      );
-      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2);
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-01",
-        present: true,
-        source: "assignment-dialog",
-      });
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
+      await waitFor(() => expect(applyCalls()).toHaveLength(1));
+      expect(applyCalls()[0][1]).toMatchObject({ p_coverage: "full", p_dates: undefined });
     });
 
-    it("preserves the committed base assignment and still attempts every date when one timesheet write fails", async () => {
-      const { insertMock, deleteMock } = configureDialogSupabase();
-      toggleTimesheetDayMock
-        .mockRejectedValueOnce(new Error("first date failed"))
-        .mockResolvedValueOnce(undefined);
+    it("a failed command writes nothing from the browser and keeps the dialog open", async () => {
+      const { insertMock, updateMock, deleteMock } = configureDialogSupabase();
+      mockSupabase.rpc.mockImplementation((name: string) => Promise.resolve(
+        name === "apply_direct_assignment"
+          ? { data: null, error: { code: "P0001", message: "injected schedule failure" } }
+          : { data: null, error: null },
+      ));
 
       await renderAssignmentDialog();
 
-      await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2));
-
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-01",
-        present: true,
-        source: "assignment-dialog",
-      });
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
+      await waitFor(() => expect(applyCalls()).toHaveLength(1));
+      expect(insertMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
       expect(deleteMock).not.toHaveBeenCalled();
+      expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
       expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
-    });
-
-    it("can leave partial date coverage when a later timesheet write fails", async () => {
-      const { insertMock, deleteMock } = configureDialogSupabase();
-      toggleTimesheetDayMock
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error("second date failed"));
-
-      await renderAssignmentDialog();
-
-      await waitFor(() => expect(insertMock).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2));
-
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-01",
-        present: true,
-        source: "assignment-dialog",
-      });
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
-      expect(deleteMock).not.toHaveBeenCalled();
-      expect(syncTimesheetCategoriesMock).not.toHaveBeenCalled();
+      expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
     });
   });
 });
