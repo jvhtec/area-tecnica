@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory=$true)][string]$ManifestPath,
   [string[]]$TestFile = @(
     'tests/assignments/matrix-failure.disposable.integration.test.tsx',
-    'tests/assignments/staffing-public-methods.disposable.integration.test.ts'
+    'tests/assignments/staffing-public-methods.disposable.integration.test.ts',
+    'tests/assignments/staffing-completion.disposable.integration.test.ts'
   )
 )
 $ErrorActionPreference = 'Stop'
@@ -25,8 +26,10 @@ try {
   $env:STAFFING_DISPOSABLE_MANIFEST = $resolvedManifest
   Push-Location -LiteralPath $repoPath
   try {
-    & npx vitest run @TestFile --maxWorkers=1
-    if ($LASTEXITCODE -ne 0) { throw 'Disposable staffing characterization failed; inspect test output and retain uncertain fixtures' }
+    foreach ($file in $TestFile) {
+      & npx vitest run $file --maxWorkers=1
+      if ($LASTEXITCODE -ne 0) { throw "Disposable staffing suite failed: $file; retain uncertain fixtures and stop subsequent suites" }
+    }
   } finally { Pop-Location }
 } finally {
   foreach ($name in $taskEnvironmentNames) { [Environment]::SetEnvironmentVariable($name,$savedTaskEnvironment[$name],'Process') }

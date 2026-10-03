@@ -19,8 +19,10 @@ try {
   $env:STAFFING_EDGE_TEST_SERVICE_KEY = $localKeys['SERVICE_ROLE_KEY']
   Push-Location -LiteralPath $repoPath
   try {
-    & npx vitest run @TestFile --maxWorkers=1
-    if ($LASTEXITCODE -ne 0) { throw 'Local staffing characterization failed; inspect the test output' }
+    foreach ($file in $TestFile) {
+      & npx vitest run $file --maxWorkers=1
+      if ($LASTEXITCODE -ne 0) { throw "Local staffing suite failed: $file; retain uncertain fixtures and stop subsequent suites" }
+    }
   } finally { Pop-Location }
 } finally {
   foreach ($name in $taskEnvironmentNames) { [Environment]::SetEnvironmentVariable($name,$savedTaskEnvironment[$name],'Process') }
