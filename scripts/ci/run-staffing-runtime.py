@@ -32,6 +32,7 @@ def run(root, checkout, cli, node, base_port):
                     '--cli', str(cli), '--node', str(node), '--base-port', str(base_port)],
                    cwd=checkout, env=environment, check=True, timeout=120)
     results = []
+    phase = 'prepare'
     original = None
     teardown_error = None
     try:
@@ -49,6 +50,7 @@ def run(root, checkout, cli, node, base_port):
                            STAFFING_EDGE_TEST_ANON_KEY=keys['ANON_KEY'],
                            STAFFING_EDGE_TEST_SERVICE_KEY=keys['SERVICE_ROLE_KEY'])
         for index, (suite, expected) in enumerate(SUITES):
+            phase = suite
             report_path = root / ('behavior-' + str(index) + '.json')
             with (root / ('behavior-' + str(index) + '.log')).open('xb') as log:
                 subprocess.run([str(node), str(checkout / 'node_modules' / 'vitest' / 'vitest.mjs'),
@@ -64,6 +66,27 @@ def run(root, checkout, cli, node, base_port):
             print(json.dumps(result), flush=True)
     except BaseException as error:
         original = error
+        # The controller's own final line contains a fixed refusal message, not
+        # raw CLI output or private file bodies. Export only its error category.
+        try:
+            journal = json.loads(read_source(root / 'journal.json'))
+            last = journal['operations'][-1] if journal['operations'] else {}
+        except Exception:
+            last = {}  # Diagnostics must never replace the original failure.
+        print(json.dumps({'failedPhase': phase, 'lastOperation': last.get('operation'),
+                          'operationState': last.get('state'), 'errorCategory': type(error).__name__}), flush=True)
+        if phase in ['bootstrap', 'migrate', 'services', 'cache', 'edge', 'reference']:
+            try:
+                lines = read_source(root / ('runner-' + phase + '.log')).decode('utf8', errors='replace').splitlines()
+            except Exception:
+                lines = []
+            safe = [line for line in lines if line.startswith('Synthetic provisioning refused (')]
+            if safe:
+                # Known controller errors are fixed text; arbitrary OSError or
+                # subprocess diagnostics are not copied into public logs.
+                message = safe[-1]
+                if message.startswith(('Synthetic provisioning refused (ValueError): ', 'Synthetic provisioning refused (RuntimeError): ')) and len(message) <= 256:
+                    print(message, flush=True)
     finally:
         # Safe even on a failing suite: the controller independently requires
         # ready phase, empty fixtures, certain completion and frozen ownership.
