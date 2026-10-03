@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localCampaignHarness } from './helpers/localCampaignHarness';
 import * as requestSafety from './helpers/localRequestSafety';
+import * as runtimeFence from './helpers/withLocalRuntimeFence';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
@@ -126,5 +127,47 @@ describe('local campaign fixture safety gates', () => {
       expect(client.auth.admin.createUser).not.toHaveBeenCalled();
       expect(client.auth.admin.deleteUser).not.toHaveBeenCalled();
     } finally { observer.mockRestore(); }
+  });
+
+  it('retries a completed cleanup failure and still removes owned Auth users', async () => {
+    command.mockImplementation((...args) => snapshotResponse(args[1] as string[]));
+    const remaining = vi.fn().mockResolvedValueOnce({ error: null, data: [{ id: 'survivor' }] })
+      .mockResolvedValue({ error: null, data: [] });
+    const deleteUser = vi.fn().mockResolvedValue({ error: null });
+    const client = {
+      auth: { admin: { createUser: vi.fn().mockResolvedValue({ error: null, data: { user: { id: 'owned-user' } } }), deleteUser },
+        signInWithPassword: vi.fn().mockResolvedValue({ error: null, data: { session: { access_token: 'local-token' } } }) },
+      from: vi.fn((table: string) => ({
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+        delete: table === 'jobs' ? vi.fn().mockReturnValue({ in: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) })
+          : vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ error: null }) }),
+        select: vi.fn().mockReturnValue({ in: remaining }),
+      })),
+    };
+    vi.mocked(createClient).mockReturnValue(client as unknown as ReturnType<typeof createClient>);
+    const h = localCampaignHarness();
+    await h.user(); await h.job();
+    await expect(h.cleanJobs()).rejects.toThrow();
+    expect(h.cleanupSafe).toBe(true);
+    expect(() => h.assertCleanupSafe()).not.toThrow();
+    await h.cleanUsers();
+    expect(deleteUser).toHaveBeenCalledWith('owned-user');
+    await h.cleanJobs();
+    expect(remaining).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains both callback and release errors while poisoning safety only on failed release', async () => {
+    command.mockImplementation((...args) => snapshotResponse(args[1] as string[]));
+    const sql = new Error('owned SQL failure'); const release = new Error('release transport failed');
+    const fence = vi.spyOn(runtimeFence, 'withLocalRuntimeFence').mockImplementationOnce(async (_runtime, action) => {
+      await action(() => undefined); throw release;
+    });
+    try {
+      const h = localCampaignHarness();
+      await expect(h.withCleanupFence(async () => { throw sql; })).rejects.toMatchObject({ errors: [sql, release] });
+      expect(h.cleanupSafe).toBe(false);
+      await expect(h.cleanUsers()).rejects.toThrow('Owned fixtures retained');
+    } finally { fence.mockRestore(); }
   });
 });

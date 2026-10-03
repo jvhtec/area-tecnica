@@ -5,6 +5,7 @@ import { expect } from 'vitest';
 import { edgeSnapshot } from './edgeSnapshot';
 import { localRequestSafety } from './localRequestSafety';
 import { withLocalRuntimeFence } from './withLocalRuntimeFence';
+import { observeLocalTransport } from './observeLocalTransport';
 
 const database = 'supabase_db_dev-history';
 const localUrl = 'http://127.0.0.1:54441';
@@ -52,15 +53,30 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
       .replace(/^import '\.\.\/\.\.\/outbound.ts';\r?\n/, '');
     if (normalize(source) !== normalize(expected)) throw new Error(`Local runtime source is stale: ${file}. Sync its public source before testing.`);
   }
+  const requests = localRequestSafety();
+  const observedFetch = observeLocalTransport(realFetch, requests);
   const client = createClient(localUrl, service, { auth: { persistSession: false, autoRefreshToken: false,
-    detectSessionInUrl: false, storageKey: `local-service-${randomUUID()}` }, global: { fetch: realFetch } });
+    detectSessionInUrl: false, storageKey: `local-service-${randomUUID()}` }, global: { fetch: observedFetch } });
   const jobs = new Set<string>();
   const users = new Set<string>();
   const marker = `[LOCAL CAMPAIGN TEST ${randomUUID()}]`;
-  const requests = localRequestSafety();
   async function fenced<T>(cleanup: (assertFresh: () => void) => Promise<T>) {
     requests.assertSafe();
-    return requests.run(() => withLocalRuntimeFence({ url: localUrl, anon, service, fetch: realFetch }, cleanup));
+    let cleanupFailure: { error: unknown } | undefined;
+    let result: { ok: true; value: T } | { ok: false; error: unknown };
+    try {
+      result = await requests.run(() => withLocalRuntimeFence({ url: localUrl, anon, service, fetch: realFetch }, async assertFresh => {
+        // A completed SQL denial/assertion is retryable after a proven release.
+        // SDK network/body failures latch independently in observedFetch.
+        try { return { ok: true as const, value: await cleanup(assertFresh) }; }
+        catch (error) { cleanupFailure = { error }; return { ok: false as const, error }; }
+      }));
+    } catch (error) {
+      if (cleanupFailure) throw new AggregateError([cleanupFailure.error, error], 'Owned cleanup and runtime release failed; retain fixture IDs');
+      throw error;
+    }
+    if (!result.ok) throw result.error;
+    return result.value;
   }
 
   function fingerprint() {
@@ -90,7 +106,7 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
       phone: '+34999000001', default_timesheet_category: 'tecnico',
       waha_endpoint: role === 'management' ? 'https://local-waha.invalid' : null }).eq('id', id)).error).toBeNull();
     const auth = createClient(localUrl, anon, { auth: { persistSession: false, autoRefreshToken: false,
-      detectSessionInUrl: false, storageKey: `local-user-${id}` }, global: { fetch: realFetch } });
+      detectSessionInUrl: false, storageKey: `local-user-${id}` }, global: { fetch: observedFetch } });
     const signedIn = await auth.auth.signInWithPassword({ email, password });
     expect(signedIn.error).toBeNull();
     return { id, token: signedIn.data.session!.access_token, client: auth };
@@ -179,5 +195,6 @@ export function localCampaignHarness(extraHandlers: string[] = []) {
   }
 
   return { client, api, user, job, start, campaign, roles, request, assignment, cleanJobs, cleanUsers, fingerprint, localUrl,
+    get cleanupSafe() { return requests.cleanupSafe; },
     assertCleanupSafe: requests.assertSafe, prepare: () => fenced(async () => undefined), withCleanupFence: fenced };
 }

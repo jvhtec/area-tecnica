@@ -46,6 +46,10 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real manager cancellation 
       await h?.cleanJobs();
       cleanupUnsafe = false;
     }
+    catch (error) {
+      cleanupUnsafe = !h?.cleanupSafe || background?.transportComplete === false;
+      throw error;
+    }
     finally {
       cleanup();
       queryClient?.clear();
