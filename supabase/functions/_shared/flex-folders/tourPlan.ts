@@ -60,6 +60,25 @@ export const plannerOwnedTourSemanticKeys = (
   })
   .map((node) => node.semantic_key));
 
+/**
+ * Recovers the technical department selection for tours created before date jobs
+ * persisted `job_departments`. Existing Flex root IDs are durable evidence that
+ * those departments belong to the tour; a new tour still requires an explicit
+ * selection before provisioning starts.
+ */
+export const selectedDepartmentsForTour = (
+  tour: TourRecord,
+  persistedDepartments: ReadonlySet<string>,
+): Set<string> => {
+  if (persistedDepartments.size > 0 || !tour.flex_main_folder_id) {
+    return new Set(persistedDepartments);
+  }
+
+  return new Set(TECHNICAL_DEPARTMENTS.filter((department) =>
+    Boolean(tour[`flex_${department}_folder_id`])
+  ));
+};
+
 /** Chooses departments whose canonical children are safe to plan. */
 export const childDepartmentsForTour = (
   tour: TourRecord,
