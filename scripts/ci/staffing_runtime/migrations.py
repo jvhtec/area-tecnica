@@ -72,8 +72,14 @@ class Migrations(Bootstrap):
         tunnel = self.observe("container", tunnel_id)
         ingress = self.observe("network", ingress_id)
         image = self.observe("image", "python:3.13-slim")["Id"]
-        if tunnel["Id"] != tunnel_id or tunnel["Name"] != "/" + self.tunnel or not tunnel["State"]["Running"] or tunnel["Image"] != image:
-            raise ValueError("Migration tunnel identity failed")
+        if tunnel["Id"] != tunnel_id:
+            raise ValueError("Migration tunnel container ID failed")
+        if tunnel["Name"] != "/" + self.tunnel:
+            raise ValueError("Migration tunnel container name failed")
+        if not tunnel["State"]["Running"]:
+            raise ValueError("Migration tunnel container is not running")
+        if tunnel["Image"] != image:
+            raise ValueError("Migration tunnel image identity failed")
         if tunnel["Config"]["Labels"].get("local.staffing-ci") != self.identity:
             raise ValueError("Migration tunnel ownership failed")
         if ingress["Id"] != ingress_id or ingress["Name"] != self.ingress or ingress["Internal"] or ingress["Labels"].get("local.staffing-ci") != self.identity or set(ingress["Containers"]) != {tunnel_id}:
