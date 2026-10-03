@@ -678,7 +678,7 @@ Keep this tracker current when changing a boundary. **DB-backed** means actual P
 | P0 20 | `staffing-campaigns.edge.integration.test.ts` | Opt-in real-runtime invited-without-schedule and declined controls |
 | P0 21 / CARLOS A1 | `tests/assignments/staffing-public-methods.disposable.integration.test.ts` | Fifteen real availability capability-link cases: legacy/path HEAD, GET/POST URL response/replay, invalid/expired tokens and ignored POST body. Offer/browser-navigation coverage and A1 product fix remain pending |
 | P1 1–9, 11–13, 15 | `staffing-phase1-characterization.test.ts`, `staffing-orchestrator/__tests__/*` | Source/helper evidence supplemented by the historical local campaign cases below; automatic waves and initial CAS contention remain gaps |
-| P1 14 | `tests/assignments/staffing-completion.disposable.integration.test.ts` | Two real-runtime completion cases: exact push dispatch/200 persistence, caller-observed503 best effort, cleared lock/no next run and inert replay; twelve-table clone/history restoration |
+| P1 14 | `tests/assignments/staffing-completion.disposable.integration.test.ts` | Two real-runtime completion cases: exact push dispatch/200 persistence, 503 observed by the caller best effort, cleared lock/no next run and inert replay; twelve-table clone/history restoration |
 | P1 10 / B11 | `supabase/tests/database/staffing_candidate_ranking_characterization.sql` | DB-backed ranking exclusions; not a full campaign tick |
 
 Future writer consolidation must inventory every direct matrix, lifecycle and tour writer in section 10 and define their common locking protocol. PR990's pair lock covers only acceptance and the timesheet-removal RPC.
