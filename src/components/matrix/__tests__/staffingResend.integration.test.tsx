@@ -9,7 +9,7 @@ import { confirmRequest, sendRequest, StaffingDatabase } from '../../../../supab
 
 vi.mock('@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval', () => ({
   useMatrixCellAssignmentRemoval: () => ({
-    multiDateRemoval: { isOpen: false, isLoading: false, otherDates: [], otherDatesCount: 0, currentDate: null, removeOption: 'single' },
+    multiDateRemoval: { isOpen: false, isLoading: false, otherDates: [], otherDatesCount: 0, currentDate: null, removeOption: 'single', stateToken: null },
     setMultiDateRemoval: vi.fn(), isRemovingAssignment: false,
     checkMultiDateAssignment: vi.fn(), handleRemoveAssignment: vi.fn(),
   }),

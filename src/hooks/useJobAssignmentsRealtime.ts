@@ -6,6 +6,13 @@ import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
+import {
+  AssignmentCommandError,
+  createAssignmentCommandId,
+  removeDirectAssignment,
+  requireCommitted,
+  runAssignmentSideEffects,
+} from "@/features/assignments/commands";
 import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import type { Database } from "@/integrations/supabase/types";
@@ -447,7 +454,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     }
   };
 
-  const removeAssignment = async (technicianId: string, renderedAssignment?: AssignmentRemovalContext) => {
+  const removeAssignment = async (technicianId: string, _renderedAssignment?: AssignmentRemovalContext) => {
     const previousJobs = queryClient.getQueryData(['jobs']);
     let assignmentRemoved = false;
 
@@ -470,52 +477,24 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         });
       });
 
-      // Get the assignment details before removal for Flex cleanup
-      const assignmentToRemove =
-        renderedAssignment?.technician_id === technicianId
-          ? renderedAssignment
-          : assignments.find(a => a.technician_id === technicianId);
-
-      // Remove from database - IMPORTANT: Delete timesheets first to avoid orphaned records
-      const { error: timesheetError } = await supabase
-        .from('timesheets')
-        .delete()
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId);
-
-      if (timesheetError) {
-        console.error('Error removing timesheets:', timesheetError);
-        queryClient.setQueryData(['jobs'], previousJobs);
-        toast.error("Failed to remove assignment timesheets");
-        return;
-      }
-
-      const { error: assignmentError } = await supabase
-        .from('job_assignments')
-        .delete()
-        .eq('job_id', jobId)
-        .eq('technician_id', technicianId);
-
-      if (assignmentError) {
-        console.error('Error removing assignment:', assignmentError);
-        queryClient.setQueryData(['jobs'], previousJobs);
-        toast.error("Failed to remove assignment");
-        return;
-      }
+      // Whole removal: membership and every day go together in one command,
+      // and the database plans the Flex removal from the roles it deleted.
+      const result = requireCommitted(await removeDirectAssignment({
+        commandId: createAssignmentCommandId(),
+        jobId,
+        technicianId,
+        source: 'job-card',
+      }));
       assignmentRemoved = true;
+      const renderedDepartment = assignments.find(a => a.technician_id === technicianId)?.profiles?.department ?? null;
+      void runAssignmentSideEffects(result.command_id, result, { technicianDepartment: renderedDepartment })
+        .then((summary) => {
+          if (summary.failed > 0) {
+            toast.error("La asignación se eliminó, pero falló la sincronización con Flex o la notificación. Queda registrado para reintentar.");
+          }
+        }, (error: unknown) => console.error('Assignment removal side effects could not run', error));
 
-      // Remove from Flex crew calls if applicable
-      if (assignmentToRemove) {
-        if (assignmentToRemove.sound_role && assignmentToRemove.sound_role !== 'none') {
-          await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'remove');
-        }
-        
-        if (assignmentToRemove.lights_role && assignmentToRemove.lights_role !== 'none') {
-          await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'remove');
-        }
-      }
-
-      toast.success("Assignment removed successfully");
+      toast.success("Asignación eliminada");
       // Invalidate jobs so JobCard lists refresh assignments relation
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
@@ -524,7 +503,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       if (!assignmentRemoved) {
         queryClient.setQueryData(['jobs'], previousJobs);
       }
-      toast.error("Failed to remove assignment");
+      toast.error(error instanceof AssignmentCommandError ? error.message : "No se pudo eliminar la asignación");
     } finally {
       setIsRemoving(prev => ({ ...prev, [technicianId]: false }));
     }

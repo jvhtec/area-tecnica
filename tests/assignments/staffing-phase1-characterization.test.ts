@@ -228,17 +228,15 @@ describe("Staffing Phase 1 characterization", () => {
       );
     });
 
-    it("uses hard lifecycle cancellation for full matrix removal", () => {
-      expect(matrixAssignmentRemoval).toContain(
-        "dataLayerClient.rpc('manage_assignment_lifecycle'",
-      );
-      expect(matrixAssignmentRemoval).toContain("p_action: 'cancel'");
-      expect(matrixAssignmentRemoval).toContain("p_delete_mode: 'hard'");
+    it("removes whole matrix assignments through the atomic removal command", () => {
+      expect(matrixAssignmentRemoval).toContain("removeDirectAssignment(");
+      expect(matrixAssignmentRemoval).not.toContain("manage_assignment_lifecycle");
     });
 
-    it("allows one-date removal to delete only that timesheet", () => {
-      expect(matrixAssignmentRemoval).toContain(".from('timesheets')");
-      expect(matrixAssignmentRemoval).toContain(".eq('date', multiDateRemoval.currentDate)");
+    it("removes one date through the guarded date command, never a direct timesheet delete", () => {
+      expect(matrixAssignmentRemoval).toContain("removeAssignmentDate(");
+      expect(matrixAssignmentRemoval).toContain("dayResult.code !== 'last_date'");
+      expect(matrixAssignmentRemoval).not.toContain(".from('timesheets')");
     });
   });
 

@@ -40,6 +40,8 @@ export interface MultiDateRemovalState {
   otherDatesCount: number;
   currentDate: string | null;
   removeOption: 'single' | 'all';
+  /** Expected-state token loaded with the dates; null when the lookup failed. */
+  stateToken: string | null;
 }
 
 export interface MatrixStaffingStatus {

@@ -234,7 +234,7 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
     expect(toastMocks.errorMock).toHaveBeenCalledWith("Failed to add assignment");
   });
 
-  it("restores the jobs cache when removing an assignment fails", async () => {
+  it("removes through the atomic command and restores the jobs cache when it fails", async () => {
     const queryClient = createRollbackQueryClient();
     const previousJobs = [
       {
@@ -251,16 +251,7 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
     ];
     queryClient.setQueryData(["jobs"], previousJobs);
 
-    const timesheetsDeleteBuilder = createMockQueryBuilder({ data: null, error: null });
-    const assignmentDeleteBuilder = createMockQueryBuilder({
-      data: null,
-      error: { message: "delete failed" },
-    });
-    mockSupabase.from.mockImplementation((table: string) => {
-      if (table === "timesheets") return timesheetsDeleteBuilder;
-      if (table === "job_assignments") return assignmentDeleteBuilder;
-      return createMockQueryBuilder();
-    });
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "permission denied" } });
 
     const { result } = renderHook(() => useJobAssignmentsRealtime("job-1"), {
       wrapper: createWrapper(queryClient),
@@ -275,9 +266,12 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
       });
     });
 
-    expect(timesheetsDeleteBuilder.delete).toHaveBeenCalled();
-    expect(assignmentDeleteBuilder.delete).toHaveBeenCalled();
+    // One atomic command; no browser-side table deletes.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("remove_direct_assignment", expect.objectContaining({
+      p_job_id: "job-1", p_technician_id: "tech-1", p_source: "job-card",
+    }));
+    expect(mockSupabase.from).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(["jobs"])).toEqual(previousJobs);
-    expect(toastMocks.errorMock).toHaveBeenCalledWith("Failed to remove assignment");
+    expect(toastMocks.errorMock).toHaveBeenCalledWith("No tienes permiso para modificar asignaciones.");
   });
 });
