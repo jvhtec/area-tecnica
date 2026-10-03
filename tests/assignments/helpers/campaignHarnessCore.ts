@@ -14,7 +14,7 @@ const coreTables = ['jobs', 'staffing_requests', 'job_assignments', 'timesheets'
 const realFetch = globalThis.fetch;
 
 function docker(...args: string[]) {
-  return execFileSync('docker', args, { encoding: 'utf8', timeout: 15_000 });
+  return execFileSync('docker', args, { encoding: 'utf8', timeout: 15_000, maxBuffer: 64 * 1024 * 1024 });
 }
 
 export function campaignHarnessCore(extraHandlers: string[], options: { mode: 'historical' | 'disposable';
