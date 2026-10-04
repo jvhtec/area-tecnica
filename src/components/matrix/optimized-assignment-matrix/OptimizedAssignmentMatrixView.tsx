@@ -24,10 +24,13 @@ import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
 import { MatrixShortcutHelp } from "@/features/matrix-v2/keyboard/MatrixShortcutHelp";
 import { FocusColumnOverlay } from "@/features/matrix-v2/focus/FocusColumnOverlay";
 import { BatchLayer } from "@/features/matrix-v2/batch/BatchLayer";
+import { useSelectionDerivations } from "./useSelectionDerivations";
 import { SelectionOverlay } from "@/features/matrix-v2/batch/SelectionOverlay";
 import type {
+  CancelStaffingAsync,
   CancelStaffingMutate,
   MatrixCellAction,
+  SendStaffingEmailAsync,
   SendStaffingEmailMutate,
 } from "@/components/matrix/optimized-matrix-cell/types";
 
@@ -89,6 +92,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   sendStaffingEmail: SendStaffingEmailMutate;
   isSendingStaffingEmail: boolean;
   cancelStaffing: CancelStaffingMutate;
+  /** Matrix v2 sends through these: each call has its own promise, which `mutate`'s per-call callbacks do not (only the latest call's fire). */
+  sendStaffingEmailAsync: SendStaffingEmailAsync;
+  cancelStaffingAsync: CancelStaffingAsync;
   isCancellingStaffing: boolean;
   checkTimeConflictEnhanced: any;
   availabilityDialog: any;
@@ -111,6 +117,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   clearCellSelection: () => void;
   /** Replaces the selection wholesale (drag and shift-click ranges). */
   onReplaceSelection: (keys: Set<string>) => void;
+  /** Whose remembered staffing channel the Matrix v2 composer uses. */
+  staffingUserId?: string | null;
   /** Grid-selected days for the offer's technician, clamped to the job. */
   offerSeedDates?: string[];
   /** Present when the new Matrix (inspector, focus, batch) is switched on. */
@@ -173,6 +181,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   sendStaffingEmail,
   isSendingStaffingEmail,
   cancelStaffing,
+  sendStaffingEmailAsync,
+  cancelStaffingAsync,
   isCancellingStaffing,
   checkTimeConflictEnhanced,
   availabilityDialog,
@@ -193,6 +203,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   techLastYearMedalRankings,
   clearCellSelection,
   onReplaceSelection,
+  staffingUserId,
   offerSeedDates,
   v2,
 }: OptimizedAssignmentMatrixViewProps) => {
@@ -252,41 +263,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   const inspectorTarget = v2?.inspectorTarget ?? null;
   const closeInspector = v2?.closeInspector;
 
-  // Selection per row, so selecting a cell re-renders the rows whose selection
-  // changed instead of every row (each used to receive the whole set). Cell
-  // keys are `${technicianId}-${yyyy-MM-dd}`; the id is a uuid with dashes of
-  // its own, so the day key is read off the end.
-  const selectedDateKeysByTech = React.useMemo(() => {
-    const byTech = new Map<string, Set<string>>();
-    selectedCells.forEach((cellKey) => {
-      const technicianId = cellKey.slice(0, -11);
-      let keys = byTech.get(technicianId);
-      if (!keys) {
-        keys = new Set<string>();
-        byTech.set(technicianId, keys);
-      }
-      keys.add(cellKey.slice(-10));
-    });
-    return byTech;
-  }, [selectedCells]);
-
-  // Cell keys are `${technicianId}-${yyyy-MM-dd}`, and the id is a uuid that
-  // carries dashes of its own, so the day key is read off the end.
-  const selectionAnchor = React.useMemo(() => {
-    if (!selectedCells.size) return null;
-    const [first] = Array.from(selectedCells);
-    const technicianId = first.slice(0, -11);
-    const date = madridDateKeyToCalendarDate(first.slice(-10));
-    return date ? { technicianId, date } : null;
-  }, [selectedCells]);
-
-  const selectedCountForSheet = React.useMemo(() => {
-    if (!sheetTarget) return 0;
-    const prefix = `${sheetTarget.technician.id}-`;
-    let count = 0;
-    selectedCells.forEach((key) => { if (key.startsWith(prefix)) count += 1; });
-    return count;
-  }, [selectedCells, sheetTarget]);
+  const { selectedDateKeysByTech, selectionAnchor, selectedCountForSheet } = useSelectionDerivations(selectedCells, sheetTarget?.technician.id ?? null);
 
   // Anchored to the viewport, not to this layout: the matrix container runs past
   // the fold on a phone, so an absolutely positioned control at its bottom edge
@@ -362,12 +339,15 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     staffingMaps,
     profileNamesMap,
     isManagementUser,
-    handleCellClick,
     grid: { cellWidth: CELL_WIDTH, cellHeight: CELL_HEIGHT, technicianWidth: TECHNICIAN_WIDTH, headerHeight: HEADER_HEIGHT },
     scrollRef: mainScrollRef,
     selectedCells,
     clearSelection: clearCellSelection,
     onReplaceSelection,
+    sendStaffingEmail: sendStaffingEmailAsync,
+    cancelStaffing: cancelStaffingAsync,
+    staffingDepartment: staffingDepartment ?? null,
+    staffingUserId: staffingUserId ?? null,
   });
   const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay, gridHandlers, previewRects, batchLayer } = v2Grid;
 

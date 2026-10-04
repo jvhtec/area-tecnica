@@ -1,3 +1,4 @@
+import type { StaffingSendPayload } from '@/features/matrix-v2/staffing/payload';
 import type { MatrixIntent, MatrixRunOutcome, MatrixUndo } from '@/features/matrix-v2/types';
 
 export type BatchRowStatus = 'pending' | 'running' | 'done' | 'noop' | 'failed' | 'skipped' | 'needs-role';
@@ -13,6 +14,8 @@ export interface BatchRow {
   /** "Festival Lúa · mar 13 – jue 15". */
   summary: string;
   intents: MatrixIntent[];
+  /** A staffing request (availability or offer) instead of assignment commands. */
+  staffing?: { payload: StaffingSendPayload };
   /** Index of the next intent to run, so a retry resumes where the row stopped. */
   next: number;
   status: BatchRowStatus;

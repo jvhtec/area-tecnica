@@ -1,4 +1,8 @@
 import { planFocusAssign } from '@/features/matrix-v2/focus/focusAssign';
+import { buildStaffingPayload, type StaffingChannel, type StaffingPhase } from '@/features/matrix-v2/staffing/payload';
+import { slotsForDepartment as departmentSlots } from '@/features/matrix-v2/roleSlots';
+import { suggestRole } from '@/features/matrix-v2/roleSuggestion';
+import { roleDisciplineForDepartment } from '@/features/matrix-v2/types';
 import { dayRangeLabel, jobDayKeys } from '@/features/matrix-v2/jobDays';
 import { technicianDisplayName } from '@/features/matrix-v2/names';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
@@ -186,6 +190,60 @@ export function buildRemoveRows(
     if (intents.length === 0) return { ...row, status: 'noop' as const, message: 'Ya no tenía asignación esos días' };
     return { ...row, intents };
   });
+}
+
+/**
+ * Availability requests or offers for the selected people, on the selected days
+ * that belong to the job: one request per person. An offer needs a role, picked
+ * from the job's open slots in turn; when that cannot be decided the row asks.
+ */
+export function planStaffingRows(
+  keys: Iterable<string>,
+  jobId: string,
+  phase: StaffingPhase,
+  channel: StaffingChannel,
+  department: string | null,
+  lookups: BatchLookups,
+): BatchRow[] {
+  const job = lookups.job(jobId);
+  if (!job) return [];
+  const jobDays = jobDayKeys(job);
+  const jobDaySet = new Set(jobDays);
+  const slots: RoleSlot[] = (lookups.roleSlots(jobId) ?? []).map((slot) => ({ ...slot }));
+  const description = (job.description ?? '').trim();
+  const rows: BatchRow[] = [];
+
+  daysByTechnician(keys).forEach((selected, technicianId) => {
+    const technician = lookups.technician(technicianId);
+    const inJob = selected.filter((day) => jobDaySet.has(day));
+    const row = baseRow(technicianId, jobId, technicianDisplayName(technician), `${job.title} · ${dayRangeLabel(inJob.length ? inJob : selected)}`, inJob[0] ?? selected[0]);
+    if (!technician) return void rows.push(skipped(row, 'No se encontró a esta persona'));
+    if (inJob.length === 0) return void rows.push(skipped(row, 'Ninguno de los días elegidos es de este trabajo'));
+    if (lookups.isFridge(technicianId)) return void rows.push(skipped(row, 'Está en la nevera'));
+    if (lookups.declinedJobIds(technicianId)?.has(jobId)) return void rows.push(skipped(row, 'Rechazó este trabajo'));
+    const days = inJob.filter((day) => !lookups.isUnavailable(technicianId, day));
+    if (days.length === 0) return void rows.push(skipped(row, 'No está disponible esos días'));
+    const note = days.length < inJob.length ? `${inJob.length - days.length === 1 ? '1 día no disponible omitido' : `${inJob.length - days.length} días no disponibles omitidos`}` : undefined;
+
+    let role: string | null = null;
+    if (phase === 'offer') {
+      const discipline = roleDisciplineForDepartment(technician.department);
+      role = suggestRole({ technician, slots: departmentSlots(slots, discipline), lastRoleCode: lookups.lastRole(technicianId) }).code;
+      if (!role) return void rows.push({ ...row, status: 'needs-role', message: 'Elige el rol: puede encajar en varios niveles', openAt: { technicianId, dateKey: days[0] } });
+      const taken = slots.find((slot) => slot.code === role);
+      if (taken) {
+        taken.open = Math.max(taken.open - 1, 0);
+        taken.filled += 1;
+      }
+    }
+    rows.push({
+      ...row,
+      summary: `${job.title} · ${dayRangeLabel(days)}`,
+      message: note,
+      staffing: { payload: buildStaffingPayload({ jobId, technicianId, phase, channel, department, days, jobDays, role, message: description }) },
+    });
+  });
+  return rows;
 }
 
 export const pairKey = pairId;

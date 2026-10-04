@@ -1,5 +1,9 @@
 import type { MatrixCommandRunner } from '@/features/matrix-v2/commandRunner';
 import type { BatchFailure, BatchRow, BatchTally } from '@/features/matrix-v2/batch/types';
+import { describeStaffingConflict } from '@/features/matrix-v2/staffing/conflicts';
+import type { StaffingSendPayload } from '@/features/matrix-v2/staffing/payload';
+import { ConflictError } from '@/features/staffing/hooks/useStaffing';
+import { getErrorMessage } from '@/utils/errorMessage';
 import type { MatrixIntent, MatrixUndo, MatrixUndoOutcome } from '@/features/matrix-v2/types';
 
 /** How many commands are in flight at once. The database serialises per technician; this keeps the browser polite. */
@@ -9,11 +13,49 @@ const unknownFailure = (message: string): BatchFailure => ({
   ok: false, code: 'unknown', message, stale: false, conflict: null, result: null, retryable: false,
 });
 
+export type SendStaffing = (payload: StaffingSendPayload) => Promise<unknown>;
+
+const conflictMessage = (error: ConflictError): string => {
+  const summary = describeStaffingConflict(error.details);
+  const parts = [
+    summary.jobs.length > 0 ? `Ya tiene ${summary.jobs.map((job) => job.title).join(', ')}` : null,
+    summary.off.length > 0 ? `No disponible: ${summary.off.map((item) => item.label).join(', ')}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Hay un choque de agenda';
+};
+
+/**
+ * A staffing request is one send. It cannot be taken back (the message is
+ * already on its way), and a clash from the server is reported as a clash, so
+ * the row offers the same way out as an assignment's: accept it and send.
+ */
+export async function runStaffingRow(send: SendStaffing, row: BatchRow, onChange?: (row: BatchRow) => void): Promise<BatchRow> {
+  const request = row.staffing;
+  if (!request) return { ...row, status: 'failed', message: 'No hay nada que enviar', failure: unknownFailure('No hay nada que enviar') };
+  onChange?.({ ...row, status: 'running', failure: null, message: undefined });
+  let finished: BatchRow;
+  try {
+    await send(request.payload);
+    finished = { ...row, status: 'done', changed: true, reversible: false, failure: null, message: undefined };
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      const message = conflictMessage(error);
+      finished = { ...row, status: 'failed', message, failure: { ok: false, code: 'conflict', message, stale: false, conflict: null, result: null, retryable: false } };
+    } else {
+      const message = getErrorMessage(error, 'No se pudo enviar la solicitud');
+      finished = { ...row, status: 'failed', message, failure: unknownFailure(message) };
+    }
+  }
+  onChange?.(finished);
+  return finished;
+}
+
 /**
  * Runs a row's commands in order and stops at the first that fails, leaving
  * `next` on it: a retry resumes there, and what already committed stays done.
  */
-export async function runRow(runner: MatrixCommandRunner, row: BatchRow, onChange?: (row: BatchRow) => void): Promise<BatchRow> {
+export async function runRow(runner: MatrixCommandRunner, row: BatchRow, onChange?: (row: BatchRow) => void, sendStaffing?: SendStaffing): Promise<BatchRow> {
+  if (row.staffing && sendStaffing) return runStaffingRow(sendStaffing, row, onChange);
   let current: BatchRow = { ...row, status: 'running', failure: null, message: undefined };
   onChange?.(current);
   while (current.next < current.intents.length) {
@@ -46,7 +88,7 @@ export async function runRow(runner: MatrixCommandRunner, row: BatchRow, onChang
 export async function runBatch(
   runner: MatrixCommandRunner,
   rows: BatchRow[],
-  { concurrency = BATCH_CONCURRENCY, onRow }: { concurrency?: number; onRow?: (row: BatchRow) => void } = {},
+  { concurrency = BATCH_CONCURRENCY, onRow, sendStaffing }: { concurrency?: number; onRow?: (row: BatchRow) => void; sendStaffing?: SendStaffing } = {},
 ): Promise<BatchRow[]> {
   const results = new Map<string, BatchRow>(rows.map((row) => [row.id, row]));
   const queue = rows.filter((row) => row.status === 'pending');
@@ -55,7 +97,7 @@ export async function runBatch(
       const finished = await runRow(runner, row, (update) => {
         results.set(update.id, update);
         onRow?.(update);
-      });
+      }, sendStaffing);
       results.set(finished.id, finished);
     }
   };
@@ -74,6 +116,7 @@ export const retryRow = (row: BatchRow, { force = false }: { force?: boolean } =
   failure: null,
   message: undefined,
   intents: force ? row.intents.map((intent, index) => (index === row.next ? forceIntent(intent) : intent)) : row.intents,
+  staffing: row.staffing && force ? { payload: { ...row.staffing.payload, override_conflicts: true } } : row.staffing,
 });
 
 export function tally(rows: BatchRow[]): BatchTally {

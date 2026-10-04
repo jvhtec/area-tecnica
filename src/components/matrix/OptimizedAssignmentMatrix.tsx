@@ -90,7 +90,7 @@ export const OptimizedAssignmentMatrix = ({
   const isGlobalCellSelected = useSelectedCellStore((state) => state.isCellSelected);
 
   const [createUserOpen, setCreateUserOpen] = useState(false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole, user } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
   const qc = useQueryClient();
 
@@ -102,8 +102,8 @@ export const OptimizedAssignmentMatrix = ({
   const { toast } = useToast();
   // Owned here rather than in every cell: the grid renders hundreds of cells,
   // and each useMutation call registers its own observer.
-  const { mutate: sendStaffingEmail, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
-  const { mutate: cancelStaffing, isPending: isCancellingStaffing } = useCancelStaffingRequest();
+  const { mutate: sendStaffingEmail, mutateAsync: sendStaffingEmailAsync, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
+  const { mutate: cancelStaffing, mutateAsync: cancelStaffingAsync, isPending: isCancellingStaffing } = useCancelStaffingRequest();
 
   // Cell dimensions (overridable for mobile). The desktop row is 72px so the
   // redesigned status card (job, role, and a "día único" line) fits without the
@@ -751,13 +751,13 @@ export const OptimizedAssignmentMatrix = ({
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
     handleJobSelected, handleStaffingActionSelected, forcedStaffingAction, forcedStaffingChannel,
     jobs, offerChannel, toast, sendStaffingEmail, checkTimeConflictEnhanced,
-    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing,
+    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing, sendStaffingEmailAsync, cancelStaffingAsync,
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     offerSeedDates,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
-    clearCellSelection, onReplaceSelection: replaceSelection,
+    clearCellSelection, onReplaceSelection: replaceSelection, staffingUserId: user?.id ?? null,
     v2: v2Config,
   };
 

@@ -53,13 +53,18 @@ interface Setup {
   state?: ReturnType<typeof makeState> | Error;
   slots?: Parameters<typeof buildJobRoleSlots>[0];
   focusJobId?: string;
+  staffingStatus?: import('@/components/matrix/optimized-matrix-cell/types').MatrixStaffingStatus | null;
+  send?: (payload: import('@/features/matrix-v2/staffing/payload').StaffingSendPayload) => Promise<{ channel?: string | null } | undefined>;
+  channel?: 'email' | 'whatsapp';
 }
 
 function setup(options: Setup = {}) {
   const jobs = options.jobs ?? [makeJob(JOB_A)];
   const run = vi.fn(options.run ?? (() => Promise.resolve(okOutcome())));
   const onClose = vi.fn();
-  const openStaffing = vi.fn();
+  const send = vi.fn(options.send ?? (() => Promise.resolve({ channel: 'email' })));
+  const cancel = vi.fn(() => Promise.resolve());
+  const setChannel = vi.fn();
   if (options.state instanceof Error) mocks.getState.mockRejectedValue(options.state);
   else mocks.getState.mockResolvedValue(options.state ?? makeState());
   const env: InspectorEnvironment = {
@@ -73,12 +78,12 @@ function setup(options: Setup = {}) {
     lastRoleByTechnician: new Map(),
     declinedJobIds: () => new Set(options.declined ?? []),
     isFridge: () => options.fridge ?? false,
-    staffingByDate: () => null,
+    staffingByDate: () => options.staffingStatus ?? null,
     profileNames: new Map([['manager-1', 'Ana Villar']]),
     canAssign: options.canAssign ?? true,
     canMarkUnavailable: options.canAssign ?? true,
     focusJobId: options.focusJobId,
-    openStaffing,
+    staffing: { send, cancel, channel: options.channel ?? 'email', setChannel, department: 'sound' },
   };
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const user = userEvent.setup();
@@ -87,7 +92,7 @@ function setup(options: Setup = {}) {
       <CellInspectorBody env={env} target={target()} onClose={onClose} />
     </QueryClientProvider>,
   );
-  return { run, onClose, openStaffing, user };
+  return { run, onClose, send, cancel, setChannel, user };
 }
 
 const assignedRow = makeMatrixRow({ date: DATE_KEY, status: 'invited', assigned_by: 'manager-1', assigned_at: '2026-10-02T16:40:00Z' });
@@ -233,11 +238,14 @@ describe('empty cell', () => {
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ coverage: 'full', mode: 'replace' }));
   });
 
-  it('hands staffing requests to the staffing flow and closes', async () => {
-    const { openStaffing, onClose, user } = setup();
+  it('opens the staffing composer in place instead of a dialog, and can go back', async () => {
+    const { onClose, user } = setup();
     await user.click(await screen.findByRole('button', { name: /Pedir disponibilidad u oferta/ }));
-    expect(onClose).toHaveBeenCalled();
-    expect(openStaffing).toHaveBeenCalledWith(TECH_1, expect.any(Date));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('radiogroup', { name: 'Qué enviar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pedir disponibilidad' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Volver' }));
+    expect(await screen.findByRole('button', { name: 'Asignar' })).toBeInTheDocument();
   });
 
   it('marks the day unavailable and closes', async () => {

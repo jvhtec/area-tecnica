@@ -3,6 +3,7 @@ import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-
 import type { MatrixCommandRunner } from '@/features/matrix-v2/commandRunner';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
 import type { MatrixTechnicianRef } from '@/features/matrix-v2/types';
+import type { StaffingChannel, StaffingPhase, StaffingSendPayload } from '@/features/matrix-v2/staffing/payload';
 
 export interface InspectorTechnician extends MatrixTechnicianRef {
   first_name: string;
@@ -15,6 +16,17 @@ export interface InspectorAvailability {
   reason?: string | null;
   notes?: string | null;
   source?: string | null;
+}
+
+/** What the staffing composer needs to send, cancel and remember: the grid's mutations as promises. */
+export interface InspectorStaffingApi {
+  send: (payload: StaffingSendPayload) => Promise<{ channel?: string | null } | undefined>;
+  cancel: (request: { job_id: string; profile_id: string; phase: StaffingPhase }) => Promise<void>;
+  /** The channel this person used last; changing it is remembered. */
+  channel: StaffingChannel;
+  setChannel: (channel: StaffingChannel) => void;
+  /** The department filter of the matrix, which the request carries. */
+  department: string | null;
 }
 
 /**
@@ -41,8 +53,8 @@ export interface InspectorEnvironment {
   canMarkUnavailable: boolean;
   /** The job a Job focus session is staffing, if any. */
   focusJobId?: string | null;
-  /** Hands staffing requests (availability, offers) to the staffing flow. */
-  openStaffing: (technicianId: string, date: Date) => void;
+  /** Availability requests and offers are composed in the inspector itself. */
+  staffing: InspectorStaffingApi;
 }
 
 export interface InspectorTarget {

@@ -14,6 +14,8 @@ import type { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/
  */
 export type SendStaffingEmailMutate = ReturnType<typeof useSendStaffingEmail>['mutate'];
 export type CancelStaffingMutate = ReturnType<typeof useCancelStaffingRequest>['mutate'];
+export type SendStaffingEmailAsync = ReturnType<typeof useSendStaffingEmail>['mutateAsync'];
+export type CancelStaffingAsync = ReturnType<typeof useCancelStaffingRequest>['mutateAsync'];
 
 export type MatrixCellAction =
   | 'select-job'

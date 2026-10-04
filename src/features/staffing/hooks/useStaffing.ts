@@ -64,6 +64,16 @@ export class ConflictError extends Error {
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
+    // Whatever the client is configured to retry (the app retries a failed mutation once), except a
+    // conflict: that is the server's answer, not a hiccup, and asking again gets the same refusal
+    // a second round trip and 1.5 s later.
+    retry: (failureCount, error) => {
+      if (error instanceof ConflictError) return false;
+      const configured = qc.getDefaultOptions().mutations?.retry;
+      if (typeof configured === 'function') return configured(failureCount, error);
+      if (typeof configured === 'number') return failureCount < configured;
+      return configured === true;
+    },
     mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], department?: string | null, override_conflicts?: boolean, require_no_conflicts?: boolean, resend_request_id?: string }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,

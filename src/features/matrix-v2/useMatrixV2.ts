@@ -13,7 +13,7 @@ import {
 } from '@/features/matrix-v2/flag';
 
 /** Admin and management get the new Matrix unless they opted out in Ajustes or with ?matriz=v1. */
-export const MATRIX_V2_DEFAULT_ON_FOR_MANAGEMENT = false;
+export const MATRIX_V2_DEFAULT_ON_FOR_MANAGEMENT = true;
 
 const browserStorage = (): Storage | null => {
   try {

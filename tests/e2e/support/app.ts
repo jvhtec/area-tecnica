@@ -36,6 +36,18 @@ interface SupabaseMockOptions {
   functions?: Record<string, MockResponder>;
 }
 
+/**
+ * A mocked function response with its own HTTP status, for the cases where the
+ * status is the point (a 409 conflict). Any other responder value is a 200.
+ */
+export interface MockHttpResponse {
+  __httpStatus: number;
+  body: unknown;
+}
+export const httpResponse = (status: number, body: unknown): MockHttpResponse => ({ __httpStatus: status, body });
+const isHttpResponse = (value: unknown): value is MockHttpResponse =>
+  typeof value === "object" && value !== null && "__httpStatus" in value && typeof (value as MockHttpResponse).__httpStatus === "number";
+
 export interface SupabaseCallLog {
   tableMutations: Array<{ table: string; method: string; body: unknown }>;
   rpcCalls: Array<{ name: string; method: string; body: unknown }>;
@@ -346,9 +358,9 @@ export async function installSupabaseMocks(
       const data = await resolveResponder(functions[name], {}, context);
 
       return route.fulfill({
-        status: 200,
+        status: isHttpResponse(data) ? data.__httpStatus : 200,
         contentType: "application/json",
-        body: JSON.stringify(data),
+        body: JSON.stringify(isHttpResponse(data) ? data.body : data),
       });
     }
 

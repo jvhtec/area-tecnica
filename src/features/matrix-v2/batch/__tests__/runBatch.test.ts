@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MatrixCommandRunner } from '@/features/matrix-v2/commandRunner';
-import { batchReversible, combineUndos, forceIntent, problemRows, retryRow, runBatch, runRow, tally } from '@/features/matrix-v2/batch/runBatch';
+import { batchReversible, combineUndos, forceIntent, problemRows, retryRow, runBatch, runRow, runStaffingRow, tally } from '@/features/matrix-v2/batch/runBatch';
+import { ConflictError } from '@/features/staffing/hooks/useStaffing';
 import type { BatchRow } from '@/features/matrix-v2/batch/types';
 import type { MatrixIntent, MatrixRunOutcome, MatrixUndo } from '@/features/matrix-v2/types';
 import { makeResult } from '@/features/matrix-v2/__tests__/fixtures';
+
+vi.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: vi.fn() }, functions: { invoke: vi.fn() }, from: vi.fn() } }));
 
 const makeUndo = (overrides: Partial<MatrixUndo> = {}): MatrixUndo => ({
   commandId: 'c', expiresAt: Date.now() + 8_000, isOpen: () => true, undo: async () => ({ ok: true }), release: () => undefined, ...overrides,
@@ -137,5 +140,47 @@ describe('batch Deshacer', () => {
     combineUndos([makeUndo({ release }), makeUndo({ release })])?.release();
     expect(release).toHaveBeenCalledTimes(2);
     expect(combineUndos([])).toBeNull();
+  });
+});
+
+describe('staffing rows', () => {
+  const staffingRow = (id: string): BatchRow => ({
+    ...makeRow(id, []), staffing: { payload: { job_id: 'job-a', profile_id: id, phase: 'availability', channel: 'email', department: null, single_day: false } },
+  });
+
+  it('sends the request once and is done, with nothing to undo', async () => {
+    const send = vi.fn().mockResolvedValue({ channel: 'email' });
+    const done = await runStaffingRow(send, staffingRow('t1'));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ profile_id: 't1', phase: 'availability' }));
+    expect(done).toMatchObject({ status: 'done', changed: true, reversible: false });
+    expect(batchReversible([done])).toBe(false);
+  });
+
+  it('a clash from the server fails the row as a clash, naming what is in the way', async () => {
+    const send = vi.fn().mockRejectedValue(new ConflictError('Conflict', { conflicts: [{ job_name: 'Boda Sol' }], unavailability: [{ date: '2026-10-15' }] }));
+    const done = await runStaffingRow(send, staffingRow('t1'));
+    expect(done).toMatchObject({ status: 'failed', message: 'Ya tiene Boda Sol · No disponible: 15 oct' });
+    expect(done.failure?.code).toBe('conflict');
+  });
+
+  it('any other failure can be retried', async () => {
+    const done = await runStaffingRow(vi.fn().mockRejectedValue(new Error('WhatsApp no responde')), staffingRow('t1'));
+    expect(done).toMatchObject({ status: 'failed', message: 'WhatsApp no responde' });
+    expect(done.failure?.code).toBe('unknown');
+  });
+
+  it('Enviar igualmente retries the same request accepting the clash', () => {
+    const forced = retryRow({ ...staffingRow('t1'), status: 'failed' }, { force: true });
+    expect(forced.staffing?.payload).toMatchObject({ override_conflicts: true, profile_id: 't1' });
+    expect(retryRow({ ...staffingRow('t1'), status: 'failed' }).staffing?.payload).not.toHaveProperty('override_conflicts');
+  });
+
+  it('runBatch sends staffing rows through the staffing sender, not the runner', async () => {
+    const run = vi.fn<MatrixCommandRunner['run']>();
+    const send = vi.fn().mockResolvedValue({});
+    const done = await runBatch(runnerWith(run), [staffingRow('a'), staffingRow('b')], { sendStaffing: send });
+    expect(run).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(done.map((row) => row.status)).toEqual(['done', 'done']);
   });
 });

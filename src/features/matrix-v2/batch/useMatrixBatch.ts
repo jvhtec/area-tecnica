@@ -7,9 +7,12 @@ import {
   pairKey,
   planAssignRows,
   planConfirmRows,
+  planStaffingRows,
   type BatchLookups,
 } from '@/features/matrix-v2/batch/plan';
-import { batchReversible, combineUndos, problemRows, retryRow, runBatch, runRow, tally } from '@/features/matrix-v2/batch/runBatch';
+import { batchReversible, combineUndos, problemRows, retryRow, runBatch, runRow, tally, type SendStaffing } from '@/features/matrix-v2/batch/runBatch';
+import type { InspectorStaffingApi } from '@/features/matrix-v2/inspector/environment';
+import type { StaffingPhase } from '@/features/matrix-v2/staffing/payload';
 import { daysByTechnician, parseCellKey } from '@/features/matrix-v2/batch/selection';
 import type { BatchRow } from '@/features/matrix-v2/batch/types';
 import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
@@ -20,7 +23,7 @@ import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
 import { madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 
-type Kind = 'assign' | 'confirm' | 'remove';
+type Kind = 'assign' | 'confirm' | 'remove' | 'availability' | 'offer';
 
 const STATE_READS_IN_FLIGHT = 4;
 
@@ -31,6 +34,8 @@ const titleFor = (kind: Kind, n: number) => {
     case 'assign': return plural(n, 'persona asignada', 'personas asignadas');
     case 'confirm': return plural(n, 'asignación confirmada', 'asignaciones confirmadas');
     case 'remove': return plural(n, 'asignación quitada', 'asignaciones quitadas');
+    case 'availability': return plural(n, 'solicitud de disponibilidad enviada', 'solicitudes de disponibilidad enviadas');
+    case 'offer': return plural(n, 'oferta enviada', 'ofertas enviadas');
   }
 };
 
@@ -41,6 +46,8 @@ interface Options {
   clearSelection: () => void;
   lookups: BatchLookups;
   jobs: MatrixJob[];
+  /** How requests are sent and on which channel; absent where staffing is not available. */
+  staffing?: InspectorStaffingApi;
 }
 
 /**
@@ -48,7 +55,8 @@ interface Options {
  * command per row step, a few in flight, each row's outcome kept. Nothing rolls
  * back another row; a change that did not go through is shown with how to fix it.
  */
-export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, lookups, jobs }: Options) {
+export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, lookups, jobs, staffing }: Options) {
+  const sendStaffing = React.useMemo<SendStaffing | undefined>(() => (staffing ? (payload) => staffing.send(payload) : undefined), [staffing]);
   const runner = v2?.runner;
   const [rows, setRowsState] = React.useState<BatchRow[]>([]);
   const rowsRef = React.useRef<BatchRow[]>([]);
@@ -105,18 +113,24 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
     setRows(planned);
     setRunning(true);
     try {
-      const final = await runBatch(runner, planned, { onRow: replaceRow });
+      const final = await runBatch(runner, planned, { onRow: replaceRow, sendStaffing });
       setRows(final);
       report(final, kind);
     } finally {
       setRunning(false);
       clearSelection();
     }
-  }, [runner, setRows, replaceRow, report, clearSelection]);
+  }, [runner, setRows, replaceRow, report, clearSelection, sendStaffing]);
 
   const assignTo = React.useCallback((jobId: string, status: 'invited' | 'confirmed') => {
     void execute(planAssignRows(selectedCells, jobId, status, lookups), 'assign');
   }, [execute, selectedCells, lookups]);
+
+  /** Availability requests or offers for everyone selected, on the person's usual channel. */
+  const requestStaffing = React.useCallback((jobId: string, phase: StaffingPhase) => {
+    if (!staffing) return;
+    void execute(planStaffingRows(selectedCells, jobId, phase, staffing.channel, staffing.department, lookups), phase);
+  }, [execute, selectedCells, lookups, staffing]);
 
   const confirm = React.useCallback(() => {
     const plan = planConfirmRows(selectedCells, lookups);
@@ -187,14 +201,14 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
   const rerun = React.useCallback(async (rowId: string, force: boolean) => {
     const row = rowsRef.current.find((candidate) => candidate.id === rowId);
     if (!row || !runner || row.status !== 'failed') return;
-    const finished = await runRow(runner, retryRow(row, { force }), replaceRow);
+    const finished = await runRow(runner, retryRow(row, { force }), replaceRow, sendStaffing);
     if (finished.status === 'done') {
       const undo = batchReversible([finished]) ? combineUndos(finished.undos) : null;
       const title = `${finished.name}: cambio aplicado`;
       if (undo) showUndoToast({ title, description: finished.summary, undo });
       else toast.success(title, { description: finished.summary });
     }
-  }, [runner, replaceRow]);
+  }, [runner, replaceRow, sendStaffing]);
 
   const openRow = React.useCallback((row: BatchRow) => {
     const date = row.openAt ? madridDateKeyToCalendarDate(row.openAt.dateKey) : null;
@@ -211,6 +225,7 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
     running,
     progress: running && rows.length > 0 ? { done: finished, total: rows.length } : null,
     assignTo,
+    requestStaffing,
     confirm,
     remove,
     markUnavailable,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRemoveRows, groupAssignedPairs, planAssignRows, planConfirmRows, resolveRemoveIntents, type BatchLookups, type BatchAssignmentRef } from '@/features/matrix-v2/batch/plan';
+import { buildRemoveRows, groupAssignedPairs, planAssignRows, planConfirmRows, planStaffingRows, resolveRemoveIntents, type BatchLookups, type BatchAssignmentRef } from '@/features/matrix-v2/batch/plan';
 import { cellKey } from '@/features/matrix-v2/batch/selection';
 import { JOB_A, JOB_B, makeJob, makeTechnician } from '@/features/matrix-v2/__tests__/fixtures';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
@@ -150,5 +150,50 @@ describe('removal', () => {
     ];
     const rows = buildRemoveRows(pairs, new Map([[`t1:${JOB_A}`, { exists: true, dates: [D1] }], [`t3:${JOB_A}`, { exists: true, dates: [D0] }]]), lookups());
     expect(rows.map((row) => row.status)).toEqual(['pending', 'skipped', 'noop']);
+  });
+});
+
+describe('planStaffingRows', () => {
+  it('one availability request per person, for the days that belong to the job', () => {
+    const rows = planStaffingRows(block(['t1', 't2'], [D0, D1, D2]), JOB_A, 'availability', 'whatsapp', 'sound', lookups());
+    expect(rows).toHaveLength(2);
+    expect(rows[0].staffing?.payload).toEqual({
+      job_id: JOB_A, profile_id: 't1', phase: 'availability', channel: 'whatsapp', department: 'sound', single_day: false,
+    });
+    expect(rows[0].intents).toEqual([]);
+    expect(rows[0].status).toBe('pending');
+  });
+
+  it('asks only for the days selected when they are not the whole job', () => {
+    const [row] = planStaffingRows(block(['t1'], [D1]), JOB_A, 'availability', 'email', null, lookups());
+    expect(row.staffing?.payload).toMatchObject({ single_day: true, dates: [D1], target_date: D1 });
+  });
+
+  it('an offer takes the open slots in turn and carries the job description as its message', () => {
+    const base = lookups();
+    const withDescription: BatchLookups = { ...base, job: (id) => (id === JOB_A ? makeJob(JOB_A, { description: 'Carga a las 8' }) : base.job(id)) };
+    const rows = planStaffingRows(block(['t1', 't2', 't3'], [D1, D2]), JOB_A, 'offer', 'email', 'sound', withDescription);
+    expect(rows.map((row) => row.staffing?.payload.role)).toEqual(['SND-FOH-R', 'SND-PA-T', 'SND-PA-T']);
+    expect(rows[0].staffing?.payload).toMatchObject({ phase: 'offer', message: 'Carga a las 8' });
+  });
+
+  it('skips people who cannot take it, with the reason, and leaves out unavailable days', () => {
+    const rows = planStaffingRows(block(['t1', 't2', 't3'], [D1, D2]), JOB_A, 'availability', 'email', null, lookups({
+      fridge: ['t1'], declined: { t2: [JOB_A] }, unavailable: [cellKey('t3', D1)],
+    }));
+    expect(rows.map((row) => [row.status, row.message])).toEqual([
+      ['skipped', 'Está en la nevera'],
+      ['skipped', 'Rechazó este trabajo'],
+      ['pending', '1 día no disponible omitido'],
+    ]);
+    expect(rows[2].staffing?.payload).toMatchObject({ dates: [D2], target_date: D2 });
+  });
+
+  it('asks for the role of an offer it cannot choose', () => {
+    const ambiguous = [makeTechnician('t9', { first_name: 'Eva', skills: [{ name: 'FOH', is_primary: true }, { name: 'Monitores' }] })];
+    const base = lookups({ slots: [] });
+    const [row] = planStaffingRows(block(['t9'], [D1]), JOB_A, 'offer', 'email', null, { ...base, technician: (id) => ambiguous.find((t) => t.id === id) });
+    expect(row).toMatchObject({ status: 'needs-role', openAt: { technicianId: 't9', dateKey: D1 } });
+    expect(row.staffing).toBeUndefined();
   });
 });

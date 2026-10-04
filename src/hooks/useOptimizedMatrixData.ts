@@ -77,6 +77,8 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  /** Offers include it as their message unless it is edited. */
+  description?: string | null;
   job_date_types?: Array<{ date: string; type: string }>;
   assigned_count?: number;
   worked_count?: number;

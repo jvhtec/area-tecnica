@@ -10,7 +10,8 @@ import { useMatrixKeyboard, type ActiveCell } from '@/features/matrix-v2/keyboar
 import type { GridMetrics } from '@/features/matrix-v2/keyboard/navigation';
 import { useMatrixShortcutRegistration } from '@/features/matrix-v2/keyboard/useMatrixShortcutRegistration';
 import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
-import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
+import type { CancelStaffingAsync, MatrixStaffingStatus, SendStaffingEmailAsync } from '@/components/matrix/optimized-matrix-cell/types';
+import { useRememberedChannel } from '@/features/matrix-v2/staffing/rememberedChannel';
 import type { BatchLookups } from '@/features/matrix-v2/batch/plan';
 import { summarizeSelection } from '@/features/matrix-v2/batch/selection';
 import { useGridSelectionGestures } from '@/features/matrix-v2/batch/useGridSelectionGestures';
@@ -33,13 +34,18 @@ interface Options {
   staffingMaps: { byDate: Map<string, MatrixStaffingStatus> } | null | undefined;
   profileNamesMap: Map<string, string>;
   isManagementUser: boolean;
-  handleCellClick: (technicianId: string, date: Date, action: 'select-job-for-staffing') => void;
   grid: GridMetrics;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   /** The grid's multi-selection (`${technicianId}-${dateKey}`), owned by the container. */
   selectedCells: Set<string>;
   clearSelection: () => void;
   onReplaceSelection: (keys: Set<string>) => void;
+  /** The grid's staffing mutations, which the composer sends and cancels through. */
+  sendStaffingEmail: SendStaffingEmailAsync;
+  cancelStaffing: CancelStaffingAsync;
+  staffingDepartment: string | null;
+  /** Whose remembered channel to use. */
+  staffingUserId: string | null;
 }
 
 /**
@@ -50,9 +56,10 @@ interface Options {
  */
 export function useMatrixGridV2({
   v2, mobile, technicians, orderedTechnicians, dates, jobs, getJobsForDate, getAssignmentForCell, getAvailabilityForCell,
-  declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, handleCellClick, grid, scrollRef,
-  selectedCells, clearSelection, onReplaceSelection,
+  declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, grid, scrollRef,
+  selectedCells, clearSelection, onReplaceSelection, sendStaffingEmail, cancelStaffing, staffingDepartment, staffingUserId,
 }: Options) {
+  const { channel, setChannel } = useRememberedChannel(staffingUserId);
   const techniciansById = React.useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
   const datesByKey = React.useMemo(() => new Map(dates.map((date) => [formatMadridDateKey(date), date])), [dates]);
   const jobsById = React.useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
@@ -74,11 +81,19 @@ export function useMatrixGridV2({
       profileNames: profileNamesMap,
       canAssign: isManagementUser,
       canMarkUnavailable: isManagementUser,
-      openStaffing: (technicianId, date) => handleCellClick(technicianId, date, 'select-job-for-staffing'),
+      focusJobId: v2.focus?.job.id ?? null,
+      staffing: {
+        send: (payload) => sendStaffingEmail(payload),
+        cancel: async (request) => { await cancelStaffing(request); },
+        channel,
+        setChannel,
+        department: staffingDepartment,
+      },
     };
   }, [
     v2, techniciansById, jobsById, getJobsForDate, getAssignmentForCell, getAvailabilityForCell,
-    declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, handleCellClick,
+    declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser,
+    sendStaffingEmail, cancelStaffing, channel, setChannel, staffingDepartment,
   ]);
 
   const orderedTechnicianIds = React.useMemo(() => orderedTechnicians.map((t) => t.id), [orderedTechnicians]);
@@ -219,7 +234,7 @@ export function useMatrixGridV2({
     roleSlots: (jobId) => v2?.roleSlotsByJob.get(jobId),
     lastRole: (technicianId) => v2?.lastRoleByTechnician.get(technicianId) ?? null,
   }), [techniciansById, jobsById, datesByKey, getAssignmentForCell, getAvailabilityForCell, fridgeSet, declinedJobsByTech, v2]);
-  const batch = useMatrixBatch({ v2, canEdit: isManagementUser, selectedCells, clearSelection, lookups, jobs });
+  const batch = useMatrixBatch({ v2, canEdit: isManagementUser, selectedCells, clearSelection, lookups, jobs, staffing: inspectorEnv?.staffing });
   const summary = React.useMemo(() => summarizeSelection(selectedCells), [selectedCells]);
   const batchLayer = {
     cells: summary.cells,
@@ -230,6 +245,9 @@ export function useMatrixGridV2({
     removal: batch.removal,
     problems: batch.problems,
     onAssign: batch.assignTo,
+    onRequest: batch.requestStaffing,
+    channel,
+    onChannelChange: setChannel,
     onConfirm: batch.confirm,
     onRemove: batch.remove,
     onMarkUnavailable: batch.markUnavailable,

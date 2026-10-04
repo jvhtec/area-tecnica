@@ -1,5 +1,7 @@
 import React from 'react';
 import { Check, Loader2, MailPlus, MoveRight, Trash2, X } from 'lucide-react';
+import { StaffingView } from '@/features/matrix-v2/staffing/StaffingView';
+import { useStaffingComposer } from '@/features/matrix-v2/staffing/useStaffingComposer';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeEs, availabilityStatusLabel, normalizeStatus, offerStatusLabel } from '@/components/matrix/optimized-matrix-cell/helpers';
 import { useInspectorSummary } from '@/features/matrix-v2/inspector/useInspectorSummary';
@@ -133,6 +135,14 @@ function AssignFormView({
 /* ------------------------------------------------------------------------- */
 
 function EmptyView({ env, target, onClose }: BodyProps) {
+  const [composing, setComposing] = React.useState(false);
+  const technician = env.getTechnician(target.technicianId);
+  const composer = useStaffingComposer({ env, technician, target, onDone: onClose });
+  if (composing) return <StaffingView composer={composer} onBack={() => setComposing(false)} />;
+  return <EmptyAssignView env={env} target={target} onClose={onClose} onCompose={() => setComposing(true)} />;
+}
+
+function EmptyAssignView({ env, target, onClose, onCompose }: BodyProps & { onCompose: () => void }) {
   const technician = env.getTechnician(target.technicianId);
   const form = useAssignForm({ env, technician, target, onDone: onClose });
   const unavailability = useUnavailability({ env, target, onDone: onClose });
@@ -164,7 +174,7 @@ function EmptyView({ env, target, onClose }: BodyProps) {
             variant="ghost"
             size="sm"
             className="-ml-2 min-h-9"
-            onClick={() => { onClose(); env.openStaffing(target.technicianId, target.date); }}
+            onClick={onCompose}
           >
             <MailPlus className="mr-1.5 h-4 w-4" aria-hidden="true" /> Pedir disponibilidad u oferta…
           </Button>

@@ -1,6 +1,7 @@
 import { BatchActionBar, type BatchBarJob } from '@/features/matrix-v2/batch/BatchActionBar';
 import { BatchResultsPanel } from '@/features/matrix-v2/batch/BatchResultsPanel';
 import type { BatchRow } from '@/features/matrix-v2/batch/types';
+import type { StaffingChannel, StaffingPhase } from '@/features/matrix-v2/staffing/payload';
 
 interface BatchLayerProps {
   /** Selected cells; the bar shows only while there are some. */
@@ -12,6 +13,9 @@ interface BatchLayerProps {
   removal: { pairs: number; people: number; days: number };
   problems: BatchRow[];
   onAssign: (jobId: string, status: 'invited' | 'confirmed') => void;
+  onRequest: (jobId: string, phase: StaffingPhase) => void;
+  channel: StaffingChannel;
+  onChannelChange: (channel: StaffingChannel) => void;
   onConfirm: () => void;
   onRemove: () => void;
   onMarkUnavailable: () => void;
@@ -40,6 +44,9 @@ export function BatchLayer(props: BatchLayerProps) {
           jobs={props.jobs}
           removal={props.removal}
           onAssign={props.onAssign}
+          onRequest={props.onRequest}
+          channel={props.channel}
+          onChannelChange={props.onChannelChange}
           onConfirm={props.onConfirm}
           onRemove={props.onRemove}
           onMarkUnavailable={props.onMarkUnavailable}

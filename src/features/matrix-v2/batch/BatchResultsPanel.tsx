@@ -48,7 +48,7 @@ export function BatchResultsPanel({ rows, onRetry, onForce, onOpen, onDismiss }:
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">{[row.message, detail && detail !== row.message ? detail : null].filter(Boolean).join(' · ')}</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {clash && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => onForce(row.id)}>Forzar</Button>}
+                {clash && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => onForce(row.id)}>{row.staffing ? 'Enviar igualmente' : 'Forzar'}</Button>}
                 {row.status === 'failed' && canRetry(row.failure) && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => onRetry(row.id)}>Reintentar</Button>}
                 {row.openAt && (
                   <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => onOpen(row)}>
