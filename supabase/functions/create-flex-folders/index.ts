@@ -17,6 +17,7 @@ import {
   flexDate,
   plannerOwnedTourSemanticKeys,
   ROOT_DEPARTMENTS,
+  selectedDepartmentsForTour,
   type TourRecord,
 } from "../_shared/flex-folders/tourPlan.ts";
 import { allowedRolesForProvisioningOperation, type FlexProvisioningOperation } from "../_shared/flex-folders/access.ts";
@@ -199,18 +200,19 @@ const markTourRoot = async (
     Deno.env.get("FLEX_TOUR_FLAG_CUSTOM_FIELD_ID") || FLEX_CUSTOM_FIELD_IDS.isTour,
   );
 };
-const loadTourDepartments = async (supabase: SupabaseClient, tourId: string): Promise<Set<string>> => {
+const loadTourDepartments = async (supabase: SupabaseClient, tour: TourRecord): Promise<Set<string>> => {
   const { data, error } = await supabase
     .from("jobs")
     .select("job_departments(department)")
-    .eq("tour_id", tourId);
+    .eq("tour_id", tour.id);
   if (error) throw error;
-  const selected = new Set<string>();
+  const persistedDepartments = new Set<string>();
   for (const job of data || []) {
     for (const row of job.job_departments || []) {
-      if (typeof row.department === "string") selected.add(row.department);
+      if (typeof row.department === "string") persistedDepartments.add(row.department);
     }
   }
+  const selected = selectedDepartmentsForTour(tour, persistedDepartments);
   if (selected.size === 0) {
     throw new HttpError(409, "Persist at least one technical department before creating tour folders");
   }
@@ -685,7 +687,7 @@ serve(async (req) => {
     if (tourError || !tourData) throw new HttpError(404, "Tour not found");
     const tour = tourData as TourRecord;
     const [selected, range, plannerOwnedSemanticKeys] = await Promise.all([
-      loadTourDepartments(supabase, tourId),
+      loadTourDepartments(supabase, tour),
       loadTourRange(supabase, tour),
       loadTourPlannerOwnedSemanticKeys(supabase, tourId),
     ]);
