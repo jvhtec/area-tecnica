@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isManagementRole } from '@/utils/permissions';
 import type { UserRole } from '@/types/user';
@@ -26,7 +25,14 @@ const browserStorage = (): Storage | null => {
 
 export function useMatrixV2() {
   const { userRole } = useOptimizedAuth();
-  const { search } = useLocation();
+  // Read straight off the URL rather than through the router: the choice is a
+  // browser-level preference, and the page renders (and is tested) without one.
+  const [search, setSearch] = useState(() => (typeof window === 'undefined' ? '' : window.location.search));
+  useEffect(() => {
+    const sync = () => setSearch(window.location.search);
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
   const defaultOn = MATRIX_V2_DEFAULT_ON_FOR_MANAGEMENT && isManagementRole(userRole as UserRole);
   const [stored, setStored] = useState<MatrixV2Choice>(() => readStoredMatrixV2Choice(browserStorage()));
 

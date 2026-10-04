@@ -1,3 +1,5 @@
+import type { RoleSlot } from "@/features/matrix-v2/roleSlots";
+
 // Technician sorting method type
 export type TechSortMethod =
   | "default"
@@ -74,4 +76,8 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
+  /** Matrix v2 (inspector, focus, batch) is switched on for this user. */
+  matrixV2?: boolean;
+  /** Role slots per job, from the page's staffing-summary query. */
+  roleSlotsByJob?: Map<string, RoleSlot[]>;
 }

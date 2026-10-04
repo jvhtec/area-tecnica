@@ -14,6 +14,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
+import { useMatrixCommandRunner } from '@/features/matrix-v2/useMatrixCommandRunner';
+import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
+import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
@@ -23,6 +26,7 @@ import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/compo
 
 import { queryKeys } from "@/lib/react-query";
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+const EMPTY_ROLE_SLOTS = new Map<string, RoleSlot[]>();
 
 // The staffing badges are fetched for a block-aligned window of technicians
 // rather than exactly the visible rows: the query is keyed on the id list, so
@@ -70,6 +74,8 @@ export const OptimizedAssignmentMatrix = ({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  matrixV2 = false,
+  roleSlotsByJob = EMPTY_ROLE_SLOTS,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -130,6 +136,26 @@ export const OptimizedAssignmentMatrix = ({
     allAssignments,
     mobile,
   });
+
+  // Matrix v2: the one entry point for changing an assignment, and the role each
+  // technician held last (so a quick assignment can start from it).
+  const runner = useMatrixCommandRunner({ jobs, technicians });
+  const lastRoleByTechnician = useMemo(() => {
+    const latest = new Map<string, { date: string; role: string }>();
+    if (!matrixV2) return new Map<string, string>();
+    for (const row of allAssignments ?? []) {
+      if (!row?.technician_id || row.status === 'declined') continue;
+      const role = row.sound_role || row.lights_role || row.video_role;
+      if (!role) continue;
+      const seen = latest.get(row.technician_id);
+      if (!seen || row.date > seen.date) latest.set(row.technician_id, { date: row.date, role });
+    }
+    return new Map([...latest].map(([technicianId, { role }]) => [technicianId, role]));
+  }, [allAssignments, matrixV2]);
+  const v2Config = useMemo<MatrixV2ViewConfig | undefined>(
+    () => (matrixV2 ? { runner, roleSlotsByJob, lastRoleByTechnician } : undefined),
+    [matrixV2, runner, roleSlotsByJob, lastRoleByTechnician],
+  );
 
   // Listen for assignment updates and refresh data
   useEffect(() => {
@@ -695,6 +721,7 @@ export const OptimizedAssignmentMatrix = ({
     offerSeedDates,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
     clearCellSelection,
+    v2: v2Config,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;

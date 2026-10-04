@@ -89,6 +89,13 @@ export interface OptimizedMatrixCellProps {
    * sheet instead of hosting four icon buttons it has no room for.
    */
   onOpenSheet?: (technicianId: string, date: Date) => void;
+  /**
+   * Matrix v2: a plain click on any cell opens the inspector instead of the
+   * per-action dialogs. The cell hands back its own element so the inspector
+   * can sit next to it.
+   */
+  inspectorMode?: boolean;
+  onInspect?: (technicianId: string, date: Date, element: HTMLElement) => void;
   /** True while any cell is selected: on touch, a tap then extends the selection. */
   selectionActive?: boolean;
   onOptimisticUpdate?: (technicianId: string, jobId: string, status: string) => void;

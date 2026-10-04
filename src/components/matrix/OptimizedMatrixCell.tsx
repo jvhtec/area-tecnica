@@ -62,6 +62,8 @@ export const OptimizedMatrixCell = memo(({
   onClick: onClickProp,
   onPrefetch: onPrefetchProp,
   onOpenSheet: onOpenSheetProp,
+  inspectorMode = false,
+  onInspect: onInspectProp,
   selectionActive = false,
   onOptimisticUpdate: onOptimisticUpdateProp,
   onRender,
@@ -94,6 +96,10 @@ export const OptimizedMatrixCell = memo(({
   );
   const onPrefetch = useCallback(() => onPrefetchProp?.(technicianId), [onPrefetchProp, technicianId]);
   const onOpenSheet = useCallback(() => onOpenSheetProp?.(technicianId, date), [onOpenSheetProp, technicianId, date]);
+  const onInspect = useCallback(
+    (element: HTMLElement) => onInspectProp?.(technicianId, date, element),
+    [onInspectProp, technicianId, date],
+  );
   const onOptimisticUpdate = useCallback(
     (status: string) => {
       if (assignment?.job_id) onOptimisticUpdateProp?.(technicianId, assignment.job_id, status);
@@ -201,7 +207,7 @@ export const OptimizedMatrixCell = memo(({
 
   React.useEffect(() => clearLongPress, [clearLongPress]);
 
-  const handleCellClick = useCallback((e: React.MouseEvent) => {
+  const handleCellClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
 
     // Ctrl+Click or Alt+Click to toggle cell selection (for Stream Deck shortcuts)
@@ -226,6 +232,12 @@ export const OptimizedMatrixCell = memo(({
       return;
     }
 
+    // Matrix v2: a plain click always opens the inspector, whatever the cell holds.
+    if (inspectorMode && onInspectProp) {
+      onInspect(e.currentTarget);
+      return;
+    }
+
     // Mark unavailable toggle mode: left-click directly toggles unavailability (no dialog)
     if (allowMarkUnavailable && !hasAssignment) {
       onClick('toggle-unavailable');
@@ -241,7 +253,7 @@ export const OptimizedMatrixCell = memo(({
     } else if (allowDirectAssign) {
       onClick('select-job'); // Create new assignment
     }
-  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable, mobile, selectionActive, onOpenSheet]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable, mobile, selectionActive, onOpenSheet, inspectorMode, onInspectProp, onInspect]);
 
   const handleRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

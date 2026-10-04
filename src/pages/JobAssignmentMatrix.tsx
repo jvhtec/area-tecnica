@@ -33,7 +33,8 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
-import { fetchStaffingSummary, staffingSummaryQueryKey } from '@/features/matrix-v2/roleSlotsQuery';
+import { fetchStaffingSummary, staffingSummaryQueryKey, useJobRoleSlots } from '@/features/matrix-v2/roleSlotsQuery';
+import { useMatrixV2 } from '@/features/matrix-v2/useMatrixV2';
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
@@ -604,6 +605,9 @@ export default function JobAssignmentMatrix() {
     hideStaffingWhatsappButtons,
   ]);
 
+  const { enabled: matrixV2 } = useMatrixV2();
+  const roleSlotsByJob = useJobRoleSlots(staffingReminderQuery.data);
+
   const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
   const outstandingJobsDescription =
     outstandingJobsCount === null
@@ -678,6 +682,8 @@ export default function JobAssignmentMatrix() {
             hideStaffingEmailButtons={hideStaffingEmailButtons}
             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
             staffingDepartment={selectedDepartment}
+            matrixV2={matrixV2}
+            roleSlotsByJob={roleSlotsByJob}
             mobile={isMobile}
             // Narrower than the old 140 now that the phone cell shows status
             // only: the action icons that needed the width live in the sheet,

@@ -18,6 +18,9 @@ import {
 } from "@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip";
 import { formatUserName } from "@/utils/userName";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import { MatrixInspectorHost } from "@/features/matrix-v2/inspector/MatrixInspectorHost";
+import type { InspectorEnvironment, InspectorTarget } from "@/features/matrix-v2/inspector/environment";
+import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
 import type {
   CancelStaffingMutate,
   MatrixCellAction,
@@ -104,6 +107,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   clearCellSelection: () => void;
   /** Grid-selected days for the offer's technician, clamped to the job. */
   offerSeedDates?: string[];
+  /** Present when the new Matrix (inspector, focus, batch) is switched on. */
+  v2?: MatrixV2ViewConfig;
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -182,6 +187,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   techLastYearMedalRankings,
   clearCellSelection,
   offerSeedDates,
+  v2,
 }: OptimizedAssignmentMatrixViewProps) => {
   // Scroll position and the virtualised window are owned here rather than by
   // the matrix container, so a scroll step re-renders this view alone.
@@ -217,12 +223,29 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
 
   // Touch action sheet: one instance for the grid, opened by tapping a cell.
   const [sheetTarget, setSheetTarget] = React.useState<MatrixMobileCellTarget | null>(null);
+  // Matrix v2: one inspector for the grid. Desktop anchors it to the clicked
+  // cell; a phone gets the same content as a bottom sheet (no anchor).
+  const [inspectorTarget, setInspectorTarget] = React.useState<InspectorTarget | null>(null);
+  const closeInspector = React.useCallback(() => setInspectorTarget(null), []);
+  const handleInspect = React.useCallback((technicianId: string, date: Date, anchor: HTMLElement) => {
+    const dateKey = formatMadridDateKey(date);
+    // A second click on the same cell closes its inspector.
+    setInspectorTarget((current) => (
+      current && current.technicianId === technicianId && current.dateKey === dateKey
+        ? null
+        : { technicianId, date, dateKey, anchor }
+    ));
+  }, []);
   const handleOpenSheet = React.useCallback(
     (technicianId: string, date: Date) => {
+      if (v2) {
+        setInspectorTarget({ technicianId, date, dateKey: formatMadridDateKey(date), anchor: null });
+        return;
+      }
       const technician = technicians.find((t) => t.id === technicianId);
       if (technician) setSheetTarget({ technician, date });
     },
-    [technicians],
+    [technicians, v2],
   );
   const closeSheet = React.useCallback(() => setSheetTarget(null), []);
 
@@ -321,6 +344,31 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     },
     [handleMainScroll],
   );
+
+  const jobsById = React.useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const inspectorEnv = React.useMemo<InspectorEnvironment | null>(() => {
+    if (!v2) return null;
+    return {
+      runner: v2.runner,
+      getTechnician: (technicianId) => techniciansById.get(technicianId),
+      getJob: (jobId) => jobsById.get(jobId),
+      getJobsForDate,
+      getAssignmentForCell,
+      getAvailabilityForCell,
+      roleSlotsByJob: v2.roleSlotsByJob,
+      lastRoleByTechnician: v2.lastRoleByTechnician,
+      declinedJobIds: (technicianId) => declinedJobsByTech.get(technicianId),
+      isFridge: (technicianId) => fridgeSet?.has(technicianId) ?? false,
+      staffingByDate: (technicianId, dateKey) => staffingMaps?.byDate.get(`${technicianId}-${dateKey}`) ?? null,
+      profileNames: profileNamesMap,
+      canAssign: isManagementUser,
+      canMarkUnavailable: isManagementUser,
+      openStaffing: (technicianId, date) => handleCellClick(technicianId, date, "select-job-for-staffing"),
+    };
+  }, [
+    v2, techniciansById, jobsById, getJobsForDate, getAssignmentForCell, getAvailabilityForCell,
+    declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, handleCellClick,
+  ]);
 
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
@@ -544,6 +592,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     onSelect={handleCellSelect}
                     onClick={handleCellClick}
                     onOpenSheet={handleOpenSheet}
+                    inspectorMode={!!v2}
+                    onInspect={handleInspect}
                     onPrefetch={handleCellPrefetch}
                     onOptimisticUpdate={handleOptimisticUpdate}
                     onRender={incrementCellRender}
@@ -611,7 +661,11 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      <MatrixMobileCellSheet
+      {inspectorEnv && (
+        <MatrixInspectorHost env={inspectorEnv} target={inspectorTarget} onClose={closeInspector} mobile={mobile} />
+      )}
+
+      {!v2 && <MatrixMobileCellSheet
         target={sheetTarget}
         onClose={closeSheet}
         assignment={sheetTarget ? getAssignmentForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
@@ -633,7 +687,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         sendStaffingEmail={sendStaffingEmail}
         cancelStaffing={cancelStaffing}
         isCancellingStaffing={isCancellingStaffing}
-      />
+      />}
 
       <MatrixDialogs
         cellAction={cellAction}
