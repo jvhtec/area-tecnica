@@ -186,6 +186,28 @@ describe("useJobAssignmentsRealtime assignment commands", () => {
     expect(toastMocks.errorMock).toHaveBeenCalledWith("No tienes permiso para modificar asignaciones.");
   });
 
+  it("reloads the state tokens when the realtime list shows a change made elsewhere", async () => {
+    const queryClient = createRollbackQueryClient();
+    configureRpc({ data: null, error: null });
+    const { rerender } = await renderManaged(queryClient);
+    const stateLoads = () => mockSupabase.rpc.mock.calls.filter(([name]) => name === "get_job_assignment_command_states").length;
+    expect(stateLoads()).toBe(1);
+
+    // Same data again: no reload.
+    rerender();
+    expect(stateLoads()).toBe(1);
+
+    realtimeMocks.useRealtimeQueryMock.mockReturnValue({
+      data: [{ technician_id: "tech-1", status: "confirmed", sound_role: "SND-FOH-R", lights_role: null,
+        video_role: null, production_role: null, _timesheet_dates: ["2026-12-01"] }],
+      isLoading: false,
+      manualRefresh: realtimeMocks.manualRefreshMock,
+      isRefreshing: false,
+    });
+    rerender();
+    await waitFor(() => expect(stateLoads()).toBe(2));
+  });
+
   it("never widens a single-day request without its day to the whole job", async () => {
     const queryClient = createRollbackQueryClient();
     configureRpc({ data: null, error: null });

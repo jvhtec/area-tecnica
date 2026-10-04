@@ -292,6 +292,23 @@ export const useJobAssignmentsRealtime = (jobId: string, { manageCommands = fals
     () => UnifiedSubscriptionManager.getInstance(queryClient),
     [queryClient]
   );
+  // When the realtime list shows a change (made in another tab or by another
+  // manager), refresh the state tokens too, so the next command is decided
+  // against the state on screen instead of failing as stale.
+  const assignmentsSignature = useMemo(() => assignments
+    .map((assignment) => [assignment.technician_id, assignment.status, assignment.sound_role, assignment.lights_role,
+      assignment.video_role, assignment.production_role, [...assignment._timesheet_dates].sort().join(',')].join('|'))
+    .sort()
+    .join(';'), [assignments]);
+  const lastAssignmentsSignatureRef = useRef(assignmentsSignature);
+  useEffect(() => {
+    if (lastAssignmentsSignatureRef.current === assignmentsSignature) return;
+    lastAssignmentsSignatureRef.current = assignmentsSignature;
+    if (manageCommands && jobId) {
+      void queryClient.invalidateQueries({ queryKey: jobAssignmentCommandStatesKey(jobId) });
+    }
+  }, [assignmentsSignature, manageCommands, jobId, queryClient]);
+
   const manualRefreshRef = useRef(manualRefresh);
   const ownerIdRef = useRef(`job-assignments-realtime-${Math.random().toString(36).slice(2)}`);
 
