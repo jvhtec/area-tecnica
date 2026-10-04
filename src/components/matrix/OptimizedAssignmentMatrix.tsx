@@ -14,13 +14,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
-import { useMatrixCommandRunner } from '@/features/matrix-v2/useMatrixCommandRunner';
-import { findMatrixCellElement } from '@/features/matrix-v2/inspector/anchor';
-import type { InspectorTarget } from '@/features/matrix-v2/inspector/environment';
-import { runQuickConfirm, runToggleUnavailable } from '@/features/matrix-v2/quickActions';
-import type { MatrixCommandSource } from '@/features/matrix-v2/types';
-import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
+import { useMatrixV2Config } from '@/features/matrix-v2/useMatrixV2Config';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
@@ -80,6 +75,9 @@ export const OptimizedAssignmentMatrix = ({
   hideStaffingWhatsappButtons = false,
   matrixV2 = false,
   roleSlotsByJob = EMPTY_ROLE_SLOTS,
+  focusJobId = null,
+  focusStatus = 'invited',
+  onFocusJobChange,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -129,7 +127,7 @@ export const OptimizedAssignmentMatrix = ({
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
   const {
-    orderedTechnicians,
+    orderedTechnicians: baseOrderedTechnicians,
     setSortJobId,
     techMedalRankings,
     techLastYearMedalRankings,
@@ -141,54 +139,42 @@ export const OptimizedAssignmentMatrix = ({
     mobile,
   });
 
-  // Matrix v2: the one entry point for changing an assignment, and the role each
-  // technician held last (so a quick assignment can start from it).
-  const runner = useMatrixCommandRunner({ jobs, technicians });
-  const lastRoleByTechnician = useMemo(() => {
-    const latest = new Map<string, { date: string; role: string }>();
-    if (!matrixV2) return new Map<string, string>();
-    for (const row of allAssignments ?? []) {
-      if (!row?.technician_id || row.status === 'declined') continue;
-      const role = row.sound_role || row.lights_role || row.video_role;
-      if (!role) continue;
-      const seen = latest.get(row.technician_id);
-      if (!seen || row.date > seen.date) latest.set(row.technician_id, { date: row.date, role });
-    }
-    return new Map([...latest].map(([technicianId, { role }]) => [technicianId, role]));
-  }, [allAssignments, matrixV2]);
-  const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget | null>(null);
-  const closeInspector = useCallback(() => setInspectorTarget(null), []);
-  const openInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent']) => {
-    const dateKey = formatMadridDateKey(date);
-    setInspectorTarget({ technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey), intent });
-  }, []);
-  const toggleInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null) => {
-    const dateKey = formatMadridDateKey(date);
-    // A second click on the same cell closes its inspector.
-    setInspectorTarget((current) => (
-      current && current.technicianId === technicianId && current.dateKey === dateKey
-        ? null
-        : { technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey) }
-    ));
-  }, []);
-  const quickConfirm = useCallback((technicianId: string, date: Date, source: MatrixCommandSource = 'matrix-inspector') => {
-    const assignment = getAssignmentForCell(technicianId, date);
-    if (!assignment) return;
-    const technician = technicians.find((candidate) => candidate.id === technicianId);
-    const name = technician ? formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico' : 'Técnico';
-    void runQuickConfirm(runner, { technicianId, jobId: assignment.job_id, name, jobTitle: assignment.job?.title, source });
-  }, [getAssignmentForCell, technicians, runner]);
-  const toggleUnavailable = useCallback((technicianId: string, dateKey: string) => {
-    const date = madridDateKeyToCalendarDate(dateKey);
-    const unavailable = date ? getAvailabilityForCell(technicianId, date)?.status === 'unavailable' : false;
-    void runToggleUnavailable({ technicianId, dateKey, unavailable, canEdit: isManagementUser });
-  }, [getAvailabilityForCell, isManagementUser]);
-  const v2Config = useMemo<MatrixV2ViewConfig | undefined>(
-    () => (matrixV2
-      ? { runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector, quickConfirm, toggleUnavailable }
-      : undefined),
-    [matrixV2, runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector, quickConfirm, toggleUnavailable],
-  );
+  // Build declined job sets per technician for targeted staffing blocking
+  const declinedJobsByTech = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    allAssignments?.forEach((a) => {
+      if (a?.status === 'declined' && a.technician_id && a.job_id) {
+        if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
+        map.get(a.technician_id)!.add(a.job_id);
+      }
+    });
+    return map;
+  }, [allAssignments]);
+
+  // Matrix v2: the runner, inspector, quick actions and job focus.
+  const {
+    v2Config,
+    orderedTechnicians,
+    quickConfirm,
+    openInspector,
+  } = useMatrixV2Config({
+    enabled: matrixV2,
+    ready: !isInitialLoading,
+    jobs,
+    technicians,
+    dates,
+    baseOrderedTechnicians,
+    allAssignments,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+    isManagementUser,
+    roleSlotsByJob,
+    declinedJobsByTech,
+    fridgeSet,
+    focusJobId,
+    focusStatus,
+    onFocusJobChange,
+  });
 
   // Listen for assignment updates and refresh data
   useEffect(() => {
@@ -240,18 +226,6 @@ export const OptimizedAssignmentMatrix = ({
     getJobsForDate,
     includeOpenSlots: !mobile,
   });
-
-  // Build declined job sets per technician for targeted staffing blocking
-  const declinedJobsByTech = React.useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    allAssignments?.forEach((a) => {
-      if (a?.status === 'declined' && a.technician_id && a.job_id) {
-        if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
-        map.get(a.technician_id)!.add(a.job_id);
-      }
-    });
-    return map;
-  }, [allAssignments]);
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');

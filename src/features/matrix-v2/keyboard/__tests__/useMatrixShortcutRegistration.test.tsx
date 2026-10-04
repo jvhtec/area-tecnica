@@ -5,8 +5,8 @@ import { useShortcutStore } from '@/stores/useShortcutStore';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { useMatrixShortcutRegistration } from '@/features/matrix-v2/keyboard/useMatrixShortcutRegistration';
 
-const makeActions = () => ({ open: vi.fn(), confirm: vi.fn(), decline: vi.fn(), remove: vi.fn(), toggleUnavailable: vi.fn() });
-const IDS = ['matrix-open-cell', 'matrix-confirm', 'matrix-decline', 'matrix-remove', 'matrix-unavailable'];
+const makeActions = () => ({ open: vi.fn(), confirm: vi.fn(), decline: vi.fn(), remove: vi.fn(), toggleUnavailable: vi.fn(), focusJob: vi.fn() });
+const IDS = ['matrix-open-cell', 'matrix-confirm', 'matrix-decline', 'matrix-remove', 'matrix-unavailable', 'matrix-focus-job'];
 
 describe('useMatrixShortcutRegistration', () => {
   afterEach(() => {

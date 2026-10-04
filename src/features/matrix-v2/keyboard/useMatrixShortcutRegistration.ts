@@ -10,6 +10,7 @@ interface Actions {
   decline: (cell: ActiveCell) => void;
   remove: (cell: ActiveCell) => void;
   toggleUnavailable: (cell: ActiveCell) => void;
+  focusJob: (cell: ActiveCell) => void;
 }
 
 const SHORTCUTS: Array<{ id: string; label: string; description: string; run: keyof Actions }> = [
@@ -18,6 +19,7 @@ const SHORTCUTS: Array<{ id: string; label: string; description: string; run: ke
   { id: 'matrix-decline', label: 'Matriz: rechazar', description: 'Pide confirmación para rechazar la asignación seleccionada', run: 'decline' },
   { id: 'matrix-remove', label: 'Matriz: quitar asignación', description: 'Pide confirmación para quitar la asignación seleccionada', run: 'remove' },
   { id: 'matrix-unavailable', label: 'Matriz: no disponible', description: 'Marca o quita la no disponibilidad de la celda seleccionada', run: 'toggleUnavailable' },
+  { id: 'matrix-focus-job', label: 'Matriz: enfocar trabajo', description: 'Enfoca el trabajo de la celda seleccionada, o sale del enfoque', run: 'focusJob' },
 ];
 
 /**

@@ -31,6 +31,10 @@ interface Options {
     decline: (cell: ActiveCell) => void;
     remove: (cell: ActiveCell) => void;
     toggleUnavailable: (cell: ActiveCell) => void;
+    /** F: focuses the job of the cell (or leaves focus when already focused). */
+    focusJob: (cell: ActiveCell) => void;
+    /** Esc with no active cell: leaves job focus. Returns whether it did. */
+    exitFocus: () => boolean;
   };
 }
 
@@ -107,6 +111,8 @@ export function useMatrixKeyboard({ enabled, technicianIds, dates, grid, scrollR
       if (active) {
         event.preventDefault();
         setActive(null);
+      } else if (actionsRef.current.exitFocus()) {
+        event.preventDefault();
       }
       return;
     }
@@ -138,6 +144,10 @@ export function useMatrixKeyboard({ enabled, technicianIds, dates, grid, scrollR
       case 'n':
       case 'N':
         run(actionsRef.current.toggleUnavailable);
+        break;
+      case 'f':
+      case 'F':
+        run(actionsRef.current.focusJob);
         break;
       default:
     }

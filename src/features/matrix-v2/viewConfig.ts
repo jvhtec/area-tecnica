@@ -2,6 +2,7 @@ import type { MatrixCommandRunner } from '@/features/matrix-v2/commandRunner';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
 import type { InspectorTarget } from '@/features/matrix-v2/inspector/environment';
 import type { MatrixCommandSource } from '@/features/matrix-v2/types';
+import type { MatrixJobFocus } from '@/features/matrix-v2/focus/useMatrixJobFocus';
 
 /** What the grid needs beyond its usual props to run the Matrix v2 surfaces. */
 export interface MatrixV2ViewConfig {
@@ -18,4 +19,9 @@ export interface MatrixV2ViewConfig {
   quickConfirm: (technicianId: string, date: Date, source?: MatrixCommandSource) => void;
   /** Marks or lifts a day's unavailability. */
   toggleUnavailable: (technicianId: string, dateKey: string) => void;
+  /** The focused job, when job focus is on. */
+  focus: MatrixJobFocus | null;
+  /** Focuses a job (or leaves focus with null); refuses jobs that take no crew. */
+  setFocusJob: (jobId: string | null) => void;
+  toggleFocusJob: (jobId: string) => void;
 }

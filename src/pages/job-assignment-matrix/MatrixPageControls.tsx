@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FocusJobPicker } from '@/features/matrix-v2/focus/FocusJobPicker';
+import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
 import { cn } from '@/lib/utils';
 import { MatrixSwitchChip } from '@/pages/job-assignment-matrix/MatrixSwitchChip';
 import {
@@ -60,6 +62,10 @@ type MatrixPageControlsProps = {
   outstandingJobsDescription: string;
   /** Matrix v2: no editing modes; every click opens the inspector. */
   matrixV2?: boolean;
+  /** Matrix v2 job focus: the jobs to pick from, the focused one, and how to change it. */
+  focusJobs?: MatrixJob[];
+  focusJobId?: string | null;
+  onFocusJob?: (jobId: string | null) => void;
 };
 
 export const MatrixPageControls = ({
@@ -105,6 +111,9 @@ export const MatrixPageControls = ({
   outstandingJobsCount,
   outstandingJobsDescription,
   matrixV2 = false,
+  focusJobs = [],
+  focusJobId = null,
+  onFocusJob,
 }: MatrixPageControlsProps) => {
   const departmentLabel = DEPARTMENT_LABELS[selectedDepartment] || formatLabel(selectedDepartment);
   const hasOutstanding = (outstandingJobsCount ?? 0) > 0;
@@ -284,6 +293,7 @@ export const MatrixPageControls = ({
               icon={<Refrigerator className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
               trailing={<Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{fridgeCount}</Badge>}
             />
+            {matrixV2 && onFocusJob && <FocusJobPicker jobs={focusJobs} focusJobId={focusJobId} onFocusJob={onFocusJob} />}
             {!matrixV2 && (
               <>
                 <MatrixSwitchChip
@@ -416,6 +426,7 @@ export const MatrixPageControls = ({
               icon={<Refrigerator className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
               trailing={<Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{fridgeCount}</Badge>}
             />
+            {matrixV2 && onFocusJob && <FocusJobPicker block jobs={focusJobs} focusJobId={focusJobId} onFocusJob={onFocusJob} />}
             {!matrixV2 && (
               <>
               <MatrixSwitchChip

@@ -92,6 +92,7 @@ export const MATRIX_SHORTCUT_HELP: Array<{ keys: string; label: string }> = [
   { keys: 'X', label: 'Rechazar la asignación' },
   { keys: 'Supr', label: 'Quitar la asignación' },
   { keys: 'N', label: 'Marcar o quitar no disponible' },
-  { keys: 'Esc', label: 'Cerrar o salir' },
+  { keys: 'F', label: 'Enfocar el trabajo de la celda (o salir del enfoque)' },
+  { keys: 'Esc', label: 'Cerrar, salir del enfoque o soltar la celda' },
   { keys: '?', label: 'Ver esta ayuda' },
 ];

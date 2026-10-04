@@ -22,6 +22,7 @@ import { MatrixInspectorHost } from "@/features/matrix-v2/inspector/MatrixInspec
 import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
 import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
 import { MatrixShortcutHelp } from "@/features/matrix-v2/keyboard/MatrixShortcutHelp";
+import { FocusColumnOverlay } from "@/features/matrix-v2/focus/FocusColumnOverlay";
 import type {
   CancelStaffingMutate,
   MatrixCellAction,
@@ -231,7 +232,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   const handleOpenSheet = React.useCallback(
     (technicianId: string, date: Date) => {
       if (v2) {
-        v2.openInspector(technicianId, date, null);
+        // A tap on a phone is a click: in job focus it assigns a free day of the job.
+        if (!v2.focus?.onCellClick(technicianId, date, null)) v2.openInspector(technicianId, date, null);
         return;
       }
       const technician = technicians.find((t) => t.id === technicianId);
@@ -359,14 +361,15 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     grid: { cellWidth: CELL_WIDTH, cellHeight: CELL_HEIGHT, technicianWidth: TECHNICIAN_WIDTH, headerHeight: HEADER_HEIGHT },
     scrollRef: mainScrollRef,
   });
-  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate } = v2Grid;
+  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay } = v2Grid;
 
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
   const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
   const handleDateHeaderJobClick = React.useCallback(
-    (jobId: string) => setSortJobId((prev) => (prev === jobId ? null : jobId)),
-    [setSortJobId],
+    // Under Matrix v2 the header's job row focuses the job; before, it only sorted by it.
+    (jobId: string) => (v2 ? v2.toggleFocusJob(jobId) : setSortJobId((prev) => (prev === jobId ? null : jobId))),
+    [setSortJobId, v2],
   );
 
   return (
@@ -541,6 +544,16 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                   );
                 })}
               </div>
+              {focusOverlay && (
+                <FocusColumnOverlay
+                  part="header"
+                  {...focusOverlay}
+                  cellWidth={CELL_WIDTH}
+                  technicianWidth={TECHNICIAN_WIDTH}
+                  headerHeight={HEADER_HEIGHT}
+                  bodyHeight={matrixHeight}
+                />
+              )}
             </div>
 
             <div className="matrix-body" style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: matrixHeight }}>
@@ -562,6 +575,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     compact={mobile}
                     medalRank={techMedalRankings.get(technician.id)}
                     lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
+                    focusFit={focus?.fits.get(technician.id)}
+                    onFocusAssign={focus?.onNameClick}
                   />
                 ))}
               </div>
@@ -612,6 +627,16 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 ))}
               </div>
             </div>
+            {focusOverlay && (
+              <FocusColumnOverlay
+                part="body"
+                {...focusOverlay}
+                cellWidth={CELL_WIDTH}
+                technicianWidth={TECHNICIAN_WIDTH}
+                headerHeight={HEADER_HEIGHT}
+                bodyHeight={matrixHeight}
+              />
+            )}
             {keyboard.ring && (
               <div
                 aria-hidden="true"

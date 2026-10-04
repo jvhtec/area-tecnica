@@ -80,4 +80,8 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   matrixV2?: boolean;
   /** Role slots per job, from the page's staffing-summary query. */
   roleSlotsByJob?: Map<string, RoleSlot[]>;
+  /** Job focus (Matrix v2): which job the grid is judged against, and the status new assignments get. */
+  focusJobId?: string | null;
+  focusStatus?: 'invited' | 'confirmed';
+  onFocusJobChange?: (jobId: string | null) => void;
 }

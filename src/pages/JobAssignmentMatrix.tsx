@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingR
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
 import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
-import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -35,6 +35,10 @@ import {
 import { queryKeys } from "@/lib/react-query";
 import { fetchStaffingSummary, staffingSummaryQueryKey, useJobRoleSlots } from '@/features/matrix-v2/roleSlotsQuery';
 import { useMatrixV2 } from '@/features/matrix-v2/useMatrixV2';
+import { JobFocusBar } from '@/features/matrix-v2/focus/JobFocusBar';
+import { useJobFocusSelection } from '@/features/matrix-v2/focus/useJobFocusSelection';
+import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
+import { jobDayKeys } from '@/features/matrix-v2/jobDays';
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
@@ -607,6 +611,27 @@ export default function JobAssignmentMatrix() {
 
   const { enabled: matrixV2 } = useMatrixV2();
   const roleSlotsByJob = useJobRoleSlots(staffingReminderQuery.data);
+  const { focusJobId, focusStatus, setFocusStatus, focusJob } = useJobFocusSelection(matrixV2);
+  // A job that takes no crew (dry hire, cancelled) is never focused, even when ?trabajo= names it.
+  const focusedJob = useMemo(() => {
+    const job = focusJobId ? yearJobs.find((candidate: MatrixJob) => candidate.id === focusJobId) : undefined;
+    return job && isFocusableJob(job) ? job : null;
+  }, [focusJobId, yearJobs]);
+  // A focused job outside the loaded weeks brings the range to it.
+  const centeredOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusedJob) {
+      centeredOn.current = null;
+      return;
+    }
+    if (centeredOn.current === focusedJob.id) return;
+    centeredOn.current = focusedJob.id;
+    const days = jobDayKeys(focusedJob);
+    const loaded = new Set(dateRange.map((date) => formatMadridDateKey(date)));
+    if (days.length === 0 || days.some((key) => loaded.has(key))) return;
+    const first = madridDateKeyToCalendarDate(days[0]);
+    if (first) setCenterDate(first);
+  }, [focusedJob, dateRange, setCenterDate]);
 
   const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
   const outstandingJobsDescription =
@@ -661,7 +686,20 @@ export default function JobAssignmentMatrix() {
         outstandingJobsCount={outstandingJobsCount}
         outstandingJobsDescription={outstandingJobsDescription}
         matrixV2={matrixV2}
+        focusJobs={yearJobs}
+        focusJobId={focusedJob?.id ?? null}
+        onFocusJob={focusJob}
       />
+
+      {matrixV2 && focusedJob && (
+        <JobFocusBar
+          job={focusedJob}
+          slots={roleSlotsByJob.get(focusedJob.id)}
+          status={focusStatus}
+          onStatusChange={setFocusStatus}
+          onExit={() => focusJob(null)}
+        />
+      )}
 
       {/* Matrix Content */}
       <div className="flex-1 overflow-hidden">
@@ -685,6 +723,9 @@ export default function JobAssignmentMatrix() {
             staffingDepartment={selectedDepartment}
             matrixV2={matrixV2}
             roleSlotsByJob={roleSlotsByJob}
+            focusJobId={focusedJob?.id ?? null}
+            focusStatus={focusStatus}
+            onFocusJobChange={focusJob}
             mobile={isMobile}
             // Narrower than the old 140 now that the phone cell shows status
             // only: the action icons that needed the width live in the sheet,

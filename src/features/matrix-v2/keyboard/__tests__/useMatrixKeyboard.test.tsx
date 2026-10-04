@@ -22,7 +22,7 @@ const key = (name: string, extra: Partial<KeyboardEventInit> = {}) => {
 function setup(overrides: { enabled?: boolean; blocked?: boolean } = {}) {
   const scrollTo = vi.fn();
   const scrollEl = { scrollLeft: 0, scrollTop: 0, clientWidth: 600, clientHeight: 400, scrollTo } as unknown as HTMLDivElement;
-  const actions = { open: vi.fn(), confirm: vi.fn(), decline: vi.fn(), remove: vi.fn(), toggleUnavailable: vi.fn() };
+  const actions = { open: vi.fn(), confirm: vi.fn(), decline: vi.fn(), remove: vi.fn(), toggleUnavailable: vi.fn(), focusJob: vi.fn(), exitFocus: vi.fn(() => false) };
   const view = renderHook((props: { enabled: boolean; blocked: boolean }) => useMatrixKeyboard({
     enabled: props.enabled,
     technicianIds,
@@ -84,6 +84,8 @@ describe('useMatrixKeyboard', () => {
     press('Delete');
     press('Backspace');
     press('n');
+    press('f');
+    expect(actions.focusJob).toHaveBeenCalledWith(cell);
     expect(actions.open).toHaveBeenCalledTimes(2);
     expect(actions.open).toHaveBeenCalledWith(cell);
     expect(actions.confirm).toHaveBeenCalledTimes(2);
@@ -106,6 +108,22 @@ describe('useMatrixKeyboard', () => {
     press('ArrowDown');
     press('Escape');
     expect(view.result.current.active).toBeNull();
+  });
+
+  it('Escape with no active cell leaves job focus, and only claims the key when it did', () => {
+    const { press, actions } = setup();
+    actions.exitFocus.mockReturnValueOnce(true);
+    expect(press('Escape').preventDefault).toHaveBeenCalled();
+    expect(press('Escape').preventDefault).not.toHaveBeenCalled();
+    expect(actions.exitFocus).toHaveBeenCalledTimes(2);
+  });
+
+  it('Escape drops the active cell before it leaves job focus', () => {
+    const { view, press, actions } = setup();
+    press('ArrowDown');
+    press('Escape');
+    expect(view.result.current.active).toBeNull();
+    expect(actions.exitFocus).not.toHaveBeenCalled();
   });
 
   it('leaves Escape and browser shortcuts alone when there is nothing to do', () => {
