@@ -158,9 +158,10 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     const item = await job();
     await h.armFault(item.id,tech.id,manager.id,'2027-10-22');
     const event = vi.fn(); window.addEventListener('assignment-updated', event);
-    const rpc = vi.spyOn(manager.client,'rpc');
     try {
-      const ui = await mount(item); await multi(ui);
+      const ui = await mount(item);
+      const rpc = vi.mocked(manager.client.rpc);
+      await multi(ui);
       await ui.user.click(screen.getByRole('gridcell', { name: '22' }));
       await ui.user.click(screen.getByRole('button', { name: /^Asignar trabajo$/ }));
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
@@ -176,10 +177,12 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
       expect(rpc.mock.calls.filter(([name]) => name==='toggle_timesheet_day')).toEqual([]);
       const trace = h.transportEvents.filter(event => event.jobId === item.id);
       expect(trace.filter(event => event.path==='/rest/v1/job_assignments')).toEqual([]);
-      const completed = await Promise.all(rpc.mock.results.filter(result=>result.type==='return').map(result=>result.value));
-      const rejected = completed.filter(result=>result.error);
+      // Observe responses already consumed by the UI. Awaiting the SDK's RPC
+      // builders again would execute the database commands a second time.
+      const completed = await Promise.all(background!.rpcResults);
+      const rejected = completed.flatMap(result => result && typeof result === 'object' && 'error' in result && result.error ? [result.error] : []);
       expect(rejected).toHaveLength(1);
-      expect(rejected[0].error).toMatchObject({ code:'P0001',message:'LOCAL_MATRIX_OWNED_DATE_FAILURE' });
+      expect(rejected[0]).toMatchObject({ code:'P0001',message:'LOCAL_MATRIX_OWNED_DATE_FAILURE' });
       expect(await dates(item.id)).toEqual([]);
       const membership = await h.client.from('job_assignments').select('job_id').eq('job_id',item.id).eq('technician_id',tech.id);
       expect(membership.error).toBeNull(); expect(membership.data).toEqual([]);
@@ -187,7 +190,7 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(toast.success).not.toHaveBeenCalled(); expect(event).not.toHaveBeenCalled();
       expect(background!.calls).toEqual([]);
-    } finally { rpc.mockRestore(); window.removeEventListener('assignment-updated',event); }
+    } finally { window.removeEventListener('assignment-updated',event); }
   }, 45_000);
 
   it('the unchanged date RPC still rejects a technician with exact authorization denial', async () => {
