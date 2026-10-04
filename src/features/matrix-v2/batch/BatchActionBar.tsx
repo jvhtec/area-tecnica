@@ -98,7 +98,8 @@ function JobChooser({ label, icon, jobs, busy, options, onPick }: {
 /**
  * What the selection can do, in one bar: nothing opens a dialog. Assigning asks
  * only for the job (and Invitado or Confirmado); removing asks once, right here,
- * with the count of what goes.
+ * with the count of what goes. The actions are one row that scrolls sideways:
+ * wrapped over several rows on a phone the bar covered the grid it acts on.
  */
 export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal, onAssign, onRequest, channel, onChannelChange, onConfirm, onRemove, onMarkUnavailable, onClear }: BatchActionBarProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -110,16 +111,16 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
       aria-label="Acciones sobre la selección"
       data-testid="batch-bar"
       data-batch-bar="true"
-      className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
+      className="flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
     >
-      <span className="pl-1 text-xs font-semibold" aria-live="polite">
+      <span className="shrink-0 pl-1 text-xs font-semibold" aria-live="polite">
         {busy
           ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />Aplicando {progress.done}/{progress.total}…</span>
           : `${plural(cells, 'celda', 'celdas')} · ${plural(people, 'persona', 'personas')}`}
       </span>
 
       {canEdit && !confirmingRemove && (
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto [&>*]:shrink-0">
           <JobChooser
             label="Asignar a…"
             icon={<Briefcase className="mr-1.5 h-4 w-4" aria-hidden="true" />}
