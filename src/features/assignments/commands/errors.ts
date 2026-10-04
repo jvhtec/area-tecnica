@@ -17,6 +17,8 @@ const MESSAGES: Record<AssignmentCommandCode, string> = {
   last_date: 'Es el último día de la asignación: elimina la asignación completa.',
   assignment_not_found: 'La asignación ya no existe.',
   dryhire_job: 'Los trabajos de dry hire no llevan personal asignado.',
+  invalid_role: 'El rol no es un rol válido. Elige uno de la lista.',
+  approved_timesheet: 'Hay partes aprobados en esos días. Los partes aprobados no se eliminan desde una asignación: anula primero la aprobación.',
   permission_denied: 'No tienes permiso para modificar asignaciones.',
   invalid_request: 'La solicitud de asignación no es válida.',
   command_id_reused: 'Esta operación ya se usó para otro cambio. Vuelve a intentarlo.',
@@ -70,3 +72,7 @@ export function classifyAssignmentRpcError(error: unknown): AssignmentCommandErr
   else if (!code && /fetch|network|timeout|abort/i.test(message)) classified = 'network';
   return new AssignmentCommandError(classified, { cause: error });
 }
+
+/** Shown when the authoritative state could not be loaded: commands refuse to run blind. */
+export const ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE =
+  'No se pudo cargar el estado actual de la asignación. Recarga e inténtalo de nuevo.';

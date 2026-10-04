@@ -51,6 +51,7 @@ import { claimInboxItems, recordAttemptResult, recordDeliveryOutcomes } from "./
 import {
   buildEventKey,
   decoratePayloadPolicy,
+  validIdempotencyKey,
   loadRecipientPreferences,
   urgencyForEvent,
 } from "./notificationPolicy.ts";
@@ -299,7 +300,11 @@ export async function handleBroadcast(
 
   let inboxIds: Map<string, string>;
   try {
-    inboxIds = await claimInboxItems(client, recipientIds, eventKey, body, payloadFor, urgency);
+    // With a caller idempotency key a retry may reuse inbox rows whose earlier
+    // delivery never reached a provider; delivered rows are never re-sent. The
+    // caller (assignment command effects) holds an exclusive claim per key.
+    inboxIds = await claimInboxItems(client, recipientIds, eventKey, body, payloadFor, urgency,
+      validIdempotencyKey(body) !== null);
   } catch (error) {
     logEvent("error", "notification_inbox_claim_failed", {
       errorCode: error instanceof Error ? error.name : "unknown",

@@ -3,6 +3,10 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 SELECT no_plan();
+CREATE FUNCTION pg_temp.tok(p_job uuid, p_tech uuid) RETURNS text LANGUAGE sql AS $tok$
+  SELECT public.get_assignment_command_state(p_job, p_tech)->>'state_token';
+$tok$;
+GRANT EXECUTE ON FUNCTION pg_temp.tok(uuid, uuid) TO authenticated;
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 
 SELECT ok(NOT has_function_privilege('anon', 'public.remove_direct_assignment(uuid,uuid,uuid,text,text,uuid,jsonb)', 'EXECUTE'),
@@ -32,9 +36,9 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claim.sub', 'db110000-0000-0000-0000-000000000002', true);
 SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"db110000-0000-0000-0000-000000000002"}', true);
 SET LOCAL ROLE authenticated;
-SELECT throws_ok($$ SELECT public.remove_direct_assignment('db310000-0000-0000-0000-000000000001', 'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002') $$,
+SELECT throws_ok($$ SELECT public.remove_direct_assignment('db310000-0000-0000-0000-000000000001', 'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002')) $$,
   '42501', 'permission denied', 'a technician cannot remove assignments');
-SELECT throws_ok($$ SELECT public.remove_assignment_date('db310000-0000-0000-0000-000000000001', 'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-16') $$,
+SELECT throws_ok($$ SELECT public.remove_assignment_date('db310000-0000-0000-0000-000000000001', 'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-16', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002')) $$,
   '42501', 'permission denied', 'a technician cannot remove days');
 RESET ROLE;
 
@@ -42,7 +46,7 @@ SELECT set_config('request.jwt.claim.sub', 'db110000-0000-0000-0000-000000000001
 SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"db110000-0000-0000-0000-000000000001"}', true);
 SET LOCAL ROLE authenticated;
 SELECT ok((public.apply_direct_assignment('db310000-0000-0000-0000-000000000010', 'db210000-0000-0000-0000-000000000001',
-  'db110000-0000-0000-0000-000000000002', 'LGT-BRD-R', 'confirmed', 'multi', ARRAY['2026-11-16', '2026-11-17', '2026-11-18']::date[])->>'ok')::boolean,
+  'db110000-0000-0000-0000-000000000002', 'LGT-BRD-R', 'confirmed', 'multi', ARRAY['2026-11-16', '2026-11-17', '2026-11-18']::date[], 'replace', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002'))->>'ok')::boolean,
   'fixture membership with three days');
 CREATE TEMP TABLE results (name text PRIMARY KEY, value jsonb);
 
@@ -66,12 +70,12 @@ INSERT INTO results SELECT 'stale_day', public.remove_assignment_date('db310000-
   (SELECT value->>'prior_state_token' FROM results WHERE name = 'first_day'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'stale_day'), 'stale_state', 'a stale date removal is rejected');
 INSERT INTO results SELECT 'absent_day', public.remove_assignment_date('db310000-0000-0000-0000-000000000013',
-  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-19');
+  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-19', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'outcome' FROM results WHERE name = 'absent_day'), 'noop', 'removing an unscheduled day is a no-op');
 SELECT lives_ok($$ SELECT public.remove_assignment_date('db310000-0000-0000-0000-000000000014',
-  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-18') $$, 'second day removal commits');
+  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-18', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002')) $$, 'second day removal commits');
 INSERT INTO results SELECT 'last_day', public.remove_assignment_date('db310000-0000-0000-0000-000000000015',
-  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-17');
+  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', '2026-11-17', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'last_day'), 'last_date', 'the last day of a membership is never removed as a date');
 RESET ROLE;
 SELECT results_eq($$ SELECT date FROM timesheets WHERE job_id = 'db210000-0000-0000-0000-000000000001' AND is_active $$,
@@ -94,11 +98,13 @@ SELECT ok((SELECT value->>'outcome' = 'committed' AND (value->'removed'->>'delet
     AND (value->'removed'->>'deleted_timesheets')::integer = 1 AND value->'dates' = '[]'::jsonb FROM results WHERE name = 'remove'),
   'whole removal deletes membership and schedule together');
 SELECT is((SELECT value->'side_effects' FROM results WHERE name = 'remove'),
-  '[{"kind": "flex", "action": "remove", "job_id": "db210000-0000-0000-0000-000000000001", "status": "pending", "department": "lights"},
-    {"kind": "notification", "action": "assignment.removed", "job_id": "db210000-0000-0000-0000-000000000001", "status": "pending"}]'::jsonb,
+  '[{"kind": "flex", "action": "remove", "job_id": "db210000-0000-0000-0000-000000000001", "status": "pending", "department": "lights",
+     "effect_id": "db310000-0000-0000-0000-000000000017:0"},
+    {"kind": "notification", "action": "assignment.removed", "job_id": "db210000-0000-0000-0000-000000000001", "status": "pending",
+     "effect_id": "db310000-0000-0000-0000-000000000017:1"}]'::jsonb,
   'removal plans Flex removal and the removal notification');
 INSERT INTO results SELECT 'remove_again', public.remove_direct_assignment('db310000-0000-0000-0000-000000000018',
-  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002');
+  'db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002', pg_temp.tok('db210000-0000-0000-0000-000000000001', 'db110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->>'outcome' = 'noop' AND value->'side_effects' = '[]'::jsonb FROM results WHERE name = 'remove_again'),
   'removing an absent membership is a no-op');
 RESET ROLE;
@@ -111,7 +117,7 @@ INSERT INTO timesheets (job_id, technician_id, date) VALUES
   ('db210000-0000-0000-0000-000000000002', 'db110000-0000-0000-0000-000000000002', '2026-11-16');
 SET LOCAL ROLE authenticated;
 INSERT INTO results SELECT 'orphan', public.remove_direct_assignment('db310000-0000-0000-0000-000000000019',
-  'db210000-0000-0000-0000-000000000002', 'db110000-0000-0000-0000-000000000002');
+  'db210000-0000-0000-0000-000000000002', 'db110000-0000-0000-0000-000000000002', pg_temp.tok('db210000-0000-0000-0000-000000000002', 'db110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->>'outcome' = 'committed' AND NOT (value->'removed'->>'deleted_assignment')::boolean
   AND (value->'removed'->>'deleted_timesheets')::integer = 1 FROM results WHERE name = 'orphan'), 'orphan schedule rows are cleaned up');
 RESET ROLE;

@@ -24,6 +24,9 @@ export class PsqlSession {
       }
     });
     this.process.stderr.on('data', chunk => { this.errors += String(chunk); });
+    // Writing to a psql that already exited (e.g. ON_ERROR_STOP) surfaces as
+    // an EPIPE on stdin: reject the pending query instead of crashing the run.
+    this.process.stdin.on('error', error => { this.pending?.reject(error); this.pending = undefined; });
     this.process.on('error', error => { this.pending?.reject(error); this.pending = undefined; });
     this.process.on('exit', code => {
       this.pending?.reject(new Error(`psql exited ${code}: ${this.errors}`));
@@ -32,8 +35,10 @@ export class PsqlSession {
   }
 
   query(sql: string): Promise<string> {
-    if (this.pending) throw new Error('Only one query per connection may be in flight');
-    if (this.process.exitCode !== null) throw new Error(this.errors);
+    // Guards reject rather than throw, so callers' .catch() sees every failure
+    // and cleanup cannot mask the original test failure.
+    if (this.pending) return Promise.reject(new Error('Only one query per connection may be in flight'));
+    if (this.process.exitCode !== null) return Promise.reject(new Error(`psql already exited: ${this.errors}`));
     this.output = '';
     const marker = `done_${randomUUID()}`;
     return new Promise((resolve, reject) => {

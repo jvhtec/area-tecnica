@@ -18,7 +18,7 @@ const FORBIDDEN = [
   // Reads for display are fine; any write chained on these tables is not.
   {
     name: "direct assignment/schedule table write",
-    pattern: /from\(\s*['"](?:job_assignments|timesheets)['"]\s*\)\s*\.\s*(?:insert|update|delete|upsert)\b/,
+    pattern: /from\(\s*['"`](?:job_assignments|timesheets)['"`]\s*\)[^;]*?\.\s*(?:insert|update|delete|upsert)\s*\(/s,
   },
   { name: "per-date toggle RPC", pattern: /toggle_timesheet_day|toggleTimesheetDay/ },
   { name: "legacy removal RPC", pattern: /remove_assignment_with_timesheets|removeTimesheetAssignment/ },

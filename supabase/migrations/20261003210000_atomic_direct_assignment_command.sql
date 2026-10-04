@@ -149,6 +149,41 @@ $$;
 REVOKE ALL ON FUNCTION public.get_assignment_command_state(uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_assignment_command_state(uuid, uuid) TO authenticated, service_role;
 
+-- Read side for job-level surfaces (job card, department dialog): the state
+-- token of every technician with membership or active days on the job, and
+-- the token of a pair with nothing yet (for a first assignment).
+CREATE FUNCTION public.get_job_assignment_command_states(p_job_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NOT (auth.role() = 'service_role' OR public.is_admin_or_management()) THEN
+    RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
+  END IF;
+  IF p_job_id IS NULL THEN
+    RAISE EXCEPTION 'job is required' USING ERRCODE = '22023';
+  END IF;
+  RETURN pg_catalog.jsonb_build_object(
+    'job_id', p_job_id,
+    'absent_state_token', pg_catalog.md5(pg_catalog.jsonb_build_object('membership', NULL, 'dates', '[]'::jsonb)::text),
+    'states', COALESCE((
+      SELECT pg_catalog.jsonb_object_agg(pair.technician_id, public.assignment_state_token(p_job_id, pair.technician_id))
+      FROM (
+        SELECT a.technician_id FROM public.job_assignments a WHERE a.job_id = p_job_id
+        UNION
+        SELECT t.technician_id FROM public.timesheets t WHERE t.job_id = p_job_id AND t.is_active
+      ) pair
+    ), '{}'::jsonb)
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_job_assignment_command_states(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_job_assignment_command_states(uuid) TO authenticated, service_role;
+
 -- ---------------------------------------------------------------------------
 -- Internal helpers (no client grants).
 -- ---------------------------------------------------------------------------
@@ -280,10 +315,109 @@ AS $$
   FROM from_roles;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Role codes. The authoritative list of assignable roles, mirrored from
+-- src/types/roles.ts (tests/assignments/assignment-role-registry.test.ts pins
+-- the two together). Commands accept only these codes, and only for the
+-- technician's discipline.
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.assignment_role_codes (
+  code text PRIMARY KEY CHECK (code ~ '^[A-Z]+-[A-Z]+-[RET]$'),
+  discipline text NOT NULL CHECK (discipline IN ('sound', 'lights', 'video', 'production')),
+  level text NOT NULL CHECK (level IN ('R', 'E', 'T')),
+  CHECK (pg_catalog.right(code, 1) = level)
+);
+COMMENT ON TABLE public.assignment_role_codes IS
+  'Assignable role codes per discipline (mirror of src/types/roles.ts). Assignment commands reject any other role.';
+ALTER TABLE public.assignment_role_codes ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.assignment_role_codes FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.assignment_role_codes TO authenticated;
+GRANT ALL ON TABLE public.assignment_role_codes TO service_role;
+CREATE POLICY assignment_role_codes_read ON public.assignment_role_codes
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) IS NOT NULL);
+
+INSERT INTO public.assignment_role_codes (code, discipline, level) VALUES
+  ('SND-FOH-R', 'sound', 'R'), ('SND-MON-R', 'sound', 'R'), ('SND-SYS-R', 'sound', 'R'),
+  ('SND-FOH-E', 'sound', 'E'), ('SND-MON-E', 'sound', 'E'), ('SND-RF-E', 'sound', 'E'), ('SND-SYS-E', 'sound', 'E'),
+  ('SND-PA-T', 'sound', 'T'), ('SND-MNT-T', 'sound', 'T'),
+  ('LGT-BRD-R', 'lights', 'R'), ('LGT-SYS-R', 'lights', 'R'), ('LGT-ASST-R', 'lights', 'R'),
+  ('LGT-BRD-E', 'lights', 'E'), ('LGT-SYS-E', 'lights', 'E'), ('LGT-FOLO-E', 'lights', 'E'), ('LGT-ASST-E', 'lights', 'E'),
+  ('LGT-DIM-R', 'lights', 'R'), ('LGT-DIM-E', 'lights', 'E'),
+  ('LGT-PA-T', 'lights', 'T'), ('LGT-CAN-T', 'lights', 'T'), ('LGT-MON-T', 'lights', 'T'),
+  ('VID-SW-R', 'video', 'R'),
+  ('VID-DIR-E', 'video', 'E'), ('VID-CAM-E', 'video', 'E'), ('VID-LED-E', 'video', 'E'), ('VID-PROJ-E', 'video', 'E'),
+  ('VID-PA-T', 'video', 'T'),
+  ('PROD-RESP-R', 'production', 'R'), ('PROD-AYUD-T', 'production', 'T'), ('PROD-COND-T', 'production', 'T');
+
+-- Discipline whose roles a technician department may hold. Logistics staff
+-- take production roles (stored in production_role).
+CREATE FUNCTION public.assignment_role_discipline(p_department text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT CASE p_department
+    WHEN 'sound' THEN 'sound' WHEN 'lights' THEN 'lights' WHEN 'video' THEN 'video'
+    WHEN 'production' THEN 'production' WHEN 'logistics' THEN 'production' END;
+$$;
+
+-- Highest category among role codes (responsable > especialista > tecnico)
+-- across every role column, production included.
+CREATE FUNCTION public.assignment_role_category(p_roles text[])
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT CASE MAX(CASE pg_catalog.right(r, 1) WHEN 'R' THEN 3 WHEN 'E' THEN 2 WHEN 'T' THEN 1 END)
+    WHEN 3 THEN 'responsable' WHEN 2 THEN 'especialista' WHEN 1 THEN 'tecnico' END
+  FROM (SELECT pg_catalog.upper(pg_catalog.btrim(role)) AS r FROM pg_catalog.unnest(p_roles) AS role) roles
+  WHERE r ~ '^[A-Z]+-[A-Z]+-[RET]$';
+$$;
+
+-- Approved timesheets are financial records: commands never delete or void
+-- them. Returns the approved days of a pair among p_dates (all days when NULL).
+CREATE FUNCTION public.assignment_approved_dates(p_job_id uuid, p_technician_id uuid, p_dates date[] DEFAULT NULL)
+RETURNS date[]
+LANGUAGE sql
+STABLE
+SET search_path = ''
+AS $$
+  SELECT COALESCE(pg_catalog.array_agg(DISTINCT t.date ORDER BY t.date), ARRAY[]::date[])
+  FROM public.timesheets t
+  WHERE t.job_id = p_job_id AND t.technician_id = p_technician_id
+    AND (t.approved_by_manager IS TRUE OR t.status = 'approved')
+    AND (p_dates IS NULL OR t.date = ANY (p_dates));
+$$;
+
+-- Stable identity for every post-commit effect: <command_id>:<index>. Push
+-- uses it as the notification idempotency key, so a retry or a duplicate
+-- report never delivers twice.
+CREATE FUNCTION public.assignment_effects_with_ids(p_command_id uuid, p_effects jsonb)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT COALESCE(pg_catalog.jsonb_agg(
+    e.effect || pg_catalog.jsonb_build_object('effect_id', p_command_id::text || ':' || (e.ord - 1))
+    ORDER BY e.ord), '[]'::jsonb)
+  FROM pg_catalog.jsonb_array_elements(COALESCE(p_effects, '[]'::jsonb)) WITH ORDINALITY AS e(effect, ord);
+$$;
+
 REVOKE ALL ON FUNCTION public.assignment_command_reject(uuid, text, uuid, uuid, uuid, uuid, text, jsonb, text, text, text, jsonb, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.assignment_remove_membership_locked(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.assignment_flex_departments(jsonb, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.assignment_role_discipline(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.assignment_role_category(text[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.assignment_approved_dates(uuid, uuid, date[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.assignment_effects_with_ids(uuid, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.assignment_flex_departments(jsonb, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.assignment_role_discipline(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.assignment_role_category(text[]) TO service_role;
+GRANT EXECUTE ON FUNCTION public.assignment_approved_dates(uuid, uuid, date[]) TO service_role;
+GRANT EXECUTE ON FUNCTION public.assignment_effects_with_ids(uuid, jsonb) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- apply_direct_assignment
@@ -325,7 +459,8 @@ DECLARE
   v_job_start timestamptz;
   v_job_end timestamptz;
   v_department text;
-  v_role_prefix text;
+  v_role_discipline text;
+  v_approved date[];
   v_existing public.job_assignments%ROWTYPE;
   v_prior jsonb;
   v_from_prior jsonb;
@@ -382,6 +517,12 @@ BEGIN
   END IF;
   IF v_source !~ '^[a-z0-9][a-z0-9_-]{0,63}$' THEN
     RAISE EXCEPTION 'invalid source' USING ERRCODE = '22023';
+  END IF;
+  -- Interactive callers must say which state they decided on; only trusted
+  -- service callers may act without an expected-state token.
+  IF NOT v_is_service AND (p_expected_state_token IS NULL
+     OR (p_from_job_id IS NOT NULL AND p_expected_from_state_token IS NULL)) THEN
+    RAISE EXCEPTION 'an expected state token is required' USING ERRCODE = '22023';
   END IF;
   IF p_metadata IS NOT NULL AND (pg_catalog.jsonb_typeof(p_metadata) <> 'object'
      OR pg_catalog.pg_column_size(p_metadata) > 4096) THEN
@@ -460,11 +601,15 @@ BEGIN
       v_actor, v_source, v_request, v_hash, 'technician_not_found', 'The technician no longer exists', NULL, NULL);
   END IF;
 
-  v_role_prefix := CASE v_department
-    WHEN 'sound' THEN 'SND' WHEN 'lights' THEN 'LGT' WHEN 'video' THEN 'VID'
-    WHEN 'production' THEN 'PROD' WHEN 'logistics' THEN 'PROD' END;
-  IF v_role_prefix IS NULL
-     OR (v_role ~ '^[A-Z]+-[A-Z]+-[RET]$' AND pg_catalog.split_part(v_role, '-', 1) <> v_role_prefix) THEN
+  -- Authoritative role validation: a registered code of the technician's
+  -- discipline, nothing else (no free-text or legacy labels).
+  SELECT discipline INTO v_role_discipline FROM public.assignment_role_codes WHERE code = v_role;
+  IF NOT FOUND THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
+      v_actor, v_source, v_request, v_hash, 'invalid_role', 'The role is not a registered role code',
+      pg_catalog.jsonb_build_object('role', v_role), NULL);
+  END IF;
+  IF v_role_discipline IS DISTINCT FROM public.assignment_role_discipline(v_department) THEN
     RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
       v_actor, v_source, v_request, v_hash, 'role_department_mismatch',
       'The role does not belong to the technician department',
@@ -525,6 +670,32 @@ BEGIN
     FROM pg_catalog.unnest(v_active_dates) AS d WHERE NOT (d = ANY (v_dates));
   ELSE
     v_to_remove := ARRAY[]::date[];
+  END IF;
+
+  -- Approved timesheets are financial records and are never deleted by a
+  -- command: replacing coverage, superseding leftovers or moving away from a
+  -- job that holds approved days is refused (un-approve first).
+  v_approved := CASE
+    WHEN v_modifying THEN public.assignment_approved_dates(p_job_id, p_technician_id, v_to_remove)
+    ELSE ARRAY(SELECT d FROM pg_catalog.unnest(public.assignment_approved_dates(p_job_id, p_technician_id, NULL)) AS d
+               WHERE NOT (d = ANY (v_dates)))
+  END;
+  IF pg_catalog.cardinality(v_approved) > 0 THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
+      v_actor, v_source, v_request, v_hash, 'approved_timesheet',
+      'Approved timesheets cannot be removed by an assignment change',
+      pg_catalog.jsonb_build_object('job_id', p_job_id, 'dates', pg_catalog.to_jsonb(v_approved)),
+      v_prior->>'state_token');
+  END IF;
+  IF p_from_job_id IS NOT NULL THEN
+    v_approved := public.assignment_approved_dates(p_from_job_id, p_technician_id, NULL);
+    IF pg_catalog.cardinality(v_approved) > 0 THEN
+      RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, p_from_job_id,
+        v_actor, v_source, v_request, v_hash, 'approved_timesheet',
+        'The assignment being moved has approved timesheets',
+        pg_catalog.jsonb_build_object('job_id', p_from_job_id, 'dates', pg_catalog.to_jsonb(v_approved)),
+        v_prior->>'state_token');
+    END IF;
   END IF;
 
   -- Conflicts are enforced here, under the technician lock, against the dates
@@ -712,11 +883,7 @@ BEGIN
 
     -- Category follows the role (formerly syncTimesheetCategoriesForAssignment,
     -- a separate best-effort browser step). Approved rows are left untouched.
-    v_category := CASE
-      WHEN pg_catalog.upper(v_role) ~ '^[A-Z]{3}-[A-Z]+-[RET]$' THEN
-        CASE pg_catalog.right(pg_catalog.upper(v_role), 1)
-          WHEN 'R' THEN 'responsable' WHEN 'E' THEN 'especialista' ELSE 'tecnico' END
-    END;
+    v_category := public.assignment_role_category(ARRAY[v_role]);
     IF v_category IS NOT NULL THEN
       FOR v_ts_id IN
         UPDATE public.timesheets t SET category = v_category
@@ -739,8 +906,12 @@ BEGIN
   END IF;
 
   v_after := public.assignment_state_snapshot(p_job_id, p_technician_id);
+  -- A move that removed nothing and left the target unchanged is a no-op
+  -- (e.g. a replayed move after the source was already cleared).
   v_outcome := CASE
-    WHEN v_removed IS NULL AND v_after->>'state_token' = v_prior->>'state_token' THEN 'noop'
+    WHEN NOT COALESCE((v_removed->>'deleted_assignment')::boolean, false)
+         AND COALESCE((v_removed->>'deleted_timesheets')::integer, 0) = 0
+         AND v_after->>'state_token' = v_prior->>'state_token' THEN 'noop'
     ELSE 'committed' END;
 
   IF v_outcome = 'committed' THEN
@@ -774,6 +945,7 @@ BEGIN
       SELECT 3, pg_catalog.jsonb_build_object('kind', 'notification', 'action', 'job.assignment.direct',
         'job_id', p_job_id, 'status', 'pending')
     ) effects;
+    v_side_effects := public.assignment_effects_with_ids(p_command_id, v_side_effects);
   END IF;
 
   v_result := pg_catalog.jsonb_build_object(

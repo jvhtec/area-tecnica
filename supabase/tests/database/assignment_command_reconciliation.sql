@@ -3,9 +3,14 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 SELECT no_plan();
+CREATE FUNCTION pg_temp.tok(p_job uuid, p_tech uuid) RETURNS text LANGUAGE sql AS $tok$
+  SELECT public.get_assignment_command_state(p_job, p_tech)->>'state_token';
+$tok$;
+GRANT EXECUTE ON FUNCTION pg_temp.tok(uuid, uuid) TO authenticated;
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 
-SELECT ok(NOT has_function_privilege('anon', 'public.record_assignment_side_effects(uuid,jsonb)', 'EXECUTE')
+SELECT ok(NOT has_function_privilege('anon', 'public.record_assignment_side_effects(uuid,uuid,jsonb)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.claim_assignment_side_effects(uuid,integer)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.get_assignment_consistency_issues(date,integer)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.get_assignment_side_effect_backlog(integer,interval)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.get_assignment_command_metrics(timestamptz)', 'EXECUTE'),
@@ -31,24 +36,50 @@ INSERT INTO jobs (id, title, start_time, end_time, job_type, status) VALUES
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE results (name text PRIMARY KEY, value jsonb);
 INSERT INTO results SELECT 'apply', public.apply_direct_assignment('dc310000-0000-0000-0000-000000000001',
-  'dc210000-0000-0000-0000-000000000001', 'dc110000-0000-0000-0000-000000000001', 'SND-FOH-R', 'invited', 'full', NULL);
+  'dc210000-0000-0000-0000-000000000001', 'dc110000-0000-0000-0000-000000000001', 'SND-FOH-R', 'invited', 'full', NULL, 'replace', pg_temp.tok('dc210000-0000-0000-0000-000000000001', 'dc110000-0000-0000-0000-000000000001'));
 SELECT is((SELECT jsonb_array_length(value->'side_effects') FROM results WHERE name = 'apply'), 2, 'flex add + notification are planned');
 SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'dc310000-0000-0000-0000-000000000001'), 'pending',
   'plan starts pending');
+-- One runner claims the effects; a concurrent second runner gets nothing.
+INSERT INTO results SELECT 'claim1', public.claim_assignment_side_effects('dc310000-0000-0000-0000-000000000001', 120);
+SELECT is((SELECT jsonb_array_length(value->'effects') FROM results WHERE name = 'claim1'), 2, 'the first runner claims both pending effects');
+SELECT ok((SELECT value->'effects'->0->>'index' = '0' AND value->'effects'->1->>'effect_id' = 'dc310000-0000-0000-0000-000000000001:1'
+  FROM results WHERE name = 'claim1'), 'claimed effects carry their index and stable effect id');
+INSERT INTO results SELECT 'claim2', public.claim_assignment_side_effects('dc310000-0000-0000-0000-000000000001', 120);
+SELECT ok((SELECT jsonb_array_length(value->'effects') = 0 AND value->'claim_token' = 'null'::jsonb FROM results WHERE name = 'claim2'),
+  'a concurrent retry claims nothing, so nothing is sent twice');
+SELECT throws_ok($$ SELECT public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001',
+  (SELECT (value->>'claim_token')::uuid FROM results WHERE name = 'claim1'),
+  '[{"index": 0, "status": "failed"}, {"index": 0, "status": "succeeded"}]') $$,
+  '22023', 'invalid side-effect result', 'a report may not list the same effect twice');
+SELECT is((public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001', gen_random_uuid(),
+  '[{"index": 0, "status": "succeeded"}]'))->'ignored_indexes', '[0]'::jsonb, 'a runner without the claim is ignored');
 SELECT is((public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001',
+  (SELECT (value->>'claim_token')::uuid FROM results WHERE name = 'claim1'),
   '[{"index": 0, "status": "failed", "error": "Flex timeout"}, {"index": 1, "status": "succeeded"}]'))->>'side_effects_status', 'failed',
   'a failed Flex call marks the command failed');
 SELECT is((SELECT count(*) FROM get_assignment_side_effect_backlog(50, interval '5 minutes')
   WHERE command_id = 'dc310000-0000-0000-0000-000000000001'), 1::bigint, 'failed effects appear in the reconciliation backlog');
 SELECT ok((SELECT side_effects->0->>'last_error' = 'Flex timeout' AND (side_effects->0->>'attempts')::integer = 1
-  FROM assignment_commands WHERE command_id = 'dc310000-0000-0000-0000-000000000001'), 'error and attempt count are kept');
+  AND side_effects->0->>'claim_token' IS NULL FROM assignment_commands WHERE command_id = 'dc310000-0000-0000-0000-000000000001'),
+  'error and attempt count are kept and the claim is released');
+INSERT INTO results SELECT 'claim3', public.claim_assignment_side_effects('dc310000-0000-0000-0000-000000000001', 120);
+SELECT ok((SELECT jsonb_array_length(value->'effects') = 1 AND value->'effects'->0->>'index' = '0' FROM results WHERE name = 'claim3'),
+  'a retry claims only the failed effect; the delivered notification is never re-run');
 SELECT is((public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001',
+  (SELECT (value->>'claim_token')::uuid FROM results WHERE name = 'claim3'),
   '[{"index": 0, "status": "succeeded"}]'))->>'side_effects_status', 'succeeded', 'a successful retry closes the command');
 SELECT is((SELECT count(*) FROM get_assignment_side_effect_backlog(50, interval '5 minutes')
   WHERE command_id = 'dc310000-0000-0000-0000-000000000001'), 0::bigint, 'reconciled commands leave the backlog');
-SELECT throws_ok($$ SELECT public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001', '[{"index": 9, "status": "succeeded"}]') $$,
+-- An abandoned claim (tab closed mid-run) expires and the effect is claimable again.
+UPDATE assignment_commands
+SET side_effects = jsonb_set(side_effects, '{0}', side_effects->0 || '{"status": "pending", "claim_token": "00000000-0000-0000-0000-000000000000", "claimed_until": "2000-01-01T00:00:00Z"}')
+WHERE command_id = 'dc310000-0000-0000-0000-000000000001';
+SELECT is((public.claim_assignment_side_effects('dc310000-0000-0000-0000-000000000001', 120))->'effects'->0->>'index', '0',
+  'an expired claim is reclaimable');
+SELECT throws_ok($$ SELECT public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001', gen_random_uuid(), '[{"index": 9, "status": "succeeded"}]') $$,
   '22023', 'invalid side-effect result', 'out-of-range effect index is refused');
-SELECT throws_ok($$ SELECT public.record_assignment_side_effects('dc3100ff-0000-0000-0000-000000000001', '[]') $$,
+SELECT throws_ok($$ SELECT public.claim_assignment_side_effects('dc3100ff-0000-0000-0000-000000000001', 120) $$,
   'P0002', 'unknown assignment command', 'unknown command is refused');
 SELECT ok((SELECT commands >= 1 FROM get_assignment_command_metrics(now() - interval '1 hour')
   WHERE command_type = 'apply_direct_assignment' AND outcome = 'committed'), 'metrics count committed commands');
@@ -76,8 +107,8 @@ SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"dc110000
 SET LOCAL ROLE authenticated;
 SELECT throws_ok($$ SELECT * FROM get_assignment_consistency_issues(NULL, 10) $$, '42501', 'permission denied',
   'technicians cannot read diagnostics');
-SELECT throws_ok($$ SELECT public.record_assignment_side_effects('dc310000-0000-0000-0000-000000000001', '[]') $$, '42501', 'permission denied',
-  'technicians cannot report side effects');
+SELECT throws_ok($$ SELECT public.claim_assignment_side_effects('dc310000-0000-0000-0000-000000000001', 120) $$, '42501', 'permission denied',
+  'technicians cannot claim side effects');
 SELECT is((SELECT count(*) FROM assignment_commands), 0::bigint, 'technicians cannot read the ledger');
 RESET ROLE;
 

@@ -46,6 +46,7 @@ vi.mock("../inbox.ts", () => ({
 }));
 vi.mock("../notificationPolicy.ts", () => ({
   buildEventKey: async () => "event-key",
+  validIdempotencyKey: () => null,
   urgencyForEvent: () => "normal",
   decoratePayloadPolicy: (payload: unknown) => payload,
   loadRecipientPreferences: async (_client: unknown, userIds: string[]) => new Map(

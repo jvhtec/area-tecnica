@@ -1,10 +1,12 @@
+import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
 import { getErrorMessage } from '@/utils/errorMessage';
-import type {
-  AssignmentCommandResult,
-  AssignmentCommandRow,
-  AssignmentSideEffect,
+import {
+  sideEffectSchema,
+  type AssignmentCommandResult,
+  type AssignmentCommandRow,
+  type AssignmentSideEffect,
 } from '@/features/assignments/commands/types';
 
 export interface SideEffectContext {
@@ -22,12 +24,31 @@ export interface SideEffectSummary {
 
 type EffectReport = { index: number; status: 'succeeded' | 'failed'; error?: string };
 
+const claimSchema = z.object({
+  claim_token: z.string().nullable(),
+  effects: z.array(sideEffectSchema.extend({ index: z.number().int().nonnegative() })),
+});
+
+/** How long one runner may hold an effect before it becomes retryable. */
+const CLAIM_LEASE_SECONDS = 120;
+
 const invoke = async (name: string, body: Record<string, unknown>) => {
   const { error } = await supabase.functions.invoke(name, { body });
   if (error) throw error;
 };
 
 const notificationBody = (
+  effect: AssignmentSideEffect,
+  result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed'>,
+  context: SideEffectContext,
+): Record<string, unknown> => ({
+  ...notificationPayload(effect, result, context),
+  // Stable per effect: push delivers each notification at most once per
+  // recipient, however often the effect is retried or reported.
+  idempotency_key: effect.effect_id,
+});
+
+const notificationPayload = (
   effect: AssignmentSideEffect,
   result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed'>,
   context: SideEffectContext,
@@ -91,33 +112,45 @@ async function runEffect(
 
 /**
  * Executes the post-commit plan a command returned (Flex crew sync and
- * notifications) and reports each outcome to the ledger. Failures never undo
- * the committed assignment; they stay visible in the reconciliation backlog
- * (get_assignment_side_effect_backlog) and can be retried there.
+ * notifications) and reports each outcome to the ledger. Effects are claimed
+ * first, so a concurrent runner (another tab, a retry from the reconciliation
+ * panel) never executes the same effect twice; only claimed effects run.
+ * Failures never undo the committed assignment; they stay visible in the
+ * reconciliation backlog (get_assignment_side_effect_backlog) for retry.
  */
 export async function runAssignmentSideEffects(
   commandId: string,
   result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed' | 'side_effects'>,
   context: SideEffectContext = {},
-  options: { onlyIndexes?: number[] } = {},
 ): Promise<SideEffectSummary> {
-  const reports: EffectReport[] = [];
-  await Promise.all(result.side_effects.map(async (effect, index) => {
-    if (options.onlyIndexes && !options.onlyIndexes.includes(index)) return;
-    if (effect.status === 'succeeded') return;
+  if (result.side_effects.length === 0) return { attempted: 0, failed: 0, recorded: true };
+
+  const { data: claimData, error: claimError } = await supabase.rpc('claim_assignment_side_effects', {
+    p_command_id: commandId,
+    p_lease_seconds: CLAIM_LEASE_SECONDS,
+  });
+  const claim = claimError ? null : claimSchema.safeParse(claimData);
+  if (!claim?.success || !claim.data.claim_token) {
+    if (claimError || (claim && !claim.success)) {
+      console.warn('Could not claim assignment side effects; they stay pending for retry', { commandId, claimError });
+    }
+    return { attempted: 0, failed: 0, recorded: !claimError };
+  }
+  const claimToken = claim.data.claim_token;
+
+  const reports: EffectReport[] = await Promise.all(claim.data.effects.map(async ({ index, ...effect }): Promise<EffectReport> => {
     try {
-      await runEffect(effect, result, context);
-      reports.push({ index, status: 'succeeded' });
+      await runEffect({ ...effect, effect_id: effect.effect_id ?? `${commandId}:${index}` }, result, context);
+      return { index, status: 'succeeded' };
     } catch (error) {
-      reports.push({ index, status: 'failed', error: getErrorMessage(error, 'Error desconocido').slice(0, 500) });
+      return { index, status: 'failed', error: getErrorMessage(error, 'Error desconocido').slice(0, 500) };
     }
   }));
 
-  if (reports.length === 0) return { attempted: 0, failed: 0, recorded: true };
-  reports.sort((a, b) => a.index - b.index);
   const failed = reports.filter((report) => report.status === 'failed').length;
   const { error } = await supabase.rpc('record_assignment_side_effects', {
     p_command_id: commandId,
+    p_claim_token: claimToken,
     p_results: reports,
   });
   if (error) console.warn('Could not record assignment side-effect outcomes', { commandId, error });

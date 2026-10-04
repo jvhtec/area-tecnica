@@ -26,7 +26,7 @@ const sql = (value: string | null) => (value === null ? 'NULL' : `'${value.repla
 describe.skipIf(!permitted)('assignment commands under real concurrency', () => {
   let observer: PsqlSession;
   const techId = randomUUID();
-  const jobs = Array.from({ length: 10 }, () => randomUUID());
+  const jobs = Array.from({ length: 11 }, () => randomUUID());
 
   const session = async (name: string) => {
     const s = new PsqlSession(container!);
@@ -190,5 +190,17 @@ describe.skipIf(!permitted)('assignment commands under real concurrency', () => 
     expect(second).toContain('P0409');
     expect(await observer.query(`SELECT count(*) FROM public.job_assignments WHERE job_id = ${sql(jobs[8])};`)).toBe('0');
     expect(await scheduleOf(jobs[8])).toBe('');
+  });
+
+  it('two runners retrying the same side effects at once never both get them', async () => {
+    const command = randomUUID();
+    await observer.query(`UPDATE public.timesheets SET is_active = false WHERE technician_id = ${sql(techId)} AND date = '2026-12-02';`);
+    const applied = parse(await observer.query(applyCall({ command, job: jobs[10], dates: ['2026-12-02'], policy: 'allow' })));
+    expect(applied.outcome).toBe('committed');
+    const claimCall = `SELECT public.claim_assignment_side_effects(${sql(command)}, 120);`;
+    const { first, second } = await race(claimCall, s => s.query(claimCall));
+    const claims = [first, second].map(output => JSON.parse(output.split('\n').filter(Boolean).at(-1)!) as { effects: unknown[] });
+    expect(claims[0].effects.length).toBeGreaterThan(0);
+    expect(claims[1].effects).toEqual([]);
   });
 });

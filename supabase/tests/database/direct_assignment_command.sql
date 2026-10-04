@@ -3,6 +3,10 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 SELECT no_plan();
+CREATE FUNCTION pg_temp.tok(p_job uuid, p_tech uuid) RETURNS text LANGUAGE sql AS $tok$
+  SELECT public.get_assignment_command_state(p_job, p_tech)->>'state_token';
+$tok$;
+GRANT EXECUTE ON FUNCTION pg_temp.tok(uuid, uuid) TO authenticated;
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 
 -- ---------------------------------------------------------------------------
@@ -64,7 +68,8 @@ CREATE FUNCTION pg_temp.apply(
   p_policy text DEFAULT 'reject'
 ) RETURNS jsonb LANGUAGE sql AS $$
   SELECT public.apply_direct_assignment(p_command, p_job, p_tech, p_role, p_status, p_coverage, p_dates,
-    p_mode, p_token, p_from, NULL, p_policy, 'assignment-dialog', NULL, '{}'::jsonb);
+    p_mode, COALESCE(p_token, pg_temp.tok(p_job, p_tech)), p_from,
+    CASE WHEN p_from IS NOT NULL THEN pg_temp.tok(p_from, p_tech) END, p_policy, 'assignment-dialog', NULL, '{}'::jsonb);
 $$;
 GRANT EXECUTE ON FUNCTION pg_temp.act_as(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION pg_temp.apply(uuid, uuid, uuid, text, text, text, date[], text, text, uuid, text) TO authenticated;
@@ -108,9 +113,11 @@ SELECT results_eq($$ SELECT date, is_active, source, category FROM timesheets
   $$ VALUES ('2026-11-03'::date, true, 'assignment-dialog'::text, 'responsable'::text) $$,
   'schedule and role category are written in the same transaction');
 SELECT is((SELECT value->'side_effects' FROM results WHERE name = 'create'),
-  '[{"kind": "flex", "action": "add", "job_id": "da210000-0000-0000-0000-000000000001", "status": "pending", "department": "sound"},
-    {"kind": "notification", "action": "job.assignment.direct", "job_id": "da210000-0000-0000-0000-000000000001", "status": "pending"}]'::jsonb,
-  'post-commit plan lists Flex and notification effects');
+  '[{"kind": "flex", "action": "add", "job_id": "da210000-0000-0000-0000-000000000001", "status": "pending", "department": "sound",
+     "effect_id": "da310000-0000-0000-0000-000000000010:0"},
+    {"kind": "notification", "action": "job.assignment.direct", "job_id": "da210000-0000-0000-0000-000000000001", "status": "pending",
+     "effect_id": "da310000-0000-0000-0000-000000000010:1"}]'::jsonb,
+  'post-commit plan lists Flex and notification effects, each with a stable effect id');
 SELECT is((SELECT value->>'state_token' FROM results WHERE name = 'create'),
   (SELECT public.get_assignment_command_state('da210000-0000-0000-0000-000000000001', 'da110000-0000-0000-0000-000000000002')->>'state_token'),
   'result token matches the readable state token');
@@ -124,12 +131,15 @@ SET LOCAL ROLE authenticated;
 -- ---------------------------------------------------------------------------
 -- Idempotency
 -- ---------------------------------------------------------------------------
+-- A retry resends exactly the original request, including the token it was decided on.
 INSERT INTO results SELECT 'replay', pg_temp.apply('da310000-0000-0000-0000-000000000010', 'da210000-0000-0000-0000-000000000001',
-  'da110000-0000-0000-0000-000000000002', 'SND-FOH-R', 'invited', 'single', ARRAY['2026-11-03']::date[]);
+  'da110000-0000-0000-0000-000000000002', 'SND-FOH-R', 'invited', 'single', ARRAY['2026-11-03']::date[], 'replace',
+  (SELECT value->>'prior_state_token' FROM results WHERE name = 'create'));
 SELECT ok((SELECT (value->>'replayed')::boolean AND value - 'replayed' = (SELECT value - 'replayed' FROM results WHERE name = 'create')
   FROM results WHERE name = 'replay'), 'a transport retry replays the original result');
 SELECT throws_ok($$ SELECT pg_temp.apply('da310000-0000-0000-0000-000000000010', 'da210000-0000-0000-0000-000000000001',
-  'da110000-0000-0000-0000-000000000002', 'SND-MON-R', 'invited', 'single', ARRAY['2026-11-03']::date[]) $$,
+  'da110000-0000-0000-0000-000000000002', 'SND-MON-R', 'invited', 'single', ARRAY['2026-11-03']::date[], 'replace',
+  (SELECT value->>'prior_state_token' FROM results WHERE name = 'create')) $$,
   '23505', 'command_id_reused', 'reusing a command id for a different request is refused');
 INSERT INTO results SELECT 'noop', pg_temp.apply('da310000-0000-0000-0000-000000000011', 'da210000-0000-0000-0000-000000000001',
   'da110000-0000-0000-0000-000000000002', 'SND-FOH-R', 'invited', 'single', ARRAY['2026-11-03']::date[]);
@@ -235,14 +245,14 @@ SELECT ok((SELECT value->>'outcome' = 'committed' AND (value->>'conflict_overrid
 -- Move / reassign (job 4 -> job 2)
 -- ---------------------------------------------------------------------------
 INSERT INTO results SELECT 'move', public.apply_direct_assignment('da310000-0000-0000-0000-000000000020', 'da210000-0000-0000-0000-000000000002',
-  'da110000-0000-0000-0000-000000000002', 'SND-FOH-T', 'invited', 'single', ARRAY['2026-11-02']::date[], 'replace', NULL,
+  'da110000-0000-0000-0000-000000000002', 'SND-PA-T', 'invited', 'single', ARRAY['2026-11-02']::date[], 'replace', pg_temp.tok('da210000-0000-0000-0000-000000000002', 'da110000-0000-0000-0000-000000000002'),
   'da210000-0000-0000-0000-000000000004',
   public.get_assignment_command_state('da210000-0000-0000-0000-000000000004', 'da110000-0000-0000-0000-000000000002')->>'state_token',
   'reject', 'assignment-dialog', NULL, '{}'::jsonb);
 SELECT ok((SELECT value->>'outcome' = 'committed' AND (value->'moved_from'->>'deleted_assignment')::boolean
     AND (value->'moved_from'->>'deleted_timesheets')::integer = 2 FROM results WHERE name = 'move'),
   'a move removes the old membership and its schedule');
-SELECT ok((SELECT value->'side_effects'->0 = '{"kind": "flex", "action": "remove", "job_id": "da210000-0000-0000-0000-000000000004", "department": "sound", "status": "pending"}'::jsonb
+SELECT ok((SELECT value->'side_effects'->0 = '{"kind": "flex", "action": "remove", "job_id": "da210000-0000-0000-0000-000000000004", "department": "sound", "status": "pending", "effect_id": "da310000-0000-0000-0000-000000000020:0"}'::jsonb
   FROM results WHERE name = 'move'), 'a move plans Flex removal from the old job');
 RESET ROLE;
 SELECT is((SELECT count(*) FROM job_assignments WHERE job_id = 'da210000-0000-0000-0000-000000000004'), 0::bigint, 'old job has no membership');
@@ -262,7 +272,7 @@ CREATE TEMP TABLE before_failed_move AS
          (SELECT jsonb_agg(to_jsonb(t) ORDER BY job_id, date) FROM timesheets t WHERE technician_id = 'da110000-0000-0000-0000-000000000002') AS schedule;
 SET LOCAL ROLE authenticated;
 SELECT throws_ok($$ SELECT pg_temp.apply('da310000-0000-0000-0000-000000000021', 'da210000-0000-0000-0000-000000000004',
-  'da110000-0000-0000-0000-000000000002', 'SND-FOH-T', 'invited', 'single', ARRAY['2026-11-02']::date[], 'replace', NULL,
+  'da110000-0000-0000-0000-000000000002', 'SND-PA-T', 'invited', 'single', ARRAY['2026-11-02']::date[], 'replace', NULL,
   'da210000-0000-0000-0000-000000000002') $$, 'P0001', 'injected direct schedule failure', 'a mid-move failure propagates');
 RESET ROLE;
 SELECT ok((SELECT jsonb_agg(to_jsonb(a) ORDER BY job_id) FROM job_assignments a WHERE technician_id = 'da110000-0000-0000-0000-000000000002') = (SELECT memberships FROM before_failed_move)

@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
+import { queryClient } from '@/lib/react-query';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
 
 import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
   AssignmentCommandError,
   assignmentCommandMessage,
   createAssignmentCommandId,
@@ -74,8 +76,8 @@ export const useMatrixCellAssignmentRemoval = ({
       });
     } catch (error) {
       console.error('Error checking multi-date assignment:', error);
-      // Without a known state the removal stays day-scoped: the database
-      // refuses to treat the last day as a date removal (see below).
+      // No state, no token: removal is refused until the state loads (the
+      // dialog explains it and disables the confirmation).
       setMultiDateRemoval({
         isOpen: true,
         isLoading: false,
@@ -104,6 +106,11 @@ export const useMatrixCellAssignmentRemoval = ({
     if (!assignment?.job_id) return;
     const jobId = assignment.job_id;
     const { currentDate, stateToken, otherDatesCount } = multiDateRemoval;
+    // Fail closed: never remove without the state the manager was shown.
+    if (!stateToken) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
 
     setIsRemovingAssignment(true);
     try {
@@ -118,12 +125,13 @@ export const useMatrixCellAssignmentRemoval = ({
         if (dayResult.ok) {
           toast.success(dayResult.outcome === 'noop' ? 'Ese día ya no estaba asignado' : 'Día eliminado de la asignación');
           setMultiDateRemoval((prev) => ({ ...prev, isOpen: false }));
-          reconcileAssignmentViews(null, { technicianId: technician.id, jobIds: [jobId] });
+          reconcileAssignmentViews(queryClient, { technicianId: technician.id, jobIds: [jobId] });
           return;
         }
         if (dayResult.code !== 'last_date') requireCommitted(dayResult);
         // The last day: the whole membership goes, guarded by the state the
         // database just reported.
+        if (!dayResult.state_token) throw new AssignmentCommandError('stale_state');
         wholeRemovalToken = dayResult.state_token;
       }
 
@@ -138,12 +146,12 @@ export const useMatrixCellAssignmentRemoval = ({
       const removedDays = result.removed?.deleted_timesheets ?? otherDatesCount + 1;
       toast.success(removedDays > 1 ? `${removedDays} días eliminados de la asignación` : 'Asignación eliminada');
       setMultiDateRemoval((prev) => ({ ...prev, isOpen: false }));
-      reconcileAssignmentViews(null, { technicianId: technician.id, jobIds: [jobId] });
+      reconcileAssignmentViews(queryClient, { technicianId: technician.id, jobIds: [jobId] });
     } catch (error: unknown) {
       if (error instanceof AssignmentCommandError) {
         if (!error.retryable && error.code !== 'unknown') pendingCommandRef.current = null;
         if (error.code === 'stale_state') {
-          reconcileAssignmentViews(null, { technicianId: technician.id, jobIds: [jobId] });
+          reconcileAssignmentViews(queryClient, { technicianId: technician.id, jobIds: [jobId] });
           setMultiDateRemoval((prev) => ({ ...prev, isOpen: false }));
         }
         toast.error(error.message || assignmentCommandMessage(error.code));

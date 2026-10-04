@@ -4,8 +4,76 @@
 -- outcome here, so a failed Flex call is visible and retryable instead of a
 -- console line. Nothing here changes core assignment state.
 
+-- Effects are executed under a short claim so two runners (the committing
+-- tab, a retry from the reconciliation panel, another admin) never execute
+-- the same effect at once. A claim that is never reported back expires after
+-- its lease and the effect becomes retryable again.
+CREATE FUNCTION public.claim_assignment_side_effects(
+  p_command_id uuid,
+  p_lease_seconds integer DEFAULT 120
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_command public.assignment_commands%ROWTYPE;
+  v_token uuid := gen_random_uuid();
+  v_until timestamptz;
+  v_effects jsonb;
+  v_claimed jsonb;
+BEGIN
+  IF NOT (auth.role() = 'service_role' OR public.is_admin_or_management()) THEN
+    RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
+  END IF;
+  IF p_command_id IS NULL OR p_lease_seconds IS NULL OR p_lease_seconds NOT BETWEEN 10 AND 900 THEN
+    RAISE EXCEPTION 'a command id and a lease of 10-900 seconds are required' USING ERRCODE = '22023';
+  END IF;
+  v_until := pg_catalog.now() + pg_catalog.make_interval(secs => p_lease_seconds);
+
+  SELECT * INTO v_command FROM public.assignment_commands
+  WHERE command_id = p_command_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'unknown assignment command' USING ERRCODE = 'P0002';
+  END IF;
+
+  SELECT COALESCE(pg_catalog.jsonb_agg(
+           CASE WHEN eligible THEN effect || pg_catalog.jsonb_build_object(
+                  'claim_token', v_token, 'claimed_until', v_until)
+                ELSE effect END ORDER BY ord), '[]'::jsonb),
+         COALESCE(pg_catalog.jsonb_agg(effect || pg_catalog.jsonb_build_object('index', ord - 1) ORDER BY ord)
+                    FILTER (WHERE eligible), '[]'::jsonb)
+    INTO v_effects, v_claimed
+  FROM (
+    SELECT e.effect, e.ord,
+           e.effect->>'status' IN ('pending', 'failed')
+             AND (e.effect->>'claimed_until' IS NULL OR (e.effect->>'claimed_until')::timestamptz < pg_catalog.now())
+             AS eligible
+    FROM pg_catalog.jsonb_array_elements(v_command.side_effects) WITH ORDINALITY AS e(effect, ord)
+  ) effects;
+
+  IF pg_catalog.jsonb_array_length(v_claimed) > 0 THEN
+    UPDATE public.assignment_commands
+    SET side_effects = v_effects, side_effects_updated_at = pg_catalog.now()
+    WHERE command_id = p_command_id;
+  END IF;
+
+  RETURN pg_catalog.jsonb_build_object(
+    'command_id', p_command_id,
+    'claim_token', CASE WHEN pg_catalog.jsonb_array_length(v_claimed) > 0 THEN v_token END,
+    'effects', v_claimed);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_assignment_side_effects(uuid, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_assignment_side_effects(uuid, integer) TO authenticated, service_role;
+COMMENT ON FUNCTION public.claim_assignment_side_effects(uuid, integer) IS
+  'Claims the pending/failed, unclaimed effects of a committed assignment command for one runner; returns only the claimed effects (with index) and the claim token to report with.';
+
 CREATE FUNCTION public.record_assignment_side_effects(
   p_command_id uuid,
+  p_claim_token uuid,
   p_results jsonb
 )
 RETURNS jsonb
@@ -20,13 +88,20 @@ DECLARE
   v_index integer;
   v_status text;
   v_overall text;
+  v_ignored jsonb := '[]'::jsonb;
 BEGIN
   IF NOT (auth.role() = 'service_role' OR public.is_admin_or_management()) THEN
     RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
   END IF;
-  IF p_command_id IS NULL OR p_results IS NULL OR pg_catalog.jsonb_typeof(p_results) <> 'array'
-     OR pg_catalog.jsonb_array_length(p_results) > 32 THEN
-    RAISE EXCEPTION 'a command id and an array of results are required' USING ERRCODE = '22023';
+  IF p_command_id IS NULL OR p_claim_token IS NULL OR p_results IS NULL
+     OR pg_catalog.jsonb_typeof(p_results) <> 'array' OR pg_catalog.jsonb_array_length(p_results) > 32 THEN
+    RAISE EXCEPTION 'a command id, a claim token and an array of results are required' USING ERRCODE = '22023';
+  END IF;
+  -- One outcome per effect per report: a repeated index could overwrite a
+  -- failure with a success and double-count attempts.
+  IF (SELECT pg_catalog.count(*) <> pg_catalog.count(DISTINCT e->>'index')
+      FROM pg_catalog.jsonb_array_elements(p_results) AS e) THEN
+    RAISE EXCEPTION 'invalid side-effect result' USING ERRCODE = '22023';
   END IF;
 
   SELECT * INTO v_command FROM public.assignment_commands
@@ -43,8 +118,14 @@ BEGIN
        OR v_status IS NULL OR v_status NOT IN ('succeeded', 'failed') THEN
       RAISE EXCEPTION 'invalid side-effect result' USING ERRCODE = '22023';
     END IF;
+    -- Only the current claim holder may report; a runner whose lease expired
+    -- and was re-claimed by someone else is ignored rather than trusted.
+    IF (v_effects->v_index->>'claim_token') IS DISTINCT FROM p_claim_token::text THEN
+      v_ignored := v_ignored || pg_catalog.to_jsonb(v_index);
+      CONTINUE;
+    END IF;
     v_effects := pg_catalog.jsonb_set(v_effects, ARRAY[v_index::text],
-      (v_effects->v_index) || pg_catalog.jsonb_build_object(
+      ((v_effects->v_index) - ARRAY['claim_token', 'claimed_until']::text[]) || pg_catalog.jsonb_build_object(
         'status', v_status,
         'attempts', COALESCE((v_effects->v_index->>'attempts')::integer, 0) + 1,
         'last_error', CASE WHEN v_status = 'failed'
@@ -66,14 +147,14 @@ BEGIN
   WHERE command_id = p_command_id;
 
   RETURN pg_catalog.jsonb_build_object('command_id', p_command_id, 'side_effects', v_effects,
-    'side_effects_status', v_overall);
+    'side_effects_status', v_overall, 'ignored_indexes', v_ignored);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.record_assignment_side_effects(uuid, jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.record_assignment_side_effects(uuid, jsonb) TO authenticated, service_role;
-COMMENT ON FUNCTION public.record_assignment_side_effects(uuid, jsonb) IS
-  'Records per-effect outcomes ([{index, status: succeeded|failed, error?}]) for a committed assignment command''s post-commit plan.';
+REVOKE ALL ON FUNCTION public.record_assignment_side_effects(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_assignment_side_effects(uuid, uuid, jsonb) TO authenticated, service_role;
+COMMENT ON FUNCTION public.record_assignment_side_effects(uuid, uuid, jsonb) IS
+  'Records per-effect outcomes ([{index, status: succeeded|failed, error?}]) for effects claimed with p_claim_token; other indexes are ignored.';
 
 -- Commands whose post-commit effects failed, or never reported back (a tab
 -- closed mid-way). The grace period keeps in-flight work out of the list.

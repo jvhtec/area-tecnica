@@ -1,5 +1,6 @@
 import { dataLayerClient } from '@/services/dataLayerClient';
 import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
   AssignmentCommandError,
   applyDirectAssignment,
   assignmentCommandMessage,
@@ -252,6 +253,13 @@ export const AssignJobDialog = ({
       toast.error('Cargando el estado de la asignación, por favor espera...');
       return;
     }
+    // Fail closed: without the authoritative state there is no expected-state
+    // token, and a command sent blind could overwrite a colleague's change.
+    const sourceToken = moveFromJobId ? sourceState?.state_token : null;
+    if (!selectedState || sourceToken === undefined) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
 
     let dates: string[] | undefined;
     if (coverageMode === 'multi') {
@@ -272,9 +280,9 @@ export const AssignJobDialog = ({
       coverage: coverageMode,
       dates,
       mode: modificationMode,
-      expectedStateToken: selectedState?.state_token ?? null,
+      expectedStateToken: selectedState.state_token,
       fromJobId: moveFromJobId,
-      expectedFromStateToken: moveFromJobId ? sourceState?.state_token ?? null : null,
+      expectedFromStateToken: sourceToken,
       // Conflicts are enforced by the database under the technician lock; an
       // override is an explicit second decision after seeing the warning.
       conflictPolicy: skipConflictCheck ? 'allow' : 'reject',
@@ -332,10 +340,14 @@ export const AssignJobDialog = ({
       toast.error('Cargando el estado de la asignación, por favor espera...');
       return;
     }
+    if (!sourceState) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
     const input = {
       jobId: existingAssignment.job_id,
       technicianId,
-      expectedStateToken: sourceState?.state_token ?? null,
+      expectedStateToken: sourceState.state_token,
       source: 'assignment-dialog',
     };
     const commandId = commandIdFor(JSON.stringify({ remove: input }));

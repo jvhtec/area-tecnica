@@ -4,6 +4,9 @@ import { queryKeys } from '@/lib/react-query';
 export const assignmentCommandStateKey = (jobId: string, technicianId: string) =>
   queryKeys.scope('assignment-command-state', jobId, technicianId);
 
+export const jobAssignmentCommandStatesKey = (jobId: string) =>
+  queryKeys.scope('job-assignment-command-states', jobId);
+
 /**
  * Refreshes every read model that shows a job/technician pair after a command
  * settles (committed, no-op or rejected-as-stale). The command result is the
@@ -18,6 +21,7 @@ export function reconcileAssignmentViews(
   if (queryClient) {
     for (const jobId of uniqueJobIds) {
       void queryClient.invalidateQueries({ queryKey: assignmentCommandStateKey(jobId, technicianId) });
+      void queryClient.invalidateQueries({ queryKey: jobAssignmentCommandStatesKey(jobId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.scope('existing-timesheets', jobId, technicianId) });
     }
     void queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });

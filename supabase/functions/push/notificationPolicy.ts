@@ -43,6 +43,14 @@ const SCHEDULE_OCCURRENCE_EVENT_TYPES = new Set([
   "programa.feed.tick",
 ]);
 
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:._-]{7,199}$/;
+
+/** The caller's idempotency key when it is well formed, otherwise null. */
+export function validIdempotencyKey(body: Pick<BroadcastBody, "idempotency_key">): string | null {
+  const key = body.idempotency_key;
+  return typeof key === "string" && IDEMPOTENCY_KEY_PATTERN.test(key) ? key : null;
+}
+
 export function categoryForEvent(type: string): NotificationCategory {
   // Money movements get their own category so a technician can mute routine job
   // chatter without losing sight of what they are owed.
@@ -165,6 +173,10 @@ export async function buildEventKey(body: BroadcastBody, now = Date.now()): Prom
   if (body.event_id && SCHEDULE_OCCURRENCE_EVENT_TYPES.has(body.type)) {
     return `${body.type}:${body.event_id}`;
   }
+  // An explicit occurrence identity (assignment command effects) is stable
+  // across retries, unlike the five-minute content window below.
+  const idempotencyKey = validIdempotencyKey(body);
+  if (idempotencyKey) return `${body.type}:idem:${idempotencyKey}`;
   const identity = {
     type: body.type,
     entity: entityKey(body),

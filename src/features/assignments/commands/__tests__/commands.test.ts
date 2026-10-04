@@ -159,28 +159,41 @@ describe('runAssignmentSideEffects', () => {
     side_effects: effects,
   });
 
-  it('executes the plan and records each outcome, keeping failures visible', async () => {
+  /** The claim RPC grants `claimed`; record succeeds. */
+  const claimGranting = (claimed: Array<Record<string, unknown>>, token: string | null = 'claim-1') => {
+    rpcMock.mockImplementation((name: string) => Promise.resolve(name === 'claim_assignment_side_effects'
+      ? { data: { claim_token: token, effects: claimed }, error: null }
+      : { data: {}, error: null }));
+  };
+
+  it('claims, executes only the claimed effects and records outcomes with the claim token', async () => {
     vi.useRealTimers();
     invokeMock
       .mockResolvedValueOnce({ error: { message: 'Flex down' } })
       .mockResolvedValueOnce({ error: null });
-    rpcMock.mockResolvedValue({ data: {}, error: null });
+    claimGranting([
+      { kind: 'flex', action: 'add', job_id: 'job-1', department: 'sound', status: 'pending', effect_id: 'cmd-1:0', index: 0 },
+      { kind: 'notification', action: 'job.assignment.direct', job_id: 'job-1', status: 'pending', effect_id: 'cmd-1:1', index: 1 },
+    ]);
 
     const summary = await runAssignmentSideEffects('cmd-1', committed([
-      { kind: 'flex', action: 'add', job_id: 'job-1', department: 'sound', status: 'pending' },
-      { kind: 'notification', action: 'job.assignment.direct', job_id: 'job-1', status: 'pending' },
+      { kind: 'flex', action: 'add', job_id: 'job-1', department: 'sound', status: 'pending', effect_id: 'cmd-1:0' },
+      { kind: 'notification', action: 'job.assignment.direct', job_id: 'job-1', status: 'pending', effect_id: 'cmd-1:1' },
     ]), { technicianDepartment: 'sound', recipientName: 'Pat' });
 
     expect(summary).toEqual({ attempted: 2, failed: 1, recorded: true });
+    expect(rpcMock).toHaveBeenCalledWith('claim_assignment_side_effects', { p_command_id: 'cmd-1', p_lease_seconds: 120 });
     expect(invokeMock).toHaveBeenCalledWith('manage-flex-crew-assignments', {
       body: { job_id: 'job-1', technician_id: 'tech-1', department: 'sound', action: 'add' },
     });
     expect(invokeMock).toHaveBeenCalledWith('push', { body: expect.objectContaining({
       type: 'job.assignment.direct', recipient_id: 'tech-1', recipient_name: 'Pat',
       assignment_status: 'confirmed', single_day: true, target_date: '2026-12-01T00:00:00Z', departments: ['sound'],
+      idempotency_key: 'cmd-1:1',
     }) });
     expect(rpcMock).toHaveBeenCalledWith('record_assignment_side_effects', {
       p_command_id: 'cmd-1',
+      p_claim_token: 'claim-1',
       p_results: [
         { index: 0, status: 'failed', error: 'Flex down' },
         { index: 1, status: 'succeeded' },
@@ -188,23 +201,33 @@ describe('runAssignmentSideEffects', () => {
     });
   });
 
-  it('sends the confirmation notification for a status command', async () => {
+  it('runs nothing when another runner holds the claim', async () => {
+    vi.useRealTimers();
+    claimGranting([], null);
+    const summary = await runAssignmentSideEffects('cmd-1', committed([
+      { kind: 'notification', action: 'job.assignment.direct', job_id: 'job-1', status: 'pending', effect_id: 'cmd-1:0' },
+    ]));
+    expect(summary).toEqual({ attempted: 0, failed: 0, recorded: true });
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalledWith('record_assignment_side_effects', expect.anything());
+  });
+
+  it('sends the confirmation notification for a status command with its idempotency key', async () => {
     vi.useRealTimers();
     invokeMock.mockResolvedValue({ error: null });
-    rpcMock.mockResolvedValue({ data: {}, error: null });
+    claimGranting([{ kind: 'notification', action: 'job.assignment.confirmed', job_id: 'job-1', status: 'pending', effect_id: 'cmd-1:0', index: 0 }]);
     await runAssignmentSideEffects('cmd-1', committed([
-      { kind: 'notification', action: 'job.assignment.confirmed', job_id: 'job-1', status: 'pending' },
+      { kind: 'notification', action: 'job.assignment.confirmed', job_id: 'job-1', status: 'pending', effect_id: 'cmd-1:0' },
     ]), { recipientName: 'Pat' });
     expect(invokeMock).toHaveBeenCalledWith('push', { body: {
       action: 'broadcast', type: 'job.assignment.confirmed', job_id: 'job-1', recipient_id: 'tech-1', recipient_name: 'Pat',
+      idempotency_key: 'cmd-1:0',
     } });
   });
 
-  it('skips effects that already succeeded and records nothing when there is nothing to do', async () => {
+  it('does nothing for a command without effects', async () => {
     vi.useRealTimers();
-    const summary = await runAssignmentSideEffects('cmd-1', committed([
-      { kind: 'flex', action: 'add', job_id: 'job-1', department: 'sound', status: 'succeeded' },
-    ]));
+    const summary = await runAssignmentSideEffects('cmd-1', committed([]));
     expect(summary).toEqual({ attempted: 0, failed: 0, recorded: true });
     expect(invokeMock).not.toHaveBeenCalled();
     expect(rpcMock).not.toHaveBeenCalled();

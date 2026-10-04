@@ -17,6 +17,8 @@ export const REJECTION_CODES = [
   'last_date',
   'assignment_not_found',
   'dryhire_job',
+  'invalid_role',
+  'approved_timesheet',
 ] as const;
 export type AssignmentRejectionCode = (typeof REJECTION_CODES)[number];
 
@@ -58,6 +60,7 @@ export const sideEffectSchema = z.object({
   status: z.enum(['pending', 'succeeded', 'failed']),
   attempts: z.number().optional(),
   last_error: z.string().nullable().optional(),
+  effect_id: z.string().optional(),
 });
 export type AssignmentSideEffect = z.infer<typeof sideEffectSchema>;
 
@@ -126,6 +129,21 @@ export const commandStateSchema = z.object({
   state_token: z.string(),
 });
 export type AssignmentCommandState = z.infer<typeof commandStateSchema>;
+
+export const jobCommandStatesSchema = z.object({
+  job_id: z.string(),
+  absent_state_token: z.string(),
+  states: z.record(z.string()),
+});
+
+/** State tokens of every technician on a job, for job-level surfaces. */
+export interface JobAssignmentCommandStates {
+  jobId: string;
+  /** Token of a pair with no membership and no days (a first assignment). */
+  absentStateToken: string;
+  /** Token per technician that has membership or active days on the job. */
+  tokenFor: (technicianId: string) => string;
+}
 
 export interface ApplyDirectAssignmentInput {
   commandId: string;

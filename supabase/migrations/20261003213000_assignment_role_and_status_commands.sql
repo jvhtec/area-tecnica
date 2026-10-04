@@ -11,21 +11,6 @@ ALTER TABLE public.assignment_commands ADD CONSTRAINT assignment_commands_comman
     'apply_direct_assignment', 'remove_direct_assignment', 'remove_assignment_date',
     'change_assignment_role', 'set_assignment_status'));
 
--- Highest category among the department role codes (responsable > especialista
--- > tecnico), the same rule as getCategoryFromAssignment in the client.
-CREATE FUNCTION public.assignment_role_category(p_roles text[])
-RETURNS text
-LANGUAGE sql
-IMMUTABLE
-SET search_path = ''
-AS $$
-  SELECT CASE MAX(CASE pg_catalog.right(r, 1) WHEN 'R' THEN 3 WHEN 'E' THEN 2 WHEN 'T' THEN 1 END)
-    WHEN 3 THEN 'responsable' WHEN 2 THEN 'especialista' WHEN 1 THEN 'tecnico' END
-  FROM (SELECT pg_catalog.upper(pg_catalog.btrim(role)) AS r FROM pg_catalog.unnest(p_roles) AS role) roles
-  WHERE r ~ '^[A-Z]{3}-[A-Z]+-[RET]$';
-$$;
-REVOKE ALL ON FUNCTION public.assignment_role_category(text[]) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.assignment_role_category(text[]) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- change_assignment_role
@@ -53,7 +38,8 @@ DECLARE
   v_actor uuid;
   v_role text := NULLIF(NULLIF(pg_catalog.btrim(p_role), ''), 'none');
   v_source text := COALESCE(NULLIF(pg_catalog.btrim(p_source), ''), 'job-card');
-  v_prefix text;
+  v_role_discipline text;
+  v_department text;
   v_job_type text;
   v_request jsonb;
   v_hash text;
@@ -83,6 +69,11 @@ BEGIN
   END IF;
   IF v_source !~ '^[a-z0-9][a-z0-9_-]{0,63}$' THEN
     RAISE EXCEPTION 'invalid source' USING ERRCODE = '22023';
+  END IF;
+  -- Interactive callers must say which state they decided on; only trusted
+  -- service callers may act without an expected-state token.
+  IF NOT v_is_service AND p_expected_state_token IS NULL THEN
+    RAISE EXCEPTION 'an expected state token is required' USING ERRCODE = '22023';
   END IF;
   IF p_metadata IS NOT NULL AND (pg_catalog.jsonb_typeof(p_metadata) <> 'object'
      OR pg_catalog.pg_column_size(p_metadata) > 4096) THEN
@@ -128,13 +119,25 @@ BEGIN
       pg_catalog.jsonb_build_object('current', v_prior), v_prior->>'state_token');
   END IF;
 
-  v_prefix := CASE p_department WHEN 'sound' THEN 'SND' WHEN 'lights' THEN 'LGT'
-    WHEN 'video' THEN 'VID' ELSE 'PROD' END;
-  IF v_role ~ '^[A-Z]+-[A-Z]+-[RET]$' AND pg_catalog.split_part(v_role, '-', 1) <> v_prefix THEN
-    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
-      v_actor, v_source, v_request, v_hash, 'role_department_mismatch',
-      'The role does not belong to that department',
-      pg_catalog.jsonb_build_object('department', p_department, 'role', v_role), v_prior->>'state_token');
+  -- Authoritative role validation (clearing a role is always allowed): a
+  -- registered code of this role column's discipline, held by a technician of
+  -- that discipline.
+  IF v_role IS NOT NULL THEN
+    SELECT discipline INTO v_role_discipline FROM public.assignment_role_codes WHERE code = v_role;
+    IF NOT FOUND THEN
+      RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+        v_actor, v_source, v_request, v_hash, 'invalid_role', 'The role is not a registered role code',
+        pg_catalog.jsonb_build_object('role', v_role), v_prior->>'state_token');
+    END IF;
+    SELECT department INTO v_department FROM public.profiles WHERE id = p_technician_id;
+    IF v_role_discipline <> p_department
+       OR public.assignment_role_discipline(v_department) IS DISTINCT FROM p_department THEN
+      RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+        v_actor, v_source, v_request, v_hash, 'role_department_mismatch',
+        'The role does not belong to that department',
+        pg_catalog.jsonb_build_object('department', p_department, 'technician_department', v_department, 'role', v_role),
+        v_prior->>'state_token');
+    END IF;
   END IF;
 
   v_old_role := CASE p_department WHEN 'sound' THEN v_existing.sound_role WHEN 'lights' THEN v_existing.lights_role
@@ -153,7 +156,7 @@ BEGIN
     RETURNING * INTO v_updated;
 
     IF COALESCE(p_sync_category, true) THEN
-      v_category := public.assignment_role_category(ARRAY[v_updated.sound_role, v_updated.lights_role, v_updated.video_role]);
+      v_category := public.assignment_role_category(ARRAY[v_updated.sound_role, v_updated.lights_role, v_updated.video_role, v_updated.production_role]);
       IF v_category IS NOT NULL THEN
         PERFORM 1 FROM public.profiles WHERE id = p_technician_id FOR KEY SHARE NOWAIT;
         PERFORM 1 FROM public.timesheets t
@@ -191,6 +194,7 @@ BEGIN
       v_side_effects := pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
         'kind', 'flex', 'action', CASE WHEN v_role IS NULL THEN 'remove' ELSE 'add' END,
         'job_id', p_job_id, 'department', p_department, 'status', 'pending'));
+      v_side_effects := public.assignment_effects_with_ids(p_command_id, v_side_effects);
     END IF;
     v_outcome := 'committed';
   END IF;
@@ -259,6 +263,9 @@ DECLARE
   v_after jsonb;
   v_delete_mode text;
   v_job_type text;
+  v_department text;
+  v_approved date[];
+  v_noop boolean := false;
   v_lifecycle jsonb;
   v_outcome text;
   v_side_effects jsonb := '[]'::jsonb;
@@ -274,6 +281,11 @@ BEGIN
   END IF;
   IF v_source !~ '^[a-z0-9][a-z0-9_-]{0,63}$' THEN
     RAISE EXCEPTION 'invalid source' USING ERRCODE = '22023';
+  END IF;
+  -- Interactive callers must say which state they decided on; only trusted
+  -- service callers may act without an expected-state token.
+  IF NOT v_is_service AND p_expected_state_token IS NULL THEN
+    RAISE EXCEPTION 'an expected state token is required' USING ERRCODE = '22023';
   END IF;
   IF p_metadata IS NOT NULL AND (pg_catalog.jsonb_typeof(p_metadata) <> 'object'
      OR pg_catalog.pg_column_size(p_metadata) > 4096) THEN
@@ -323,10 +335,35 @@ BEGIN
 
   -- Tour memberships are removed on decline; everything else is soft.
   v_delete_mode := CASE WHEN v_existing.assignment_source = 'tour' THEN 'hard' ELSE 'soft' END;
+
+  -- Already in the requested state: a true no-op (the lifecycle would still
+  -- restamp response_time and write an audit row).
+  IF (p_action = 'confirm' AND v_existing.status = 'confirmed')
+     OR (p_action = 'decline' AND v_delete_mode = 'soft' AND v_existing.status = 'declined'
+         AND pg_catalog.jsonb_array_length(v_prior->'dates') = 0) THEN
+    v_noop := true;
+  ELSIF p_action = 'decline' THEN
+    -- A decline voids (soft) or deletes (tour) the schedule; approved days are
+    -- financial records and block it.
+    v_approved := public.assignment_approved_dates(p_job_id, p_technician_id,
+      CASE WHEN v_delete_mode = 'soft'
+        THEN ARRAY(SELECT pg_catalog.jsonb_array_elements_text(v_prior->'dates')::date) END);
+    IF pg_catalog.cardinality(v_approved) > 0 THEN
+      RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+        v_actor, v_source, v_request, v_hash, 'approved_timesheet',
+        'Approved timesheets cannot be voided by a decline',
+        pg_catalog.jsonb_build_object('job_id', p_job_id, 'dates', pg_catalog.to_jsonb(v_approved)),
+        v_prior->>'state_token');
+    END IF;
+  END IF;
   -- This transaction already holds the membership row, so the lifecycle's
   -- own NOWAIT lock succeeds; its writes commit or roll back with ours.
-  v_lifecycle := public.manage_assignment_lifecycle(p_job_id, p_technician_id, p_action, v_delete_mode,
-    v_actor, COALESCE(p_metadata, '{}'::jsonb) || pg_catalog.jsonb_build_object('command_id', p_command_id, 'source', v_source));
+  IF v_noop THEN
+    v_lifecycle := pg_catalog.jsonb_build_object('success', true, 'action', 'noop');
+  ELSE
+    v_lifecycle := public.manage_assignment_lifecycle(p_job_id, p_technician_id, p_action, v_delete_mode,
+      v_actor, COALESCE(p_metadata, '{}'::jsonb) || pg_catalog.jsonb_build_object('command_id', p_command_id, 'source', v_source));
+  END IF;
 
   IF NOT COALESCE((v_lifecycle->>'success')::boolean, false) THEN
     IF v_lifecycle->>'error' = 'conflict_detected' THEN
@@ -343,7 +380,17 @@ BEGIN
   IF v_outcome = 'committed' AND p_action = 'confirm' THEN
     v_side_effects := pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
       'kind', 'notification', 'action', 'job.assignment.confirmed', 'job_id', p_job_id, 'status', 'pending'));
+  ELSIF v_outcome = 'committed' AND v_lifecycle->>'action' = 'hard_deleted' THEN
+    -- A declined tour membership is gone: take it off the Flex crew too, the
+    -- same plan remove_direct_assignment uses. Soft declines keep membership
+    -- (status declined) and leave Flex as it was before this change.
+    SELECT department INTO v_department FROM public.profiles WHERE id = p_technician_id;
+    SELECT COALESCE(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('kind', 'flex', 'action', 'remove',
+             'job_id', p_job_id, 'department', dept, 'status', 'pending')), '[]'::jsonb)
+      INTO v_side_effects
+    FROM pg_catalog.unnest(public.assignment_flex_departments(v_prior->'assignment', v_department)) AS dept;
   END IF;
+  v_side_effects := public.assignment_effects_with_ids(p_command_id, v_side_effects);
 
   v_result := pg_catalog.jsonb_build_object(
     'ok', true, 'outcome', v_outcome, 'command_id', p_command_id,

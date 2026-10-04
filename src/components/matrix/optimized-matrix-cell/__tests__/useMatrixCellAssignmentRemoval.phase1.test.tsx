@@ -57,10 +57,21 @@ const commandResult = (overrides: Record<string, unknown> = {}) => ({
 
 type RpcHandlers = Partial<Record<string, (args: Record<string, unknown>) => unknown>>;
 
+// Effects the last committed command planned; the claim RPC hands them out.
+let claimable: Array<Record<string, unknown>> = [];
+
 const configureRpc = (handlers: RpcHandlers) => {
+  claimable = [];
   rpcMock.mockImplementation((name: string, args: Record<string, unknown>) => {
     const handler = handlers[name];
-    if (handler) return Promise.resolve(handler(args));
+    if (handler) {
+      const response = handler(args) as { data?: { side_effects?: Array<Record<string, unknown>> } };
+      if (response?.data?.side_effects) claimable = response.data.side_effects;
+      return Promise.resolve(response);
+    }
+    if (name === "claim_assignment_side_effects") {
+      return Promise.resolve({ data: { claim_token: "claim-1", effects: claimable.map((effect, index) => ({ ...effect, index })) }, error: null });
+    }
     if (name === "record_assignment_side_effects") return Promise.resolve({ data: {}, error: null });
     return Promise.resolve({ data: null, error: { code: "PGRST202", message: `unexpected rpc ${name}` } });
   });
@@ -106,13 +117,19 @@ describe("matrix assignment removal through assignment commands", () => {
     });
   });
 
-  it("keeps removal day-scoped when the lookup fails", async () => {
+  it("refuses to remove anything when the authoritative state cannot be loaded", async () => {
     configureRpc({ get_assignment_command_state: () => ({ data: null, error: { code: "XX000", message: "lookup failed" } }) });
     const { result } = renderRemoval();
 
     await act(async () => { await result.current.checkMultiDateAssignment(); });
-
     expect(result.current.multiDateRemoval).toMatchObject({ otherDatesCount: 0, stateToken: null, currentDate: "2026-12-01" });
+
+    await act(async () => { await result.current.handleRemoveAssignment(false); });
+    await act(async () => { await result.current.handleRemoveAssignment(true); });
+
+    expect(rpcCalls("remove_assignment_date")).toHaveLength(0);
+    expect(rpcCalls("remove_direct_assignment")).toHaveLength(0);
+    expect(toastErrorMock).toHaveBeenCalledWith(expect.stringMatching(/no se pudo cargar el estado actual/i));
   });
 
   it("removes only the selected day while others remain, guarded by the loaded state", async () => {
@@ -194,6 +211,7 @@ describe("matrix assignment removal through assignment commands", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith("Asignación eliminada");
     await vi.waitFor(() => expect(rpcCalls("record_assignment_side_effects")).toHaveLength(1));
     expect(rpcCalls("record_assignment_side_effects")[0][1]).toMatchObject({
+      p_claim_token: "claim-1",
       p_results: expect.arrayContaining([{ index: 1, status: "failed", error: "Flex down" }]),
     });
     await vi.waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith(expect.stringMatching(/queda registrado para reintentar/i)));

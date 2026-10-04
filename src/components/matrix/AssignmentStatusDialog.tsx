@@ -23,8 +23,11 @@ import { queryKeys } from "@/lib/react-query";
 import { getErrorName } from '@/utils/errorMessage';
 import { getPrivateDataScope } from '@/lib/private-data-scope';
 import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
   AssignmentCommandError,
+  assignmentCommandStateKey,
   createAssignmentCommandId,
+  getAssignmentCommandState,
   reconcileAssignmentViews,
   requireCommitted,
   runAssignmentSideEffects,
@@ -71,16 +74,28 @@ export const AssignmentStatusDialog = ({
     enabled: open && !!technicianId
   });
 
+  // Authoritative state of the pair, loaded when the dialog opens; the status
+  // command is only sent against it.
+  const stateJobId = assignment?.job_id ?? '';
+  const { data: pairState, isLoading: isLoadingPairState } = useQuery({
+    queryKey: assignmentCommandStateKey(stateJobId, technicianId),
+    queryFn: () => getAssignmentCommandState(stateJobId, technicianId),
+    enabled: open && !!stateJobId && !!technicianId,
+    staleTime: 10_000,
+  });
+
   // Mutation with proper optimistic update and rollback
   const assignmentMutation = useMutation({
     mutationFn: async ({
       jobId,
       techId,
       actionType,
+      expectedStateToken,
     }: {
       jobId: string;
       techId: string;
       actionType: 'confirm' | 'decline';
+      expectedStateToken: string;
     }) => {
       // One command under the shared assignment locks; the database decides
       // tour hard-deletes and enforces conflicts on confirmation.
@@ -89,6 +104,7 @@ export const AssignmentStatusDialog = ({
         jobId,
         technicianId: techId,
         action: actionType,
+        expectedStateToken,
         notes,
         source: 'matrix-dialog',
       }));
@@ -158,6 +174,9 @@ export const AssignmentStatusDialog = ({
 
       // Show error to user
       if (err instanceof AssignmentCommandError) {
+        if (err.code === 'stale_state') {
+          reconcileAssignmentViews(queryClient, { technicianId: variables.techId, jobIds: [variables.jobId] });
+        }
         toast.error(err.message);
       } else {
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -199,13 +218,24 @@ export const AssignmentStatusDialog = ({
       return;
     }
 
+    if (isLoadingPairState) {
+      toast.error('Cargando el estado de la asignación, por favor espera...');
+      return;
+    }
+    // Fail closed: no authoritative state, no command.
+    if (!pairState) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
     // Execute the mutation
     assignmentMutation.mutate({
       jobId: assignment.job_id,
       techId: technicianId,
       actionType: action,
+      expectedStateToken: pairState.state_token,
     });
-  }, [assignment?.job_id, technicianId, action, assignmentMutation]);
+  }, [assignment?.job_id, technicianId, action, assignmentMutation, isLoadingPairState, pairState]);
 
   const actionConfig = {
     confirm: {

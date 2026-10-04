@@ -228,6 +228,25 @@ describe('AssignJobDialog direct-assignment command', () => {
     expect(applyMock.mock.calls.map(([input]) => input.commandId)).toEqual(['cmd-1', 'cmd-1']);
   });
 
+  it('refuses to send a command when the authoritative state could not be loaded', async () => {
+    useQueryMock.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+      if (queryKey[0] === 'technician') return { data: defaultTechnician, isLoading: false };
+      return { data: undefined, isLoading: false, isError: true };
+    });
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <AssignJobDialog open onClose={onClose} technicianId="tech-1" date={new Date('2024-06-01T00:00:00Z')}
+        availableJobs={[baseJob]} preSelectedJobId="job-1" />
+    );
+
+    await pickRole(user);
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    await waitFor(() => expect(toastFn.error).toHaveBeenCalledWith(expect.stringMatching(/no se pudo cargar el estado actual/i)));
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('keeps the dialog open and explains a stale state rejection', async () => {
     applyMock.mockResolvedValueOnce({ ...conflictRejection, code: 'stale_state', details: {} });
     const user = userEvent.setup();

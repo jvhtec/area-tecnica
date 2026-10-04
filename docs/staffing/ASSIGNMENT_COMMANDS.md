@@ -17,6 +17,7 @@ transactions; it sends one command and treats the result as authoritative.
 | `change_assignment_role` | Set or clear one department role column; recategorizes/reprices unapproved active days | Job-card role selectors (`JobAssignmentDialog`) |
 | `set_assignment_status` | Manager confirm/decline; wraps `manage_assignment_lifecycle` after the shared locks (tour memberships hard-deleted on decline, decided server-side) | `AssignmentStatusDialog` |
 | `get_assignment_command_state` | Membership, active days and the **state token** for a pair | dialogs, before a command |
+| `get_job_assignment_command_states` | Every member's token for one job plus the token of an absent pair (`absent_state_token`) | job-card dialogs (`useJobAssignmentsRealtime({ manageCommands })`) |
 
 All are `SECURITY DEFINER`, executable by `authenticated` but authorized
 inside for `admin`/`management` (or `service_role`, which may pass
@@ -24,7 +25,8 @@ inside for `admin`/`management` (or `service_role`, which may pass
 
 TypeScript wrappers live in `src/features/assignments/commands/` — use them,
 never call the RPCs or write `job_assignments`/`timesheets` from a Matrix
-surface (`tests/assignments/matrix-direct-write-guard.test.ts` enforces it).
+surface (`tests/assignments/matrix-direct-write-guard.test.ts` and the writer
+inventory in §7 enforce it).
 
 ### Result shape
 
@@ -38,7 +40,7 @@ surface (`tests/assignments/matrix-direct-write-guard.test.ts` enforces it).
   "state_token": "…", "prior_state_token": "…",
   "added_dates": [], "removed_dates": [], "moved_from": { … }, "removed": { … },
   "conflict_override": false,
-  "side_effects": [ { "kind": "flex", "action": "add", "department": "sound", "job_id": "…", "status": "pending" } ],
+  "side_effects": [ { "effect_id": "<command_id>:0", "kind": "flex", "action": "add", "department": "sound", "job_id": "…", "status": "pending" } ],
   "warnings": [ { "kind": "timesheet_repricing_failed", … } ],
   "replayed": false,
   "details": { … }            // rejection payload (e.g. conflicts)
@@ -54,12 +56,35 @@ surface (`tests/assignments/matrix-direct-write-guard.test.ts` enforces it).
 | `last_date` | Date removal of the last day | Matrix falls back to whole removal using the returned token |
 | `assignment_not_found` | Role/status change on a pair without membership | Toast |
 | `dryhire_job` | Dry-hire jobs have no crew by definition | Toast |
-| `job_not_found`, `technician_not_found`, `role_department_mismatch`, `invalid_job_span` | Entity/role validation | Toast |
+| `approved_timesheet` | The command would delete or void an approved day (`details.dates`) | Toast; un-approve it in Timesheets first |
+| `invalid_role` | Role code not in `assignment_role_codes` | Toast |
+| `role_department_mismatch` | Role discipline differs from the column or the technician's department (logistics staff take production roles) | Toast |
+| `job_not_found`, `technician_not_found`, `invalid_job_span` | Entity validation | Toast |
 
 Malformed calls raise `22023`; unauthorized calls raise `42501`. Anything
 after the first write raises and rolls the whole command back.
 
 ## 2. Invariants the commands guarantee
+
+**Approved timesheets are financial records.** No command deletes or voids a
+day whose timesheet is approved (`approved_by_manager` or `status =
+'approved'`): replacing days, superseding leftovers, the source of a move,
+whole removal, date removal and a manager decline all reject with
+`approved_timesheet` before any write. Un-approve the day on the timesheet
+page first. Role changes never recategorize approved rows either.
+
+**Roles are validated by the database.** `assignment_role_codes` mirrors
+`src/types/roles.ts` (pinned by `tests/assignments/assignment-role-registry.test.ts`).
+Commands reject unknown codes, a code in the wrong column, and a code outside
+the technician's discipline (`assignment_role_discipline`: logistics → production).
+Clearing a role is always allowed. Production roles count toward the
+timesheet category (`assignment_role_category`, `resolve_category_for_timesheet`
+and the `compute_timesheet_amount_2025` fallback, since `20261003215000`), so
+`PROD-RESP-R` is billed as responsable and `PROD-AYUD-T` as técnico.
+
+**Status no-ops write nothing.** Confirming a confirmed membership, or
+declining an already declined one with no active days, returns `outcome:
+noop` without touching the lifecycle, the audit log or side effects.
 
 **Dry hire is out of scope everywhere.** Dry-hire jobs have no crew by
 definition: the commands refuse them (`dryhire_job`), their schedule rows are
@@ -109,9 +134,13 @@ start at step 2 and never take step 1 after it, so no cycle exists. `manage_assi
   id; dialogs keep the id while the outcome is unknown and mint a new one
   after any definitive outcome or a changed decision.
 - **Stale human intent:** `p_expected_state_token` (from
-  `get_assignment_command_state`) is an md5 of the membership decision
-  fields and active days. A mismatch is `stale_state`. `NULL` skips the check
-  (job-card removal, which is an explicit "remove this person").
+  `get_assignment_command_state` / `get_job_assignment_command_states`) is an
+  md5 of the membership decision fields and active days. A mismatch is
+  `stale_state`. **Every interactive command must send one** (a move also
+  sends the source pair's token); a call without it raises `22023`. Only
+  `service_role` may omit it. Surfaces **fail closed**: if the authoritative
+  state cannot be loaded they disable the action and show "No se pudo cargar
+  el estado actual de la asignación", never guess.
 - There is no `insert → catch 23505 → update` path anywhere.
 
 ## 5. Side effects and reconciliation
@@ -120,11 +149,22 @@ Committed commands return a `side_effects` plan (Flex add/remove per
 department; `job.assignment.direct`, `job.assignment.confirmed` or
 `assignment.removed` notification). A role change plans a Flex add/remove only
 when a sound/lights role appears or is cleared.
-`runAssignmentSideEffects` executes it after commit and reports each outcome
-with `record_assignment_side_effects`. Failures and plans that never reported
-back (5-minute grace) appear in `get_assignment_side_effect_backlog` and in
-**Ajustes → Reconciliación de asignaciones** (admin/management) with a retry.
-Flex add/remove are idempotent; a notification retry may notify again.
+Each effect carries a stable identity, `effect_id = <command_id>:<index>`.
+
+Execution is claimed: `runAssignmentSideEffects` (and the reconciliation
+retry) first calls `claim_assignment_side_effects(command, lease)`, which
+returns a `claim_token` and only the effects still pending/failed; a second
+runner while the lease is held gets nothing. Outcomes are reported with
+`record_assignment_side_effects(command, claim_token, results)`, which rejects
+duplicate indexes and ignores reports from a runner that no longer holds the
+claim (`ignored_indexes`). Failures and plans that never reported back appear
+in `get_assignment_side_effect_backlog` and in **Ajustes → Reconciliación de
+asignaciones** (admin/management) with a retry.
+
+Flex add/remove are idempotent. Notifications send `idempotency_key =
+effect_id` to the `push` function, which keys the event as
+`<type>:idem:<key>` and claims it in the delivery inbox, so a retry of an
+already delivered notification does not notify again.
 
 Repricing (`compute_timesheet_amount_2025`) runs inside the command per row
 in a subtransaction; a failure (e.g. missing rate card) is returned in
@@ -161,9 +201,17 @@ schedule for a job/technician pair now goes through a command:
 | Day toggle RPC | `toggle_timesheet_day` | Takes the pair key; no app caller left |
 
 `tests/assignments/matrix-direct-write-guard.test.ts` pins every converged
-surface: no chained `insert/update/delete/upsert` on `job_assignments` or
-`timesheets`, no per-date toggles, legacy removal, lifecycle RPC, browser
-category sync or direct Flex crew calls.
+surface: no `insert/update/delete/upsert` on `job_assignments` or
+`timesheets` (backticks and intervening filters included), no per-date
+toggles, legacy removal, lifecycle RPC, browser category sync or direct Flex
+crew calls.
+
+`tests/assignments/assignment-writer-inventory.test.ts` scans every app and
+edge-function source for table writes (chained or through a stored builder)
+and assignment RPC calls, and compares them with
+`tests/assignments/assignment-writers.allowlist.json`. A new writer, a new
+kind of write in a listed file, a stale entry or an entry without a reason
+fails; only the command client may call the command RPCs.
 
 Outside assignment state (deliberately not commands):
 
@@ -179,10 +227,12 @@ Outside assignment state (deliberately not commands):
 
 1. `supabase db push --dry-run` against linked production; check the five
    migrations (`20261003210000`, `20261003211000`, `20261003212000`,
-   `20261003213000`, `20261003214000`), their grants and the new table.
+   `20261003213000`, `20261003214000`, `20261003215000`), their grants and
+   the new tables (`assignment_commands`, `assignment_role_codes`).
 2. Deploy `staffing-click` first (it handles `P0409`; the old database never
-   raises it), then apply the migrations, then deploy the client. The old
-   client keeps working (existing RPCs keep their signatures and results).
+   raises it) and `push` (it accepts `idempotency_key`), then apply the
+   migrations, then deploy the client. The old client keeps working for
+   existing RPCs; the new command RPCs are only called by the new client.
 3. Verify with `get_assignment_command_metrics()` and
    `get_assignment_consistency_issues()`; watch the reconciliation backlog.
 4. Run the PR #992 synthetic runtime as the controlled preflight
@@ -193,6 +243,8 @@ Outside assignment state (deliberately not commands):
 
 - pgTAP: `direct_assignment_command.sql`, `assignment_removal_commands.sql`,
   `assignment_command_reconciliation.sql`, `assignment_role_status_commands.sql`,
+  `assignment_command_hardening.sql` (registry, production/logistics category
+  and rate, approved protection, status no-ops, tour Flex, required tokens),
   `staffing_offer_conflict_under_lock.sql`.
 - Real concurrency (two psql backends, CI `rls_rpc_security_tests` job):
   `tests/assignments/direct-assignment-commands.integration.test.ts` — stale
@@ -202,4 +254,5 @@ Outside assignment state (deliberately not commands):
   `STAFFING_TEST_DB_CONTAINER=<container> ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL=<container>`.
 - Unit/component: `src/features/assignments/commands/__tests__`,
   `AssignJobDialog.test.tsx`, `useMatrixCellAssignmentRemoval.phase1.test.tsx`,
-  `matrix-direct-write-guard.test.ts`.
+  `matrix-direct-write-guard.test.ts`, `assignment-writer-inventory.test.ts`,
+  `assignment-role-registry.test.ts`.

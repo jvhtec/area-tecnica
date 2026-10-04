@@ -3,6 +3,10 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 SELECT no_plan();
+CREATE FUNCTION pg_temp.tok(p_job uuid, p_tech uuid) RETURNS text LANGUAGE sql AS $tok$
+  SELECT public.get_assignment_command_state(p_job, p_tech)->>'state_token';
+$tok$;
+GRANT EXECUTE ON FUNCTION pg_temp.tok(uuid, uuid) TO authenticated;
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
 
 SELECT ok(NOT has_function_privilege('anon', 'public.change_assignment_role(uuid,uuid,uuid,text,text,boolean,text,text,uuid,jsonb)', 'EXECUTE')
@@ -36,9 +40,9 @@ SELECT set_config('request.jwt.claim.sub', 'de110000-0000-0000-0000-000000000002
 SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"de110000-0000-0000-0000-000000000002"}', true);
 SET LOCAL ROLE authenticated;
 SELECT throws_ok($$ SELECT public.change_assignment_role('de310000-0000-0000-0000-000000000001', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R') $$, '42501', 'permission denied', 'a technician cannot change roles');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R', true, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002')) $$, '42501', 'permission denied', 'a technician cannot change roles');
 SELECT throws_ok($$ SELECT public.set_assignment_status('de310000-0000-0000-0000-000000000001', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'confirm') $$, '42501', 'permission denied', 'the status command is manager-only');
+  'de110000-0000-0000-0000-000000000002', 'confirm', pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002')) $$, '42501', 'permission denied', 'the status command is manager-only');
 RESET ROLE;
 
 SELECT set_config('request.jwt.claim.sub', 'de110000-0000-0000-0000-000000000001', true);
@@ -47,11 +51,11 @@ SET LOCAL ROLE authenticated;
 CREATE TEMP TABLE results (name text PRIMARY KEY, value jsonb);
 
 INSERT INTO results SELECT 'missing', public.change_assignment_role('de310000-0000-0000-0000-000000000002', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R', true, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'missing'), 'assignment_not_found', 'role change needs a membership');
 
 SELECT ok((public.apply_direct_assignment('de310000-0000-0000-0000-000000000003', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'SND-PA-T', 'invited', 'full', NULL)->>'ok')::boolean, 'fixture membership');
+  'de110000-0000-0000-0000-000000000002', 'SND-PA-T', 'invited', 'full', NULL, 'replace', pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'))->>'ok')::boolean, 'fixture membership');
 
 -- ---------------------------------------------------------------------------
 -- Role change
@@ -64,26 +68,26 @@ SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'sou
 SELECT results_eq($$ SELECT DISTINCT category FROM timesheets WHERE job_id = 'de210000-0000-0000-0000-000000000001' $$,
   $$ VALUES ('responsable'::text) $$, 'categories follow the new role in the same transaction');
 INSERT INTO results SELECT 'role_noop', public.change_assignment_role('de310000-0000-0000-0000-000000000005', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R', true, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'outcome' FROM results WHERE name = 'role_noop'), 'noop', 'the same role is a no-op');
 INSERT INTO results SELECT 'role_stale', public.change_assignment_role('de310000-0000-0000-0000-000000000006', 'de210000-0000-0000-0000-000000000001',
   'de110000-0000-0000-0000-000000000002', 'sound', 'SND-MON-E', true, (SELECT value->>'prior_state_token' FROM results WHERE name = 'role'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'role_stale'), 'stale_state', 'a stale role change is rejected');
 INSERT INTO results SELECT 'role_mismatch', public.change_assignment_role('de310000-0000-0000-0000-000000000007', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'LGT-BRD-R');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'LGT-BRD-R', true, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'role_mismatch'), 'role_department_mismatch', 'a lights code cannot fill the sound column');
 INSERT INTO results SELECT 'role_clear', public.change_assignment_role('de310000-0000-0000-0000-000000000008', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'none');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'none', true, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->'assignment'->>'sound_role' IS NULL
   AND value->'side_effects'->0->>'action' = 'remove' AND value->'side_effects'->0->>'department' = 'sound'
   FROM results WHERE name = 'role_clear'), 'clearing a sound role plans the Flex removal');
 INSERT INTO results SELECT 'role_restore', public.change_assignment_role('de310000-0000-0000-0000-000000000009', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-MON-E', false);
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-MON-E', false, pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->'side_effects'->0->>'action' = 'add' FROM results WHERE name = 'role_restore'), 'setting a sound role plans the Flex add');
 SELECT results_eq($$ SELECT DISTINCT category FROM timesheets WHERE job_id = 'de210000-0000-0000-0000-000000000001' $$,
   $$ VALUES ('responsable'::text) $$, 'category sync can be disabled per call');
 INSERT INTO results SELECT 'role_replay', public.change_assignment_role('de310000-0000-0000-0000-000000000009', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-MON-E', false);
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-MON-E', false, (SELECT value->>'prior_state_token' FROM results WHERE name = 'role_restore'));
 SELECT ok((SELECT (value->>'replayed')::boolean FROM results WHERE name = 'role_replay'), 'role change retries replay');
 RESET ROLE;
 SELECT is((SELECT count(*) FROM assignment_audit_log WHERE action = 'role_changed' AND job_id = 'de210000-0000-0000-0000-000000000001'), 3::bigint,
@@ -100,7 +104,7 @@ INSERT INTO timesheets (job_id, technician_id, date) VALUES
   ('de210000-0000-0000-0000-000000000002', 'de110000-0000-0000-0000-000000000002', '2026-12-07');
 SET LOCAL ROLE authenticated;
 INSERT INTO results SELECT 'confirm_conflict', public.set_assignment_status('de310000-0000-0000-0000-000000000010', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'confirm');
+  'de110000-0000-0000-0000-000000000002', 'confirm', pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'confirm_conflict'), 'conflict', 'confirmation with an overlapping schedule is rejected');
 RESET ROLE;
 SELECT is((SELECT status::text FROM job_assignments WHERE job_id = 'de210000-0000-0000-0000-000000000001'), 'invited', 'rejected confirmation writes nothing');
@@ -113,7 +117,7 @@ SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'sta
   AND value->'side_effects'->0->>'action' = 'job.assignment.confirmed' FROM results WHERE name = 'confirm'),
   'confirmation commits and plans the confirmation notification');
 INSERT INTO results SELECT 'decline', public.set_assignment_status('de310000-0000-0000-0000-000000000012', 'de210000-0000-0000-0000-000000000001',
-  'de110000-0000-0000-0000-000000000002', 'decline');
+  'de110000-0000-0000-0000-000000000002', 'decline', pg_temp.tok('de210000-0000-0000-0000-000000000001', 'de110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->'assignment'->>'status' = 'declined' AND value->'dates' = '[]'::jsonb FROM results WHERE name = 'decline'),
   'a soft decline keeps membership and voids its schedule');
 RESET ROLE;
@@ -125,16 +129,16 @@ INSERT INTO timesheets (job_id, technician_id, date) VALUES
   ('de210000-0000-0000-0000-000000000003', 'de110000-0000-0000-0000-000000000002', '2026-12-14');
 SET LOCAL ROLE authenticated;
 INSERT INTO results SELECT 'tour_decline', public.set_assignment_status('de310000-0000-0000-0000-000000000013', 'de210000-0000-0000-0000-000000000003',
-  'de110000-0000-0000-0000-000000000002', 'decline');
+  'de110000-0000-0000-0000-000000000002', 'decline', pg_temp.tok('de210000-0000-0000-0000-000000000003', 'de110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT value->'assignment' = 'null'::jsonb AND value->'lifecycle'->>'action' = 'hard_deleted' FROM results WHERE name = 'tour_decline'),
   'declining a tour membership removes it (decided server-side)');
 INSERT INTO results SELECT 'decline_missing', public.set_assignment_status('de310000-0000-0000-0000-000000000014', 'de210000-0000-0000-0000-000000000003',
-  'de110000-0000-0000-0000-000000000002', 'decline');
+  'de110000-0000-0000-0000-000000000002', 'decline', pg_temp.tok('de210000-0000-0000-0000-000000000003', 'de110000-0000-0000-0000-000000000002'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'decline_missing'), 'assignment_not_found', 'status change needs a membership');
 INSERT INTO results SELECT 'dryhire_status', public.set_assignment_status('de310000-0000-0000-0000-000000000015', 'de210000-0000-0000-0000-000000000004',
-  'de110000-0000-0000-0000-000000000002', 'confirm');
+  'de110000-0000-0000-0000-000000000002', 'confirm', pg_temp.tok('de210000-0000-0000-0000-000000000004', 'de110000-0000-0000-0000-000000000002'));
 INSERT INTO results SELECT 'dryhire_role', public.change_assignment_role('de310000-0000-0000-0000-000000000016', 'de210000-0000-0000-0000-000000000004',
-  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R');
+  'de110000-0000-0000-0000-000000000002', 'sound', 'SND-FOH-R', true, pg_temp.tok('de210000-0000-0000-0000-000000000004', 'de110000-0000-0000-0000-000000000002'));
 SELECT ok((SELECT bool_and(value->>'code' = 'dryhire_job') FROM results WHERE name IN ('dryhire_status', 'dryhire_role')),
   'dry-hire jobs are excluded from status and role commands');
 RESET ROLE;

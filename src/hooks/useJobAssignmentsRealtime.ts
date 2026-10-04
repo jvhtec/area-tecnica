@@ -1,12 +1,15 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
   AssignmentCommandError,
+  getJobAssignmentCommandStates,
+  jobAssignmentCommandStatesKey,
   applyDirectAssignment,
   createAssignmentCommandId,
   reconcileAssignmentViews,
@@ -134,10 +137,26 @@ export const mergeTimesheetAssignmentsForDisplay = ({
   });
 };
 
-export const useJobAssignmentsRealtime = (jobId: string) => {
+export interface UseJobAssignmentsRealtimeOptions {
+  /**
+   * Load the authoritative per-technician state tokens so this surface can run
+   * assignment commands. Management dialogs pass true; read-only views (the
+   * timesheet page) leave it off and never call the manager-only state RPC.
+   * Without loaded tokens every mutation fails closed.
+   */
+  manageCommands?: boolean;
+}
+
+export const useJobAssignmentsRealtime = (jobId: string, { manageCommands = false }: UseJobAssignmentsRealtimeOptions = {}) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRemoving, setIsRemoving] = useState<Record<string, boolean>>({});
   const queryClient = useQueryClient();
+  const { data: commandStates } = useQuery({
+    queryKey: jobAssignmentCommandStatesKey(jobId),
+    queryFn: () => getJobAssignmentCommandStates(jobId),
+    enabled: manageCommands && !!jobId,
+    staleTime: 10_000,
+  });
   
   // Use our enhanced real-time query hook for better reliability
   // Timesheets are the source of truth for display; join with job_assignments for role metadata
@@ -334,6 +353,16 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       return;
     }
     const singleDayDate = options?.singleDay ? options.singleDayDate ?? null : null;
+    // A single-day request without its day must never widen to the full job.
+    if (options?.singleDay && !singleDayDate) {
+      toast.error("Selecciona el día de la asignación");
+      return;
+    }
+    if (!commandStates) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
+    const expectedStateToken = commandStates.tokenFor(technicianId);
     const previousJobs = queryClient.getQueryData(['jobs']);
 
     // Optimistic cache update for 'jobs' list so cards update instantly
@@ -367,6 +396,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         coverage: singleDayDate ? 'single' : 'full',
         dates: singleDayDate ? [singleDayDate] : undefined,
         mode: 'add',
+        expectedStateToken,
         conflictPolicy: 'reject',
         source: 'department-dialog',
       }));
@@ -395,6 +425,11 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
   };
 
   const removeAssignment = async (technicianId: string, _renderedAssignment?: AssignmentRemovalContext) => {
+    if (!commandStates) {
+      toast.error(ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE);
+      return;
+    }
+    const expectedStateToken = commandStates.tokenFor(technicianId);
     const previousJobs = queryClient.getQueryData(['jobs']);
     let assignmentRemoved = false;
 
@@ -423,6 +458,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         commandId: createAssignmentCommandId(),
         jobId,
         technicianId,
+        expectedStateToken,
         source: 'job-card',
       }));
       assignmentRemoved = true;
@@ -435,6 +471,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         }, (error: unknown) => console.error('Assignment removal side effects could not run', error));
 
       toast.success("Asignación eliminada");
+      reconcileAssignmentViews(queryClient, { technicianId, jobIds: [jobId] });
       // Invalidate jobs so JobCard lists refresh assignments relation
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
@@ -442,6 +479,9 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       console.error('Error in removeAssignment:', error);
       if (!assignmentRemoved) {
         queryClient.setQueryData(['jobs'], previousJobs);
+      }
+      if (error instanceof AssignmentCommandError && error.code === 'stale_state') {
+        reconcileAssignmentViews(queryClient, { technicianId, jobIds: [jobId] });
       }
       toast.error(error instanceof AssignmentCommandError ? error.message : "No se pudo eliminar la asignación");
     } finally {
@@ -469,6 +509,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     refetch: handleRefresh,
     addAssignment,
     removeAssignment,
-    isRemoving
+    isRemoving,
+    /** Expected-state token per technician, or null until the state loads. */
+    expectedStateTokenFor: (technicianId: string): string | null => commandStates?.tokenFor(technicianId) ?? null,
   };
 };

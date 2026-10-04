@@ -39,6 +39,7 @@ import { roleOptionsForDiscipline } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
   AssignmentCommandError,
   changeAssignmentRole,
   createAssignmentCommandId,
@@ -69,7 +70,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const { toast } = useToast();
   const { user } = useOptimizedAuth();
   const [isSyncing, setIsSyncing] = useState(false);
-  const { removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
+  const { removeAssignment, isRemoving, expectedStateTokenFor } = useJobAssignmentsRealtime(jobId, { manageCommands: true });
   const { useCrewCallData } = useFlexCrewAssignments();
 
   // Get current user's department or use the passed department
@@ -89,6 +90,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // One atomic command: role column + category/repricing of unapproved days.
   // Flex follows when a sound/lights role appears or is cleared.
   const handleRoleChange = async (technicianId: string, roleDepartment: AssignmentRoleDepartment, newRole: string) => {
+    // Fail closed: a role change is only sent against the state this dialog loaded.
+    const expectedStateToken = expectedStateTokenFor(technicianId);
+    if (!expectedStateToken) {
+      toast({ title: "Error", description: ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE, variant: "destructive" });
+      return;
+    }
     try {
       const result = requireCommitted(await changeAssignmentRole({
         commandId: createAssignmentCommandId(),
@@ -97,6 +104,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
         department: roleDepartment,
         role: newRole === 'none' ? null : newRole,
         syncCategory: !disableCategorySync,
+        expectedStateToken,
         source: 'job-card',
       }));
       if (result.side_effects.length > 0) {

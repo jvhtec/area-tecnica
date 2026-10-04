@@ -7,10 +7,12 @@ import {
 import {
   commandResultSchema,
   commandStateSchema,
+  jobCommandStatesSchema,
   type ApplyDirectAssignmentInput,
   type AssignmentCommandResult,
   type AssignmentCommandState,
   type ChangeAssignmentRoleInput,
+  type JobAssignmentCommandStates,
   type SetAssignmentStatusInput,
   type RemoveAssignmentDateInput,
   type RemoveDirectAssignmentInput,
@@ -140,4 +142,24 @@ export async function getAssignmentCommandState(jobId: string, technicianId: str
     throw new AssignmentCommandError('unknown', { message: 'Estado de asignación no reconocido', cause: parsed.error });
   }
   return parsed.data;
+}
+
+/**
+ * State tokens for every technician on a job. Job-level surfaces load this
+ * with their list and send the technician's token back with each command, so
+ * a change made elsewhere meanwhile is rejected as stale.
+ */
+export async function getJobAssignmentCommandStates(jobId: string): Promise<JobAssignmentCommandStates> {
+  const { data, error } = await supabase.rpc('get_job_assignment_command_states', { p_job_id: jobId });
+  if (error) throw classifyAssignmentRpcError(error);
+  const parsed = jobCommandStatesSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new AssignmentCommandError('unknown', { message: 'Estado de asignaciones no reconocido', cause: parsed.error });
+  }
+  const { job_id: parsedJobId, absent_state_token: absentStateToken, states } = parsed.data;
+  return {
+    jobId: parsedJobId,
+    absentStateToken,
+    tokenFor: (technicianId) => states[technicianId] ?? absentStateToken,
+  };
 }

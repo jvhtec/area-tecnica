@@ -29,6 +29,7 @@ DECLARE
   v_ledger public.assignment_commands%ROWTYPE;
   v_department text;
   v_prior jsonb;
+  v_approved date[];
   v_removed jsonb;
   v_after jsonb;
   v_outcome text;
@@ -44,6 +45,11 @@ BEGIN
   END IF;
   IF v_source !~ '^[a-z0-9][a-z0-9_-]{0,63}$' THEN
     RAISE EXCEPTION 'invalid source' USING ERRCODE = '22023';
+  END IF;
+  -- Interactive callers must say which state they decided on; only trusted
+  -- service callers may act without an expected-state token.
+  IF NOT v_is_service AND p_expected_state_token IS NULL THEN
+    RAISE EXCEPTION 'an expected state token is required' USING ERRCODE = '22023';
   END IF;
   IF p_metadata IS NOT NULL AND (pg_catalog.jsonb_typeof(p_metadata) <> 'object'
      OR pg_catalog.pg_column_size(p_metadata) > 4096) THEN
@@ -80,6 +86,15 @@ BEGIN
       pg_catalog.jsonb_build_object('current', v_prior), v_prior->>'state_token');
   END IF;
 
+  v_approved := public.assignment_approved_dates(p_job_id, p_technician_id, NULL);
+  IF pg_catalog.cardinality(v_approved) > 0 THEN
+    RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+      v_actor, v_source, v_request, v_hash, 'approved_timesheet',
+      'Approved timesheets cannot be removed by an assignment change',
+      pg_catalog.jsonb_build_object('job_id', p_job_id, 'dates', pg_catalog.to_jsonb(v_approved)),
+      v_prior->>'state_token');
+  END IF;
+
   SELECT department INTO v_department FROM public.profiles WHERE id = p_technician_id;
 
   -- Orphan schedule rows are removed even without membership (same contract
@@ -112,6 +127,7 @@ BEGIN
       SELECT 2, pg_catalog.jsonb_build_object('kind', 'notification', 'action', 'assignment.removed',
         'job_id', p_job_id, 'status', 'pending')
     ) effects;
+    v_side_effects := public.assignment_effects_with_ids(p_command_id, v_side_effects);
   END IF;
 
   v_result := pg_catalog.jsonb_build_object(
@@ -200,6 +216,11 @@ BEGIN
   IF v_source !~ '^[a-z0-9][a-z0-9_-]{0,63}$' THEN
     RAISE EXCEPTION 'invalid source' USING ERRCODE = '22023';
   END IF;
+  -- Interactive callers must say which state they decided on; only trusted
+  -- service callers may act without an expected-state token.
+  IF NOT v_is_service AND p_expected_state_token IS NULL THEN
+    RAISE EXCEPTION 'an expected state token is required' USING ERRCODE = '22023';
+  END IF;
   IF p_metadata IS NOT NULL AND (pg_catalog.jsonb_typeof(p_metadata) <> 'object'
      OR pg_catalog.pg_column_size(p_metadata) > 4096) THEN
     RAISE EXCEPTION 'metadata must be a small JSON object' USING ERRCODE = '22023';
@@ -251,6 +272,14 @@ BEGIN
         v_actor, v_source, v_request, v_hash, 'last_date',
         'This is the last scheduled day; remove the whole assignment instead',
         NULL, v_prior->>'state_token');
+    END IF;
+
+    IF pg_catalog.cardinality(public.assignment_approved_dates(p_job_id, p_technician_id, ARRAY[p_date])) > 0 THEN
+      RETURN public.assignment_command_reject(p_command_id, c_type, p_job_id, p_technician_id, NULL,
+        v_actor, v_source, v_request, v_hash, 'approved_timesheet',
+        'Approved timesheets cannot be removed by an assignment change',
+        pg_catalog.jsonb_build_object('job_id', p_job_id, 'dates', pg_catalog.jsonb_build_array(p_date)),
+        v_prior->>'state_token');
     END IF;
 
     -- ---- Writes start here. ----

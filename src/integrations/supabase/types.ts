@@ -755,6 +755,24 @@ export type Database = {
           },
         ]
       }
+      assignment_role_codes: {
+        Row: {
+          code: string
+          discipline: string
+          level: string
+        }
+        Insert: {
+          code: string
+          discipline: string
+          level: string
+        }
+        Update: {
+          code?: string
+          discipline?: string
+          level?: string
+        }
+        Relationships: []
+      }
       availability_conflicts: {
         Row: {
           conflict_date: string
@@ -12646,6 +12664,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assignment_approved_dates: {
+        Args: { p_dates?: string[]; p_job_id: string; p_technician_id: string }
+        Returns: string[]
+      }
       assignment_command_reject: {
         Args: {
           p_actor_id: string
@@ -12664,6 +12686,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assignment_effects_with_ids: {
+        Args: { p_command_id: string; p_effects: Json }
+        Returns: Json
+      }
       assignment_flex_departments: {
         Args: { p_assignment: Json; p_fallback_department: string }
         Returns: string[]
@@ -12673,6 +12699,10 @@ export type Database = {
         Returns: Json
       }
       assignment_role_category: { Args: { p_roles: string[] }; Returns: string }
+      assignment_role_discipline: {
+        Args: { p_department: string }
+        Returns: string
+      }
       assignment_state_snapshot: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: Json
@@ -12783,6 +12813,10 @@ export type Database = {
           _target_job_id: string
           _technician_id: string
         }
+        Returns: Json
+      }
+      claim_assignment_side_effects: {
+        Args: { p_command_id: string; p_lease_seconds?: number }
         Returns: Json
       }
       claim_push_schedule: {
@@ -13110,6 +13144,10 @@ export type Database = {
           job_id: string
           technician_id: string
         }[]
+      }
+      get_job_assignment_command_states: {
+        Args: { p_job_id: string }
+        Returns: Json
       }
       get_job_producer_claims: {
         Args: { p_job_ids?: string[] }
@@ -13646,7 +13684,7 @@ export type Database = {
         }[]
       }
       record_assignment_side_effects: {
-        Args: { p_command_id: string; p_results: Json }
+        Args: { p_claim_token: string; p_command_id: string; p_results: Json }
         Returns: Json
       }
       record_push_target_health: {

@@ -45,8 +45,9 @@ export async function fetchAssignmentConsistencyIssues(limit = 200): Promise<Ass
 
 /**
  * Re-runs the unfinished effects of one ledger command from its stored
- * result. Flex add/remove are idempotent; a notification retry may notify
- * again, which is the documented best-effort semantics.
+ * result. Only effects this call manages to claim are executed, so two
+ * admins (or tabs) retrying at once never send a notification twice; push
+ * also dedupes on each effect's idempotency key.
  */
 export async function retryAssignmentSideEffects(commandId: string): Promise<SideEffectSummary> {
   const { data, error } = await supabase

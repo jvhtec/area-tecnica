@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockQueryBuilder, mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
@@ -133,32 +133,51 @@ describe('mergeTimesheetAssignmentsForDisplay', () => {
   });
 });
 
-describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
-  it("adds through the atomic command and restores the jobs cache when it fails", async () => {
+describe("useJobAssignmentsRealtime assignment commands", () => {
+  const STATES = {
+    job_id: "job-1",
+    absent_state_token: "absent-token",
+    states: { "tech-1": "tech-1-token" },
+  };
+
+  /** Job state RPC answers; every command RPC answers with `commandResponse`. */
+  const configureRpc = (commandResponse: { data: unknown; error: unknown }) => {
+    mockSupabase.rpc.mockImplementation((name: string) => Promise.resolve(
+      name === "get_job_assignment_command_states" ? { data: STATES, error: null } : commandResponse,
+    ));
+  };
+
+  const renderManaged = async (queryClient: QueryClient) => {
+    const rendered = renderHook(() => useJobAssignmentsRealtime("job-1", { manageCommands: true }), {
+      wrapper: createWrapper(queryClient),
+    });
+    await waitFor(() => expect(rendered.result.current.expectedStateTokenFor("tech-1")).toBe("tech-1-token"));
+    return rendered;
+  };
+
+  it("adds through the atomic command with the loaded state and restores the jobs cache when it fails", async () => {
     const queryClient = createRollbackQueryClient();
     const previousJobs = [
       { id: "job-1", job_assignments: [] },
       { id: "job-2", job_assignments: [{ technician_id: "other-tech" }] },
     ];
     queryClient.setQueryData(["jobs"], previousJobs);
+    configureRpc({ data: null, error: { code: "42501", message: "permission denied" } });
 
-    mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "permission denied" } });
-
-    const { result } = renderHook(() => useJobAssignmentsRealtime("job-1"), {
-      wrapper: createWrapper(queryClient),
-    });
-
+    const { result } = await renderManaged(queryClient);
     await act(async () => {
-      await result.current.addAssignment("tech-1", "foh", "none");
+      await result.current.addAssignment("tech-2", "SND-FOH-R", "none");
     });
 
-    // Membership + full schedule in one command; no direct table insert.
+    // Membership + full schedule in one command; no direct table insert. A
+    // technician new to the job is guarded by the absent-pair token.
     expect(mockSupabase.rpc).toHaveBeenCalledWith("apply_direct_assignment", expect.objectContaining({
       p_job_id: "job-1",
-      p_technician_id: "tech-1",
-      p_role: "foh",
+      p_technician_id: "tech-2",
+      p_role: "SND-FOH-R",
       p_coverage: "full",
       p_mode: "add",
+      p_expected_state_token: "absent-token",
       p_conflict_policy: "reject",
       p_source: "department-dialog",
     }));
@@ -167,7 +186,20 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
     expect(toastMocks.errorMock).toHaveBeenCalledWith("No tienes permiso para modificar asignaciones.");
   });
 
-  it("removes through the atomic command and restores the jobs cache when it fails", async () => {
+  it("never widens a single-day request without its day to the whole job", async () => {
+    const queryClient = createRollbackQueryClient();
+    configureRpc({ data: null, error: null });
+    const { result } = await renderManaged(queryClient);
+
+    await act(async () => {
+      await result.current.addAssignment("tech-2", "SND-FOH-R", "none", { singleDay: true, singleDayDate: null });
+    });
+
+    expect(mockSupabase.rpc).not.toHaveBeenCalledWith("apply_direct_assignment", expect.anything());
+    expect(toastMocks.errorMock).toHaveBeenCalledWith("Selecciona el día de la asignación");
+  });
+
+  it("removes through the atomic command with the technician's token and restores the cache when it fails", async () => {
     const queryClient = createRollbackQueryClient();
     const previousJobs = [
       {
@@ -183,28 +215,33 @@ describe("useJobAssignmentsRealtime optimistic cache rollback", () => {
       },
     ];
     queryClient.setQueryData(["jobs"], previousJobs);
+    configureRpc({ data: null, error: { code: "42501", message: "permission denied" } });
 
-    mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: "42501", message: "permission denied" } });
-
-    const { result } = renderHook(() => useJobAssignmentsRealtime("job-1"), {
-      wrapper: createWrapper(queryClient),
-    });
-
+    const { result } = await renderManaged(queryClient);
     await act(async () => {
-      await result.current.removeAssignment("tech-1", {
-        technician_id: "tech-1",
-        sound_role: "foh",
-        lights_role: null,
-        video_role: null,
-      });
+      await result.current.removeAssignment("tech-1");
     });
 
     // One atomic command; no browser-side table deletes.
     expect(mockSupabase.rpc).toHaveBeenCalledWith("remove_direct_assignment", expect.objectContaining({
-      p_job_id: "job-1", p_technician_id: "tech-1", p_source: "job-card",
+      p_job_id: "job-1", p_technician_id: "tech-1", p_expected_state_token: "tech-1-token", p_source: "job-card",
     }));
     expect(mockSupabase.from).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(["jobs"])).toEqual(previousJobs);
     expect(toastMocks.errorMock).toHaveBeenCalledWith("No tienes permiso para modificar asignaciones.");
+  });
+
+  it("fails closed without loaded state: read-only views cannot mutate", async () => {
+    const queryClient = createRollbackQueryClient();
+    configureRpc({ data: null, error: null });
+    const { result } = renderHook(() => useJobAssignmentsRealtime("job-1"), { wrapper: createWrapper(queryClient) });
+
+    await act(async () => {
+      await result.current.removeAssignment("tech-1");
+      await result.current.addAssignment("tech-2", "SND-FOH-R", "none");
+    });
+
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    expect(toastMocks.errorMock).toHaveBeenCalledWith(expect.stringMatching(/no se pudo cargar el estado actual/i));
   });
 });
