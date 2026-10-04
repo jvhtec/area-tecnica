@@ -25,17 +25,15 @@ import {
   fetchAvailabilityForWindow,
   fetchJobsForWindow,
   formatLabel,
-  parseSummaryRow,
   type Department,
   type MatrixJob,
   type OutstandingJobInfo,
   type OutstandingRoleInfo,
-  type StaffingAssignmentRow,
-  type StaffingSummaryRow,
 } from '@/pages/job-assignment-matrix/utils';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { fetchStaffingSummary, staffingSummaryQueryKey } from '@/features/matrix-v2/roleSlotsQuery';
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
@@ -419,40 +417,8 @@ export default function JobAssignmentMatrix() {
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
 
   const staffingReminderQuery = useQuery({
-    queryKey: queryKeys.scope('matrix-staffing-summary', jobIdsKey),
-    queryFn: async () => {
-      if (!jobIds.length) {
-        return { summaries: [] as StaffingSummaryRow[], assignments: [] as StaffingAssignmentRow[] };
-      }
-
-      const [summaryRes, assignmentsRes] = await Promise.all([
-        dataLayerClient.from('job_required_roles_summary')
-          .select('job_id, department, roles')
-          .in('job_id', jobIds),
-        dataLayerClient.from('job_assignments')
-          .select('job_id, sound_role, lights_role, video_role, production_role, status')
-          .in('job_id', jobIds),
-      ]);
-
-      if (summaryRes.error) throw summaryRes.error;
-      if (assignmentsRes.error) throw assignmentsRes.error;
-
-      const summaries = (summaryRes.data || [])
-        .map(parseSummaryRow)
-        .filter((row): row is StaffingSummaryRow => Boolean(row));
-
-      const assignments = ((assignmentsRes.data || []) as StaffingAssignmentRow[])
-        .filter((row): row is StaffingAssignmentRow => Boolean(row && row.job_id))
-        .map((row) => ({
-          ...row,
-          sound_role: row.sound_role ? String(row.sound_role) : null,
-          lights_role: row.lights_role ? String(row.lights_role) : null,
-          video_role: row.video_role ? String(row.video_role) : null,
-          status: row.status ? String(row.status) : null,
-        }));
-
-      return { summaries, assignments };
-    },
+    queryKey: staffingSummaryQueryKey(jobIdsKey),
+    queryFn: () => fetchStaffingSummary(jobIds),
     enabled: jobIds.length > 0,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,

@@ -14,6 +14,7 @@ const ASSIGNMENT_RPCS = [
   'remove_assignment_date',
   'change_assignment_role',
   'set_assignment_status',
+  'unconfirm_assignment',
   'assign_staffing_offer',
   'toggle_timesheet_day',
   'remove_assignment_with_timesheets',
@@ -77,7 +78,7 @@ describe('assignment writer inventory', () => {
   });
 
   it('only the command layer calls the assignment command RPCs', () => {
-    const commandRpcs = ['apply_direct_assignment', 'remove_direct_assignment', 'remove_assignment_date', 'change_assignment_role', 'set_assignment_status'];
+    const commandRpcs = ['apply_direct_assignment', 'remove_direct_assignment', 'remove_assignment_date', 'change_assignment_role', 'set_assignment_status', 'unconfirm_assignment'];
     const callers = [...actual.entries()]
       .filter(([, writes]) => writes.some((write) => commandRpcs.includes(write.replace('rpc:', ''))))
       .map(([file]) => file);

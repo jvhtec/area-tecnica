@@ -14081,6 +14081,10 @@ export type Database = {
         Args: { p_form_data: Json; p_token: string }
         Returns: Json
       }
+      supersede_assignment_side_effects: {
+        Args: { p_command_ids: string[] }
+        Returns: Json
+      }
       sync_preset_assignments_for_tour: {
         Args: { _preset_id: string; _tour_id: string }
         Returns: undefined
@@ -14155,6 +14159,18 @@ export type Database = {
         Returns: boolean
       }
       transport_write_actor_is_trusted: { Args: never; Returns: boolean }
+      unconfirm_assignment: {
+        Args: {
+          p_actor_id?: string
+          p_command_id: string
+          p_expected_state_token?: string
+          p_job_id: string
+          p_metadata?: Json
+          p_source?: string
+          p_technician_id: string
+        }
+        Returns: Json
+      }
       update_tour_dates: { Args: never; Returns: undefined }
       upsert_job_prep_days: {
         Args: { p_dates: string[]; p_job_id: string }
