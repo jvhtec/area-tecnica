@@ -8,7 +8,7 @@ import { jobDayKeys } from '@/features/matrix-v2/jobDays';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
 import type { MatrixTechnicianRef } from '@/features/matrix-v2/types';
 import type { MatrixJob, MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
-import { formatUserName } from '@/utils/userName';
+import { technicianDisplayName as nameOf } from '@/features/matrix-v2/names';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
 
 /** What the grid needs to draw and drive job focus. */
@@ -41,9 +41,6 @@ interface Options {
   lastRoleByTechnician: Map<string, string>;
   openInspector: (technicianId: string, date: Date, anchor: HTMLElement | null) => void;
 }
-
-const nameOf = (technician: MatrixTechnicianRef | undefined) =>
-  (technician ? formatUserName(technician.first_name ?? '', technician.nickname ?? null, technician.last_name ?? '') : '') || 'Técnico';
 
 const roleHeld = (assignment: MatrixTimesheetAssignment | undefined): string | null =>
   assignment?.sound_role || assignment?.lights_role || assignment?.video_role || null;

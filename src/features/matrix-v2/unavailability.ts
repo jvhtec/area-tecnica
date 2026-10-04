@@ -75,3 +75,20 @@ export async function clearUnavailableWithUndo(technicianId: string, dateKey: st
   });
   return { ok: true };
 }
+
+/**
+ * Marks several people's days at once, with one Deshacer for all of it. A person
+ * whose marks failed is reported, and the ones that did land can still be undone.
+ */
+export async function markUnavailableManyWithUndo(groups: Array<{ technicianId: string; dateKeys: string[] }>): Promise<UnavailabilityResult> {
+  const settled = await Promise.allSettled(groups.map((group) => markUnavailable(group.technicianId, group.dateKeys)));
+  const done = groups.filter((_, index) => settled[index].status === 'fulfilled');
+  const days = done.reduce((sum, group) => sum + new Set(group.dateKeys).size, 0);
+  if (done.length === 0) return { ok: false, message: 'No se pudo marcar como no disponible. Inténtalo de nuevo.' };
+  toast(`${days} ${days === 1 ? 'día marcado' : 'días marcados'} como no disponible${days === 1 ? '' : 's'}`, {
+    description: `${done.length} ${done.length === 1 ? 'persona' : 'personas'}`,
+    action: { label: 'Deshacer', onClick: () => { void Promise.all(done.map((group) => clearUnavailable(group.technicianId, group.dateKeys))); } },
+  });
+  if (done.length < groups.length) return { ok: false, message: `Solo se marcaron ${done.length} de ${groups.length} personas. Revisa el resto e inténtalo de nuevo.` };
+  return { ok: true };
+}

@@ -18,6 +18,12 @@ const MUTATION_SURFACES = [
   "src/features/matrix-v2/inspector/useCellInspectorModel.ts",
   "src/features/matrix-v2/inspector/CellInspectorBody.tsx",
   "src/features/matrix-v2/inspector/MatrixInspectorHost.tsx",
+  // Job focus and batch actions also go through the runner, never around it.
+  "src/features/matrix-v2/focus/focusAssign.ts",
+  "src/features/matrix-v2/focus/useMatrixJobFocus.ts",
+  "src/features/matrix-v2/batch/plan.ts",
+  "src/features/matrix-v2/batch/runBatch.ts",
+  "src/features/matrix-v2/batch/useMatrixBatch.ts",
 ];
 
 const FORBIDDEN = [
@@ -51,6 +57,8 @@ describe("matrix mutation surfaces use the assignment command layer", () => {
     ["src/features/matrix-v2/commandRunner.ts", "applyDirectAssignment("],
     ["src/features/matrix-v2/commandRunner.ts", "unconfirmAssignment("],
     ["src/features/matrix-v2/inspector/useCellInspectorModel.ts", "env.runner.run("],
+    ["src/features/matrix-v2/focus/focusAssign.ts", "runner.run("],
+    ["src/features/matrix-v2/batch/runBatch.ts", "runner.run("],
   ])("%s persists through %s", (path, command) => {
     expect(readFileSync(join(process.cwd(), path), "utf8")).toContain(command);
   });

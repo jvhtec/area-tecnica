@@ -11,6 +11,10 @@ import type { GridMetrics } from '@/features/matrix-v2/keyboard/navigation';
 import { useMatrixShortcutRegistration } from '@/features/matrix-v2/keyboard/useMatrixShortcutRegistration';
 import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
+import type { BatchLookups } from '@/features/matrix-v2/batch/plan';
+import { summarizeSelection } from '@/features/matrix-v2/batch/selection';
+import { useGridSelectionGestures } from '@/features/matrix-v2/batch/useGridSelectionGestures';
+import { useMatrixBatch } from '@/features/matrix-v2/batch/useMatrixBatch';
 import { dimmedColumnRuns, firstJobColumn, jobColumnRuns } from '@/features/matrix-v2/focus/columns';
 import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
 
@@ -32,6 +36,10 @@ interface Options {
   handleCellClick: (technicianId: string, date: Date, action: 'select-job-for-staffing') => void;
   grid: GridMetrics;
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  /** The grid's multi-selection (`${technicianId}-${dateKey}`), owned by the container. */
+  selectedCells: Set<string>;
+  clearSelection: () => void;
+  onReplaceSelection: (keys: Set<string>) => void;
 }
 
 /**
@@ -43,6 +51,7 @@ interface Options {
 export function useMatrixGridV2({
   v2, mobile, technicians, orderedTechnicians, dates, jobs, getJobsForDate, getAssignmentForCell, getAvailabilityForCell,
   declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, handleCellClick, grid, scrollRef,
+  selectedCells, clearSelection, onReplaceSelection,
 }: Options) {
   const techniciansById = React.useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
   const datesByKey = React.useMemo(() => new Map(dates.map((date) => [formatMadridDateKey(date), date])), [dates]);
@@ -116,7 +125,12 @@ export function useMatrixGridV2({
         if (!v2?.focus?.onCellClick(cell.technicianId, date, null)) v2?.openInspector(cell.technicianId, date, null);
       }),
       focusJob,
+      // Esc drops a selection before it leaves job focus.
       exitFocus: () => {
+        if (selectedCells.size > 0) {
+          clearSelection();
+          return true;
+        }
         if (!v2?.focus) return false;
         v2.setFocusJob(null);
         return true;
@@ -126,7 +140,7 @@ export function useMatrixGridV2({
       remove: (cell: ActiveCell) => withAssignment(cell, (date) => v2?.openInspector(cell.technicianId, date, null, 'remove'), 'Esta celda no tiene ninguna asignación que quitar.'),
       toggleUnavailable: (cell: ActiveCell) => v2?.toggleUnavailable(cell.technicianId, cell.dateKey),
     };
-  }, [v2, datesByKey, getAssignmentForCell, getJobsForDate]);
+  }, [v2, datesByKey, getAssignmentForCell, getJobsForDate, selectedCells, clearSelection]);
 
   const keyboard = useMatrixKeyboard({
     enabled: !!v2 && !mobile,
@@ -173,5 +187,58 @@ export function useMatrixGridV2({
     element.scrollTo({ left: Math.max(0, firstFocusColumn * grid.cellWidth - grid.cellWidth) });
   }, [focusJobId, firstFocusColumn, grid.cellWidth, scrollRef]);
 
-  return { inspectorEnv, keyboard, onInspect, focus, focusOverlay };
+  // Selection and batch: mouse gestures, and what the selected cells can do.
+  const technicianIds = orderedTechnicianIds;
+  const dateKeys = React.useMemo(() => dates.map((date) => formatMadridDateKey(date)), [dates]);
+  const activeRef = React.useRef(keyboard.active);
+  activeRef.current = keyboard.active;
+  const gestures = useGridSelectionGestures({
+    enabled: !!v2 && !mobile,
+    clearOnEscape: !!v2,
+    technicianIds,
+    dateKeys,
+    selectedCells,
+    onReplaceSelection,
+    getFallbackAnchor: () => activeRef.current,
+    scrollRef,
+    grid,
+  });
+  const lookups = React.useMemo<BatchLookups>(() => ({
+    technician: (technicianId) => techniciansById.get(technicianId),
+    job: (jobId) => jobsById.get(jobId),
+    assignmentOn: (technicianId, dateKey) => {
+      const date = datesByKey.get(dateKey);
+      return date ? getAssignmentForCell(technicianId, date) : undefined;
+    },
+    isUnavailable: (technicianId, dateKey) => {
+      const date = datesByKey.get(dateKey);
+      return date ? getAvailabilityForCell(technicianId, date)?.status === 'unavailable' : false;
+    },
+    isFridge: (technicianId) => fridgeSet?.has(technicianId) ?? false,
+    declinedJobIds: (technicianId) => declinedJobsByTech.get(technicianId),
+    roleSlots: (jobId) => v2?.roleSlotsByJob.get(jobId),
+    lastRole: (technicianId) => v2?.lastRoleByTechnician.get(technicianId) ?? null,
+  }), [techniciansById, jobsById, datesByKey, getAssignmentForCell, getAvailabilityForCell, fridgeSet, declinedJobsByTech, v2]);
+  const batch = useMatrixBatch({ v2, canEdit: isManagementUser, selectedCells, clearSelection, lookups, jobs });
+  const summary = React.useMemo(() => summarizeSelection(selectedCells), [selectedCells]);
+  const batchLayer = {
+    cells: summary.cells,
+    people: summary.people,
+    canEdit: isManagementUser,
+    progress: batch.progress,
+    jobs: batch.eligibleJobs,
+    removal: batch.removal,
+    problems: batch.problems,
+    onAssign: batch.assignTo,
+    onConfirm: batch.confirm,
+    onRemove: batch.remove,
+    onMarkUnavailable: batch.markUnavailable,
+    onClear: clearSelection,
+    onRetry: batch.retry,
+    onForce: batch.force,
+    onOpen: batch.openRow,
+    onDismiss: batch.dismiss,
+  };
+
+  return { inspectorEnv, keyboard, onInspect, focus, focusOverlay, gridHandlers: gestures.gridHandlers, previewRects: gestures.previewRects, batchLayer };
 }

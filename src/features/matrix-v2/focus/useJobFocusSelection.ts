@@ -32,6 +32,8 @@ export function useJobFocusSelection(enabled: boolean) {
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (document.querySelector('[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]')) return;
+      // While cells are selected, Esc drops the selection first (the batch bar is on screen).
+      if (document.querySelector('[data-batch-bar]')) return;
       setJobId(null);
       if (typeof window === 'undefined') return;
       const search = searchWithFocusJob(window.location.search, null);

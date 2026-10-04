@@ -157,13 +157,23 @@ describe('useMatrixKeyboard', () => {
     expect(view.result.current.active).toEqual({ technicianId: 't2', dateKey: keys[1] });
   });
 
-  it('focusing the grid shows the ring on the start cell', () => {
+  const grid = (focusVisible: boolean) => Object.assign(document.createElement('div'), { matches: (selector: string) => selector === ':focus-visible' && focusVisible });
+
+  it('keyboard focus on the grid shows the ring on the start cell', () => {
     const { view } = setup();
-    const element = document.createElement('div');
+    const element = grid(true);
     act(() => view.result.current.onFocus({ target: element, currentTarget: element } as unknown as React.FocusEvent<HTMLElement>));
     expect(view.result.current.active).toEqual({ technicianId: 't0', dateKey: keys[1] });
     // Focus coming from a child must not move the ring.
     act(() => view.result.current.onFocus({ target: document.createElement('button'), currentTarget: element } as unknown as React.FocusEvent<HTMLElement>));
     expect(view.result.current.active).toEqual({ technicianId: 't0', dateKey: keys[1] });
+  });
+
+  it('a mouse press that focuses the grid starts no ring and moves nothing', () => {
+    const { view, scrollTo } = setup();
+    const element = grid(false);
+    act(() => view.result.current.onFocus({ target: element, currentTarget: element } as unknown as React.FocusEvent<HTMLElement>));
+    expect(view.result.current.active).toBeNull();
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import { slotsForDepartment, type RoleSlot } from '@/features/matrix-v2/roleSlot
 import { suggestRole } from '@/features/matrix-v2/roleSuggestion';
 import {
   roleDisciplineForDepartment,
+  type MatrixCommandSource,
   type MatrixIntent,
   type MatrixTechnicianRef,
 } from '@/features/matrix-v2/types';
@@ -29,6 +30,8 @@ export interface FocusAssignInput {
   lastRoleCode?: string | null;
   /** The role the technician already holds on this job, when they are on it. */
   existingRole?: string | null;
+  /** Where the command came from; job focus by default. */
+  source?: MatrixCommandSource;
 }
 
 /**
@@ -37,7 +40,7 @@ export interface FocusAssignInput {
  * several levels fit and nothing says which, it never guesses a pay level.
  */
 export function planFocusAssign(input: FocusAssignInput): FocusAssignPlan {
-  const { technician, jobId, days, jobDays, status, slots, lastRoleCode, existingRole } = input;
+  const { technician, jobId, days, jobDays, status, slots, lastRoleCode, existingRole, source = 'matrix-focus' } = input;
   if (days.length === 0) return { kind: 'inspect', reason: 'no-days' };
   const discipline = roleDisciplineForDepartment(technician.department);
   const role = existingRole ?? suggestRole({
@@ -60,7 +63,7 @@ export function planFocusAssign(input: FocusAssignInput): FocusAssignPlan {
       dates,
       // Adding days never drops the ones the technician already has.
       mode: 'add',
-      source: 'matrix-focus',
+      source,
     },
   };
 }

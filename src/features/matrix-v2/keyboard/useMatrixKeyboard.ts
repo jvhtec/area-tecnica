@@ -8,6 +8,15 @@ import {
   type GridMetrics,
 } from '@/features/matrix-v2/keyboard/navigation';
 
+/** True when focus arrived by keyboard (not a mouse press). Where :focus-visible is unknown, assume it did. */
+const focusedByKeyboard = (element: HTMLElement): boolean => {
+  try {
+    return typeof element.matches === 'function' ? element.matches(':focus-visible') : true;
+  } catch {
+    return true;
+  }
+};
+
 export interface ActiveCell {
   technicianId: string;
   dateKey: string;
@@ -153,9 +162,11 @@ export function useMatrixKeyboard({ enabled, technicianIds, dates, grid, scrollR
     }
   }, [enabled, blocked, technicianIds.length, dates.length, goTo, position, startPosition, active]);
 
-  // Shown the first time the grid gets focus, so the ring does not appear from nowhere.
+  // Shown the first time the keyboard brings focus to the grid, so the ring does not appear from nowhere.
+  // A mouse press on a cell's padding also focuses the grid; that must not move the view or start a ring.
   const onFocus = React.useCallback((event: React.FocusEvent<HTMLElement>) => {
     if (!enabled || event.target !== event.currentTarget || active || technicianIds.length === 0) return;
+    if (!focusedByKeyboard(event.currentTarget)) return;
     goTo(startPosition());
   }, [enabled, active, technicianIds.length, goTo, startPosition]);
 

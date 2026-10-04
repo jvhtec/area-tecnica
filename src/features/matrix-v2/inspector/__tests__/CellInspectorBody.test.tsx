@@ -63,7 +63,7 @@ function setup(options: Setup = {}) {
   if (options.state instanceof Error) mocks.getState.mockRejectedValue(options.state);
   else mocks.getState.mockResolvedValue(options.state ?? makeState());
   const env: InspectorEnvironment = {
-    runner: { run, releaseAll: vi.fn() },
+    runner: { run, releaseAll: vi.fn(), loadState: vi.fn() },
     getTechnician: (id) => (id === TECH_1 ? technician : undefined),
     getJob: (id) => jobs.find((job) => job.id === id),
     getJobsForDate: () => jobs,

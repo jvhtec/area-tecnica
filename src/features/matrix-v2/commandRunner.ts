@@ -86,6 +86,8 @@ export interface MatrixCommandRunnerDeps {
 export interface MatrixCommandRunner {
   run: (intent: MatrixIntent) => Promise<MatrixRunOutcome>;
   /** Releases every held effect now (route change). */
+  /** A pair's current state, from the cache the runner itself uses (read for at most 10 s before it is read again). */
+  loadState: (jobId: string, technicianId: string) => Promise<AssignmentCommandState>;
   releaseAll: () => void;
 }
 
@@ -501,6 +503,7 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
 
   return {
     run,
+    loadState,
     releaseAll: () => {
       for (const deferred of [...held]) deferred.release();
       held.clear();

@@ -23,6 +23,8 @@ import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
 import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
 import { MatrixShortcutHelp } from "@/features/matrix-v2/keyboard/MatrixShortcutHelp";
 import { FocusColumnOverlay } from "@/features/matrix-v2/focus/FocusColumnOverlay";
+import { BatchLayer } from "@/features/matrix-v2/batch/BatchLayer";
+import { SelectionOverlay } from "@/features/matrix-v2/batch/SelectionOverlay";
 import type {
   CancelStaffingMutate,
   MatrixCellAction,
@@ -107,6 +109,8 @@ export interface OptimizedAssignmentMatrixViewProps {
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   clearCellSelection: () => void;
+  /** Replaces the selection wholesale (drag and shift-click ranges). */
+  onReplaceSelection: (keys: Set<string>) => void;
   /** Grid-selected days for the offer's technician, clamped to the job. */
   offerSeedDates?: string[];
   /** Present when the new Matrix (inspector, focus, batch) is switched on. */
@@ -188,6 +192,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   techMedalRankings,
   techLastYearMedalRankings,
   clearCellSelection,
+  onReplaceSelection,
   offerSeedDates,
   v2,
 }: OptimizedAssignmentMatrixViewProps) => {
@@ -360,8 +365,11 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     handleCellClick,
     grid: { cellWidth: CELL_WIDTH, cellHeight: CELL_HEIGHT, technicianWidth: TECHNICIAN_WIDTH, headerHeight: HEADER_HEIGHT },
     scrollRef: mainScrollRef,
+    selectedCells,
+    clearSelection: clearCellSelection,
+    onReplaceSelection,
   });
-  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay } = v2Grid;
+  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay, gridHandlers, previewRects, batchLayer } = v2Grid;
 
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
@@ -587,6 +595,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 onMouseOver={mobile ? undefined : handleGridMouseOver}
                 onMouseLeave={mobile ? undefined : hideCellTooltip}
                 onMouseDown={mobile ? undefined : hideCellTooltip}
+                {...gridHandlers}
               >
                 {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => (
                   <MatrixGridRow
@@ -637,6 +646,9 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 bodyHeight={matrixHeight}
               />
             )}
+            {previewRects.length > 0 && (
+              <SelectionOverlay rects={previewRects} cellWidth={CELL_WIDTH} cellHeight={CELL_HEIGHT} technicianWidth={TECHNICIAN_WIDTH} headerHeight={HEADER_HEIGHT} />
+            )}
             {keyboard.ring && (
               <div
                 aria-hidden="true"
@@ -679,7 +691,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      {selectionActive && (
+      {selectionActive && !v2 && (
         <div
           className="fixed inset-x-2 z-30 flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
           style={{ bottom: floatingBottom }}
@@ -709,6 +721,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           </Button>
         </div>
       )}
+
+      {v2 && <BatchLayer {...batchLayer} />}
 
       {inspectorEnv && closeInspector && (
         <MatrixInspectorHost env={inspectorEnv} target={inspectorTarget} onClose={closeInspector} mobile={mobile} />

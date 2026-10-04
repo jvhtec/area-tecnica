@@ -428,6 +428,16 @@ export const OptimizedAssignmentMatrix = ({
     clearGlobalSelection();
   }, [clearGlobalSelection]);
 
+  // Drag and shift-click replace the selection in one go. Stream Deck keeps
+  // working from one cell, the last of the new selection.
+  const replaceSelection = useCallback((keys: Set<string>) => {
+    setSelectedCells(keys);
+    const last = [...keys].pop();
+    const date = last ? madridDateKeyToCalendarDate(last.slice(-10)) : null;
+    if (last && date) selectCell(last.slice(0, -11), date);
+    else clearGlobalSelection();
+  }, [selectCell, clearGlobalSelection]);
+
   const handleStaffingActionSelected = useCallback(async (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
       const dateKey = formatMadridDateKey(cellAction.date);
@@ -747,7 +757,7 @@ export const OptimizedAssignmentMatrix = ({
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     offerSeedDates,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
-    clearCellSelection,
+    clearCellSelection, onReplaceSelection: replaceSelection,
     v2: v2Config,
   };
 

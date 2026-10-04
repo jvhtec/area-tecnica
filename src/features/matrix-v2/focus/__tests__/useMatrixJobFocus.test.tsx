@@ -32,7 +32,7 @@ function setup(options: {
   ready?: boolean;
 } = {}) {
   const run = vi.fn<MatrixCommandRunner['run']>().mockResolvedValue(okOutcome);
-  const runner: MatrixCommandRunner = { run, releaseAll: vi.fn() };
+  const runner: MatrixCommandRunner = { run, releaseAll: vi.fn(), loadState: vi.fn() };
   const openInspector = vi.fn();
   const technicians = options.technicians ?? [makeTechnician(TECH_1), makeTechnician(TECH_2), makeTechnician(TECH_3)];
   const props = {

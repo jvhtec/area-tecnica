@@ -98,6 +98,15 @@ describe('createMatrixCommandRunner', () => {
       expect(queryClient.getQueryData(assignmentCommandStateKey(JOB_A, TECH_1))).toMatchObject({ state_token: 'token-9', dates: ['2026-10-13'] });
     });
 
+    it('loadState reads the pair once and the command that follows reuses it (a batch reads first, then removes)', async () => {
+      const { runner, mocks } = setup(makeState({ exists: true, assignment: makeRow(), dates: ['2026-10-13', '2026-10-14'], state_token: 'read-token' }));
+      mocks.remove.mockResolvedValue(makeResult());
+      expect(await runner.loadState(JOB_A, TECH_1)).toMatchObject({ state_token: 'read-token', dates: ['2026-10-13', '2026-10-14'] });
+      await runner.run({ kind: 'remove', technicianId: TECH_1, jobId: JOB_A, source: 'matrix-batch' });
+      expect(mocks.getState).toHaveBeenCalledTimes(1);
+      expect(mocks.remove).toHaveBeenCalledWith(expect.objectContaining({ expectedStateToken: 'read-token', source: 'matrix-batch' }));
+    });
+
     it('sends the loaded state token, the intent and its source', async () => {
       const { runner, mocks } = setup(makeState({ state_token: 'loaded-token' }));
       mocks.apply.mockResolvedValue(makeResult());

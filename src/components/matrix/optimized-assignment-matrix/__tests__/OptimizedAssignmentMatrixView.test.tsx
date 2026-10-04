@@ -160,6 +160,7 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   techMedalRankings: new Map(),
   techLastYearMedalRankings: new Map(),
   clearCellSelection: vi.fn(),
+  onReplaceSelection: vi.fn(),
   profileNamesMap: new Map(),
   ...overrides,
 });
