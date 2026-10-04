@@ -229,6 +229,20 @@ Outside assignment state (deliberately not commands):
    migrations (`20261003210000`, `20261003211000`, `20261003212000`,
    `20261003213000`, `20261003214000`, `20261003215000`), their grants and
    the new tables (`assignment_commands`, `assignment_role_codes`).
+   Before deploying, list legacy rows the stricter role validation would
+   refuse to edit (unregistered codes, or a code outside the technician's
+   discipline); removing them still works, but a role change or modify is
+   rejected until the role is corrected:
+
+   ```sql
+   SELECT ja.job_id, ja.technician_id, p.department, r.col, r.code
+   FROM job_assignments ja JOIN profiles p ON p.id = ja.technician_id
+   CROSS JOIN LATERAL (VALUES ('sound', ja.sound_role), ('lights', ja.lights_role),
+     ('video', ja.video_role), ('production', ja.production_role)) r(col, code)
+   WHERE r.code IS NOT NULL AND r.code <> 'none'
+     AND (r.code NOT IN (SELECT code FROM assignment_role_codes)
+       OR r.col IS DISTINCT FROM CASE p.department WHEN 'logistics' THEN 'production' ELSE p.department END);
+   ```
 2. Deploy `staffing-click` first (it handles `P0409`; the old database never
    raises it) and `push` (it accepts `idempotency_key`), then apply the
    migrations, then deploy the client. The old client keeps working for
