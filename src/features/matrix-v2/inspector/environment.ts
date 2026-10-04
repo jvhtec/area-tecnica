@@ -51,4 +51,6 @@ export interface InspectorTarget {
   dateKey: string;
   /** The clicked cell, so the popover can sit next to it; null on touch. */
   anchor: HTMLElement | null;
+  /** Opens with a destructive step already asked (the cell's ✕, the Supr key). */
+  intent?: 'decline' | 'remove';
 }

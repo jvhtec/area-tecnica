@@ -19,8 +19,9 @@ import {
 import { formatUserName } from "@/utils/userName";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
 import { MatrixInspectorHost } from "@/features/matrix-v2/inspector/MatrixInspectorHost";
-import type { InspectorEnvironment, InspectorTarget } from "@/features/matrix-v2/inspector/environment";
 import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
+import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
+import { MatrixShortcutHelp } from "@/features/matrix-v2/keyboard/MatrixShortcutHelp";
 import type {
   CancelStaffingMutate,
   MatrixCellAction,
@@ -223,23 +224,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
 
   // Touch action sheet: one instance for the grid, opened by tapping a cell.
   const [sheetTarget, setSheetTarget] = React.useState<MatrixMobileCellTarget | null>(null);
-  // Matrix v2: one inspector for the grid. Desktop anchors it to the clicked
-  // cell; a phone gets the same content as a bottom sheet (no anchor).
-  const [inspectorTarget, setInspectorTarget] = React.useState<InspectorTarget | null>(null);
-  const closeInspector = React.useCallback(() => setInspectorTarget(null), []);
-  const handleInspect = React.useCallback((technicianId: string, date: Date, anchor: HTMLElement) => {
-    const dateKey = formatMadridDateKey(date);
-    // A second click on the same cell closes its inspector.
-    setInspectorTarget((current) => (
-      current && current.technicianId === technicianId && current.dateKey === dateKey
-        ? null
-        : { technicianId, date, dateKey, anchor }
-    ));
-  }, []);
+  // Matrix v2: one inspector for the grid, whose state the container owns so the
+  // cell buttons and the keyboard can open it too. Desktop anchors it to the
+  // clicked cell; a phone gets the same content as a bottom sheet (no anchor).
+  const keyboardHintId = React.useId();
   const handleOpenSheet = React.useCallback(
     (technicianId: string, date: Date) => {
       if (v2) {
-        setInspectorTarget({ technicianId, date, dateKey: formatMadridDateKey(date), anchor: null });
+        v2.openInspector(technicianId, date, null);
         return;
       }
       const technician = technicians.find((t) => t.id === technicianId);
@@ -250,6 +242,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   const closeSheet = React.useCallback(() => setSheetTarget(null), []);
 
   const selectionActive = mobile && selectedCells.size > 0;
+  const inspectorTarget = v2?.inspectorTarget ?? null;
+  const closeInspector = v2?.closeInspector;
 
   // Selection per row, so selecting a cell re-renders the rows whose selection
   // changed instead of every row (each used to receive the whole set). Cell
@@ -345,30 +339,27 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     [handleMainScroll],
   );
 
-  const jobsById = React.useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
-  const inspectorEnv = React.useMemo<InspectorEnvironment | null>(() => {
-    if (!v2) return null;
-    return {
-      runner: v2.runner,
-      getTechnician: (technicianId) => techniciansById.get(technicianId),
-      getJob: (jobId) => jobsById.get(jobId),
-      getJobsForDate,
-      getAssignmentForCell,
-      getAvailabilityForCell,
-      roleSlotsByJob: v2.roleSlotsByJob,
-      lastRoleByTechnician: v2.lastRoleByTechnician,
-      declinedJobIds: (technicianId) => declinedJobsByTech.get(technicianId),
-      isFridge: (technicianId) => fridgeSet?.has(technicianId) ?? false,
-      staffingByDate: (technicianId, dateKey) => staffingMaps?.byDate.get(`${technicianId}-${dateKey}`) ?? null,
-      profileNames: profileNamesMap,
-      canAssign: isManagementUser,
-      canMarkUnavailable: isManagementUser,
-      openStaffing: (technicianId, date) => handleCellClick(technicianId, date, "select-job-for-staffing"),
-    };
-  }, [
-    v2, techniciansById, jobsById, getJobsForDate, getAssignmentForCell, getAvailabilityForCell,
-    declinedJobsByTech, fridgeSet, staffingMaps, profileNamesMap, isManagementUser, handleCellClick,
-  ]);
+  // Matrix v2: the inspector's environment, the keyboard model and its actions.
+  const v2Grid = useMatrixGridV2({
+    v2,
+    mobile,
+    technicians,
+    orderedTechnicians,
+    dates,
+    jobs,
+    getJobsForDate,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+    declinedJobsByTech,
+    fridgeSet,
+    staffingMaps,
+    profileNamesMap,
+    isManagementUser,
+    handleCellClick,
+    grid: { cellWidth: CELL_WIDTH, cellHeight: CELL_HEIGHT, technicianWidth: TECHNICIAN_WIDTH, headerHeight: HEADER_HEIGHT },
+    scrollRef: mainScrollRef,
+  });
+  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate } = v2Grid;
 
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
@@ -391,7 +382,23 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           on the compositor: no scroll sync in JavaScript, and they cannot trail
           the grid when the main thread is busy. */}
       <TooltipProvider>
-        <div ref={mainScrollRef} className="matrix-main-scroll" onScroll={handleGridScroll}>
+        <div
+          ref={mainScrollRef}
+          className="matrix-main-scroll"
+          onScroll={handleGridScroll}
+          {...(v2 && !mobile
+            ? {
+              tabIndex: 0,
+              role: "application",
+              "aria-label": "Matriz de asignaciones",
+              "aria-describedby": keyboardHintId,
+              "aria-activedescendant": keyboard.activeDescendant,
+              "data-matrix-grid": "true",
+              onKeyDown: keyboard.onKeyDown,
+              onFocus: keyboard.onFocus,
+            }
+            : {})}
+        >
           <div
             className="matrix-canvas"
             style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: HEADER_HEIGHT + matrixHeight }}
@@ -593,7 +600,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     onClick={handleCellClick}
                     onOpenSheet={handleOpenSheet}
                     inspectorMode={!!v2}
-                    onInspect={handleInspect}
+                    onInspect={handleInspectAndActivate}
                     onPrefetch={handleCellPrefetch}
                     onOptimisticUpdate={handleOptimisticUpdate}
                     onRender={incrementCellRender}
@@ -605,9 +612,26 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 ))}
               </div>
             </div>
+            {keyboard.ring && (
+              <div
+                aria-hidden="true"
+                data-matrix-active-ring="true"
+                className="pointer-events-none absolute z-[25] rounded-md ring-2 ring-primary ring-offset-1 ring-offset-background"
+                style={{ left: keyboard.ring.left, top: keyboard.ring.top, width: keyboard.ring.width, height: keyboard.ring.height }}
+              />
+            )}
           </div>
         </div>
       </TooltipProvider>
+
+      {v2 && !mobile && (
+        <>
+          <p id={keyboardHintId} className="sr-only">
+            Usa las flechas para moverte por la matriz, Intro para abrir una celda y ? para ver los atajos.
+          </p>
+          <div role="status" aria-live="polite" className="sr-only">{keyboard.announcement}</div>
+        </>
+      )}
 
       {!mobile && <MatrixCellHoverTooltip ref={hoverTooltipRef} resolve={resolveCellTooltip} />}
 
@@ -661,9 +685,10 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      {inspectorEnv && (
+      {inspectorEnv && closeInspector && (
         <MatrixInspectorHost env={inspectorEnv} target={inspectorTarget} onClose={closeInspector} mobile={mobile} />
       )}
+      {v2 && !mobile && <MatrixShortcutHelp open={keyboard.helpOpen} onOpenChange={keyboard.setHelpOpen} />}
 
       {!v2 && <MatrixMobileCellSheet
         target={sheetTarget}

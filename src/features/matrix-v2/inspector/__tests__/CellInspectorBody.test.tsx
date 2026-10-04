@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => ({ supabase: { rpc: vi.fn(), functions: { invoke: vi.fn() } } }));
 vi.mock('sonner', () => ({ toast: mocks.toast, Toaster: (): null => null }));
 vi.mock('@/features/matrix-v2/undoToast', () => ({ showUndoToast: mocks.showUndoToast }));
-vi.mock('@/features/matrix-v2/unavailability', () => ({ markUnavailable: mocks.markUnavailable, clearUnavailable: mocks.clearUnavailable }));
+vi.mock('@/features/matrix-v2/unavailability', () => ({
+  markUnavailableWithUndo: mocks.markUnavailable,
+  clearUnavailableWithUndo: mocks.clearUnavailable,
+}));
 vi.mock('@/features/assignments/commands', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/assignments/commands')>()),
   getAssignmentCommandState: mocks.getState,
@@ -237,15 +240,20 @@ describe('empty cell', () => {
     expect(openStaffing).toHaveBeenCalledWith(TECH_1, expect.any(Date));
   });
 
-  it('marks the day unavailable, with a way back', async () => {
-    mocks.markUnavailable.mockResolvedValue(undefined);
+  it('marks the day unavailable and closes', async () => {
+    mocks.markUnavailable.mockResolvedValue({ ok: true });
     const { onClose, user } = setup();
     await user.click(await screen.findByRole('button', { name: 'Marcar no disponible' }));
-    expect(mocks.markUnavailable).toHaveBeenCalledWith(TECH_1, [DATE_KEY]);
+    expect(mocks.markUnavailable).toHaveBeenCalledWith(TECH_1, DATE_KEY);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    const [, options] = mocks.toast.mock.calls[0];
-    options.action.onClick();
-    expect(mocks.clearUnavailable).toHaveBeenCalledWith(TECH_1, [DATE_KEY]);
+  });
+
+  it('keeps the inspector open and says why when marking fails', async () => {
+    mocks.markUnavailable.mockResolvedValue({ ok: false, message: 'No se pudo marcar como no disponible. Inténtalo de nuevo.' });
+    const { onClose, user } = setup();
+    await user.click(await screen.findByRole('button', { name: 'Marcar no disponible' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo marcar');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('is read-only for someone who cannot assign', () => {
@@ -347,20 +355,17 @@ describe('assigned cell', () => {
 });
 
 describe('unavailable cell', () => {
-  it('lifts the mark and offers to put it back', async () => {
-    mocks.clearUnavailable.mockResolvedValue(1);
+  it('lifts the mark and closes', async () => {
+    mocks.clearUnavailable.mockResolvedValue({ ok: true });
     const { onClose, user } = setup({ availability: { status: 'unavailable', reason: 'Médico' } });
     expect(screen.getByText('No disponible · Médico')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Quitar no disponibilidad' }));
-    expect(mocks.clearUnavailable).toHaveBeenCalledWith(TECH_1, [DATE_KEY]);
+    expect(mocks.clearUnavailable).toHaveBeenCalledWith(TECH_1, DATE_KEY);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    const [, options] = mocks.toast.mock.calls[0];
-    options.action.onClick();
-    expect(mocks.markUnavailable).toHaveBeenCalledWith(TECH_1, [DATE_KEY]);
   });
 
   it('explains when the unavailability comes from somewhere else', async () => {
-    mocks.clearUnavailable.mockResolvedValue(0);
+    mocks.clearUnavailable.mockResolvedValue({ ok: false, message: 'Esta no disponibilidad viene de unas vacaciones o del calendario de temporada: no se puede quitar desde aquí.' });
     const { onClose, user } = setup({ availability: { status: 'unavailable', reason: 'Vacaciones' } });
     await user.click(screen.getByRole('button', { name: 'Quitar no disponibilidad' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('vacaciones o del calendario de temporada');

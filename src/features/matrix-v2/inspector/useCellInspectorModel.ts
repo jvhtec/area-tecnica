@@ -20,8 +20,8 @@ import {
   type MatrixIntent,
   type MatrixRunOutcome,
 } from '@/features/matrix-v2/types';
-import { clearUnavailable, markUnavailable } from '@/features/matrix-v2/unavailability';
-import { showUndoToast } from '@/features/matrix-v2/undoToast';
+import { clearUnavailableWithUndo, markUnavailableWithUndo } from '@/features/matrix-v2/unavailability';
+import { reportDone } from '@/features/matrix-v2/outcomeToast';
 import type { InspectorEnvironment, InspectorTarget, InspectorTechnician } from '@/features/matrix-v2/inspector/environment';
 
 const STATE_STALE_MS = 10_000;
@@ -49,9 +49,6 @@ export interface InspectorConflict {
 const useTechnicianName = (technician: InspectorTechnician | undefined) =>
   technician ? formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico' : 'Técnico';
 
-const effectsNote = (outcome: Extract<MatrixRunOutcome, { ok: true }>) =>
-  outcome.result.side_effects.length > 0 ? 'Se avisará en unos segundos: puedes deshacerlo.' : undefined;
-
 /** The command's pair state, shared with the runner through the same query key. */
 function usePairState(jobId: string, technicianId: string, enabled: boolean) {
   return useQuery({
@@ -60,22 +57,6 @@ function usePairState(jobId: string, technicianId: string, enabled: boolean) {
     queryFn: () => getAssignmentCommandState(jobId, technicianId),
     staleTime: STATE_STALE_MS,
   });
-}
-
-/** Tells the manager how a finished command went, with Deshacer when it can be taken back. */
-function reportDone(title: string, outcome: Extract<MatrixRunOutcome, { ok: true }>, description: string | undefined) {
-  if (outcome.noop) {
-    toast.info('Ya estaba así: no había nada que cambiar');
-    return;
-  }
-  if (outcome.result.warnings.length > 0) {
-    toast.error('Se guardó, pero no se pudo recalcular el importe de algún parte');
-  }
-  if (outcome.undo) {
-    showUndoToast({ title, description: [description, effectsNote(outcome)].filter(Boolean).join(' · ') || undefined, undo: outcome.undo });
-  } else {
-    toast.success(title, { description });
-  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -298,7 +279,9 @@ export function useAssignedPair({ env, technician, target, jobId, onDone }: Assi
   const days = picked ?? pairDates;
   const dirty = picked !== null && picked.join('|') !== [...pairDates].sort().join('|');
 
-  const [pending, setPending] = useState<PendingAction>(null);
+  const [pending, setPending] = useState<PendingAction>(
+    target.intent === 'decline' ? 'decline' : target.intent === 'remove' ? 'remove-all' : null,
+  );
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -427,45 +410,21 @@ export function useUnavailability({ env, target, onDone }: { env: InspectorEnvir
   const [notice, setNotice] = useState<string | null>(null);
   const availability = env.getAvailabilityForCell(technicianId, target.date);
 
-  const mark = useCallback(async () => {
+  const apply = useCallback(async (change: typeof markUnavailableWithUndo) => {
     if (busy || !env.canMarkUnavailable) return;
     setBusy(true);
     setNotice(null);
     try {
-      await markUnavailable(technicianId, [dateKey]);
-      toast('Marcado como no disponible', {
-        description: longDayLabel(dateKey),
-        action: { label: 'Deshacer', onClick: () => { void clearUnavailable(technicianId, [dateKey]); } },
-      });
-      onDone();
-    } catch {
-      setNotice('No se pudo marcar como no disponible. Inténtalo de nuevo.');
+      const result = await change(technicianId, dateKey);
+      if (result.ok) onDone();
+      else setNotice(result.message);
     } finally {
       setBusy(false);
     }
   }, [busy, env.canMarkUnavailable, technicianId, dateKey, onDone]);
 
-  const clear = useCallback(async () => {
-    if (busy || !env.canMarkUnavailable) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      const removed = await clearUnavailable(technicianId, [dateKey]);
-      if (removed === 0) {
-        setNotice('Esta no disponibilidad viene de unas vacaciones o del calendario de temporada: no se puede quitar desde aquí.');
-        return;
-      }
-      toast('Disponible de nuevo', {
-        description: longDayLabel(dateKey),
-        action: { label: 'Deshacer', onClick: () => { void markUnavailable(technicianId, [dateKey]); } },
-      });
-      onDone();
-    } catch {
-      setNotice('No se pudo quitar la no disponibilidad. Inténtalo de nuevo.');
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, env.canMarkUnavailable, technicianId, dateKey, onDone]);
+  const mark = useCallback(() => apply(markUnavailableWithUndo), [apply]);
+  const clear = useCallback(() => apply(clearUnavailableWithUndo), [apply]);
 
   return { availability, busy, notice, mark, clear, canEdit: env.canMarkUnavailable };
 }

@@ -318,7 +318,7 @@ export const OptimizedMatrixCell = memo(({
   // A plain click only does something in one of the edit modes; without one the
   // cell is read-only and should not advertise itself as clickable.
   const plainClickIsActionable =
-    mobile || allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
+    mobile || inspectorMode || allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
 
   // The staffing conversation gets its own caption line so an empty-looking cell
   // says what is in flight, instead of only being tinted.
@@ -375,6 +375,7 @@ export const OptimizedMatrixCell = memo(({
             width: `${width}px`,
             height: `${height}px`,
           }}
+          id={`mcell-${technicianId}-${dateKey}`}
           data-matrix-cell="true"
           data-matrix-cell-state={cellState}
           // Read by the grid's shared hover tooltip (MatrixCellHoverTooltip).
@@ -595,16 +596,19 @@ export const OptimizedMatrixCell = memo(({
                 </div>
               )}
 
-              <div className="absolute top-1.5 right-1.5 z-10">
-                <button
-                  type="button"
-                  className={DANGER_BUTTON_CLASS}
-                  title="Eliminar asignación"
-                  onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
-                >
-                  <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                </button>
-              </div>
+              {/* Matrix v2 removes from the inspector (day or whole job, confirmed there). */}
+              {!inspectorMode && (
+                <div className="absolute top-1.5 right-1.5 z-10">
+                  <button
+                    type="button"
+                    className={DANGER_BUTTON_CLASS}
+                    title="Eliminar asignación"
+                    onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
+                  >
+                    <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                  </button>
+                </div>
+              )}
             </>
           )}
 

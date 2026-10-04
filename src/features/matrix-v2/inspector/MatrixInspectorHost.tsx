@@ -14,6 +14,7 @@ import { CellInspectorBody } from '@/features/matrix-v2/inspector/CellInspectorB
 import { useInspectorSummary } from '@/features/matrix-v2/inspector/useInspectorSummary';
 import type { InspectorEnvironment, InspectorTarget } from '@/features/matrix-v2/inspector/environment';
 import { StatusPill } from '@/features/matrix-v2/inspector/parts';
+import { resolveInspectorAnchor } from '@/features/matrix-v2/inspector/anchor';
 
 export interface MatrixInspectorHostProps {
   env: InspectorEnvironment;
@@ -22,13 +23,6 @@ export interface MatrixInspectorHostProps {
   /** Phones get a bottom sheet; desktop gets a popover next to the cell. */
   mobile: boolean;
 }
-
-/** The cell element for a target; the grid renders only the visible window, so it can be gone. */
-const findCellElement = (target: InspectorTarget): HTMLElement | null => {
-  if (target.anchor?.isConnected) return target.anchor;
-  const technicianId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(target.technicianId) : target.technicianId;
-  return document.querySelector<HTMLElement>(`[data-matrix-cell][data-technician-id="${technicianId}"][data-date-key="${target.dateKey}"]`);
-};
 
 function PopoverInspector({ env, target, onClose, anchor }: { env: InspectorEnvironment; target: InspectorTarget; onClose: () => void; anchor: HTMLElement }) {
   const summary = useInspectorSummary(env, target);
@@ -63,8 +57,9 @@ function PopoverInspector({ env, target, onClose, anchor }: { env: InspectorEnvi
             if (event.target instanceof Node && anchor.contains(event.target)) event.preventDefault();
           }}
           onCloseAutoFocus={(event) => {
+            // Back to the grid, so the arrow keys carry on from the active cell.
             event.preventDefault();
-            if (anchor.isConnected) anchor.focus({ preventScroll: true });
+            document.querySelector<HTMLElement>('[data-matrix-grid]')?.focus({ preventScroll: true });
           }}
           className={cn(
             'z-[70] max-h-[min(82vh,680px)] w-[348px] overflow-y-auto rounded-xl border bg-popover text-popover-foreground shadow-xl outline-none',
@@ -121,7 +116,7 @@ function SheetInspector({ env, target, onClose }: { env: InspectorEnvironment; t
  */
 export function MatrixInspectorHost({ env, target, onClose, mobile }: MatrixInspectorHostProps) {
   if (!target) return null;
-  const anchor = mobile ? null : findCellElement(target);
+  const anchor = mobile ? null : resolveInspectorAnchor(target);
   if (!anchor) return <SheetInspector env={env} target={target} onClose={onClose} />;
   return <PopoverInspector env={env} target={target} onClose={onClose} anchor={anchor} />;
 }

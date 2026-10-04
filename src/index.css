@@ -343,6 +343,12 @@
   box-shadow: 4px 0 12px -6px hsl(var(--foreground) / 0.18);
 }
 
+/* Matrix v2: the grid itself takes keyboard focus (arrows move the active cell). */
+.matrix-main-scroll:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+
 /* Matrix v2: the Deshacer toast drains in step with the undo window. */
 @keyframes matrix-undo-drain {
   from { transform: scaleX(1); }

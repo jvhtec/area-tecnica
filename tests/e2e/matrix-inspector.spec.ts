@@ -91,6 +91,9 @@ async function openMatrix(page: Page, options: { initiallyAssigned?: boolean; qu
   return { calls, state };
 }
 
+/** A toast, not the grid's screen-reader announcement (also a status region). */
+const toastWith = (page: Page, text: string) =>
+  page.getByRole("region", { name: /Notifications/ }).getByRole("status").filter({ hasText: text });
 const cell = (page: Page, offset: number) => page.locator(`[data-technician-id="${TECH_ID}"][data-date-key="${day(offset)}"]`);
 const inspector = (page: Page) => page.getByRole("dialog").filter({ hasText: "Marta" });
 const rpcNames = (calls: Awaited<ReturnType<typeof openMatrix>>["calls"]) => calls.rpcCalls.map((call) => call.name);
@@ -116,14 +119,14 @@ test("a click on an empty cell opens the inspector and assigns in one step", asy
 
   await expect(panel).toBeHidden();
   await expect(cell(page, 1)).toContainText("Gira Lúa");
-  await expect(page.getByRole("status").filter({ hasText: "Marta" }).getByRole("button", { name: "Deshacer" })).toBeVisible();
+  await expect(toastWith(page, "Marta").getByRole("button", { name: "Deshacer" })).toBeVisible();
 });
 
 test("Deshacer takes the assignment back and nobody is notified", async ({ page }) => {
   const { calls, state } = await openMatrix(page);
   await cell(page, 1).click();
   await inspector(page).getByRole("button", { name: "Asignar", exact: true }).click();
-  const toast = page.getByRole("status").filter({ hasText: "Marta" });
+  const toast = toastWith(page, "Marta");
   await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "Deshacer" }).click();
 
@@ -163,7 +166,7 @@ test("an invited technician is confirmed in one click, and it can be undone", as
   await expect.poll(() => state.status).toBe("confirmed");
   expect(asBody(calls.rpcCalls.find((call) => call.name === "set_assignment_status")?.body)).toMatchObject({ p_action: "confirm", p_expected_state_token: "t-assigned" });
 
-  await page.getByRole("status").filter({ hasText: "confirmado" }).getByRole("button", { name: "Deshacer" }).click();
+  await toastWith(page, "confirmado").getByRole("button", { name: "Deshacer" }).click();
   await expect.poll(() => state.status).toBe("invited");
   expect(asBody(calls.rpcCalls.find((call) => call.name === "unconfirm_assignment")?.body)).toMatchObject({ p_expected_state_token: "t3" });
 });
@@ -196,4 +199,123 @@ test("Escape closes the inspector", async ({ page }) => {
   await expect(inspector(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(inspector(page)).toBeHidden();
+});
+
+test.describe("without editing modes", () => {
+  test("Matrix v2 has no assignment, unavailability or staffing-icon switches", async ({ page }) => {
+    await openMatrix(page);
+    await expect(cell(page, 1)).toBeVisible();
+    if (isMobileViewport(page)) await page.getByRole("button", { name: /^Filtros/ }).click();
+    await expect(page.getByRole("switch", { name: /alternar asignación directa/i })).toHaveCount(0);
+    await expect(page.getByRole("switch", { name: /alternar marcar no disponible/i })).toHaveCount(0);
+    await expect(page.getByRole("switch", { name: /mostrar botones de (email|whatsapp)/i })).toHaveCount(0);
+    await expect(page.getByRole("switch", { name: /nevera/i }).first()).toBeVisible();
+    // The per-cell staffing icon cluster is gone; those requests start in the inspector.
+    await expect(cell(page, 1).getByRole("button", { name: /disponibilidad/i })).toHaveCount(0);
+  });
+
+  test("the old modes are still there with ?matriz=v1", async ({ page }) => {
+    await openMatrix(page, { query: "?matriz=v1" });
+    await expect(cell(page, 1)).toBeVisible();
+    if (isMobileViewport(page)) await page.getByRole("button", { name: /^Filtros/ }).click();
+    await expect(page.getByRole("switch", { name: /alternar asignación directa/i }).first()).toBeVisible();
+  });
+
+  test("the ✓ on an invited cell confirms at once, and there is no ✕ that removes", async ({ page }) => {
+    test.skip(isMobileViewport(page), "The phone cell has no icon buttons: it opens the sheet.");
+    const { calls, state } = await openMatrix(page, { initiallyAssigned: true });
+    await expect(cell(page, 1)).toContainText("Gira Lúa");
+    await expect(cell(page, 1).getByTitle("Eliminar asignación")).toHaveCount(0);
+    await cell(page, 1).getByTitle("Confirmar", { exact: true }).click();
+    await expect.poll(() => state.status).toBe("confirmed");
+    expect(asBody(calls.rpcCalls.find((call) => call.name === "set_assignment_status")?.body)).toMatchObject({ p_action: "confirm", p_source: "matrix-inspector" });
+    await expect(toastWith(page, "confirmado").getByRole("button", { name: "Deshacer" })).toBeVisible();
+    await expect(inspector(page)).toBeHidden();
+  });
+
+  test("the cell's ✕ opens the inspector already asking to decline", async ({ page }) => {
+    test.skip(isMobileViewport(page), "The phone cell has no icon buttons: it opens the sheet.");
+    const { state } = await openMatrix(page, { initiallyAssigned: true });
+    await cell(page, 1).getByTitle("Rechazar", { exact: true }).click();
+    const confirm = inspector(page).getByRole("alertdialog");
+    await expect(confirm).toContainText("¿Rechazar en nombre de Marta?");
+    expect(state.status).toBe("invited");
+  });
+
+  test("right-click opens the inspector", async ({ page }) => {
+    test.skip(isMobileViewport(page), "Right-click is a desktop gesture.");
+    await openMatrix(page);
+    await cell(page, 1).click({ button: "right" });
+    await expect(inspector(page)).toBeVisible();
+  });
+});
+
+test.describe("keyboard", () => {
+  test.beforeEach(({ page }) => {
+    test.skip(isMobileViewport(page), "The keyboard model is for desktop.");
+  });
+
+  test("arrows move a ring, Intro opens the inspector and Escape returns to the grid", async ({ page }) => {
+    await openMatrix(page);
+    const grid = page.locator("[data-matrix-grid]");
+    await expect(cell(page, 1)).toBeVisible();
+    await grid.focus();
+    await expect(page.locator("[data-matrix-active-ring]")).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    // The live region names the cell the ring is on.
+    await expect(page.getByRole("status").filter({ hasText: "Marta Ibáñez" })).toContainText("libre");
+    await page.keyboard.press("Enter");
+    await expect(inspector(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(inspector(page)).toBeHidden();
+    await expect(grid).toBeFocused();
+  });
+
+  test("C confirms the active invited cell and X asks to decline", async ({ page }) => {
+    const { state } = await openMatrix(page, { initiallyAssigned: true });
+    const grid = page.locator("[data-matrix-grid]");
+    await expect(cell(page, 1)).toContainText("Gira Lúa");
+    await grid.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("c");
+    await expect.poll(() => state.status).toBe("confirmed");
+    await page.keyboard.press("x");
+    await expect(inspector(page).getByRole("alertdialog")).toContainText("¿Rechazar en nombre de Marta?");
+  });
+
+  test("Supr asks before removing", async ({ page }) => {
+    const { state } = await openMatrix(page, { initiallyAssigned: true });
+    await page.locator("[data-matrix-grid]").focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Delete");
+    const confirm = inspector(page).getByRole("alertdialog");
+    await expect(confirm).toContainText("Quitar a Marta");
+    expect(state.removed).toBe(0);
+  });
+
+  test("N marks the day unavailable", async ({ page }) => {
+    const { calls } = await openMatrix(page);
+    await page.locator("[data-matrix-grid]").focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("n");
+    await expect.poll(() => calls.tableMutations.filter((mutation) => mutation.table.startsWith("technician_availability")).length).toBeGreaterThan(0);
+  });
+
+  test("? lists the shortcuts", async ({ page }) => {
+    await openMatrix(page);
+    await page.locator("[data-matrix-grid]").focus();
+    await page.keyboard.press("?");
+    const help = page.getByRole("dialog", { name: "Atajos de la matriz" });
+    await expect(help).toBeVisible();
+    await expect(help).toContainText("Confirmar la asignación");
+  });
+
+  test("C on an empty cell says there is nothing to confirm", async ({ page }) => {
+    const { calls } = await openMatrix(page);
+    await page.locator("[data-matrix-grid]").focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("c");
+    await expect(page.getByText("Esta celda no tiene ninguna asignación que confirmar.")).toBeVisible();
+    expect(calls.rpcCalls.map((call) => call.name)).not.toContain("set_assignment_status");
+  });
 });

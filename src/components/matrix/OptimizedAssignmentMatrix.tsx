@@ -15,6 +15,10 @@ import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
 import { useMatrixCommandRunner } from '@/features/matrix-v2/useMatrixCommandRunner';
+import { findMatrixCellElement } from '@/features/matrix-v2/inspector/anchor';
+import type { InspectorTarget } from '@/features/matrix-v2/inspector/environment';
+import { runQuickConfirm, runToggleUnavailable } from '@/features/matrix-v2/quickActions';
+import type { MatrixCommandSource } from '@/features/matrix-v2/types';
 import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
 
@@ -152,9 +156,38 @@ export const OptimizedAssignmentMatrix = ({
     }
     return new Map([...latest].map(([technicianId, { role }]) => [technicianId, role]));
   }, [allAssignments, matrixV2]);
+  const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget | null>(null);
+  const closeInspector = useCallback(() => setInspectorTarget(null), []);
+  const openInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent']) => {
+    const dateKey = formatMadridDateKey(date);
+    setInspectorTarget({ technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey), intent });
+  }, []);
+  const toggleInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null) => {
+    const dateKey = formatMadridDateKey(date);
+    // A second click on the same cell closes its inspector.
+    setInspectorTarget((current) => (
+      current && current.technicianId === technicianId && current.dateKey === dateKey
+        ? null
+        : { technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey) }
+    ));
+  }, []);
+  const quickConfirm = useCallback((technicianId: string, date: Date, source: MatrixCommandSource = 'matrix-inspector') => {
+    const assignment = getAssignmentForCell(technicianId, date);
+    if (!assignment) return;
+    const technician = technicians.find((candidate) => candidate.id === technicianId);
+    const name = technician ? formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico' : 'Técnico';
+    void runQuickConfirm(runner, { technicianId, jobId: assignment.job_id, name, jobTitle: assignment.job?.title, source });
+  }, [getAssignmentForCell, technicians, runner]);
+  const toggleUnavailable = useCallback((technicianId: string, dateKey: string) => {
+    const date = madridDateKeyToCalendarDate(dateKey);
+    const unavailable = date ? getAvailabilityForCell(technicianId, date)?.status === 'unavailable' : false;
+    void runToggleUnavailable({ technicianId, dateKey, unavailable, canEdit: isManagementUser });
+  }, [getAvailabilityForCell, isManagementUser]);
   const v2Config = useMemo<MatrixV2ViewConfig | undefined>(
-    () => (matrixV2 ? { runner, roleSlotsByJob, lastRoleByTechnician } : undefined),
-    [matrixV2, runner, roleSlotsByJob, lastRoleByTechnician],
+    () => (matrixV2
+      ? { runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector, quickConfirm, toggleUnavailable }
+      : undefined),
+    [matrixV2, runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector, quickConfirm, toggleUnavailable],
   );
 
   // Listen for assignment updates and refresh data
@@ -296,6 +329,21 @@ export const OptimizedAssignmentMatrix = ({
       toast({ title: 'En la nevera', description: 'Este técnico está en la nevera y no puede ser asignado.', variant: 'destructive' });
       return;
     }
+    // Matrix v2: confirm and decline are quick actions, everything else is the inspector.
+    if (matrixV2) {
+      if (action === 'confirm') {
+        quickConfirm(technicianId, date);
+        return;
+      }
+      if (action === 'decline') {
+        openInspector(technicianId, date, null, 'decline');
+        return;
+      }
+      if (action === 'unavailable') {
+        openInspector(technicianId, date, null);
+        return;
+      }
+    }
     // Gate direct assign-related actions behind allowDirectAssign
     if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
       return;
@@ -364,7 +412,7 @@ export const OptimizedAssignmentMatrix = ({
 
     // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser, matrixV2, quickConfirm, openInspector]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -704,8 +752,13 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     canExpandBefore, canExpandAfter, onNearEdgeScroll, onVisibleRowsChange: handleVisibleRowsChange,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
-    hideStaffingEmailButtons, hideStaffingWhatsappButtons,
+    fridgeSet, mobile, staffingDepartment,
+    // Matrix v2 has no editing modes: managers can always assign (the inspector
+    // is read-only for everyone else), and the staffing icons live in the inspector.
+    allowDirectAssign: matrixV2 ? isManagementUser : allowDirectAssign,
+    allowMarkUnavailable: matrixV2 ? false : allowMarkUnavailable,
+    hideStaffingEmailButtons: matrixV2 ? true : hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons: matrixV2 ? true : hideStaffingWhatsappButtons,
     cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getHeaderCounts, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,

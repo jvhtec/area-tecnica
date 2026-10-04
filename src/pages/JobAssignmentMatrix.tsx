@@ -660,6 +660,7 @@ export default function JobAssignmentMatrix() {
         handleReminderOpenChange={handleReminderOpenChange}
         outstandingJobsCount={outstandingJobsCount}
         outstandingJobsDescription={outstandingJobsDescription}
+        matrixV2={matrixV2}
       />
 
       {/* Matrix Content */}
