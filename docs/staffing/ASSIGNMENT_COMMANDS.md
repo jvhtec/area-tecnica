@@ -77,10 +77,20 @@ page first. Role changes never recategorize approved rows either.
 `src/types/roles.ts` (pinned by `tests/assignments/assignment-role-registry.test.ts`).
 Commands reject unknown codes, a code in the wrong column, and a code outside
 the technician's discipline (`assignment_role_discipline`: logistics → production).
-Clearing a role is always allowed. Production roles count toward the
-timesheet category (`assignment_role_category`, `resolve_category_for_timesheet`
-and the `compute_timesheet_amount_2025` fallback, since `20261003215000`), so
-`PROD-RESP-R` is billed as responsable and `PROD-AYUD-T` as técnico.
+Clearing a role is always allowed.
+
+**Production/logistics roles never select compensation.** `PROD-*` codes are
+staffing/operational labels: they are validated, stored in `production_role`,
+locked, ledgered and replayed like any other role, but they never choose the
+Técnico/Especialista/Responsable category. `assignment_role_category` only
+reads `SND`/`LGT`/`VID` codes (the same rule as `getCategoryFromAssignment` in
+the client), so a production role change never recategorizes timesheets, and
+`resolve_category_for_timesheet` and the `compute_timesheet_amount_2025` role
+fallback read only sound/lights/video roles, unchanged from before these
+commands. Production and logistics pay keeps coming from the existing
+mechanism (last known category, `profiles.default_timesheet_category`, custom
+rates). Sound/lights/video keep their R/E/T rate semantics. Pinned by
+`assignment_command_hardening.sql`.
 
 **Status no-ops write nothing.** Confirming a confirmed membership, or
 declining an already declined one with no active days, returns `outcome:
@@ -227,7 +237,7 @@ Outside assignment state (deliberately not commands):
 
 1. `supabase db push --dry-run` against linked production; check the five
    migrations (`20261003210000`, `20261003211000`, `20261003212000`,
-   `20261003213000`, `20261003214000`, `20261003215000`), their grants and
+   `20261003213000`, `20261003214000`), their grants and
    the new tables (`assignment_commands`, `assignment_role_codes`).
    Before deploying, list legacy rows the stricter role validation would
    refuse to edit (unregistered codes, or a code outside the technician's

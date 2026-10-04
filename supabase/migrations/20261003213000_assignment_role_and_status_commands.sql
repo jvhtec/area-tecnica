@@ -156,7 +156,7 @@ BEGIN
     RETURNING * INTO v_updated;
 
     IF COALESCE(p_sync_category, true) THEN
-      v_category := public.assignment_role_category(ARRAY[v_updated.sound_role, v_updated.lights_role, v_updated.video_role, v_updated.production_role]);
+      v_category := public.assignment_role_category(ARRAY[v_updated.sound_role, v_updated.lights_role, v_updated.video_role]);
       IF v_category IS NOT NULL THEN
         PERFORM 1 FROM public.profiles WHERE id = p_technician_id FOR KEY SHARE NOWAIT;
         PERFORM 1 FROM public.timesheets t

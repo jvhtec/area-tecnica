@@ -362,8 +362,11 @@ AS $$
     WHEN 'production' THEN 'production' WHEN 'logistics' THEN 'production' END;
 $$;
 
--- Highest category among role codes (responsable > especialista > tecnico)
--- across every role column, production included.
+-- Compensation category among role codes (responsable > especialista >
+-- tecnico), the same rule as getCategoryFromAssignment in the client. Only
+-- sound, lights and video roles carry R/E/T pay semantics: production and
+-- logistics roles (PROD-*) are staffing/operational labels and never select a
+-- category, so their pay stays on the profile/custom-rate mechanism.
 CREATE FUNCTION public.assignment_role_category(p_roles text[])
 RETURNS text
 LANGUAGE sql
@@ -373,7 +376,7 @@ AS $$
   SELECT CASE MAX(CASE pg_catalog.right(r, 1) WHEN 'R' THEN 3 WHEN 'E' THEN 2 WHEN 'T' THEN 1 END)
     WHEN 3 THEN 'responsable' WHEN 2 THEN 'especialista' WHEN 1 THEN 'tecnico' END
   FROM (SELECT pg_catalog.upper(pg_catalog.btrim(role)) AS r FROM pg_catalog.unnest(p_roles) AS role) roles
-  WHERE r ~ '^[A-Z]+-[A-Z]+-[RET]$';
+  WHERE r ~ '^(SND|LGT|VID)-[A-Z]+-[RET]$';
 $$;
 
 -- Approved timesheets are financial records: commands never delete or void

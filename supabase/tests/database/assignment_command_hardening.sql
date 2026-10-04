@@ -14,12 +14,15 @@ INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, r
   ('d0110000-0000-0000-0000-000000000002', 'h-sound@test.local', '{}', '{}', 'authenticated', 'authenticated'),
   ('d0110000-0000-0000-0000-000000000003', 'h-prod@test.local', '{}', '{}', 'authenticated', 'authenticated'),
   ('d0110000-0000-0000-0000-000000000004', 'h-logi@test.local', '{}', '{}', 'authenticated', 'authenticated');
-INSERT INTO profiles (id, email, first_name, last_name, role, department) VALUES
-  ('d0110000-0000-0000-0000-000000000001', 'h-manager@test.local', 'Hard', 'Manager', 'management', 'sound'),
-  ('d0110000-0000-0000-0000-000000000002', 'h-sound@test.local', 'Hard', 'Sound', 'technician', 'sound'),
-  ('d0110000-0000-0000-0000-000000000003', 'h-prod@test.local', 'Hard', 'Prod', 'technician', 'production'),
-  ('d0110000-0000-0000-0000-000000000004', 'h-logi@test.local', 'Hard', 'Logi', 'technician', 'logistics')
-ON CONFLICT (id) DO UPDATE SET role = excluded.role, department = excluded.department;
+-- The production/logistics profiles carry a default category that differs
+-- from their role's R/E/T suffix, to show which one pays.
+INSERT INTO profiles (id, email, first_name, last_name, role, department, default_timesheet_category) VALUES
+  ('d0110000-0000-0000-0000-000000000001', 'h-manager@test.local', 'Hard', 'Manager', 'management', 'sound', NULL),
+  ('d0110000-0000-0000-0000-000000000002', 'h-sound@test.local', 'Hard', 'Sound', 'technician', 'sound', NULL),
+  ('d0110000-0000-0000-0000-000000000003', 'h-prod@test.local', 'Hard', 'Prod', 'technician', 'production', 'especialista'),
+  ('d0110000-0000-0000-0000-000000000004', 'h-logi@test.local', 'Hard', 'Logi', 'technician', 'logistics', 'responsable')
+ON CONFLICT (id) DO UPDATE SET role = excluded.role, department = excluded.department,
+  default_timesheet_category = excluded.default_timesheet_category;
 INSERT INTO activity_catalog (code, label, default_visibility, severity, toast_enabled)
 SELECT code, code, 'management', 'info', false
 FROM unnest(ARRAY['job.created', 'assignment.created', 'assignment.updated', 'assignment.removed', 'timesheet.approved']) code
@@ -60,41 +63,62 @@ INSERT INTO results SELECT 'cross', pg_temp.apply('d0310000-0000-0000-0000-00000
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'cross'), 'role_department_mismatch', 'a sound technician cannot take a production role');
 
 -- ---------------------------------------------------------------------------
--- Production / logistics roles drive category and rate
+-- Production / logistics roles are staffing labels, never compensation
 -- ---------------------------------------------------------------------------
+-- Their pay stays on the pre-existing mechanism (here the profile default
+-- category seeded above).
+RESET ROLE;
+SELECT ok(assignment_role_category(ARRAY['PROD-RESP-R', 'PROD-AYUD-T', 'PROD-COND-T']) IS NULL,
+  'production roles never select a compensation category');
+SELECT is(assignment_role_category(ARRAY['SND-FOH-R', 'LGT-PA-T', 'VID-CAM-E']), 'responsable',
+  'sound/lights/video roles keep their R/E/T semantics');
+SET LOCAL ROLE authenticated;
 INSERT INTO results SELECT 'prod', pg_temp.apply('d0310000-0000-0000-0000-000000000004', 'd0210000-0000-0000-0000-000000000001',
   'd0110000-0000-0000-0000-000000000003', 'PROD-RESP-R', ARRAY['2027-01-11']::date[]);
 SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'production_role' = 'PROD-RESP-R' FROM results WHERE name = 'prod'),
   'a production technician takes a production role');
 SELECT is((SELECT category FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000003'),
-  'responsable', 'Responsable de Producción is categorized responsable');
+  'especialista', 'Responsable de Producción keeps the profile category, not responsable');
 INSERT INTO results SELECT 'logi', pg_temp.apply('d0310000-0000-0000-0000-000000000005', 'd0210000-0000-0000-0000-000000000001',
   'd0110000-0000-0000-0000-000000000004', 'PROD-AYUD-T', ARRAY['2027-01-12']::date[]);
 SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'production_role' = 'PROD-AYUD-T' FROM results WHERE name = 'logi'),
   'logistics staff take production roles');
+SELECT is((SELECT category FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000004'),
+  'responsable', 'a logistics Ayudante keeps the profile category, not tecnico');
 INSERT INTO results SELECT 'prod_role', public.change_assignment_role('d0310000-0000-0000-0000-000000000006', 'd0210000-0000-0000-0000-000000000001',
   'd0110000-0000-0000-0000-000000000003', 'production', 'PROD-AYUD-T', true, pg_temp.tok('d0210000-0000-0000-0000-000000000001', 'd0110000-0000-0000-0000-000000000003'));
+SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'production_role' = 'PROD-AYUD-T' FROM results WHERE name = 'prod_role'),
+  'a production role change commits');
 SELECT is((SELECT category FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000003'),
-  'tecnico', 'a production role change recategorizes the days');
+  'especialista', 'a production role change does not recategorize the days');
 INSERT INTO results SELECT 'prod_mismatch', public.change_assignment_role('d0310000-0000-0000-0000-000000000007', 'd0210000-0000-0000-0000-000000000001',
   'd0110000-0000-0000-0000-000000000003', 'sound', 'SND-FOH-R', true, pg_temp.tok('d0210000-0000-0000-0000-000000000001', 'd0110000-0000-0000-0000-000000000003'));
 SELECT is((SELECT value->>'code' FROM results WHERE name = 'prod_mismatch'), 'role_department_mismatch',
   'a role column outside the technician discipline is refused');
 RESET ROLE;
--- The category trigger and the amount engine read production roles too.
+-- Neither the category trigger nor the amount engine reads production roles.
 UPDATE job_assignments SET production_role = 'PROD-RESP-R'
 WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000003';
+SELECT is(resolve_category_for_timesheet('d0210000-0000-0000-0000-000000000001', 'd0110000-0000-0000-0000-000000000003'),
+  'especialista', 'the category resolver ignores the production role');
 INSERT INTO timesheets (job_id, technician_id, date) VALUES
   ('d0210000-0000-0000-0000-000000000001', 'd0110000-0000-0000-0000-000000000003', '2027-01-13');
 SELECT is((SELECT category FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001'
-  AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13'), 'responsable',
-  'a new timesheet for a production responsable is autofilled responsable');
+  AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13'), 'especialista',
+  'a new timesheet for a production responsable is autofilled from the profile, not the role');
 UPDATE timesheets SET start_time = '09:00', end_time = '17:00'
 WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13';
-SELECT ok((SELECT r->'amount_breakdown'->>'category' = 'responsable' AND (r->'amount_breakdown'->>'base_day_eur')::numeric = 150
+SELECT ok((SELECT r->'amount_breakdown'->>'category' = 'especialista' AND (r->'amount_breakdown'->>'base_day_eur')::numeric = 125
   FROM (SELECT compute_timesheet_amount_2025((SELECT id FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001'
     AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13'), false) AS r) x),
-  'the amount engine prices a production responsable with the responsable rate card');
+  'the amount engine prices a production responsable on the profile category, not the responsable rate card');
+-- The amount engine's own role fallback (no stored category) ignores it too.
+UPDATE timesheets SET category = NULL
+WHERE job_id = 'd0210000-0000-0000-0000-000000000001' AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13';
+SELECT ok((SELECT r->'amount_breakdown'->>'category' IS DISTINCT FROM 'responsable'
+  FROM (SELECT compute_timesheet_amount_2025((SELECT id FROM timesheets WHERE job_id = 'd0210000-0000-0000-0000-000000000001'
+    AND technician_id = 'd0110000-0000-0000-0000-000000000003' AND date = '2027-01-13'), false) AS r) x),
+  'the amount fallback never derives responsable from a production role');
 SET LOCAL ROLE authenticated;
 
 -- ---------------------------------------------------------------------------
