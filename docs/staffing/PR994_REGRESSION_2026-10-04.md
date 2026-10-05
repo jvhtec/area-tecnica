@@ -170,15 +170,16 @@ Observed additional checks:
 | Real PostgREST and SQL concurrency | 38 passed, including 7 new Flex cases |
 | Shared reconciliation coordinator | 69 focused tests passed |
 | Generic proxy compatibility and bypass tests | 115 passed |
-| HTTP adapters | 6 passed; legacy intent is not forwarded, bulk shares the coordinator, missing profiles denied |
+| HTTP adapters | 13 passed; legacy intent is not forwarded, bulk shares the coordinator, missing profiles denied; unmapped calls skip without provider access and lookup failures remain errors |
 | Full synthetic runtime rerun | 44 passed, 0 skipped; owned teardown certified |
 | Populated historical upgrade | Seven PR migrations applied from 251 to 258; all four whole-row hashes unchanged |
 | Historical approved timesheet probe | Removal rejected as `approved_timesheet`, then transaction rolled back |
 | Final lint, app typecheck, Edge typecheck and governance (2026-10-05) | Passed; 104 Edge modules checked |
-| Full unit suite | 538 files, 3,845 tests passed; 110 opt-in tests skipped and exercised separately where relevant above |
+| Full unit suite | 538 files, 3,852 tests passed; 110 opt-in tests skipped and exercised separately where relevant above |
 | Critical suite and coverage thresholds | Passed |
 | Production build and bundle budget | `npm run build` and `npm run budget:bundle` passed |
 | Local production-build Chromium suite | 52 passed, 10 skipped; missing browser binary/libraries repaired before the successful run |
+| Local production-build mobile viewport suite | 60 passed, 2 skipped, including touch-only Matrix flows |
 
 The final Edge type check caught callback control-flow narrowing in the added
 contact tracking. Ownership tracking now occurs inside the verified-contact
@@ -208,6 +209,24 @@ durable persistence, refused error release and blocked replacement. The independ
 recheck passed all 69 helper tests with no remaining finding in that narrow review.
 Errors with journaled contacts conservatively retain busy ownership for recovery,
 even if an individual provider operation was settled.
+
+CodeRabbit completed review `a1ab7095-8ac5-44c6-b202-9606d4c895fb`
+through `319e5db9`, with no architecture-level concern and two bounded findings.
+Single and bulk adapters now skip absent/empty physical mappings; lookup errors
+still fail visibly, and mapped calls retain the durable coordinator. Thirteen
+adapter tests pass; six new assertions fail with the original adapters while
+seven controls pass. No gate or journal is cleared by the unmapped-call skip.
+
+The seven real Flex integration cases now accept a configured loopback endpoint
+and an explicitly permitted container, or the known disposable GitHub Actions
+target. The CI database integration step includes them. On a new owned target
+`supabase_db_pr994reviewfollowup` at port 18090, all seven real cases and thirteen
+adapter cases passed with zero skips. The old fixed gate skipped all seven cases
+on that same target. Two older staffing suites refused its different name/port
+as designed; their original 38-case validation remains recorded above. Lint,
+app/Edge type checks, governance, critical and the full unit suite were rerun
+after these changes. Public command contracts and coordinator/proxy safety
+helpers gained 58 JSDoc comments to address the review's documentation warning.
 
 The first follow-up runtime passed 41 cases and two of the three fault cases,
 but its positive fixture lacked a crew-call scope. It now provisions an owned

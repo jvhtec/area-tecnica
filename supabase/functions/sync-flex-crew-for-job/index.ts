@@ -21,9 +21,10 @@ serve(createHttpHandler(async (req) => {
     throw new HttpError(400, 'Only sound and lights crew calls are supported');
   }
   const { data: calls, error } = await supabase.from('flex_crew_calls')
-    .select('department').eq('job_id', body.job_id);
+    .select('department,flex_element_id').eq('job_id', body.job_id);
   if (error) throw new HttpError(503, 'Could not load crew calls');
-  const departments = [...new Set((calls ?? []).map(c => c.department))]
+  const departments = [...new Set((calls ?? [])
+    .filter(c => typeof c.flex_element_id === 'string' && c.flex_element_id.trim()).map(c => c.department))]
     .filter((d): d is 'sound' | 'lights' => (d === 'sound' || d === 'lights')
       && (!Array.isArray(requested) || requested.length === 0 || requested.includes(d)));
   const summary: Record<string, Awaited<ReturnType<typeof reconcileFlexCrew>>> = {};

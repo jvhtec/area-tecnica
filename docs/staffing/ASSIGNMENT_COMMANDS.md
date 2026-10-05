@@ -277,6 +277,9 @@ profile department; soft decline preserves direct membership and hard-deleted
 tour membership is absent. Missing resources and unsupported lights dictionaries
 remain diagnostic; unknown provider contacts are retained because ownership
 cannot be proved. Inventory any legacy roleless memberships before rollout.
+Departments without a mapped physical crew call return a successful skip rather
+than an endlessly retryable effect. Lookup failures remain visible errors;
+this skip never unlocks an existing physical gate or clears its contact journal.
 
 Assignment transactions can commit while a worker talks to Flex. That worker
 rereads current intent, reconciles again when it changes, and validates the final
@@ -325,7 +328,11 @@ does not require deleting additive database state.
   `assignment_command_missing_identity.sql`, `flex_crew_reconciliation.sql`;
   shared coordinator/proxy and HTTP adapter tests; opt-in
   `flex-reconciliation.integration.test.ts` runs historical retry paths against
-  real PostgREST and tests independent claim/retarget backends.
+  real PostgREST and tests independent claim/retarget backends. CI includes all
+  seven cases in `scripts/ci/test-staffing-postgrest.sh`. Locally set
+  `STAFFING_TEST_REST_URL` to a loopback HTTP endpoint with an explicit port,
+  `STAFFING_TEST_DB_CONTAINER` to an owned disposable target, and repeat that
+  container in `ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL` to opt in.
 - Real concurrency (two psql backends, CI `rls_rpc_security_tests` job):
   `tests/assignments/direct-assignment-commands.integration.test.ts` — stale
   managers, same-day cross-job race, concurrent retry, offer acceptance, move

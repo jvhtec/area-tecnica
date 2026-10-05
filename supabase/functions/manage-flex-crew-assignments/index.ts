@@ -16,6 +16,13 @@ serve(createHttpHandler(async (req) => {
     || !['add', 'remove', 'reconcile'].includes(String(action))) {
     throw new HttpError(400, 'Job, supported department and action are required');
   }
+  const { data: calls, error: callError } = await supabase.from('flex_crew_calls')
+    .select('flex_element_id').eq('job_id', job_id).eq('department', department).limit(1);
+  if (callError) throw new HttpError(503, 'Could not load crew calls');
+  if (!calls?.some(call => typeof call.flex_element_id === 'string' && call.flex_element_id.trim())) {
+    return jsonResponse({ success: true, message: 'No mapped Flex crew call for this department',
+      added: 0, removed: 0, kept: 0, rolesSet: 0, diagnostics: [] });
+  }
   const token = Deno.env.get('X_AUTH_TOKEN') || Deno.env.get('FLEX_X_AUTH_TOKEN') || '';
   if (!token) throw new HttpError(503, 'Flex authentication not configured');
   const summary = await reconcileFlexCrew(supabase, job_id, department, token);

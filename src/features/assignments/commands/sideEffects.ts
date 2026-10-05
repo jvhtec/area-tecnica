@@ -32,11 +32,13 @@ const claimSchema = z.object({
 /** How long one runner may hold an effect before it becomes retryable. */
 const CLAIM_LEASE_SECONDS = 120;
 
+/** Invoke one post-commit handler and propagate failure for ledger reporting. */
 const invoke = async (name: string, body: Record<string, unknown>) => {
   const { error } = await supabase.functions.invoke(name, { body });
   if (error) throw error;
 };
 
+/** Attach the stable effect ID to its notification payload for delivery deduplication. */
 const notificationBody = (
   effect: AssignmentSideEffect,
   result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed'>,
@@ -48,6 +50,7 @@ const notificationBody = (
   idempotency_key: effect.effect_id,
 });
 
+/** Build the event-specific recipient and department payload from the committed command. */
 const notificationPayload = (
   effect: AssignmentSideEffect,
   result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed'>,
@@ -92,6 +95,7 @@ const notificationPayload = (
   };
 };
 
+/** Dispatch a claimed effect; legacy Flex intent is reconciled by the crew handler. */
 async function runEffect(
   effect: AssignmentSideEffect,
   result: Pick<AssignmentCommandResult, 'technician_id' | 'assignment' | 'dates' | 'removed'>,

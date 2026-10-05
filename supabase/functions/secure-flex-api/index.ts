@@ -37,6 +37,7 @@ interface FlexProxyRequest extends Record<string, unknown> {
   headers?: unknown;
 }
 
+/** Normalize a relative provider route and reject origin, base-path or allowlist escapes. */
 function validateEndpoint(endpoint: unknown): URL {
   if (typeof endpoint !== "string" || !endpoint.startsWith("/")) {
     throw new HttpError(400, "Endpoint must be a relative Flex API path", {
@@ -81,6 +82,7 @@ function validateEndpoint(endpoint: unknown): URL {
   return target;
 }
 
+/** Copy bounded permitted caller headers without forwarding authentication credentials. */
 function sanitizeHeaders(input: unknown): Headers {
   const output = new Headers();
 

@@ -36,21 +36,26 @@ class RpcFailure extends Error {
   }
 }
 
+/** Require an object-shaped RPC or provider record. */
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Malformed Flex reconciliation data");
   return value as Record<string, unknown>;
 }
+/** Require a nonempty identity without coercing provider values. */
 function string(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) throw new Error("Missing Flex reconciliation identity");
   return value;
 }
+/** Preserve explicit missing identities while rejecting malformed values. */
 function nullableString(value: unknown): string | null {
   return value === null ? null : string(value);
 }
+/** Validate current intent, mapping identities and the durable contact journal. */
 function projection(value: unknown): Projection {
   const row = record(value);
   if (!Array.isArray(row.desired) || !Array.isArray(row.current)) throw new Error("Malformed crew projection");
   if (!Array.isArray(row.owned_contacts)) throw new Error("Missing durable contact journal");
+  /** Validate the shared crew-call, technician and resource identity fields. */
   const base = (v: unknown) => {
     const r = record(v);
     return { crew_call_id: string(r.crew_call_id), technician_id: string(r.technician_id), resource_id: nullableString(r.resource_id) };
@@ -69,6 +74,7 @@ function projection(value: unknown): Projection {
 
 // Abort is advisory. The race also bounds providers that ignore it; the durable
 // operation stays outstanding even when that provider completes much later.
+/** Bound I/O independently of advisory abort support; timeout never proves settlement. */
 async function bounded<T>(task: (signal: AbortSignal) => PromiseLike<T>, ms: number): Promise<T> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -111,11 +117,13 @@ export async function reconcileFlexCrew(
     "X-Auth-Token": flexToken, "X-Requested-With": "XMLHttpRequest",
     "X-API-Client": "flex5-desktop", Accept: "*/*",
   };
+  /** Keep every normal request within both request and reconciliation deadlines. */
   const remaining = () => {
     const ms = Math.min(REQUEST_MS, deadline - Date.now());
     if (ms <= 0) throw new Error("Flex reconciliation time budget exhausted");
     return ms;
   };
+  /** Call a bounded service RPC and distinguish definitive SQL refusals from ambiguous failures. */
   async function rpc(name: string, args: Record<string, unknown>, cleanup = false): Promise<unknown> {
     const response = await bounded((signal) => supabase.rpc(name, args).abortSignal(signal), cleanup ? REQUEST_MS : remaining());
     if (response.error) {
@@ -124,11 +132,15 @@ export async function reconcileFlexCrew(
     }
     return response.data;
   }
+  /** Bind every ownership-sensitive RPC to the claimed physical element and token. */
   const ownerArgs = () => ({ p_element: gate!.element, p_owner: gate!.owner });
+  /** Construct the provider route for the claimed physical crew element. */
   const elementUrl = () => `${API}/${encodeURIComponent(gate!.element)}`;
+  /** Load current intent and journal only for the active, settled owner. */
   async function read(): Promise<Projection> {
     return projection(await rpc("read_flex_crew_reconciliation", ownerArgs()));
   }
+  /** Require an authoritative provider row read with unique contact and resource identities. */
   async function contacts(): Promise<{ contacts: Contact[]; rows: Map<string, Record<string, unknown>> }> {
     const qs = new URLSearchParams({ _dc: String(Date.now()), node: "root" });
     qs.append("codeList", "contact");
@@ -163,16 +175,19 @@ export async function reconcileFlexCrew(
     }
     return { contacts: found, rows };
   }
+  /** Persist a verified mapping through the ownership and physical-retarget boundary. */
   async function map(row: Pick<Mapping, "crew_call_id" | "technician_id">, line: string | null) {
     await rpc("write_flex_crew_mapping", {
       ...ownerArgs(), p_crew_call: row.crew_call_id, p_technician: row.technician_id, p_line_item: line,
     });
   }
+  /** Retain durable ownership when external completion cannot be established. */
   async function quarantine() {
     // Failure to record uncertainty still leaves a busy, outstanding gate.
     try { await rpc("settle_flex_crew_operation", { ...ownerArgs(), p_uncertain: true }, true); }
     catch { /* Never release or retry the external mutation. */ }
   }
+  /** Durably admit one external write, consume its response and settle only with proven ownership. */
   async function mutate(
     kind: "add" | "remove" | "role", row: Pick<Mapping, "crew_call_id" | "technician_id">,
     token: string, url: string, init: RequestInit, verify?: () => Promise<string>,
@@ -219,6 +234,7 @@ export async function reconcileFlexCrew(
     }
   }
 
+  /** Reconcile one current projection while retaining unproven contacts and journaled ownership. */
   async function reconcile(snapshot: Projection) {
     // SQL supplies the union of all aliases and filters explicit roles,
     // dryhire and deleted tour membership. Never infer intent from profiles.

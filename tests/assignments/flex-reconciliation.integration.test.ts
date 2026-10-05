@@ -10,8 +10,11 @@ import { retryAssignmentSideEffects } from '@/features/assignments/commands/reco
 
 const endpoint = process.env.STAFFING_TEST_REST_URL;
 const container = process.env.STAFFING_TEST_DB_CONTAINER;
-const permitted = endpoint === 'http://127.0.0.1:18089' && container === 'supabase_db_pr990staffingreview'
-  && process.env.ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL === container;
+const localEndpoint = endpoint?.match(/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):([1-9]\d{0,4})\/?$/);
+const permitted = Boolean(localEndpoint && Number(localEndpoint[1]) <= 65535 && container) && (
+  (process.env.GITHUB_ACTIONS === 'true' && container === 'supabase_db_syldobdcdsgfgjtbuwxm')
+  || process.env.ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL === container
+);
 const networkFetch = globalThis.fetch;
 const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
 function deferred() {

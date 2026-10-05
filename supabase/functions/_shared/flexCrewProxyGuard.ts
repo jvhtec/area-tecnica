@@ -42,46 +42,59 @@ const HEADER_FIELDS = new Set(['name', 'documentName', 'documentNumber', 'planne
 const LINE_FIELDS = new Set(['pricingModel', 'pricing-model', 'timeQty', 'time-qty', 'quantity']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Reject mutations that cannot prove safe scope or target managed crew membership. */
 function deny(): never {
   throw new HttpError(409, 'Flex mutation is not allowlisted or targets managed crew membership', { code: 'flex_crew_reconciliation_required' });
 }
+/** Reject ambiguous caller payloads before any provider mutation. */
 function malformed(): never { throw new HttpError(400, 'Invalid or conflicting Flex mutation payload'); }
+/** Fail closed when trusted classification metadata cannot be read. */
 function unavailable(): never { throw new HttpError(503, 'Could not verify Flex mutation metadata'); }
+/** Require an object-shaped metadata or payload record. */
 function row(value: unknown): Row {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return malformed();
   return value as Row;
 }
+/** Read a Flex field value that may use the provider data wrapper. */
 function unwrap(value: unknown): unknown {
   return value && typeof value === 'object' && !Array.isArray(value) && 'data' in value ? (value as Row).data : value;
 }
+/** Validate and normalize a caller or provider UUID before scope comparisons. */
 function uuid(value: unknown): string {
   const unwrapped = unwrap(value);
   if (typeof unwrapped !== 'string' || !UUID.test(unwrapped)) return malformed();
   return unwrapped.toLowerCase();
 }
+/** Require all available identity aliases to agree. */
 function identity(data: Row, keys: string[]): string | undefined {
   const values = keys.filter((key) => data[key] != null).map((key) => uuid(data[key]));
   if (new Set(values).size > 1) return deny();
   return values[0];
 }
+/** Reject fields outside the finite allowlist for this operation. */
 function only(data: Row, keys: string[]) {
   if (Object.keys(data).some((key) => !keys.includes(key))) deny();
 }
+/** Require a nonempty text field without coercing caller values. */
 function text(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) return malformed();
   return value;
 }
+/** Validate finite quantities and the required sign before forwarding. */
 function numeric(value: unknown, positive = false) {
   if ((typeof value !== 'string' && typeof value !== 'number') || String(value).trim() === '' || !Number.isFinite(Number(value)) || (positive ? Number(value) <= 0 : Number(value) < 0)) malformed();
 }
 
 // JSON.parse erases duplicate keys. Walk its already-validated source tokens
 // so escaped spellings and nested bulkData duplicates also fail.
+/** Parse JSON while rejecting duplicate keys, including escaped and nested keys. */
 function parseJson(source: string): Row {
   let parsed: unknown;
   try { parsed = JSON.parse(source); } catch { return malformed(); }
   let i = 0;
+  /** Advance over whitespace in already syntax-validated JSON. */
   const space = () => { while (i < source.length && /\s/.test(source[i])) i++; };
+  /** Decode one JSON string token while preserving escaped-key identity. */
   const quoted = () => {
     const start = i++;
     while (i < source.length) {
@@ -90,6 +103,7 @@ function parseJson(source: string): Row {
     }
     return JSON.parse(source.slice(start, i)) as string;
   };
+  /** Walk validated JSON tokens with bounded nesting and unique object keys. */
   const value = (depth: number) => {
     if (depth > 20) malformed();
     space();
@@ -118,6 +132,7 @@ function parseJson(source: string): Row {
   value(0);
   return row(parsed);
 }
+/** Read form or query fields without losing duplicate-key evidence. */
 function parameters(params: URLSearchParams): Row {
   const result: Row = Object.create(null);
   for (const [key, value] of params) {
@@ -126,6 +141,7 @@ function parameters(params: URLSearchParams): Row {
   }
   return result;
 }
+/** Merge supported body and query encodings only when shared fields agree. */
 function payload(url: URL, inspection: FlexMutationInspection): Row {
   const query = parameters(url.searchParams);
   let body: Row = {};
@@ -157,6 +173,7 @@ export async function assertNotCrewMutation(
   const path = target.pathname.slice(basePath.length).replace(/\/$/, '');
   const data = payload(target, inspection);
   const deadline = Date.now() + 30_000;
+  /** Limit metadata I/O even when a transport ignores cancellation. */
   async function bounded<T>(task: (signal: AbortSignal) => PromiseLike<T>): Promise<T> {
     const ms = Math.min(10_000, deadline - Date.now());
     if (ms <= 0) return unavailable();
@@ -172,6 +189,7 @@ export async function assertNotCrewMutation(
     } catch { return unavailable(); }
     finally { clearTimeout(timer); }
   }
+  /** Read trusted provider metadata with redirects, body size and time bounded. */
   async function get(endpoint: string): Promise<unknown> {
     return bounded(async (signal) => {
       const response = await inspection.fetch(`${base.origin}${basePath}${endpoint}`, { method: 'GET', signal, redirect: 'error' });
@@ -181,6 +199,7 @@ export async function assertNotCrewMutation(
       return JSON.parse(body) as unknown;
     });
   }
+  /** Read local classification evidence without silently truncating large results. */
   async function lookup(table: string, id: string, workOrder = false): Promise<Row[]> {
     const result = await bounded((signal) => {
       const query = client.from(table).select('*');
@@ -192,6 +211,7 @@ export async function assertNotCrewMutation(
     return result.data.map(row);
   }
   const cache = new Map<string, Element>();
+  /** Bind an element to trusted definition metadata and reject conflicting local evidence. */
   async function classify(id: string, crewHeader = false): Promise<Element> {
     if (cache.has(id)) return cache.get(id)!;
     const [calls, gates] = await Promise.all([lookup('flex_crew_calls', id), lookup('flex_crew_reconciliation_gates', id)]);
@@ -227,10 +247,12 @@ export async function assertNotCrewMutation(
     cache.set(id, result);
     return result;
   }
+  /** Read bounded provider rows belonging to the classified document. */
   async function members(id: string, family: string): Promise<Map<string, Row>> {
     const value = await get(`/${family}/${id}/row-data/?node=root&codeList=contact&codeList=quantity&codeList=notes`);
     if (!Array.isArray(value)) deny();
     const result = new Map<string, Row>();
+    /** Traverse a bounded provider subtree and reject ambiguous identities. */
     const walk = (values: unknown[], depth: number) => {
       if (depth > 12) deny();
       for (const v of values) {
@@ -250,6 +272,7 @@ export async function assertNotCrewMutation(
     walk(value, 0);
     return result;
   }
+  /** Require referenced lines to belong to this document and prove a permitted non-crew type. */
   async function verifyLines(id: string, family: string, ids: string[]) {
     if (!ids.length) return;
     const rows = await members(id, family);
@@ -262,6 +285,7 @@ export async function assertNotCrewMutation(
       if (new Set(types).size !== 1 || !LINE_TYPES.has(types[0]) || (family === 'line-item' && types[0] !== 'inventory-model')) deny();
     }
   }
+  /** Prove parent and sibling scope before permitting resource insertion. */
   async function references(element: Element, family: string, fields: Row) {
     const ids = ['parentLineItemId', 'nextSiblingId'].filter((key) => fields[key] != null && fields[key] !== '').map((key) => uuid(fields[key]));
     await verifyLines(element.id, family, ids);
@@ -339,6 +363,7 @@ export async function assertNotCrewMutation(
     const tree = await get(`/element/${id}/tree`);
     if (!Array.isArray(tree) || !tree.length) deny();
     const seen = new Set<string>();
+    /** Traverse a bounded provider subtree and reject ambiguous identities. */
     const walk = async (nodes: unknown[], parent?: string, depth = 0) => {
       if (depth > 12) deny();
       for (const value of nodes) {
