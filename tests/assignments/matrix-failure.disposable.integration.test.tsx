@@ -83,6 +83,12 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
 
   async function job(): Promise<AssignableJob> {
     const id = await h.job();
+    // Provision the crew-call scope required by the real reconciliation RPC.
+    // This technician has no provider resource, so no Flex HTTP write occurs.
+    const crew = await h.client.from('flex_crew_calls').insert({
+      job_id: id, department: 'sound', flex_element_id: crypto.randomUUID(),
+    });
+    expect(crew.error).toBeNull();
     // UTC begins on the previous day, but the intended Madrid span is 20–22.
     const result = await h.client.from('jobs').update({ start_time: '2027-10-19T22:30:00Z',
       end_time: '2027-10-22T21:59:00Z' }).eq('id', id).select('id,title,status,start_time,end_time').single();
