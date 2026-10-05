@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
+import { assertNotCrewMutation } from "../_shared/flexCrewProxyGuard.ts";
 import {
   createHttpHandler,
   HttpError,
@@ -161,6 +162,17 @@ serve(createHttpHandler(async (req) => {
   headers.set("X-Auth-Token", flexAuthToken);
   headers.set("apikey", flexAuthToken);
 
+  await assertNotCrewMutation(supabase, target, method, {
+    apiBaseUrl: FLEX_API_BASE_URL,
+    body,
+    contentType: headers.get("Content-Type") ?? undefined,
+    fetch: (url, init) => fetch(url, {
+      ...init,
+      headers,
+      redirect: "error",
+    }),
+  });
+
   const shouldRetry = method === "GET";
   const response = await fetchWithRetry(
     target.toString(),
@@ -168,6 +180,7 @@ serve(createHttpHandler(async (req) => {
       method,
       headers,
       body: body || undefined,
+      redirect: "error",
     },
     {
       attempts: shouldRetry ? 3 : 1,

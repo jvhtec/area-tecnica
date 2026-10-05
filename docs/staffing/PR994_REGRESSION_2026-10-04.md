@@ -2,10 +2,14 @@
 
 ## Verdict and scope
 
-Local regression checks passed for PR #994's production changes at
+The initial local regression checks passed for PR #994's production changes at
 `f9b130f6d1e4ab8ac39717cd98c1e224345a8974`, with the accompanying test-harness
-corrections. No production handler, migration, authorization rule, or runtime
-admission/cleanup guard was changed by this follow-up.
+corrections. The later manually requested CodeRabbit review retained two security
+architecture blockers despite green CI. Both were reproduced: missing-profile
+authorization passed nullable guards, and old Flex intents reversed newer crew
+decisions. The subsequent reconciliation follow-up changes production handlers
+and adds two migrations; its evidence is recorded below. Runtime admission and
+cleanup safeguards remain unchanged.
 
 The final merge and production migration application remain human actions.
 Check the current PR checks/review threads before merging. Follow
@@ -132,8 +136,94 @@ and supplied the Git index required by the assignment-writer inventory.
 ## Limits
 
 No production database or real email/WhatsApp/Flex delivery was exercised.
-Providers were isolated behind the synthetic sink. Browser/mobile smoke tests
-are covered by the PR's GitHub checks; the local matrix tests exercised real
-Auth/RLS/SQL through jsdom, rather than a physical device. The production linked
+Providers were isolated behind the synthetic sink. The later local production-build
+Chromium run passed 52 browser tests with 10 skips; matrix runtime tests exercised real
+Auth/RLS/SQL through jsdom. No physical device was exercised. The production linked
 dry-run, role inventory, migration apply, merge, and post-deploy verification
 remain required human release steps.
+
+## Reconciliation and authorization blocker follow-up
+
+The manually requested CodeRabbit review through `14d67f3` retained two
+architecture concerns. Independently reproduced negative controls confirmed
+both: all 42 missing-identity denial cases failed against the original nullable
+guards, and two historical Flex retries reversed newer opposite decisions while
+their two current-intent controls passed.
+
+The additive authorization migration fails closed at all 14 assignment boundary
+RPCs while preserving their signatures, grants and unrelated role helpers. The
+second migration provides a service-only, non-expiring physical-element gate.
+Both crew endpoints reconcile current explicit roles through one coordinator.
+Every external write is admitted durably; verified add settlement persists its
+local ownership mapping atomically. Uncertain outcomes retain ownership without
+lease takeover. The proxy positively classifies permitted equipment/financial
+operations and refuses alternate crew membership/role writes. Job deletion
+removes core membership before requesting crew reconciliation.
+
+Observed additional checks:
+
+| Check | Result |
+| --- | --- |
+| Fresh migration replay and database lint | All 258 migrations applied; lint passed |
+| Full pgTAP suite | 62 files, 1,522 assertions passed |
+| Missing identity authorization | 47 assertions passed; 42 denial assertions fail without the fix |
+| Real PostgREST and SQL concurrency | 38 passed, including 7 new Flex cases |
+| Shared reconciliation coordinator | 69 focused tests passed |
+| Generic proxy compatibility and bypass tests | 115 passed |
+| HTTP adapters | 6 passed; legacy intent is not forwarded, bulk shares the coordinator, missing profiles denied |
+| Full synthetic runtime rerun | 44 passed, 0 skipped; owned teardown certified |
+| Populated historical upgrade | Seven PR migrations applied from 251 to 258; all four whole-row hashes unchanged |
+| Historical approved timesheet probe | Removal rejected as `approved_timesheet`, then transaction rolled back |
+| Final lint, app typecheck, Edge typecheck and governance (2026-10-05) | Passed; 104 Edge modules checked |
+| Full unit suite | 538 files, 3,845 tests passed; 110 opt-in tests skipped and exercised separately where relevant above |
+| Critical suite and coverage thresholds | Passed |
+| Production build and bundle budget | `npm run build` and `npm run budget:bundle` passed |
+| Local production-build Chromium suite | 52 passed, 10 skipped; missing browser binary/libraries repaired before the successful run |
+
+The final Edge type check caught callback control-flow narrowing in the added
+contact tracking. Ownership tracking now occurs inside the verified-contact
+callback; focused runtime tests and all 104 Edge type checks pass after that fix.
+The security advisor reported 19 pre-existing warnings and none for the new gate.
+
+The new real integration cases execute the actual retry path through the shared
+coordinator and real service RPCs with a simulated Flex provider. They cover both
+superseded intents and current controls, a paused add followed by newer removal,
+independent claim backends on physical aliases, and retargeting while mapping.
+The retarget case observes a genuine row-lock wait and refuses the obsolete
+physical mapping after the competing transaction commits.
+
+Additional negative controls disable the pre-admission outstanding flag and
+atomic add settlement separately; both tests fail as expected, then pass after
+restoration. Late provider completion, HTTP 408, failed/ambiguous mapping
+settlement, cascading source deletion and response-body hangs cannot release
+uncertain external ownership.
+
+The final independent review reproduced another combined failure: a successful
+add, cascading source/mapping deletion, then a failed projection could release
+ownership and let a retry forget the provider contact. Its regression failed
+before the fix. A durable gate contact journal now survives cascades, is read by
+reconciliation and cannot be discarded by error cleanup. Two timing tests cover
+cascade before the first read and cascade followed by read failure; pgTAP verifies
+durable persistence, refused error release and blocked replacement. The independent
+recheck passed all 69 helper tests with no remaining finding in that narrow review.
+Errors with journaled contacts conservatively retain busy ownership for recovery,
+even if an individual provider operation was settled.
+
+The first follow-up runtime passed 41 cases and two of the three fault cases,
+but its positive fixture lacked a crew-call scope. It now provisions an owned
+scope explicitly. A technician without a resource and without existing mappings
+requires no provider read/write; this safe skip still validates the final source
+token. The complete rerun passed and removed only its certified owned target.
+
+The historical-copy upgrade preserved 1,187 jobs, 3,070 assignments, 5,857
+timesheets and 327 profiles again. The source hashes also remained unchanged;
+the private data dump was removed after the isolated comparison. No source
+record, production database, real Flex request or actual delivery was modified.
+
+Readiness still requires a fresh completed CodeRabbit review through the final
+HEAD, current CI across all workflows, zero unresolved threads and current main.
+Production inventory, linked migration dry-run/application, old-worker drainage,
+deliberate maintainer review, final merge and production verification remain
+human release steps. Provider classification relies on the repository's known
+Flex definition IDs and key-info/row-data formats; live Flex compatibility was
+not exercised. Unknown or conflicting metadata fails closed.
