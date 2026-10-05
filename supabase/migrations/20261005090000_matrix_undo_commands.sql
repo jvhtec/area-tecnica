@@ -12,8 +12,11 @@
 --
 -- Nothing here replaces an existing command: the lock order, ledger and
 -- state-token contract are the ones from the atomic assignment commands.
--- Both functions treat a missing/NULL role or auth claim as "not allowed"
--- (COALESCE), instead of letting a NULL slip through a NOT (... OR ...) test.
+-- Both functions fail closed with the same guard the assignment commands got in
+-- 20261004165712_assignment_command_authorization_fail_closed: a missing
+-- profile, UID or authenticated role is "not allowed", never a NULL that slips
+-- through a NOT (... OR ...) test. This migration runs after that one and
+-- replaces none of the functions it hardened.
 
 ALTER TABLE public.assignment_commands DROP CONSTRAINT assignment_commands_command_type_check;
 ALTER TABLE public.assignment_commands ADD CONSTRAINT assignment_commands_command_type_check
@@ -60,7 +63,8 @@ DECLARE
   v_outcome text;
   v_result jsonb;
 BEGIN
-  IF NOT (v_is_service OR COALESCE(public.is_admin_or_management(), false)) THEN
+  IF (v_is_service OR (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL
+      AND public.is_admin_or_management() IS TRUE)) IS NOT TRUE THEN
     RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
   END IF;
   v_actor := CASE WHEN v_is_service THEN p_actor_id ELSE auth.uid() END;
@@ -213,7 +217,8 @@ DECLARE
   v_total_kept integer := 0;
   v_items jsonb := '[]'::jsonb;
 BEGIN
-  IF NOT (v_is_service OR COALESCE(public.is_admin_or_management(), false)) THEN
+  IF (v_is_service OR (auth.role() = 'authenticated' AND auth.uid() IS NOT NULL
+      AND public.is_admin_or_management() IS TRUE)) IS NOT TRUE THEN
     RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
   END IF;
   IF p_command_ids IS NULL OR pg_catalog.cardinality(p_command_ids) NOT BETWEEN 1 AND 32 THEN
