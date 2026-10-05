@@ -20,7 +20,7 @@ const asBody = (body: unknown): Body => (typeof body === "object" && body !== nu
  * are stateful, so the grid, the inspector and the undo window behave as they
  * do against the real database.
  */
-async function openMatrix(page: Page, options: { initiallyAssigned?: boolean; query?: string } = {}) {
+async function openMatrix(page: Page, options: { initiallyAssigned?: boolean } = {}) {
   const job = {
     id: JOB_ID, title: "Gira Lúa", start_time: `${day(1)}T08:00:00Z`, end_time: `${day(2)}T18:00:00Z`,
     color: "#2563eb", status: "Confirmado", job_type: "single", job_departments: [{ department: "sound" }], job_assignments: [],
@@ -87,7 +87,7 @@ async function openMatrix(page: Page, options: { initiallyAssigned?: boolean; qu
     },
     functions: { push: { ok: true }, "manage-flex-crew-assignments": { ok: true } },
   });
-  await page.goto(`/job-assignment-matrix${options.query ?? "?matriz=v2"}`);
+  await page.goto(`/job-assignment-matrix`);
   return { calls, state };
 }
 
@@ -212,13 +212,6 @@ test.describe("without editing modes", () => {
     await expect(page.getByRole("switch", { name: /nevera/i }).first()).toBeVisible();
     // The per-cell staffing icon cluster is gone; those requests start in the inspector.
     await expect(cell(page, 1).getByRole("button", { name: /disponibilidad/i })).toHaveCount(0);
-  });
-
-  test("the old modes are still there with ?matriz=v1", async ({ page }) => {
-    await openMatrix(page, { query: "?matriz=v1" });
-    await expect(cell(page, 1)).toBeVisible();
-    if (isMobileViewport(page)) await page.getByRole("button", { name: /^Filtros/ }).click();
-    await expect(page.getByRole("switch", { name: /alternar asignación directa/i }).first()).toBeVisible();
   });
 
   test("the ✓ on an invited cell confirms at once, and there is no ✕ that removes", async ({ page }) => {

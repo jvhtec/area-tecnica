@@ -6,9 +6,6 @@ import { describe, expect, it } from "vitest";
 // surfaces persist through src/features/assignments/commands only. A direct
 // table write or a multi-step RPC sequence here reintroduces partial states.
 const MUTATION_SURFACES = [
-  "src/components/matrix/AssignJobDialog.tsx",
-  "src/components/matrix/AssignmentStatusDialog.tsx",
-  "src/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval.ts",
   "src/components/jobs/JobAssignmentDialog.tsx",
   "src/hooks/useJobAssignmentsRealtime.ts",
   "src/components/department/MobileAssignmentsDialog.tsx",
@@ -48,14 +45,13 @@ describe("matrix mutation surfaces use the assignment command layer", () => {
   });
 
   it.each([
-    ["src/components/matrix/AssignJobDialog.tsx", "applyDirectAssignment("],
-    ["src/components/matrix/AssignmentStatusDialog.tsx", "setAssignmentStatus("],
-    ["src/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval.ts", "removeAssignmentDate("],
     ["src/components/jobs/JobAssignmentDialog.tsx", "changeAssignmentRole("],
     ["src/hooks/useJobAssignmentsRealtime.ts", "removeDirectAssignment("],
     ["src/hooks/useJobAssignmentsRealtime.ts", "applyDirectAssignment("],
     ["src/features/matrix-v2/commandRunner.ts", "applyDirectAssignment("],
     ["src/features/matrix-v2/commandRunner.ts", "unconfirmAssignment("],
+    ["src/features/matrix-v2/commandRunner.ts", "setAssignmentStatus("],
+    ["src/features/matrix-v2/commandRunner.ts", "removeAssignmentDate("],
     ["src/features/matrix-v2/inspector/useCellInspectorModel.ts", "env.runner.run("],
     ["src/features/matrix-v2/focus/focusAssign.ts", "runner.run("],
     ["src/features/matrix-v2/batch/runBatch.ts", "runner.run("],

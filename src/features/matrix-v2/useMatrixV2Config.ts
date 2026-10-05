@@ -17,7 +17,6 @@ import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 type Technician = MatrixTechnicianRef & { id: string };
 
 interface Options {
-  enabled: boolean;
   /** False while the grid has no data to judge fit from. */
   ready: boolean;
   jobs: MatrixJob[];
@@ -39,10 +38,10 @@ interface Options {
 /**
  * Everything Matrix v2 adds to the grid container: the command runner, the
  * inspector and quick actions, and job focus (with the row order it freezes).
- * Returns the view config the grid renders from, or undefined under v1.
+ * Returns the view config the grid renders from.
  */
 export function useMatrixV2Config<T extends Technician>({
-  enabled, ready, jobs, technicians, dates, baseOrderedTechnicians, allAssignments, getAssignmentForCell,
+  ready, jobs, technicians, dates, baseOrderedTechnicians, allAssignments, getAssignmentForCell,
   getAvailabilityForCell, isManagementUser, roleSlotsByJob, declinedJobsByTech, fridgeSet, focusJobId, focusStatus, onFocusJobChange,
 }: Options & { baseOrderedTechnicians: T[] }) {
   // The one entry point for changing an assignment, and the role each
@@ -50,7 +49,6 @@ export function useMatrixV2Config<T extends Technician>({
   const runner = useMatrixCommandRunner({ jobs, technicians });
   const lastRoleByTechnician = useMemo(() => {
     const latest = new Map<string, { date: string; role: string }>();
-    if (!enabled) return new Map<string, string>();
     for (const row of allAssignments ?? []) {
       if (!row?.technician_id || row.status === 'declined') continue;
       const role = row.sound_role || row.lights_role || row.video_role;
@@ -59,7 +57,7 @@ export function useMatrixV2Config<T extends Technician>({
       if (!seen || row.date > seen.date) latest.set(row.technician_id, { date: row.date, role });
     }
     return new Map([...latest].map(([technicianId, { role }]) => [technicianId, role]));
-  }, [allAssignments, enabled]);
+  }, [allAssignments]);
 
   const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget | null>(null);
   const closeInspector = useCallback(() => setInspectorTarget(null), []);
@@ -90,7 +88,7 @@ export function useMatrixV2Config<T extends Technician>({
   }, [getAvailabilityForCell, isManagementUser]);
 
   const { focus, applyOrder } = useMatrixJobFocus({
-    focusJobId: enabled ? focusJobId : null,
+    focusJobId,
     status: focusStatus,
     ready,
     jobs,
@@ -119,16 +117,14 @@ export function useMatrixV2Config<T extends Technician>({
   }, [jobs, onFocusJobChange]);
   const toggleFocusJob = useCallback((jobId: string) => setFocusJob(focusJobId === jobId ? null : jobId), [setFocusJob, focusJobId]);
 
-  const v2Config = useMemo<MatrixV2ViewConfig | undefined>(
-    () => (enabled
-      ? {
-        runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector,
-        quickConfirm, toggleUnavailable, focus, setFocusJob, toggleFocusJob,
-      }
-      : undefined),
-    [enabled, runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector,
+  const v2Config = useMemo<MatrixV2ViewConfig>(
+    () => ({
+      runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector,
+      quickConfirm, toggleUnavailable, focus, setFocusJob, toggleFocusJob,
+    }),
+    [runner, roleSlotsByJob, lastRoleByTechnician, inspectorTarget, toggleInspector, openInspector, closeInspector,
       quickConfirm, toggleUnavailable, focus, setFocusJob, toggleFocusJob],
   );
 
-  return { v2Config, orderedTechnicians, quickConfirm, openInspector };
+  return { v2Config, orderedTechnicians };
 }

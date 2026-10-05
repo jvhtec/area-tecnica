@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
-import React from 'react';
-import { toast } from 'sonner';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { cleanup } from '@testing-library/react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { disposableCampaignHarness } from './helpers/disposableCampaignHarness';
 import { trackLocalFunctions } from './helpers/trackLocalFunctions';
-import { navigateCalendarMonth } from './helpers/navigateCalendarMonth';
 
 const binding = vi.hoisted(() => ({ client: null as unknown as SupabaseClient }));
 // The legacy dataLayerClient captures this export during module initialization.
@@ -20,18 +15,17 @@ vi.mock('@/lib/supabase', () => ({ supabase: new Proxy({}, {
   },
 }) }));
 vi.mock('@/integrations/supabase/client', () => ({ get supabase() { return binding.client; } }));
-import { AssignJobDialog, type AssignableJob, type ExistingAssignment } from '@/components/matrix/AssignJobDialog';
-import { fromMadridDateKey } from '@/utils/timezoneUtils';
+import { AssignmentCommandError, applyDirectAssignment, createAssignmentCommandId, getAssignmentCommandState,
+  requireCommitted } from '@/features/assignments/commands';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 
-describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFING_CI_MANIFEST)('disposable clone real matrix atomic-write evidence (P0.16)', () => {
+describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFING_CI_MANIFEST)('disposable clone real assignment-command atomic-write evidence (P0.16)', () => {
   let h: ReturnType<typeof disposableCampaignHarness>;
   let manager: Awaited<ReturnType<typeof h.user>>;
   let tech: Awaited<ReturnType<typeof h.user>>;
   let baseline: string[];
   let historicalBaseline: string[];
   let background: ReturnType<typeof trackLocalFunctions> | undefined;
-  let queryClient: QueryClient | undefined;
   let cleanupUnsafe = false;
 
   beforeAll(async () => {
@@ -49,7 +43,7 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     if (cleanupUnsafe) return;
     cleanupUnsafe = true;
     try {
-      cleanup(); queryClient?.clear();
+      cleanup();
       await background?.drain();
       await h?.cleanJobs();
       cleanupUnsafe = false;
@@ -60,7 +54,6 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     }
     finally {
       cleanup();
-      queryClient?.clear();
       background?.restore();
       background = undefined;
     }
@@ -81,11 +74,11 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     background = trackLocalFunctions(client);
   }
 
-  async function job(): Promise<AssignableJob> {
+  async function job() {
     const id = await h.job();
     // UTC begins on the previous day, but the intended Madrid span is 20–22.
     const result = await h.client.from('jobs').update({ start_time: '2027-10-19T22:30:00Z',
-      end_time: '2027-10-22T21:59:00Z' }).eq('id', id).select('id,title,status,start_time,end_time').single();
+      end_time: '2027-10-22T21:59:00Z' }).eq('id', id).select('id').single();
     expect(result.error).toBeNull();
     return result.data!;
   }
@@ -93,7 +86,7 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
   async function assignment(jobId: string) {
     const result = await h.client.from('job_assignments').select('*').eq('job_id', jobId).eq('technician_id', tech.id).single();
     expect(result.error).toBeNull();
-    return result.data! as ExistingAssignment;
+    return result.data!;
   }
 
   async function dates(jobId: string) {
@@ -102,103 +95,45 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     return result.data!.map(row => row.date);
   }
 
-  async function mount(item: AssignableJob, date = '2027-10-20', existingAssignment?: ExistingAssignment) {
-    bind();
-    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-    const close = vi.fn();
-    const user = userEvent.setup();
-    render(<QueryClientProvider client={queryClient}><AssignJobDialog open onClose={close} technicianId={tech.id}
-      date={fromMadridDateKey(date)} availableJobs={[item]} preSelectedJobId={item.id} existingAssignment={existingAssignment} /></QueryClientProvider>);
-    const combo = await screen.findByRole('combobox');
-    await user.click(combo);
-    await user.click(await screen.findByRole('option', { name: 'FOH — Responsable' }));
-    // Active queries must finish before submitting; their real cache supplies
-    // modification mode, rather than a manufactured useQuery result.
-    await waitFor(() => expect(queryClient!.isFetching()).toBe(0));
-    return { user, close, jobId: item.id };
+  async function members(jobId: string) {
+    const result = await h.client.from('job_assignments').select('job_id').eq('job_id', jobId).eq('technician_id', tech.id);
+    expect(result.error).toBeNull();
+    return result.data!;
   }
 
-  async function submit(ui: Awaited<ReturnType<typeof mount>>) {
-    await ui.user.click(screen.getByRole('button', { name: /^(Asignar|Reasignar) trabajo$/ }));
-    await waitFor(() => expect(ui.close).toHaveBeenCalledOnce(), { timeout: 15_000 });
-    await background!.drain();
-    const pushes = background!.calls.filter(call => call.name === 'push');
-    expect(pushes).toHaveLength(1);
-    const push = pushes[0];
-    expect((await push.result).error).toBeNull();
-    expect(push.body).toMatchObject({ action: 'broadcast', type: 'job.assignment.direct', job_id: ui.jobId, recipient_id: tech.id,
-      departments: ['sound'] });
-  }
+  const sparse = async (jobId: string) => applyDirectAssignment({ commandId: createAssignmentCommandId(), jobId, technicianId: tech.id,
+    role: 'SND-FOH-R', status: 'invited', coverage: 'multi', dates: ['2027-10-20', '2027-10-22'],
+    expectedStateToken: (await getAssignmentCommandState(jobId, tech.id)).state_token, source: 'matrix-batch' });
 
-  async function multi(ui: Awaited<ReturnType<typeof mount>>) {
-    await ui.user.click(screen.getByRole('tab', { name: 'Varios Días' }));
-    // This picker opens at today's month. Navigate its actual controls rather
-    // than freezing the clock used by real Auth and HTTP timeouts.
-    await navigateCalendarMonth(ui.user, new Date(2027, 9, 1));
-    expect(screen.getByText('October 2027')).toBeInTheDocument();
-  }
-
-  it('same manager without fault creates both sparse dates and emits success', async () => {
+  it('same manager without fault creates both sparse dates', async () => {
     const item = await job();
-    const event = vi.fn(); window.addEventListener('assignment-updated', event);
-    try {
-      const ui = await mount(item); await multi(ui);
-      await ui.user.click(screen.getByRole('gridcell', { name: '22' }));
-      await submit(ui);
-      expect(await dates(item.id)).toEqual(['2027-10-20','2027-10-22']);
-      expect(await assignment(item.id)).toMatchObject({ single_day: true, assignment_date: '2027-10-20',
-        status: 'invited', assignment_source: 'direct', sound_role: 'SND-FOH-R', assigned_by: manager.id });
-      expect(toast.error).not.toHaveBeenCalled(); expect(toast.success).toHaveBeenCalledOnce();
-      expect(event).toHaveBeenCalledOnce();
-      expect(background!.calls.filter(call => call.name === 'manage-flex-crew-assignments')).toHaveLength(1);
-    } finally { window.removeEventListener('assignment-updated', event); }
+    bind();
+    requireCommitted(await sparse(item.id));
+    expect(await dates(item.id)).toEqual(['2027-10-20', '2027-10-22']);
+    expect(await assignment(item.id)).toMatchObject({ single_day: true, assignment_date: '2027-10-20',
+      status: 'invited', assignment_source: 'direct', sound_role: 'SND-FOH-R', assigned_by: manager.id });
   }, 45_000);
 
-  it('one failed date rolls back the whole command: no membership, no day, dialog stays open', async () => {
+  it('one failed date rolls back the whole command: no membership, no day', async () => {
     const item = await job();
-    await h.armFault(item.id,tech.id,manager.id,'2027-10-22');
-    const event = vi.fn(); window.addEventListener('assignment-updated', event);
-    try {
-      const ui = await mount(item);
-      const rpc = vi.mocked(manager.client.rpc);
-      await multi(ui);
-      await ui.user.click(screen.getByRole('gridcell', { name: '22' }));
-      await ui.user.click(screen.getByRole('button', { name: /^Asignar trabajo$/ }));
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-        'No se pudo completar la operación de asignación.'), { timeout: 15_000 });
-      await waitFor(() => expect(screen.getByRole('button', { name: /^Asignar trabajo$/ })).toBeEnabled());
-      await background!.drain();
-      await act(async () => { await new Promise(resolve => window.setTimeout(resolve, 175)); });
-      await background!.drain();
-      // One atomic command; the browser no longer issues per-date writes.
-      const commands = rpc.mock.calls.filter(([name]) => name==='apply_direct_assignment');
-      expect(commands).toHaveLength(1);
-      expect(commands[0][1]).toMatchObject({ p_coverage:'multi', p_dates:['2027-10-20','2027-10-22'] });
-      expect(rpc.mock.calls.filter(([name]) => name==='toggle_timesheet_day')).toEqual([]);
-      const trace = h.transportEvents.filter(event => event.jobId === item.id);
-      expect(trace.filter(event => event.path==='/rest/v1/job_assignments')).toEqual([]);
-      // Observe responses already consumed by the UI. Awaiting the SDK's RPC
-      // builders again would execute the database commands a second time.
-      const completed = await Promise.all(background!.rpcResults);
-      const rejected = completed.flatMap(result => result && typeof result === 'object' && 'error' in result && result.error ? [result.error] : []);
-      expect(rejected).toHaveLength(1);
-      expect(rejected[0]).toMatchObject({ code:'P0001',message:'LOCAL_MATRIX_OWNED_DATE_FAILURE' });
-      expect(await dates(item.id)).toEqual([]);
-      const membership = await h.client.from('job_assignments').select('job_id').eq('job_id',item.id).eq('technician_id',tech.id);
-      expect(membership.error).toBeNull(); expect(membership.data).toEqual([]);
-      expect(ui.close).not.toHaveBeenCalled();
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(toast.success).not.toHaveBeenCalled(); expect(event).not.toHaveBeenCalled();
-      expect(background!.calls).toEqual([]);
-    } finally { window.removeEventListener('assignment-updated',event); }
+    await h.armFault(item.id, tech.id, manager.id, '2027-10-22');
+    bind();
+    const outcome = await sparse(item.id).then(result => result, (error: unknown) => error);
+    // The database rejects the command as a whole, whether the client surfaces it as a result or an error.
+    expect(outcome instanceof AssignmentCommandError || (outcome as { ok?: boolean }).ok === false).toBe(true);
+    await background!.drain();
+    expect(await dates(item.id)).toEqual([]);
+    expect(await members(item.id)).toEqual([]);
+    const trace = h.transportEvents.filter(event => event.jobId === item.id);
+    expect(trace.filter(event => event.path === '/rest/v1/job_assignments')).toEqual([]);
+    expect(background!.calls).toEqual([]);
   }, 45_000);
 
   it('the unchanged date RPC still rejects a technician with exact authorization denial', async () => {
-    const item=await job(); bind(tech.client);
-    await expect(toggleTimesheetDay({ jobId:item.id,technicianId:tech.id,dateIso:'2027-10-20',present:true }))
-      .rejects.toMatchObject({code:'42501'});
+    const item = await job(); bind(tech.client);
+    await expect(toggleTimesheetDay({ jobId: item.id, technicianId: tech.id, dateIso: '2027-10-20', present: true }))
+      .rejects.toMatchObject({ code: '42501' });
     expect(await dates(item.id)).toEqual([]);
-    const membership=await h.client.from('job_assignments').select('job_id').eq('job_id',item.id).eq('technician_id',tech.id);
-    expect(membership.error).toBeNull(); expect(membership.data).toEqual([]);
+    expect(await members(item.id)).toEqual([]);
   }, 45_000);
 });

@@ -1,7 +1,7 @@
 # Assignment Matrix UX overhaul roadmap
 
 **Date:** 2026-10-04  
-**Status:** approved (all decisions in §6 accepted as recommended)  
+**Status:** approved (all decisions in §6 accepted as recommended). U0–U5 implemented (PR #995); U6 cleanup implemented in a stacked PR that must not merge before the two-week soak described in U6.  
 **Depends on:** PR #994 (atomic assignment commands), including its two open security findings  
 **Baseline read:** `feat/matrix-hardening-commands@14d67f3`  
 **Scope:** manual Matrix work: assign, modify, move, remove, confirm/decline, unavailability, manual availability/offer requests  

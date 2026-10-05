@@ -1,15 +1,9 @@
 import React from "react";
 
 import { OptimizedMatrixCell } from "@/components/matrix/OptimizedMatrixCell";
-import type {
-  CancelStaffingMutate,
-  MatrixStaffingStatus,
-  OptimizedMatrixCellProps,
-  SendStaffingEmailMutate,
-} from "@/components/matrix/optimized-matrix-cell/types";
+import type { MatrixStaffingStatus, OptimizedMatrixCellProps } from "@/components/matrix/optimized-matrix-cell/types";
 
-// Shared so rows with no declined jobs or no selection keep a stable prop.
-const EMPTY_DECLINED_JOB_IDS: Set<string> = new Set<string>();
+// Shared so rows with no selection keep a stable prop.
 const EMPTY_SELECTED_DATE_KEYS: Set<string> = new Set<string>();
 
 export interface MatrixStaffingMaps {
@@ -33,26 +27,14 @@ export interface MatrixGridRowProps {
   /** This row's selected days, as Madrid day keys. */
   selectedDateKeys?: Set<string>;
   selectionActive: boolean;
-  declinedJobIds?: Set<string>;
   isFridge: boolean;
-  allowDirectAssign: boolean;
-  allowMarkUnavailable: boolean;
   mobile: boolean;
-  staffingDepartment: string | null;
-  hideStaffingEmailButtons: boolean;
-  hideStaffingWhatsappButtons: boolean;
   onSelect: OptimizedMatrixCellProps["onSelect"];
-  onClick: OptimizedMatrixCellProps["onClick"];
-  onOpenSheet: NonNullable<OptimizedMatrixCellProps["onOpenSheet"]>;
-  inspectorMode?: boolean;
-  onInspect?: OptimizedMatrixCellProps["onInspect"];
+  onInspect: OptimizedMatrixCellProps["onInspect"];
+  onConfirm: OptimizedMatrixCellProps["onConfirm"];
+  onDecline: OptimizedMatrixCellProps["onDecline"];
   onPrefetch: NonNullable<OptimizedMatrixCellProps["onPrefetch"]>;
-  onOptimisticUpdate: NonNullable<OptimizedMatrixCellProps["onOptimisticUpdate"]>;
   onRender: () => void;
-  sendStaffingEmail: SendStaffingEmailMutate;
-  isSendingStaffingEmail: boolean;
-  cancelStaffing: CancelStaffingMutate;
-  isCancellingStaffing: boolean;
 }
 
 /**
@@ -75,26 +57,14 @@ export const MatrixGridRow = React.memo(function MatrixGridRow({
   staffingMaps,
   selectedDateKeys = EMPTY_SELECTED_DATE_KEYS,
   selectionActive,
-  declinedJobIds = EMPTY_DECLINED_JOB_IDS,
   isFridge,
-  allowDirectAssign,
-  allowMarkUnavailable,
   mobile,
-  staffingDepartment,
-  hideStaffingEmailButtons,
-  hideStaffingWhatsappButtons,
   onSelect,
-  onClick,
-  onOpenSheet,
-  inspectorMode = false,
   onInspect,
+  onConfirm,
+  onDecline,
   onPrefetch,
-  onOptimisticUpdate,
   onRender,
-  sendStaffingEmail,
-  isSendingStaffingEmail,
-  cancelStaffing,
-  isCancellingStaffing,
 }: MatrixGridRowProps) {
   return (
     <div
@@ -124,29 +94,16 @@ export const MatrixGridRow = React.memo(function MatrixGridRow({
               height={cellHeight}
               isSelected={selectedDateKeys.has(visibleDateKeys[offset])}
               onSelect={onSelect}
-              onClick={onClick}
-              onOpenSheet={onOpenSheet}
-              inspectorMode={inspectorMode}
               onInspect={onInspect}
+              onConfirm={onConfirm}
+              onDecline={onDecline}
               selectionActive={selectionActive}
               onPrefetch={onPrefetch}
-              onOptimisticUpdate={onOptimisticUpdate}
               onRender={onRender}
-              jobId={jobId}
-              declinedJobIdsSet={declinedJobIds}
-              allowDirectAssign={allowDirectAssign}
-              allowMarkUnavailable={allowMarkUnavailable}
               staffingStatusProvided={staffingByJob}
               staffingStatusByDateProvided={staffingByDate}
               isFridge={isFridge}
               mobile={mobile}
-              staffingDepartment={staffingDepartment}
-              hideStaffingEmailButtons={hideStaffingEmailButtons}
-              hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
-              sendStaffingEmail={sendStaffingEmail}
-              isSendingStaffingEmail={isSendingStaffingEmail}
-              cancelStaffing={cancelStaffing}
-              isCancellingStaffing={isCancellingStaffing}
             />
           </div>
         );

@@ -114,7 +114,7 @@ async function openMatrix(page: Page, options: Options = {}) {
     },
     functions: { push: { ok: true }, "manage-flex-crew-assignments": { ok: true } },
   });
-  await page.goto("/job-assignment-matrix?matriz=v2");
+  await page.goto("/job-assignment-matrix");
   return { calls, assigned };
 }
 

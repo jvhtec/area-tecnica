@@ -1,11 +1,10 @@
 import React from "react";
-import { ArrowUpDown, CalendarCheck, ChevronLeft, ChevronRight, UserPlus, X } from "lucide-react";
+import { ArrowUpDown, CalendarCheck, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
 
-import { formatMadridDateKey, isMadridToday, madridDateKeyToCalendarDate } from "@/utils/timezoneUtils";
+import { formatMadridDateKey, isMadridToday } from "@/utils/timezoneUtils";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { MatrixMobileCellSheet, type MatrixMobileCellTarget } from "@/components/matrix/MatrixMobileCellSheet";
 
 import { TechnicianRow } from "../TechnicianRow";
 import { DateHeader } from "../DateHeader";
@@ -17,7 +16,8 @@ import {
   type MatrixCellHoverTooltipHandle,
 } from "@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip";
 import { formatUserName } from "@/utils/userName";
-import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import { CreateUserDialog } from "@/components/users/CreateUserDialog";
+import { queryKeys } from "@/lib/react-query";
 import { MatrixInspectorHost } from "@/features/matrix-v2/inspector/MatrixInspectorHost";
 import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
 import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
@@ -26,13 +26,7 @@ import { FocusColumnOverlay } from "@/features/matrix-v2/focus/FocusColumnOverla
 import { BatchLayer } from "@/features/matrix-v2/batch/BatchLayer";
 import { useSelectionDerivations } from "./useSelectionDerivations";
 import { SelectionOverlay } from "@/features/matrix-v2/batch/SelectionOverlay";
-import type {
-  CancelStaffingAsync,
-  CancelStaffingMutate,
-  MatrixCellAction,
-  SendStaffingEmailAsync,
-  SendStaffingEmailMutate,
-} from "@/components/matrix/optimized-matrix-cell/types";
+import type { CancelStaffingAsync, SendStaffingEmailAsync } from "@/components/matrix/optimized-matrix-cell/types";
 
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
@@ -53,19 +47,14 @@ export interface OptimizedAssignmentMatrixViewProps {
   technicians: any[];
   orderedTechnicians: any[];
   fridgeSet?: Set<string>;
-  allowDirectAssign: boolean;
-  allowMarkUnavailable?: boolean;
   mobile: boolean;
   staffingDepartment?: string | null;
-  hideStaffingEmailButtons?: boolean;
-  hideStaffingWhatsappButtons?: boolean;
   cycleTechSort: () => void;
   getSortLabel: () => string;
   isManagementUser: boolean;
   setCreateUserOpen: (open: boolean) => void;
   createUserOpen: boolean;
   qc: any;
-  setSortJobId: React.Dispatch<React.SetStateAction<string | null>>;
   getJobsForDate: (date: Date) => any[];
   getHeaderCounts?: (date: Date) => DateHeaderCounts;
   getAssignmentForCell: (technicianId: string, date: Date) => any;
@@ -74,55 +63,22 @@ export interface OptimizedAssignmentMatrixViewProps {
   staffingMaps: any;
   profileNamesMap: Map<string, string>;
   handleCellSelect: (technicianId: string, date: Date, selected: boolean) => void;
-  handleCellClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
   handleCellPrefetch: (technicianId: string) => void;
-  handleOptimisticUpdate: (technicianId: string, jobId: string, status: string) => void;
   incrementCellRender: () => void;
   declinedJobsByTech: Map<string, Set<string>>;
-  cellAction: any;
-  currentTechnician: any | null;
-  closeDialogs: () => void;
-  handleJobSelected: (jobId: string) => void;
-  handleStaffingActionSelected: (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => void;
-  forcedStaffingAction: any;
-  forcedStaffingChannel: any;
   jobs: any[];
-  offerChannel: "email" | "whatsapp";
-  toast: any;
-  sendStaffingEmail: SendStaffingEmailMutate;
-  isSendingStaffingEmail: boolean;
-  cancelStaffing: CancelStaffingMutate;
-  /** Matrix v2 sends through these: each call has its own promise, which `mutate`'s per-call callbacks do not (only the latest call's fire). */
+  /** Each call has its own promise, which `mutate`'s per-call callbacks do not (only the latest call's fire). */
   sendStaffingEmailAsync: SendStaffingEmailAsync;
   cancelStaffingAsync: CancelStaffingAsync;
-  isCancellingStaffing: boolean;
-  checkTimeConflictEnhanced: any;
-  availabilityDialog: any;
-  setAvailabilityDialog: (value: any) => void;
-  availabilityCoverage: "full" | "single" | "multi";
-  setAvailabilityCoverage: (value: "full" | "single" | "multi") => void;
-  availabilitySingleDate: Date | null;
-  setAvailabilitySingleDate: (value: Date | null) => void;
-  availabilityMultiDates: Date[];
-  setAvailabilityMultiDates: (value: Date[]) => void;
-  availabilitySending: boolean;
-  setAvailabilitySending: (value: boolean) => void;
-  handleEmailError: (error: unknown, payload: any) => void;
-  conflictDialog: any;
-  setConflictDialog: (value: any) => void;
-  // Roadmap P3-06 keeps this prop reserved for Stream Deck-aware matrix view integration.
-  isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   clearCellSelection: () => void;
   /** Replaces the selection wholesale (drag and shift-click ranges). */
   onReplaceSelection: (keys: Set<string>) => void;
-  /** Whose remembered staffing channel the Matrix v2 composer uses. */
+  /** Whose remembered staffing channel the composer uses. */
   staffingUserId?: string | null;
-  /** Grid-selected days for the offer's technician, clamped to the job. */
-  offerSeedDates?: string[];
-  /** Present when the new Matrix (inspector, focus, batch) is switched on. */
-  v2?: MatrixV2ViewConfig;
+  /** The inspector, job focus and batch state, owned by the container. */
+  v2: MatrixV2ViewConfig;
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -142,19 +98,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   technicians,
   orderedTechnicians,
   fridgeSet,
-  allowDirectAssign,
-  allowMarkUnavailable = false,
   mobile,
   staffingDepartment = null,
-  hideStaffingEmailButtons = false,
-  hideStaffingWhatsappButtons = false,
   cycleTechSort,
   getSortLabel,
   isManagementUser,
   setCreateUserOpen,
   createUserOpen,
   qc,
-  setSortJobId,
   getJobsForDate,
   getHeaderCounts,
   getAssignmentForCell,
@@ -163,48 +114,17 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   staffingMaps,
   profileNamesMap,
   handleCellSelect,
-  handleCellClick,
   handleCellPrefetch,
-  handleOptimisticUpdate,
   incrementCellRender,
   declinedJobsByTech,
-  cellAction,
-  currentTechnician,
-  closeDialogs,
-  handleJobSelected,
-  handleStaffingActionSelected,
-  forcedStaffingAction,
-  forcedStaffingChannel,
   jobs,
-  offerChannel,
-  toast,
-  sendStaffingEmail,
-  isSendingStaffingEmail,
-  cancelStaffing,
   sendStaffingEmailAsync,
   cancelStaffingAsync,
-  isCancellingStaffing,
-  checkTimeConflictEnhanced,
-  availabilityDialog,
-  setAvailabilityDialog,
-  availabilityCoverage,
-  setAvailabilityCoverage,
-  availabilitySingleDate,
-  setAvailabilitySingleDate,
-  availabilityMultiDates,
-  setAvailabilityMultiDates,
-  availabilitySending,
-  setAvailabilitySending,
-  handleEmailError,
-  conflictDialog,
-  setConflictDialog,
-  isGlobalCellSelected: _isGlobalCellSelected,
   techMedalRankings,
   techLastYearMedalRankings,
   clearCellSelection,
   onReplaceSelection,
   staffingUserId,
-  offerSeedDates,
   v2,
 }: OptimizedAssignmentMatrixViewProps) => {
   // Scroll position and the virtualised window are owned here rather than by
@@ -237,33 +157,15 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     onVisibleRowsChange?.(visibleRows);
   }, [onVisibleRowsChange, visibleRows]);
 
-  void _isGlobalCellSelected;
-
-  // Touch action sheet: one instance for the grid, opened by tapping a cell.
-  const [sheetTarget, setSheetTarget] = React.useState<MatrixMobileCellTarget | null>(null);
-  // Matrix v2: one inspector for the grid, whose state the container owns so the
-  // cell buttons and the keyboard can open it too. Desktop anchors it to the
-  // clicked cell; a phone gets the same content as a bottom sheet (no anchor).
+  // One inspector for the grid, whose state the container owns so the cell
+  // buttons and the keyboard can open it too. Desktop anchors it to the clicked
+  // cell; a phone gets the same content as a bottom sheet (no anchor).
   const keyboardHintId = React.useId();
-  const handleOpenSheet = React.useCallback(
-    (technicianId: string, date: Date) => {
-      if (v2) {
-        // A tap on a phone is a click: in job focus it assigns a free day of the job.
-        if (!v2.focus?.onCellClick(technicianId, date, null)) v2.openInspector(technicianId, date, null);
-        return;
-      }
-      const technician = technicians.find((t) => t.id === technicianId);
-      if (technician) setSheetTarget({ technician, date });
-    },
-    [technicians, v2],
-  );
-  const closeSheet = React.useCallback(() => setSheetTarget(null), []);
 
   const selectionActive = mobile && selectedCells.size > 0;
-  const inspectorTarget = v2?.inspectorTarget ?? null;
-  const closeInspector = v2?.closeInspector;
+  const { inspectorTarget, closeInspector } = v2;
 
-  const { selectedDateKeysByTech, selectionAnchor, selectedCountForSheet } = useSelectionDerivations(selectedCells, sheetTarget?.technician.id ?? null);
+  const { selectedDateKeysByTech } = useSelectionDerivations(selectedCells);
 
   // Anchored to the viewport, not to this layout: the matrix container runs past
   // the fold on a phone, so an absolutely positioned control at its bottom edge
@@ -351,13 +253,18 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   });
   const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay, gridHandlers, previewRects, batchLayer } = v2Grid;
 
+  // The cell's ✓ and ✕: confirming is immediate (with Deshacer), declining asks first in the inspector.
+  const { quickConfirm, openInspector } = v2;
+  const handleConfirm = React.useCallback((technicianId: string, date: Date) => quickConfirm(technicianId, date), [quickConfirm]);
+  const handleDecline = React.useCallback((technicianId: string, date: Date) => openInspector(technicianId, date, null, "decline"), [openInspector]);
+
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
   const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
   const handleDateHeaderJobClick = React.useCallback(
-    // Under Matrix v2 the header's job row focuses the job; before, it only sorted by it.
-    (jobId: string) => (v2 ? v2.toggleFocusJob(jobId) : setSortJobId((prev) => (prev === jobId ? null : jobId))),
-    [setSortJobId, v2],
+    // The header's job row focuses the job.
+    (jobId: string) => v2.toggleFocusJob(jobId),
+    [v2],
   );
 
   return (
@@ -377,7 +284,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           ref={mainScrollRef}
           className="matrix-main-scroll"
           onScroll={handleGridScroll}
-          {...(v2 && !mobile
+          {...(!mobile
             ? {
               tabIndex: 0,
               role: "application",
@@ -592,26 +499,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     staffingMaps={staffingMaps}
                     selectedDateKeys={selectedDateKeysByTech.get(technician.id)}
                     selectionActive={selectionActive}
-                    declinedJobIds={declinedJobsByTech.get(technician.id)}
                     isFridge={fridgeSet?.has(technician.id) || false}
-                    allowDirectAssign={allowDirectAssign}
-                    allowMarkUnavailable={allowMarkUnavailable}
                     mobile={mobile}
-                    staffingDepartment={staffingDepartment}
-                    hideStaffingEmailButtons={hideStaffingEmailButtons}
-                    hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
                     onSelect={handleCellSelect}
-                    onClick={handleCellClick}
-                    onOpenSheet={handleOpenSheet}
-                    inspectorMode={!!v2}
                     onInspect={handleInspectAndActivate}
+                    onConfirm={handleConfirm}
+                    onDecline={handleDecline}
                     onPrefetch={handleCellPrefetch}
-                    onOptimisticUpdate={handleOptimisticUpdate}
                     onRender={incrementCellRender}
-                    sendStaffingEmail={sendStaffingEmail}
-                    isSendingStaffingEmail={isSendingStaffingEmail}
-                    cancelStaffing={cancelStaffing}
-                    isCancellingStaffing={isCancellingStaffing}
                   />
                 ))}
               </div>
@@ -641,7 +536,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       </TooltipProvider>
 
-      {v2 && !mobile && (
+      {!mobile && (
         <>
           <p id={keyboardHintId} className="sr-only">
             Usa las flechas para moverte por la matriz, Intro para abrir una celda y ? para ver los atajos.
@@ -653,7 +548,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
       {!mobile && <MatrixCellHoverTooltip ref={hoverTooltipRef} resolve={resolveCellTooltip} />}
 
       {/* Touch affordances over the grid */}
-      {mobile && !selectionActive && !sheetTarget && (
+      {mobile && !selectionActive && (
         // The wrapper carries the positioning: Button's size variants add
         // `coarse-hit-target`, whose `position: relative` wins over a `fixed`
         // utility on a coarse pointer.
@@ -671,104 +566,24 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      {selectionActive && !v2 && (
-        <div
-          className="fixed inset-x-2 z-30 flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
-          style={{ bottom: floatingBottom }}
-        >
-          <span className="pl-1 text-xs font-semibold">
-            {selectedCells.size} {selectedCells.size === 1 ? 'día' : 'días'}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            className="ml-auto h-9 flex-1 rounded-xl text-xs font-semibold"
-            onClick={() => {
-              if (selectionAnchor) handleOpenSheet(selectionAnchor.technicianId, selectionAnchor.date);
-            }}
-          >
-            Acciones
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 rounded-xl px-3 text-xs"
-            onClick={clearCellSelection}
-          >
-            <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-            Limpiar
-          </Button>
-        </div>
-      )}
+      <BatchLayer {...batchLayer} />
 
-      {v2 && <BatchLayer {...batchLayer} />}
-
-      {inspectorEnv && closeInspector && (
+      {inspectorEnv && (
         <MatrixInspectorHost env={inspectorEnv} target={inspectorTarget} onClose={closeInspector} mobile={mobile} />
       )}
-      {v2 && !mobile && <MatrixShortcutHelp open={keyboard.helpOpen} onOpenChange={keyboard.setHelpOpen} />}
+      {!mobile && <MatrixShortcutHelp open={keyboard.helpOpen} onOpenChange={keyboard.setHelpOpen} />}
 
-      {!v2 && <MatrixMobileCellSheet
-        target={sheetTarget}
-        onClose={closeSheet}
-        assignment={sheetTarget ? getAssignmentForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
-        availability={sheetTarget ? getAvailabilityForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
-        staffingStatus={
-          sheetTarget
-            ? (staffingMaps?.byDate.get(`${sheetTarget.technician.id}-${formatMadridDateKey(sheetTarget.date)}`) ?? null)
-            : null
-        }
-        selectedDateCount={selectedCountForSheet}
-        allowDirectAssign={allowDirectAssign}
-        canMarkUnavailable={isManagementUser}
-        isFridge={sheetTarget ? fridgeSet?.has(sheetTarget.technician.id) || false : false}
-        staffingDepartment={staffingDepartment}
-        onAction={(action, actionJobId) => {
-          if (!sheetTarget) return;
-          handleCellClick(sheetTarget.technician.id, sheetTarget.date, action, actionJobId);
-        }}
-        sendStaffingEmail={sendStaffingEmail}
-        cancelStaffing={cancelStaffing}
-        isCancellingStaffing={isCancellingStaffing}
-      />}
-
-      <MatrixDialogs
-        cellAction={cellAction}
-        currentTechnician={currentTechnician}
-        closeDialogs={closeDialogs}
-        handleJobSelected={handleJobSelected}
-        handleStaffingActionSelected={handleStaffingActionSelected}
-        forcedStaffingAction={forcedStaffingAction}
-        forcedStaffingChannel={forcedStaffingChannel}
-        getJobsForDate={getJobsForDate}
-        declinedJobsByTech={declinedJobsByTech}
-        jobs={jobs}
-        staffingDepartment={staffingDepartment}
-        offerChannel={offerChannel}
-        toast={toast}
-        sendStaffingEmail={sendStaffingEmail}
-        checkTimeConflictEnhanced={checkTimeConflictEnhanced}
-        availabilityDialog={availabilityDialog}
-        setAvailabilityDialog={setAvailabilityDialog}
-        availabilityCoverage={availabilityCoverage}
-        setAvailabilityCoverage={setAvailabilityCoverage}
-        availabilitySingleDate={availabilitySingleDate}
-        setAvailabilitySingleDate={setAvailabilitySingleDate}
-        availabilityMultiDates={availabilityMultiDates}
-        setAvailabilityMultiDates={setAvailabilityMultiDates}
-        availabilitySending={availabilitySending}
-        setAvailabilitySending={setAvailabilitySending}
-        handleEmailError={handleEmailError}
-        conflictDialog={conflictDialog}
-        setConflictDialog={setConflictDialog}
-        offerSeedDates={offerSeedDates}
-        selectedCells={selectedCells}
-        isManagementUser={isManagementUser}
-        createUserOpen={createUserOpen}
-        setCreateUserOpen={setCreateUserOpen}
-        qc={qc}
-      />
+      {isManagementUser && (
+        <CreateUserDialog
+          open={createUserOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              qc.invalidateQueries({ queryKey: queryKeys.scope("optimized-matrix-technicians") });
+            }
+            setCreateUserOpen(open);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-10-03T21:29:21.459Z",
+  "generatedAt": "2026-10-05T00:36:52.177Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 963,
+  "total": 932,
   "domains": {
     "app": {
-      "total": 667,
+      "total": 636,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 538,
-        "react-hooks/exhaustive-deps": 65,
-        "react-refresh/only-export-components": 43,
+        "@typescript-eslint/no-explicit-any": 512,
+        "react-hooks/exhaustive-deps": 61,
+        "react-refresh/only-export-components": 42,
         "@typescript-eslint/no-require-imports": 1,
         "@typescript-eslint/no-empty-object-type": 4,
         "no-control-regex": 4,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 799,
+    "@typescript-eslint/no-explicit-any": 773,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -43,8 +43,8 @@
     "no-empty": 13,
     "no-useless-escape": 22,
     "prefer-const": 1,
-    "react-hooks/exhaustive-deps": 65,
-    "react-refresh/only-export-components": 43
+    "react-hooks/exhaustive-deps": 61,
+    "react-refresh/only-export-components": 42
   },
   "files": {
     "src/components/auth/SignUpForm.tsx": {
@@ -198,42 +198,21 @@
     "src/components/matrix/__tests__/StaffingOfferList.test.tsx": {
       "@typescript-eslint/no-explicit-any": 1
     },
-    "src/components/matrix/AssignJobDialog.tsx": {
-      "react-refresh/only-export-components": 1
-    },
-    "src/components/matrix/AssignmentStatusDialog.tsx": {
-      "@typescript-eslint/no-explicit-any": 3
-    },
     "src/components/matrix/DateHeader.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/matrix/OfferDetailsDialog.tsx": {
-      "react-hooks/exhaustive-deps": 1
     },
     "src/components/matrix/optimized-assignment-matrix/__tests__/OptimizedAssignmentMatrixView.test.tsx": {
       "@typescript-eslint/no-explicit-any": 3
     },
-    "src/components/matrix/optimized-assignment-matrix/MatrixDialogs.tsx": {
-      "@typescript-eslint/no-explicit-any": 9
-    },
     "src/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView.tsx": {
-      "@typescript-eslint/no-explicit-any": 19,
+      "@typescript-eslint/no-explicit-any": 8,
       "@typescript-eslint/ban-ts-comment": 1
-    },
-    "src/components/matrix/optimized-assignment-matrix/types.ts": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip.tsx": {
       "@typescript-eslint/no-explicit-any": 2
     },
     "src/components/matrix/optimized-matrix-cell/types.ts": {
       "@typescript-eslint/no-explicit-any": 2
-    },
-    "src/components/matrix/OptimizedAssignmentMatrix.tsx": {
-      "react-hooks/exhaustive-deps": 2
-    },
-    "src/components/matrix/OptimizedMatrixCell.tsx": {
-      "react-hooks/exhaustive-deps": 1
     },
     "src/components/matrix/StaffingAutoModePanel.tsx": {
       "@typescript-eslint/no-explicit-any": 5
@@ -838,9 +817,6 @@
     },
     "supabase/functions/wallboard-feed/index.ts": {
       "@typescript-eslint/no-explicit-any": 33
-    },
-    "tests/assignments/critical-paths.test.ts": {
-      "@typescript-eslint/no-explicit-any": 2
     },
     "tests/timesheets/critical-paths.test.ts": {
       "@typescript-eslint/no-explicit-any": 3

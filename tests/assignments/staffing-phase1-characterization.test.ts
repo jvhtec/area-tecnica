@@ -12,11 +12,8 @@ const staffingOrchestrator = readRepoFile("supabase/functions/staffing-orchestra
 const campaignFinalization = readRepoFile("supabase/functions/staffing-orchestrator/campaignFinalization.ts");
 const staffingSweeper = readRepoFile("supabase/functions/staffing-sweeper/index.ts");
 const staffingHook = readRepoFile("src/features/staffing/hooks/useStaffing.ts");
-const assignJobDialog = readRepoFile("src/components/matrix/AssignJobDialog.tsx");
-const assignmentStatusDialog = readRepoFile("src/components/matrix/AssignmentStatusDialog.tsx");
-const matrixAssignmentRemoval = readRepoFile(
-  "src/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval.ts",
-);
+const matrixCommandRunner = readRepoFile("src/features/matrix-v2/commandRunner.ts");
+const matrixJobDays = readRepoFile("src/features/matrix-v2/jobDays.ts");
 const driverAssignmentMigration = readRepoFile(
   "supabase/migrations/20260924134000_driver_assignment_delivery.sql",
 );
@@ -190,16 +187,17 @@ describe("Staffing Phase 1 characterization", () => {
 
   describe("direct assignment atomic command boundary", () => {
     it("persists membership and schedule through one database command, not browser steps", () => {
-      expect(assignJobDialog).toContain("applyDirectAssignment(");
-      expect(assignJobDialog).not.toContain(".from('job_assignments')");
-      expect(assignJobDialog).not.toContain(".from('timesheets')");
-      expect(assignJobDialog).not.toContain("toggleTimesheetDay");
-      expect(assignJobDialog).not.toContain("syncTimesheetCategoriesForAssignment");
+      expect(matrixCommandRunner).toContain("commands.applyDirectAssignment(");
+      expect(matrixCommandRunner).not.toContain(".from('job_assignments')");
+      expect(matrixCommandRunner).not.toContain(".from('timesheets')");
+      expect(matrixCommandRunner).not.toContain("toggleTimesheetDay");
+      expect(matrixCommandRunner).not.toContain("syncTimesheetCategoriesForAssignment");
     });
 
     it("runs Flex and notification side effects only after the command committed", () => {
-      expectOrdered(assignJobDialog, "const result = await applyDirectAssignment(", "runSideEffectsInBackground(result)");
-      expect(assignJobDialog).not.toContain("functions.invoke('manage-flex-crew-assignments'");
+      // Effects are held for the undo window and only scheduled from a committed result.
+      expectOrdered(matrixCommandRunner, "const holdEffects = (result: AssignmentCommandResult)", "scheduleDeferredEffects(result.command_id");
+      expect(matrixCommandRunner).not.toContain("functions.invoke('manage-flex-crew-assignments'");
     });
 
     it("keeps confirmed assignments confirmed when a normal edit requests invited", () => {
@@ -211,7 +209,7 @@ describe("Staffing Phase 1 characterization", () => {
     it("represents multi-date coverage with active timesheets rather than one assignment_date value", () => {
       expect(directAssignmentMigration).toContain("v_single_day := p_coverage <> 'full';");
       expect(directAssignmentMigration).toContain("v_assignment_date := CASE WHEN v_single_day THEN v_dates[1] END;");
-      expect(assignJobDialog).toContain("existingTimesheetDateKeys");
+      expect(matrixJobDays).toContain("getAssignableJobDateKeys");
       expect(productionSchema).toContain(
         'COMMENT ON COLUMN "public"."job_assignments"."single_day" IS \'DEPRECATED:',
       );
@@ -223,8 +221,8 @@ describe("Staffing Phase 1 characterization", () => {
 
   describe("assignment lifecycle RPC usage", () => {
     it("routes manager confirm/decline through the status command, which wraps manage_assignment_lifecycle", () => {
-      expect(assignmentStatusDialog).toContain("setAssignmentStatus(");
-      expect(assignmentStatusDialog).not.toContain("manage_assignment_lifecycle");
+      expect(matrixCommandRunner).toContain("commands.setAssignmentStatus(");
+      expect(matrixCommandRunner).not.toContain("manage_assignment_lifecycle");
       expect(roleStatusMigration).toContain("v_lifecycle := public.manage_assignment_lifecycle(");
       expect(roleStatusMigration).toContain(
         "v_delete_mode := CASE WHEN v_existing.assignment_source = 'tour' THEN 'hard' ELSE 'soft' END;",
@@ -232,14 +230,13 @@ describe("Staffing Phase 1 characterization", () => {
     });
 
     it("removes whole matrix assignments through the atomic removal command", () => {
-      expect(matrixAssignmentRemoval).toContain("removeDirectAssignment(");
-      expect(matrixAssignmentRemoval).not.toContain("manage_assignment_lifecycle");
+      expect(matrixCommandRunner).toContain("commands.removeDirectAssignment(");
+      expect(matrixCommandRunner).not.toContain("manage_assignment_lifecycle");
     });
 
     it("removes one date through the guarded date command, never a direct timesheet delete", () => {
-      expect(matrixAssignmentRemoval).toContain("removeAssignmentDate(");
-      expect(matrixAssignmentRemoval).toContain("dayResult.code !== 'last_date'");
-      expect(matrixAssignmentRemoval).not.toContain(".from('timesheets')");
+      expect(matrixCommandRunner).toContain("commands.removeAssignmentDate(");
+      expect(matrixCommandRunner).not.toContain(".from('timesheets')");
     });
   });
 

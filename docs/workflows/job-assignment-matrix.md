@@ -14,8 +14,9 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 | **Page controls/dialogs** | `src/pages/job-assignment-matrix/MatrixPageControls.tsx`, `StaffingReminderDialogs.tsx`, `useStaffingButtonPreferences.ts`, `useMatrixViewport.ts` |
 | **Core component** | `src/components/matrix/OptimizedAssignmentMatrix.tsx` |
 | **Matrix controller hooks** | `src/components/matrix/optimized-assignment-matrix/useMatrixScrollState.ts`, `useMatrixTechnicianOrdering.ts` |
-| **Matrix view/dialogs** | `src/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView.tsx`, `MatrixDialogs.tsx` |
-| **Assignment dialog** | `src/components/matrix/AssignJobDialog.tsx` |
+| **Matrix view** | `src/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView.tsx`, `MatrixGridRow.tsx`, `useSelectionDerivations.ts` |
+| **Interaction layer (cell inspector, keyboard, job focus, batch, staffing composer, undo)** | `src/features/matrix-v2/` |
+| **Command runner** | `src/features/matrix-v2/commandRunner.ts` (predict → exact result → rollback; 8 s undo window) |
 | **Cell components** | `src/components/matrix/MatrixCell.tsx`, `OptimizedMatrixCell.tsx`, `optimized-matrix-cell/` |
 | **Data hook** | `src/hooks/useOptimizedMatrixData.ts` (21.3KB) |
 | **Virtualization** | `src/components/matrix/optimized-assignment-matrix/useMatrixScrollState.ts` |
@@ -74,35 +75,32 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 
 ## Conflict Detection
 
-Located in `src/utils/technicianAvailability.ts`:
+Conflicts are enforced by the assignment commands under the technician lock
+(`conflict` rejection), not by a client preflight:
 
-- **Hard conflicts**: Overlapping job times → prompts confirmation dialog; user can proceed via "Forzar asignación" (force assignment) override in `AssignJobDialog.tsx`
-- **Soft conflicts**: Cautionary flags → shows warning, allows assignment
-- Checks against:
-  - Existing timesheets for overlapping dates
-  - Unavailability records from `availability_schedules`
-  - Job date types (filters out 'off'/'travel' dates)
+- **Hard conflicts** (overlapping confirmed work): the command rejects; the inspector, focus bar or batch row shows the clash and offers **Forzar**, which is a second command with `conflictPolicy: 'allow'`.
+- Known unavailability (`technician_availability` plus approved vacations) is shown on the cell and is an overrideable conflict.
+- Job date types `off`/`travel` are not assignable days (`getAssignableJobDateKeys`, `src/features/matrix-v2/jobDays.ts`).
 
-## Assignment Workflow
+## Interaction Model
+
+There are no modes. A click on a cell opens the **inspector** (popover on desktop, bottom sheet on phones) and every action in it is one step.
 
 ```text
-1. CLICK CELL → opens AssignJobDialog
-2. SELECT JOB → from available jobs for that date
-3. SELECT ROLE → department-specific (FOH/Monitors/Systems for Sound, etc.)
-4. SELECT COVERAGE:
-   - 'full' = entire job duration
-   - 'single' = single day only
-   - 'multi' = multiple selected dates
-5. CONFLICT CHECK → checkForConflicts()
-   - Hard conflict → dialog, requires user override
-   - Soft conflict → warning, allows assignment
-6. EXECUTE ASSIGNMENT:
-   - Creates/updates job_assignments record
-   - Creates timesheets via toggleTimesheetDay
-   - Syncs category via syncTimesheetCategoriesForAssignment
-   - Calls manage-flex-crew-assignments edge function
-   - Sets assigned_by manager ID and timestamp
+CELL CLICK → inspector for that technician/day
+  empty cell   → pick a job (the one in focus, or the day's jobs) → Asignar   (role suggested from the job's open slots)
+  invited      → Confirmar / Rechazar / Quitar            (✓ ✕ on the cell itself confirm/decline without opening it)
+  assigned     → role, days, Quitar (asks inline, never a dialog)
+  any cell     → Pedir disponibilidad u oferta (staffing composer), No disponible
 ```
+
+- **Deshacer**: every assignment, confirmation and role change can be taken back for 8 seconds. Flex and notification side effects are held until the window closes; an undo supersedes them, so nobody is told. Removals are not undoable.
+- **Keyboard**: arrows move an active-cell ring, `Intro` opens the inspector, `C` confirm, `X` decline, `N` mark unavailable, `F` focus the cell's job (or leave focus), `Supr` remove (asks first), `Esc` back, `?` lists the shortcuts. Registered in `useShortcutStore` (Stream Deck).
+- **Job focus** (`?trabajo=<job id>`): the job bar shows role slots and the next open slot, the job's days are highlighted, each technician gets a fit chip, and rows are ordered once on entry. A click on a day assigns that day; a click on a name assigns every free day. Status for new assignments is Invitado or Confirmado (bar toggle). Dry-hire jobs cannot be focused.
+- **Selection and batch**: drag, shift-click or ctrl-click; one action bar (Asignar a…, Confirmar, No disponible, Quitar, Pedir disponibilidad / Enviar oferta). One command per technician/day pair, three at a time; each failed row keeps **Forzar** or **Reintentar**; one **Deshacer** reverts the batch.
+- **Staffing composer** lives inside the inspector: intent first, job and days prefilled, suggested role, message collapsed, remembered channel, in-flight requests can be resent or cancelled, a clash shows inline with "Enviar igualmente".
+
+Every write goes through `@/features/assignments/commands` (see `docs/staffing/ASSIGNMENT_COMMANDS.md`); `tests/assignments/matrix-direct-write-guard.test.ts` pins this for the matrix files.
 
 ## Cell Color Coding
 
@@ -126,5 +124,5 @@ Located in `src/utils/technicianAvailability.ts`:
 
 - `JobAssignmentMatrix.tsx` is now the route composition shell; control rendering, mobile filter UI, reminder dialogs, viewport detection, and staffing button preference persistence live in `src/pages/job-assignment-matrix/`.
 - `OptimizedAssignmentMatrix.tsx` composes data, ordering, scroll state, and cell actions. Virtualized layout rendering remains in `OptimizedAssignmentMatrixView.tsx`.
-- `OptimizedMatrixCell.tsx` owns the visible cell content, while assignment removal side effects, retry/cancel dialogs, and tooltip formatting live under `src/components/matrix/optimized-matrix-cell/`.
+- `OptimizedMatrixCell.tsx` owns the visible cell content, while the staffing badges, tooltip and display helpers live under `src/components/matrix/optimized-matrix-cell/`.
 - Focused regression coverage for this boundary is in `src/pages/__tests__/JobAssignmentMatrix.test.tsx`, `src/components/matrix/__tests__/OptimizedAssignmentMatrix.test.tsx`, `src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx`, `src/components/matrix/optimized-assignment-matrix/__tests__/OptimizedAssignmentMatrixView.test.tsx`, and the matrix Playwright smoke tests.

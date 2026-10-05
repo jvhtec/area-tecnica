@@ -9,14 +9,14 @@ describe('useJobFocusSelection', () => {
 
   it('starts from ?trabajo= and defaults new assignments to Invitado', () => {
     window.history.replaceState(null, '', '/matriz?trabajo=job-1');
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
     expect(result.current.focusJobId).toBe('job-1');
     expect(result.current.focusStatus).toBe('invited');
   });
 
   it('keeps the URL in step, and leaves other parameters alone', () => {
     window.history.replaceState(null, '', '/matriz?matriz=v2');
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
     act(() => result.current.focusJob('job-2'));
     expect(window.location.search).toBe('?matriz=v2&trabajo=job-2');
     act(() => result.current.focusJob(null));
@@ -24,13 +24,8 @@ describe('useJobFocusSelection', () => {
     expect(result.current.focusJobId).toBeNull();
   });
 
-  it('is never focused when Matrix v2 is off', () => {
-    window.history.replaceState(null, '', '/matriz?trabajo=job-1');
-    expect(renderHook(() => useJobFocusSelection(false)).result.current.focusJobId).toBeNull();
-  });
-
   it('follows the back button', () => {
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
     window.history.replaceState(null, '', '/matriz?trabajo=job-9');
     act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
     expect(result.current.focusJobId).toBe('job-9');
@@ -38,7 +33,7 @@ describe('useJobFocusSelection', () => {
 
   it('Esc leaves focus', () => {
     window.history.replaceState(null, '', '/matriz?trabajo=job-1');
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
     act(() => { fireEvent.keyDown(document.body, { key: 'Escape' }); });
     expect(result.current.focusJobId).toBeNull();
     expect(window.location.search).toBe('');
@@ -46,7 +41,7 @@ describe('useJobFocusSelection', () => {
 
   it('Esc closing a popover, a dialog or a text field does not also leave focus', () => {
     window.history.replaceState(null, '', '/matriz?trabajo=job-1');
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
 
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
@@ -62,7 +57,7 @@ describe('useJobFocusSelection', () => {
   });
 
   it('can change the status for the session', () => {
-    const { result } = renderHook(() => useJobFocusSelection(true));
+    const { result } = renderHook(() => useJobFocusSelection());
     act(() => result.current.setFocusStatus('confirmed'));
     expect(result.current.focusStatus).toBe('confirmed');
   });

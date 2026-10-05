@@ -40,7 +40,7 @@ const titleFor = (kind: Kind, n: number) => {
 };
 
 interface Options {
-  v2: MatrixV2ViewConfig | undefined;
+  v2: MatrixV2ViewConfig;
   canEdit: boolean;
   selectedCells: Set<string>;
   clearSelection: () => void;

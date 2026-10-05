@@ -4,16 +4,9 @@ import { formatInTimeZone } from "date-fns-tz";
 
 import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import type { MatrixTimesheetAssignment } from "@/hooks/useOptimizedMatrixData";
 import type { OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from "@/components/matrix/optimized-assignment-matrix/types";
 
 type MatrixTechnician = OptimizedAssignmentMatrixExtendedProps["technicians"][number];
-
-type SortJobStatusRow = {
-  profile_id: string;
-  availability_status: string | null;
-  offer_status: string | null;
-};
 
 type TechResidenciaRow = {
   id: string;
@@ -63,11 +56,10 @@ const fetchTimesheetCountMaps = async (year: number): Promise<TimesheetCountMaps
 const buildMedalRankings = (
   countMaps: TimesheetCountMaps | undefined,
   techSortMethod: TechSortMethod,
-  sortJobId: string | null,
 ) => {
   const rankings = new Map<string, "gold" | "silver" | "bronze">();
 
-  if (!countMaps?.counts || !countMaps?.departments || techSortMethod !== "default" || sortJobId) {
+  if (!countMaps?.counts || !countMaps?.departments || techSortMethod !== "default") {
     return rankings;
   }
 
@@ -111,51 +103,15 @@ const buildMedalRankings = (
 
 type UseMatrixTechnicianOrderingArgs = {
   technicians: MatrixTechnician[];
-  allAssignments: MatrixTimesheetAssignment[];
   mobile: boolean;
 };
 
 export const useMatrixTechnicianOrdering = ({
   technicians,
-  allAssignments,
   mobile,
 }: UseMatrixTechnicianOrderingArgs) => {
-  const [sortJobId, setSortJobId] = useState<string | null>(null);
   const [techSortMethod, setTechSortMethod] = useState<TechSortMethod>("default");
   const allTechIds = useMemo(() => technicians.map((t) => t.id), [technicians]);
-
-  const { data: sortJobStatuses } = useQuery({
-    queryKey: queryKeys.scope("matrix-sort-job-statuses", sortJobId, allTechIds.join(",")),
-    queryFn: async () => {
-      if (!sortJobId || !allTechIds.length) return new Map<string, { availability_status: string | null; offer_status: string | null }>();
-      const chunk = <T,>(arr: T[], size: number) => {
-        const out: T[][] = [];
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-        return out;
-      };
-      const batches = chunk(allTechIds, 30);
-      const map = new Map<string, { availability_status: string | null; offer_status: string | null }>();
-      for (const b of batches) {
-        const { data, error } = await dataLayerClient.rpc("get_assignment_matrix_staffing_filtered", {
-          p_job_ids: [sortJobId],
-          p_profile_ids: b,
-        });
-        if (error) {
-          console.warn("Sort job statuses RPC error", error);
-          continue;
-        }
-        ((data || []) as SortJobStatusRow[]).forEach((r) => {
-          const av = r.availability_status === "pending" ? "requested" : (r.availability_status === "expired" ? null : r.availability_status);
-          const of = r.offer_status === "pending" ? "sent" : (r.offer_status === "expired" ? null : r.offer_status);
-          map.set(r.profile_id, { availability_status: av, offer_status: of });
-        });
-      }
-      return map;
-    },
-    enabled: !!sortJobId,
-    staleTime: 2_000,
-    gcTime: 60_000,
-  });
 
   const { data: techResidencias } = useQuery({
     queryKey: queryKeys.scope("tech-residencias", allTechIds.join(",")),
@@ -198,39 +154,6 @@ export const useMatrixTechnicianOrdering = ({
 
   const orderedTechnicians = useMemo(() => {
     const techs = [...technicians];
-
-    if (sortJobId) {
-      const baseOrder = new Map<string, number>();
-      technicians.forEach((t, i) => baseOrder.set(t.id, i));
-      const scoreMap = new Map<string, number>();
-      allAssignments?.forEach((a) => {
-        if (a.job_id !== sortJobId) return;
-        const cur = scoreMap.get(a.technician_id) || 0;
-        const status = (a.status || "").toLowerCase();
-        const add = status === "confirmed" ? 3 : (status === "invited" ? 1 : 0);
-        scoreMap.set(a.technician_id, Math.max(cur, add));
-      });
-      if (sortJobStatuses && sortJobStatuses.size) {
-        technicians.forEach((t) => {
-          const s = sortJobStatuses.get(t.id);
-          if (!s) return;
-          const cur = scoreMap.get(t.id) || 0;
-          let add = 0;
-          if (s.offer_status === "confirmed") add = Math.max(add, 2);
-          else if (s.offer_status === "sent") add = Math.max(add, 1.5);
-          if (s.availability_status === "confirmed") add = Math.max(add, 1.2);
-          else if (s.availability_status === "requested") add = Math.max(add, 1);
-          if (add > 0) scoreMap.set(t.id, Math.max(cur, add));
-        });
-      }
-      techs.sort((a, b) => {
-        const sa = scoreMap.get(a.id) || 0;
-        const sb = scoreMap.get(b.id) || 0;
-        if (sb !== sa) return sb - sa;
-        return (baseOrder.get(a.id)! - baseOrder.get(b.id)!);
-      });
-      return techs;
-    }
 
     switch (techSortMethod) {
       case "location":
@@ -299,16 +222,16 @@ export const useMatrixTechnicianOrdering = ({
     }
 
     return techs;
-  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
+  }, [technicians, techSortMethod, techResidencias, techConfirmedCounts]);
 
   const techMedalRankings = useMemo(
-    () => buildMedalRankings(techConfirmedCounts, techSortMethod, sortJobId),
-    [techConfirmedCounts, techSortMethod, sortJobId],
+    () => buildMedalRankings(techConfirmedCounts, techSortMethod),
+    [techConfirmedCounts, techSortMethod],
   );
 
   const techLastYearMedalRankings = useMemo(
-    () => buildMedalRankings(techLastYearCounts, techSortMethod, sortJobId),
-    [techLastYearCounts, techSortMethod, sortJobId],
+    () => buildMedalRankings(techLastYearCounts, techSortMethod),
+    [techLastYearCounts, techSortMethod],
   );
 
   const cycleTechSort = useCallback(() => {
@@ -316,10 +239,7 @@ export const useMatrixTechnicianOrdering = ({
     const currentIndex = methods.indexOf(techSortMethod);
     const nextIndex = (currentIndex + 1) % methods.length;
     setTechSortMethod(methods[nextIndex]);
-    if (sortJobId) {
-      setSortJobId(null);
-    }
-  }, [techSortMethod, sortJobId]);
+  }, [techSortMethod]);
 
   const getSortLabel = useCallback(() => {
     switch (techSortMethod) {
@@ -335,7 +255,6 @@ export const useMatrixTechnicianOrdering = ({
 
   return {
     orderedTechnicians,
-    setSortJobId,
     techMedalRankings,
     techLastYearMedalRankings,
     cycleTechSort,
