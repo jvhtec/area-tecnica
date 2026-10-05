@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FocusJobPicker } from '@/features/matrix-v2/focus/FocusJobPicker';
+import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
 import { cn } from '@/lib/utils';
 import { MatrixSwitchChip } from '@/pages/job-assignment-matrix/MatrixSwitchChip';
 import {
@@ -58,6 +60,12 @@ type MatrixPageControlsProps = {
   handleReminderOpenChange: (open: boolean) => void;
   outstandingJobsCount: number | null;
   outstandingJobsDescription: string;
+  /** Matrix v2: no editing modes; every click opens the inspector. */
+  matrixV2?: boolean;
+  /** Matrix v2 job focus: the jobs to pick from, the focused one, and how to change it. */
+  focusJobs?: MatrixJob[];
+  focusJobId?: string | null;
+  onFocusJob?: (jobId: string | null) => void;
 };
 
 export const MatrixPageControls = ({
@@ -102,6 +110,10 @@ export const MatrixPageControls = ({
   handleReminderOpenChange,
   outstandingJobsCount,
   outstandingJobsDescription,
+  matrixV2 = false,
+  focusJobs = [],
+  focusJobId = null,
+  onFocusJob,
 }: MatrixPageControlsProps) => {
   const departmentLabel = DEPARTMENT_LABELS[selectedDepartment] || formatLabel(selectedDepartment);
   const hasOutstanding = (outstandingJobsCount ?? 0) > 0;
@@ -267,10 +279,12 @@ export const MatrixPageControls = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-              Modos
-            </span>
+            {!matrixV2 && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                Modos
+              </span>
+            )}
             <MatrixSwitchChip
               label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}
               ariaLabel={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}
@@ -279,40 +293,45 @@ export const MatrixPageControls = ({
               icon={<Refrigerator className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
               trailing={<Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{fridgeCount}</Badge>}
             />
-            <MatrixSwitchChip
-              label="Asignación directa"
-              ariaLabel="Alternar asignación directa"
-              checked={allowDirectAssign}
-              onCheckedChange={(value) => {
-                setAllowDirectAssign(value);
-                if (value) setAllowMarkUnavailable(false);
-              }}
-            />
-            {canMarkUnavailable && (
-              <MatrixSwitchChip
-                label="No disponible"
-                ariaLabel="Alternar marcar no disponible"
-                checked={allowMarkUnavailable}
-                onCheckedChange={(value) => {
-                  setAllowMarkUnavailable(value);
-                  if (value) setAllowDirectAssign(false);
-                }}
-              />
+            {matrixV2 && onFocusJob && <FocusJobPicker jobs={focusJobs} focusJobId={focusJobId} onFocusJob={onFocusJob} />}
+            {!matrixV2 && (
+              <>
+                <MatrixSwitchChip
+                  label="Asignación directa"
+                  ariaLabel="Alternar asignación directa"
+                  checked={allowDirectAssign}
+                  onCheckedChange={(value) => {
+                    setAllowDirectAssign(value);
+                    if (value) setAllowMarkUnavailable(false);
+                  }}
+                />
+                {canMarkUnavailable && (
+                  <MatrixSwitchChip
+                    label="No disponible"
+                    ariaLabel="Alternar marcar no disponible"
+                    checked={allowMarkUnavailable}
+                    onCheckedChange={(value) => {
+                      setAllowMarkUnavailable(value);
+                      if (value) setAllowDirectAssign(false);
+                    }}
+                  />
+                )}
+                <MatrixSwitchChip
+                  label="Email"
+                  ariaLabel="Mostrar botones de email"
+                  checked={!hideStaffingEmailButtons}
+                  onCheckedChange={(value) => setHideStaffingEmailButtons(!value)}
+                  icon={<Mail className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
+                />
+                <MatrixSwitchChip
+                  label="WhatsApp"
+                  ariaLabel="Mostrar botones de WhatsApp"
+                  checked={!hideStaffingWhatsappButtons}
+                  onCheckedChange={(value) => setHideStaffingWhatsappButtons(!value)}
+                  icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+                />
+              </>
             )}
-            <MatrixSwitchChip
-              label="Email"
-              ariaLabel="Mostrar botones de email"
-              checked={!hideStaffingEmailButtons}
-              onCheckedChange={(value) => setHideStaffingEmailButtons(!value)}
-              icon={<Mail className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
-            />
-            <MatrixSwitchChip
-              label="WhatsApp"
-              ariaLabel="Mostrar botones de WhatsApp"
-              checked={!hideStaffingWhatsappButtons}
-              onCheckedChange={(value) => setHideStaffingWhatsappButtons(!value)}
-              icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
-            />
           </div>
         </div>
       </div>
@@ -341,25 +360,29 @@ export const MatrixPageControls = ({
               </span>
             )}
           </button>
-          <MatrixSwitchChip
-            label="Directa"
-            ariaLabel="Alternar asignación directa"
-            checked={allowDirectAssign}
-            onCheckedChange={(value) => {
-              setAllowDirectAssign(value);
-              if (value) setAllowMarkUnavailable(false);
-            }}
-          />
-          {canMarkUnavailable && (
+          {!matrixV2 && (
+            <>
             <MatrixSwitchChip
-              label="No disp."
-              ariaLabel="Alternar marcar no disponible"
-              checked={allowMarkUnavailable}
+              label="Directa"
+              ariaLabel="Alternar asignación directa"
+              checked={allowDirectAssign}
               onCheckedChange={(value) => {
-                setAllowMarkUnavailable(value);
-                if (value) setAllowDirectAssign(false);
+                setAllowDirectAssign(value);
+                if (value) setAllowMarkUnavailable(false);
               }}
             />
+            {canMarkUnavailable && (
+              <MatrixSwitchChip
+                label="No disp."
+                ariaLabel="Alternar marcar no disponible"
+                checked={allowMarkUnavailable}
+                onCheckedChange={(value) => {
+                  setAllowMarkUnavailable(value);
+                  if (value) setAllowDirectAssign(false);
+                }}
+              />
+            )}
+            </>
           )}
         </div>
 
@@ -403,44 +426,49 @@ export const MatrixPageControls = ({
               icon={<Refrigerator className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
               trailing={<Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{fridgeCount}</Badge>}
             />
-            <MatrixSwitchChip
-              block
-              label="Asignación directa"
-              ariaLabel="Alternar asignación directa"
-              checked={allowDirectAssign}
-              onCheckedChange={(value) => {
-                setAllowDirectAssign(value);
-                if (value) setAllowMarkUnavailable(false);
-              }}
-            />
-            {canMarkUnavailable && (
+            {matrixV2 && onFocusJob && <FocusJobPicker block jobs={focusJobs} focusJobId={focusJobId} onFocusJob={onFocusJob} />}
+            {!matrixV2 && (
+              <>
               <MatrixSwitchChip
                 block
-                label="Marcar no disponible"
-                ariaLabel="Alternar marcar no disponible"
-                checked={allowMarkUnavailable}
+                label="Asignación directa"
+                ariaLabel="Alternar asignación directa"
+                checked={allowDirectAssign}
                 onCheckedChange={(value) => {
-                  setAllowMarkUnavailable(value);
-                  if (value) setAllowDirectAssign(false);
+                  setAllowDirectAssign(value);
+                  if (value) setAllowMarkUnavailable(false);
                 }}
               />
+              {canMarkUnavailable && (
+                <MatrixSwitchChip
+                  block
+                  label="Marcar no disponible"
+                  ariaLabel="Alternar marcar no disponible"
+                  checked={allowMarkUnavailable}
+                  onCheckedChange={(value) => {
+                    setAllowMarkUnavailable(value);
+                    if (value) setAllowDirectAssign(false);
+                  }}
+                />
+              )}
+              <MatrixSwitchChip
+                block
+                label="Mostrar email"
+                ariaLabel="Mostrar botones de email"
+                checked={!hideStaffingEmailButtons}
+                onCheckedChange={(value) => setHideStaffingEmailButtons(!value)}
+                icon={<Mail className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
+              />
+              <MatrixSwitchChip
+                block
+                label="Mostrar WhatsApp"
+                ariaLabel="Mostrar botones de WhatsApp"
+                checked={!hideStaffingWhatsappButtons}
+                onCheckedChange={(value) => setHideStaffingWhatsappButtons(!value)}
+                icon={<MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
+              />
+              </>
             )}
-            <MatrixSwitchChip
-              block
-              label="Mostrar email"
-              ariaLabel="Mostrar botones de email"
-              checked={!hideStaffingEmailButtons}
-              onCheckedChange={(value) => setHideStaffingEmailButtons(!value)}
-              icon={<Mail className="h-4 w-4 text-sky-600 dark:text-sky-400" />}
-            />
-            <MatrixSwitchChip
-              block
-              label="Mostrar WhatsApp"
-              ariaLabel="Mostrar botones de WhatsApp"
-              checked={!hideStaffingWhatsappButtons}
-              onCheckedChange={(value) => setHideStaffingWhatsappButtons(!value)}
-              icon={<MessageCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
-            />
 
             <MatrixLegend className="w-full justify-center" showLabel />
 

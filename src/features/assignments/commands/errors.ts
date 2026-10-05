@@ -18,6 +18,7 @@ const MESSAGES: Record<AssignmentCommandCode, string> = {
   assignment_not_found: 'La asignación ya no existe.',
   dryhire_job: 'Los trabajos de dry hire no llevan personal asignado.',
   invalid_role: 'El rol no es un rol válido. Elige uno de la lista.',
+  invalid_transition: 'Esta asignación no se puede reabrir: solo una asignación confirmada puede volver a invitada.',
   approved_timesheet: 'Hay partes aprobados en esos días. Los partes aprobados no se eliminan desde una asignación: anula primero la aprobación.',
   permission_denied: 'No tienes permiso para modificar asignaciones.',
   invalid_request: 'La solicitud de asignación no es válida.',

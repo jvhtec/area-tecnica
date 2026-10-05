@@ -14,6 +14,7 @@ import {
   type ChangeAssignmentRoleInput,
   type JobAssignmentCommandStates,
   type SetAssignmentStatusInput,
+  type UnconfirmAssignmentInput,
   type RemoveAssignmentDateInput,
   type RemoveDirectAssignmentInput,
 } from '@/features/assignments/commands/types';
@@ -133,6 +134,17 @@ export function setAssignmentStatus(input: SetAssignmentStatusInput): Promise<As
     p_expected_state_token: input.expectedStateToken ?? undefined,
     p_source: input.source ?? 'matrix',
     p_metadata: input.notes ? { notes: input.notes } : undefined,
+  }));
+}
+
+/** Takes back a manager confirm inside the undo window (confirmed -> invited). */
+export function unconfirmAssignment(input: UnconfirmAssignmentInput): Promise<AssignmentCommandResult> {
+  return execute(() => supabase.rpc('unconfirm_assignment', {
+    p_command_id: input.commandId,
+    p_job_id: input.jobId,
+    p_technician_id: input.technicianId,
+    p_expected_state_token: input.expectedStateToken ?? undefined,
+    p_source: input.source ?? 'matrix',
   }));
 }
 

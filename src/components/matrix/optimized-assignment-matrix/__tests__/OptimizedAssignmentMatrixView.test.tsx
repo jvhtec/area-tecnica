@@ -141,6 +141,8 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   sendStaffingEmail: vi.fn(),
   isSendingStaffingEmail: false,
   cancelStaffing: vi.fn(),
+  sendStaffingEmailAsync: vi.fn(),
+  cancelStaffingAsync: vi.fn(),
   isCancellingStaffing: false,
   checkTimeConflictEnhanced: vi.fn(),
   availabilityDialog: null,
@@ -160,6 +162,7 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   techMedalRankings: new Map(),
   techLastYearMedalRankings: new Map(),
   clearCellSelection: vi.fn(),
+  onReplaceSelection: vi.fn(),
   profileNamesMap: new Map(),
   ...overrides,
 });

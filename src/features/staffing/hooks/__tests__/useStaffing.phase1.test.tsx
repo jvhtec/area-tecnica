@@ -578,3 +578,38 @@ describe("staffing hooks Phase 1 characterization", () => {
     });
   });
 });
+
+describe("useSendStaffingEmail retries", () => {
+  const retryingWrapper = () => {
+    // How the app is configured: a failed mutation is tried once more.
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } });
+    return ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  };
+  const request = { job_id: "job-1", profile_id: "tech-1", phase: "availability" as const };
+
+  it("does not ask twice for a conflict: it is the server's answer, not a hiccup", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(
+      JSON.stringify({ error: "Conflicto", details: { conflict_type: "job_overlap", conflicts: [{ job_name: "Boda" }] } }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    )));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useSendStaffingEmail(), { wrapper: retryingWrapper() });
+
+    const outcome = await runMutation(() => result.current.mutateAsync(request));
+    expect(outcome.error).toBeInstanceOf(ConflictError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still tries any other failure once more, as the client is configured to", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(
+      JSON.stringify({ error: "El proveedor no responde" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    )));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useSendStaffingEmail(), { wrapper: retryingWrapper() });
+
+    const outcome = await runMutation(() => result.current.mutateAsync(request));
+    expect((outcome.error as Error).message).toBe("El proveedor no responde");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

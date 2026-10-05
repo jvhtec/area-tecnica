@@ -62,6 +62,8 @@ export const OptimizedMatrixCell = memo(({
   onClick: onClickProp,
   onPrefetch: onPrefetchProp,
   onOpenSheet: onOpenSheetProp,
+  inspectorMode = false,
+  onInspect: onInspectProp,
   selectionActive = false,
   onOptimisticUpdate: onOptimisticUpdateProp,
   onRender,
@@ -94,6 +96,10 @@ export const OptimizedMatrixCell = memo(({
   );
   const onPrefetch = useCallback(() => onPrefetchProp?.(technicianId), [onPrefetchProp, technicianId]);
   const onOpenSheet = useCallback(() => onOpenSheetProp?.(technicianId, date), [onOpenSheetProp, technicianId, date]);
+  const onInspect = useCallback(
+    (element: HTMLElement) => onInspectProp?.(technicianId, date, element),
+    [onInspectProp, technicianId, date],
+  );
   const onOptimisticUpdate = useCallback(
     (status: string) => {
       if (assignment?.job_id) onOptimisticUpdateProp?.(technicianId, assignment.job_id, status);
@@ -201,7 +207,7 @@ export const OptimizedMatrixCell = memo(({
 
   React.useEffect(() => clearLongPress, [clearLongPress]);
 
-  const handleCellClick = useCallback((e: React.MouseEvent) => {
+  const handleCellClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
 
     // Ctrl+Click or Alt+Click to toggle cell selection (for Stream Deck shortcuts)
@@ -226,6 +232,12 @@ export const OptimizedMatrixCell = memo(({
       return;
     }
 
+    // Matrix v2: a plain click always opens the inspector, whatever the cell holds.
+    if (inspectorMode && onInspectProp) {
+      onInspect(e.currentTarget);
+      return;
+    }
+
     // Mark unavailable toggle mode: left-click directly toggles unavailability (no dialog)
     if (allowMarkUnavailable && !hasAssignment) {
       onClick('toggle-unavailable');
@@ -241,7 +253,7 @@ export const OptimizedMatrixCell = memo(({
     } else if (allowDirectAssign) {
       onClick('select-job'); // Create new assignment
     }
-  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable, mobile, selectionActive, onOpenSheet]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, allowDirectAssign, allowMarkUnavailable, mobile, selectionActive, onOpenSheet, inspectorMode, onInspectProp, onInspect]);
 
   const handleRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -306,7 +318,7 @@ export const OptimizedMatrixCell = memo(({
   // A plain click only does something in one of the edit modes; without one the
   // cell is read-only and should not advertise itself as clickable.
   const plainClickIsActionable =
-    mobile || allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
+    mobile || inspectorMode || allowDirectAssign || (allowMarkUnavailable && !hasAssignment) || isUnavailable;
 
   // The staffing conversation gets its own caption line so an empty-looking cell
   // says what is in flight, instead of only being tinted.
@@ -363,6 +375,7 @@ export const OptimizedMatrixCell = memo(({
             width: `${width}px`,
             height: `${height}px`,
           }}
+          id={`mcell-${technicianId}-${dateKey}`}
           data-matrix-cell="true"
           data-matrix-cell-state={cellState}
           // Read by the grid's shared hover tooltip (MatrixCellHoverTooltip).
@@ -583,16 +596,19 @@ export const OptimizedMatrixCell = memo(({
                 </div>
               )}
 
-              <div className="absolute top-1.5 right-1.5 z-10">
-                <button
-                  type="button"
-                  className={DANGER_BUTTON_CLASS}
-                  title="Eliminar asignación"
-                  onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
-                >
-                  <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                </button>
-              </div>
+              {/* Matrix v2 removes from the inspector (day or whole job, confirmed there). */}
+              {!inspectorMode && (
+                <div className="absolute top-1.5 right-1.5 z-10">
+                  <button
+                    type="button"
+                    className={DANGER_BUTTON_CLASS}
+                    title="Eliminar asignación"
+                    onClick={(e) => { e.stopPropagation(); checkMultiDateAssignment(); }}
+                  >
+                    <X className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                  </button>
+                </div>
+              )}
             </>
           )}
 

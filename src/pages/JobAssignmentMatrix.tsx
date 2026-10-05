@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingR
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
 import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
-import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -25,17 +25,20 @@ import {
   fetchAvailabilityForWindow,
   fetchJobsForWindow,
   formatLabel,
-  parseSummaryRow,
   type Department,
   type MatrixJob,
   type OutstandingJobInfo,
   type OutstandingRoleInfo,
-  type StaffingAssignmentRow,
-  type StaffingSummaryRow,
 } from '@/pages/job-assignment-matrix/utils';
 
 
 import { queryKeys } from "@/lib/react-query";
+import { fetchStaffingSummary, staffingSummaryQueryKey, useJobRoleSlots } from '@/features/matrix-v2/roleSlotsQuery';
+import { useMatrixV2 } from '@/features/matrix-v2/useMatrixV2';
+import { JobFocusBar } from '@/features/matrix-v2/focus/JobFocusBar';
+import { useJobFocusSelection } from '@/features/matrix-v2/focus/useJobFocusSelection';
+import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
+import { jobDayKeys } from '@/features/matrix-v2/jobDays';
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
@@ -419,40 +422,8 @@ export default function JobAssignmentMatrix() {
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
 
   const staffingReminderQuery = useQuery({
-    queryKey: queryKeys.scope('matrix-staffing-summary', jobIdsKey),
-    queryFn: async () => {
-      if (!jobIds.length) {
-        return { summaries: [] as StaffingSummaryRow[], assignments: [] as StaffingAssignmentRow[] };
-      }
-
-      const [summaryRes, assignmentsRes] = await Promise.all([
-        dataLayerClient.from('job_required_roles_summary')
-          .select('job_id, department, roles')
-          .in('job_id', jobIds),
-        dataLayerClient.from('job_assignments')
-          .select('job_id, sound_role, lights_role, video_role, production_role, status')
-          .in('job_id', jobIds),
-      ]);
-
-      if (summaryRes.error) throw summaryRes.error;
-      if (assignmentsRes.error) throw assignmentsRes.error;
-
-      const summaries = (summaryRes.data || [])
-        .map(parseSummaryRow)
-        .filter((row): row is StaffingSummaryRow => Boolean(row));
-
-      const assignments = ((assignmentsRes.data || []) as StaffingAssignmentRow[])
-        .filter((row): row is StaffingAssignmentRow => Boolean(row && row.job_id))
-        .map((row) => ({
-          ...row,
-          sound_role: row.sound_role ? String(row.sound_role) : null,
-          lights_role: row.lights_role ? String(row.lights_role) : null,
-          video_role: row.video_role ? String(row.video_role) : null,
-          status: row.status ? String(row.status) : null,
-        }));
-
-      return { summaries, assignments };
-    },
+    queryKey: staffingSummaryQueryKey(jobIdsKey),
+    queryFn: () => fetchStaffingSummary(jobIds),
     enabled: jobIds.length > 0,
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -638,6 +609,30 @@ export default function JobAssignmentMatrix() {
     hideStaffingWhatsappButtons,
   ]);
 
+  const { enabled: matrixV2 } = useMatrixV2();
+  const roleSlotsByJob = useJobRoleSlots(staffingReminderQuery.data);
+  const { focusJobId, focusStatus, setFocusStatus, focusJob } = useJobFocusSelection(matrixV2);
+  // A job that takes no crew (dry hire, cancelled) is never focused, even when ?trabajo= names it.
+  const focusedJob = useMemo(() => {
+    const job = focusJobId ? yearJobs.find((candidate: MatrixJob) => candidate.id === focusJobId) : undefined;
+    return job && isFocusableJob(job) ? job : null;
+  }, [focusJobId, yearJobs]);
+  // A focused job outside the loaded weeks brings the range to it.
+  const centeredOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusedJob) {
+      centeredOn.current = null;
+      return;
+    }
+    if (centeredOn.current === focusedJob.id) return;
+    centeredOn.current = focusedJob.id;
+    const days = jobDayKeys(focusedJob);
+    const loaded = new Set(dateRange.map((date) => formatMadridDateKey(date)));
+    if (days.length === 0 || days.some((key) => loaded.has(key))) return;
+    const first = madridDateKeyToCalendarDate(days[0]);
+    if (first) setCenterDate(first);
+  }, [focusedJob, dateRange, setCenterDate]);
+
   const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
   const outstandingJobsDescription =
     outstandingJobsCount === null
@@ -690,7 +685,21 @@ export default function JobAssignmentMatrix() {
         handleReminderOpenChange={handleReminderOpenChange}
         outstandingJobsCount={outstandingJobsCount}
         outstandingJobsDescription={outstandingJobsDescription}
+        matrixV2={matrixV2}
+        focusJobs={yearJobs}
+        focusJobId={focusedJob?.id ?? null}
+        onFocusJob={focusJob}
       />
+
+      {matrixV2 && focusedJob && (
+        <JobFocusBar
+          job={focusedJob}
+          slots={roleSlotsByJob.get(focusedJob.id)}
+          status={focusStatus}
+          onStatusChange={setFocusStatus}
+          onExit={() => focusJob(null)}
+        />
+      )}
 
       {/* Matrix Content */}
       <div className="flex-1 overflow-hidden">
@@ -712,6 +721,11 @@ export default function JobAssignmentMatrix() {
             hideStaffingEmailButtons={hideStaffingEmailButtons}
             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
             staffingDepartment={selectedDepartment}
+            matrixV2={matrixV2}
+            roleSlotsByJob={roleSlotsByJob}
+            focusJobId={focusedJob?.id ?? null}
+            focusStatus={focusStatus}
+            onFocusJobChange={focusJob}
             mobile={isMobile}
             // Narrower than the old 140 now that the phone cell shows status
             // only: the action icons that needed the width live in the sheet,

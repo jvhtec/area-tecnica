@@ -44,6 +44,8 @@ export interface MatrixGridRowProps {
   onSelect: OptimizedMatrixCellProps["onSelect"];
   onClick: OptimizedMatrixCellProps["onClick"];
   onOpenSheet: NonNullable<OptimizedMatrixCellProps["onOpenSheet"]>;
+  inspectorMode?: boolean;
+  onInspect?: OptimizedMatrixCellProps["onInspect"];
   onPrefetch: NonNullable<OptimizedMatrixCellProps["onPrefetch"]>;
   onOptimisticUpdate: NonNullable<OptimizedMatrixCellProps["onOptimisticUpdate"]>;
   onRender: () => void;
@@ -84,6 +86,8 @@ export const MatrixGridRow = React.memo(function MatrixGridRow({
   onSelect,
   onClick,
   onOpenSheet,
+  inspectorMode = false,
+  onInspect,
   onPrefetch,
   onOptimisticUpdate,
   onRender,
@@ -122,6 +126,8 @@ export const MatrixGridRow = React.memo(function MatrixGridRow({
               onSelect={onSelect}
               onClick={onClick}
               onOpenSheet={onOpenSheet}
+              inspectorMode={inspectorMode}
+              onInspect={onInspect}
               selectionActive={selectionActive}
               onPrefetch={onPrefetch}
               onOptimisticUpdate={onOptimisticUpdate}

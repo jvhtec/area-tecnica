@@ -14,6 +14,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
+import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
+import { useMatrixV2Config } from '@/features/matrix-v2/useMatrixV2Config';
 
 import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
@@ -23,6 +25,7 @@ import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/compo
 
 import { queryKeys } from "@/lib/react-query";
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+const EMPTY_ROLE_SLOTS = new Map<string, RoleSlot[]>();
 
 // The staffing badges are fetched for a block-aligned window of technicians
 // rather than exactly the visible rows: the query is keyed on the id list, so
@@ -70,6 +73,11 @@ export const OptimizedAssignmentMatrix = ({
   staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
+  matrixV2 = false,
+  roleSlotsByJob = EMPTY_ROLE_SLOTS,
+  focusJobId = null,
+  focusStatus = 'invited',
+  onFocusJobChange,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -82,7 +90,7 @@ export const OptimizedAssignmentMatrix = ({
   const isGlobalCellSelected = useSelectedCellStore((state) => state.isCellSelected);
 
   const [createUserOpen, setCreateUserOpen] = useState(false);
-  const { userRole } = useOptimizedAuth();
+  const { userRole, user } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
   const qc = useQueryClient();
 
@@ -94,8 +102,8 @@ export const OptimizedAssignmentMatrix = ({
   const { toast } = useToast();
   // Owned here rather than in every cell: the grid renders hundreds of cells,
   // and each useMutation call registers its own observer.
-  const { mutate: sendStaffingEmail, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
-  const { mutate: cancelStaffing, isPending: isCancellingStaffing } = useCancelStaffingRequest();
+  const { mutate: sendStaffingEmail, mutateAsync: sendStaffingEmailAsync, isPending: isSendingStaffingEmail } = useSendStaffingEmail();
+  const { mutate: cancelStaffing, mutateAsync: cancelStaffingAsync, isPending: isCancellingStaffing } = useCancelStaffingRequest();
 
   // Cell dimensions (overridable for mobile). The desktop row is 72px so the
   // redesigned status card (job, role, and a "día único" line) fits without the
@@ -119,7 +127,7 @@ export const OptimizedAssignmentMatrix = ({
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
   const {
-    orderedTechnicians,
+    orderedTechnicians: baseOrderedTechnicians,
     setSortJobId,
     techMedalRankings,
     techLastYearMedalRankings,
@@ -129,6 +137,43 @@ export const OptimizedAssignmentMatrix = ({
     technicians,
     allAssignments,
     mobile,
+  });
+
+  // Build declined job sets per technician for targeted staffing blocking
+  const declinedJobsByTech = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    allAssignments?.forEach((a) => {
+      if (a?.status === 'declined' && a.technician_id && a.job_id) {
+        if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
+        map.get(a.technician_id)!.add(a.job_id);
+      }
+    });
+    return map;
+  }, [allAssignments]);
+
+  // Matrix v2: the runner, inspector, quick actions and job focus.
+  const {
+    v2Config,
+    orderedTechnicians,
+    quickConfirm,
+    openInspector,
+  } = useMatrixV2Config({
+    enabled: matrixV2,
+    ready: !isInitialLoading,
+    jobs,
+    technicians,
+    dates,
+    baseOrderedTechnicians,
+    allAssignments,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+    isManagementUser,
+    roleSlotsByJob,
+    declinedJobsByTech,
+    fridgeSet,
+    focusJobId,
+    focusStatus,
+    onFocusJobChange,
   });
 
   // Listen for assignment updates and refresh data
@@ -181,18 +226,6 @@ export const OptimizedAssignmentMatrix = ({
     getJobsForDate,
     includeOpenSlots: !mobile,
   });
-
-  // Build declined job sets per technician for targeted staffing blocking
-  const declinedJobsByTech = React.useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    allAssignments?.forEach((a) => {
-      if (a?.status === 'declined' && a.technician_id && a.job_id) {
-        if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
-        map.get(a.technician_id)!.add(a.job_id);
-      }
-    });
-    return map;
-  }, [allAssignments]);
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
@@ -270,6 +303,21 @@ export const OptimizedAssignmentMatrix = ({
       toast({ title: 'En la nevera', description: 'Este técnico está en la nevera y no puede ser asignado.', variant: 'destructive' });
       return;
     }
+    // Matrix v2: confirm and decline are quick actions, everything else is the inspector.
+    if (matrixV2) {
+      if (action === 'confirm') {
+        quickConfirm(technicianId, date);
+        return;
+      }
+      if (action === 'decline') {
+        openInspector(technicianId, date, null, 'decline');
+        return;
+      }
+      if (action === 'unavailable') {
+        openInspector(technicianId, date, null);
+        return;
+      }
+    }
     // Gate direct assign-related actions behind allowDirectAssign
     if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
       return;
@@ -338,7 +386,7 @@ export const OptimizedAssignmentMatrix = ({
 
     // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser, matrixV2, quickConfirm, openInspector]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -379,6 +427,16 @@ export const OptimizedAssignmentMatrix = ({
     setSelectedCells(new Set());
     clearGlobalSelection();
   }, [clearGlobalSelection]);
+
+  // Drag and shift-click replace the selection in one go. Stream Deck keeps
+  // working from one cell, the last of the new selection.
+  const replaceSelection = useCallback((keys: Set<string>) => {
+    setSelectedCells(keys);
+    const last = [...keys].pop();
+    const date = last ? madridDateKeyToCalendarDate(last.slice(-10)) : null;
+    if (last && date) selectCell(last.slice(0, -11), date);
+    else clearGlobalSelection();
+  }, [selectCell, clearGlobalSelection]);
 
   const handleStaffingActionSelected = useCallback(async (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     if (cellAction?.type === 'select-job-for-staffing') {
@@ -678,8 +736,13 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     canExpandBefore, canExpandAfter, onNearEdgeScroll, onVisibleRowsChange: handleVisibleRowsChange,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
-    hideStaffingEmailButtons, hideStaffingWhatsappButtons,
+    fridgeSet, mobile, staffingDepartment,
+    // Matrix v2 has no editing modes: managers can always assign (the inspector
+    // is read-only for everyone else), and the staffing icons live in the inspector.
+    allowDirectAssign: matrixV2 ? isManagementUser : allowDirectAssign,
+    allowMarkUnavailable: matrixV2 ? false : allowMarkUnavailable,
+    hideStaffingEmailButtons: matrixV2 ? true : hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons: matrixV2 ? true : hideStaffingWhatsappButtons,
     cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getHeaderCounts, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
@@ -688,13 +751,14 @@ export const OptimizedAssignmentMatrix = ({
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
     handleJobSelected, handleStaffingActionSelected, forcedStaffingAction, forcedStaffingChannel,
     jobs, offerChannel, toast, sendStaffingEmail, checkTimeConflictEnhanced,
-    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing,
+    isSendingStaffingEmail, cancelStaffing, isCancellingStaffing, sendStaffingEmailAsync, cancelStaffingAsync,
     availabilityDialog, setAvailabilityDialog, availabilityCoverage, setAvailabilityCoverage,
     availabilitySingleDate, setAvailabilitySingleDate, availabilityMultiDates, setAvailabilityMultiDates,
     availabilitySending, setAvailabilitySending, handleEmailError, conflictDialog, setConflictDialog,
     offerSeedDates,
     isGlobalCellSelected, techMedalRankings, techLastYearMedalRankings,
-    clearCellSelection,
+    clearCellSelection, onReplaceSelection: replaceSelection, staffingUserId: user?.id ?? null,
+    v2: v2Config,
   };
 
   return <OptimizedAssignmentMatrixView {...viewProps} />;
