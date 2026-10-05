@@ -28,8 +28,10 @@ const MESSAGES: Record<AssignmentCommandCode, string> = {
   unknown: 'No se pudo completar la operación de asignación.',
 };
 
+/** Return the Spanish user-facing message for a classified command outcome. */
 export const assignmentCommandMessage = (code: AssignmentCommandCode): string => MESSAGES[code];
 
+/** Narrow a returned code to the recognized database rejection vocabulary. */
 export const isRejectionCode = (code: string | undefined): code is AssignmentRejectionCode =>
   typeof code === 'string' && (REJECTION_CODES as readonly string[]).includes(code);
 
@@ -55,6 +57,7 @@ export class AssignmentCommandError extends Error {
   }
 }
 
+/** Read a structured RPC error code without assuming a transport error shape. */
 const readCode = (error: unknown): string | undefined => {
   if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
   const { code } = error;

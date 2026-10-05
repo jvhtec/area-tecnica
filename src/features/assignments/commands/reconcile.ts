@@ -1,9 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/react-query';
 
+/** Scope authoritative command state to one job and technician. */
 export const assignmentCommandStateKey = (jobId: string, technicianId: string) =>
   queryKeys.scope('assignment-command-state', jobId, technicianId);
 
+/** Scope the token collection to one job. */
 export const jobAssignmentCommandStatesKey = (jobId: string) =>
   queryKeys.scope('job-assignment-command-states', jobId);
 

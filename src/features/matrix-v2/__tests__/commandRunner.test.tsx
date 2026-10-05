@@ -345,6 +345,21 @@ describe('createMatrixCommandRunner', () => {
       expect(outcome.undo).toBeNull();
     });
 
+    it('confirming a declined assignment offers no undo: unconfirm would leave it invited', async () => {
+      const { runner, mocks } = setup(makeState({ exists: true, assignment: makeRow({ status: 'declined' }), dates: [] }));
+      mocks.status.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed' }), dates: [] }));
+      const outcome = mustSucceed(await runner.run({ kind: 'confirm', technicianId: TECH_1, jobId: JOB_A, source: 'matrix-inspector' }));
+      expect(outcome.undo).toBeNull();
+    });
+
+    it('assigning over a declined membership offers no undo', async () => {
+      const { runner, mocks } = setup(makeState({ exists: true, assignment: makeRow({ status: 'declined', sound_role: 'SND-FOH-E' }), dates: ['2026-10-13'] }));
+      mocks.apply.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed', sound_role: 'SND-FOH-E' }), dates: ['2026-10-13'] }));
+      const outcome = mustSucceed(await runner.run(assignIntent({ status: 'confirmed', coverage: 'multi', dates: ['2026-10-13'] })));
+      expect(outcome.undo).toBeNull();
+      expect(mocks.unconfirm).not.toHaveBeenCalled();
+    });
+
     it('a role change is undone by restoring the previous role', async () => {
       const { runner, mocks } = setup(makeState({ ...pair, assignment: makeRow({ sound_role: 'SND-PA-T' }) }));
       mocks.role.mockResolvedValueOnce(makeResult({ assignment: makeRow({ sound_role: 'SND-FOH-R' }), state_token: 'after', side_effects: [] }))

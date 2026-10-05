@@ -321,12 +321,15 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
         const previous = state.assignment;
         const after = result.assignment;
         if (!after) return null;
+        // Only an invited or confirmed pair can be put back by one command; a
+        // declined one cannot be re-declined without undoing more than this change.
+        if (previous.status !== 'invited' && previous.status !== 'confirmed') return null;
         const department = roleDepartmentForCode(intent.role);
         if (!department) return null;
         const previousRole = roleOf(state, department);
         const roleChanged = previousRole !== intent.role;
         const datesChanged = !sameDates(state.dates, result.dates);
-        const upgraded = previous.status !== 'confirmed' && after.status === 'confirmed';
+        const upgraded = previous.status === 'invited' && after.status === 'confirmed';
         if (upgraded && !roleChanged && !datesChanged) {
           return { run: (commandId, token) => commands.unconfirmAssignment({ commandId, jobId, technicianId, expectedStateToken: token, source }) };
         }
@@ -350,7 +353,8 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
         };
       }
       case 'confirm': {
-        if (state.assignment?.status === 'confirmed') return null;
+        // unconfirm goes back to invited, so it is only the inverse of confirming an invitation.
+        if (state.assignment?.status !== 'invited') return null;
         return { run: (commandId, token) => commands.unconfirmAssignment({ commandId, jobId, technicianId, expectedStateToken: token, source }) };
       }
       case 'role': {

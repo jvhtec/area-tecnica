@@ -24,6 +24,7 @@ export const createAssignmentCommandId = (): string => crypto.randomUUID();
 
 const RETRY_DELAYS_MS = [400, 1200];
 
+/** Wait between transport retries without changing the logical command identity. */
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type RpcResponse = { data: unknown; error: unknown };
@@ -67,6 +68,7 @@ export function requireCommitted(result: AssignmentCommandResult): AssignmentCom
   throw new AssignmentCommandError(code, { result });
 }
 
+/** Apply or move membership and schedule in one state-checked database command. */
 export function applyDirectAssignment(input: ApplyDirectAssignmentInput): Promise<AssignmentCommandResult> {
   return execute(() => supabase.rpc('apply_direct_assignment', {
     p_command_id: input.commandId,
@@ -85,6 +87,7 @@ export function applyDirectAssignment(input: ApplyDirectAssignmentInput): Promis
   }));
 }
 
+/** Remove the complete assignment through the approved-timesheet protection boundary. */
 export function removeDirectAssignment(input: RemoveDirectAssignmentInput): Promise<AssignmentCommandResult> {
   return execute(() => supabase.rpc('remove_direct_assignment', {
     p_command_id: input.commandId,
@@ -95,6 +98,7 @@ export function removeDirectAssignment(input: RemoveDirectAssignmentInput): Prom
   }));
 }
 
+/** Remove one scheduled day without widening removal to other dates. */
 export function removeAssignmentDate(input: RemoveAssignmentDateInput): Promise<AssignmentCommandResult> {
   return execute(() => supabase.rpc('remove_assignment_date', {
     p_command_id: input.commandId,
@@ -106,6 +110,7 @@ export function removeAssignmentDate(input: RemoveAssignmentDateInput): Promise<
   }));
 }
 
+/** Change one department role with state checking and server-side category synchronization. */
 export function changeAssignmentRole(input: ChangeAssignmentRoleInput): Promise<AssignmentCommandResult> {
   return execute(() => supabase.rpc('change_assignment_role', {
     p_command_id: input.commandId,
@@ -119,6 +124,7 @@ export function changeAssignmentRole(input: ChangeAssignmentRoleInput): Promise<
   }));
 }
 
+/** Confirm or decline membership through the shared assignment lifecycle command. */
 export function setAssignmentStatus(input: SetAssignmentStatusInput): Promise<AssignmentCommandResult> {
   return execute(() => supabase.rpc('set_assignment_status', {
     p_command_id: input.commandId,

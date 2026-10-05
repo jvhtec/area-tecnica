@@ -233,10 +233,11 @@ Outside assignment state (deliberately not commands):
 
 ## 8. Rollout
 
-1. `supabase db push --dry-run` against linked production; check the five
+1. Human-run `supabase db push --linked --dry-run` against production; check the seven
    migrations (`20261003210000`, `20261003211000`, `20261003212000`,
-   `20261003213000`, `20261003214000`), their grants and
-   the new tables (`assignment_commands`, `assignment_role_codes`).
+   `20261003213000`, `20261003214000`, `20261004165712`,
+   `20261004170928`), their grants and the new tables
+   (`assignment_commands`, `assignment_role_codes`, `flex_crew_reconciliation_gates`).
    Before deploying, list legacy rows the stricter role validation would
    refuse to edit (unregistered codes, or a code outside the technician's
    discipline); removing them still works, but a role change or modify is
@@ -252,14 +253,67 @@ Outside assignment state (deliberately not commands):
        OR r.col IS DISTINCT FROM CASE p.department WHEN 'logistics' THEN 'production' ELSE p.department END);
    ```
 2. Deploy `staffing-click` first (it handles `P0409`; the old database never
-   raises it) and `push` (it accepts `idempotency_key`), then apply the
-   migrations, then deploy the client. The old client keeps working for
-   existing RPCs; the new command RPCs are only called by the new client.
+   raises it) and `push` (it accepts `idempotency_key`). A human applies the
+   migrations before deploying `manage-flex-crew-assignments`,
+   `sync-flex-crew-for-job` and `secure-flex-api`, which require the new gate
+   RPCs/table. Retire/drain old Flex handlers and outstanding requests before
+   enabling retries; their writes cannot be fenced retroactively. Deploy the
+   client last. The old client keeps working with legacy crew add/remove bodies;
+   those bodies now request reconciliation rather than replaying historical intent.
 3. Verify with `get_assignment_command_metrics()` and
    `get_assignment_consistency_issues()`; watch the reconciliation backlog.
 4. Run the PR #992 synthetic runtime as the controlled preflight
    (`tests/assignments/matrix-failure.disposable.integration.test.tsx` calls the
    commands directly and expects a faulted date to roll back the whole command).
+
+### Flex retry ordering and recovery
+
+Single and bulk crew sync use the same non-expiring gate per physical Flex
+element, including all local aliases. Current explicit sound/lights assignment
+roles determine membership. Clearing a role does not recreate it from the
+profile department; soft decline preserves direct membership and hard-deleted
+tour membership is absent. Missing resources and unsupported lights dictionaries
+remain diagnostic; unknown provider contacts are retained because ownership
+cannot be proved. Inventory any legacy roleless memberships before rollout.
+Departments without a mapped physical crew call return a successful skip rather
+than an endlessly retryable effect. Lookup failures remain visible errors;
+this skip never unlocks an existing physical gate or clears its contact journal.
+
+Assignment transactions can commit while a worker talks to Flex. That worker
+rereads current intent, reconciles again when it changes, and validates the final
+state token before success. This is eventual reconciliation, not an atomic
+transaction spanning PostgreSQL and Flex. A delayed historical retry cannot
+reverse a newer completed reconciliation through either crew endpoint.
+
+Every mutating request is durably admitted before dispatch. A verified add's
+local mapping and settlement commit together. Network timeouts, HTTP 408/202/5xx,
+unconsumed bodies, ambiguous RPC responses or crashes retain busy/uncertain
+ownership. Neither the effect's 120-second claim lease nor elapsed gate age
+permits another external writer. The generic proxy refuses crew mutation paths
+and requires positive classification for permitted non-crew operations. The
+finite crew header fields used by job date/name sync (name, document number,
+planned start/end) remain supported; they cannot mutate contacts or business roles.
+
+The gate also journals contact ownership when claimed, mapped or added, without
+foreign keys to deletable source rows. Reconciliation reads this journal even
+when a source cascade removes mappings before its first read. Only verified
+successful reconciliation clears it. An error with journaled contacts retains
+the busy owner, including a settled role refusal or failed projection; operator
+recovery is required rather than forgetting the contact and admitting a retry.
+
+For a blocked gate, inspect its state, owner, timestamp and operation descriptor
+with service privileges. Do not force-unlock from the UI or based on age. Human
+recovery must first retire the original worker and prove that its provider request
+has completed or cannot execute later. Reconcile the provider's observed contact
+identities with the local mappings before clearing ownership under a deliberate
+operator transaction. If settlement cannot be proven, keep the gate blocked.
+There is no automatic takeover or client recovery RPC. Job deletion can remove
+local mappings; the physical gate and its outstanding descriptor survive it.
+
+Rollback must preserve this ordering boundary: pause Flex retries, retire/drain
+workers, then forward-fix guarded handlers/RPCs. Do not redeploy historical
+unfenced crew handlers or drop busy/uncertain gates. Reverting the frontend alone
+does not require deleting additive database state.
 
 ## 9. Tests
 
@@ -268,6 +322,15 @@ Outside assignment state (deliberately not commands):
   `assignment_command_hardening.sql` (registry, production/logistics category
   and rate, approved protection, status no-ops, tour Flex, required tokens),
   `staffing_offer_conflict_under_lock.sql`.
+- Fail-closed authorization and physical crew ownership:
+  `assignment_command_missing_identity.sql`, `flex_crew_reconciliation.sql`;
+  shared coordinator/proxy and HTTP adapter tests; opt-in
+  `flex-reconciliation.integration.test.ts` runs historical retry paths against
+  real PostgREST and tests independent claim/retarget backends. CI includes all
+  seven cases in `scripts/ci/test-staffing-postgrest.sh`. Locally set
+  `STAFFING_TEST_REST_URL` to a loopback HTTP endpoint with an explicit port,
+  `STAFFING_TEST_DB_CONTAINER` to an owned disposable target, and repeat that
+  container in `ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL` to opt in.
 - Real concurrency (two psql backends, CI `rls_rpc_security_tests` job):
   `tests/assignments/direct-assignment-commands.integration.test.ts` — stale
   managers, same-day cross-job race, concurrent retry, offer acceptance, move
