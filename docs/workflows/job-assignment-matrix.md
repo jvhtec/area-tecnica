@@ -79,7 +79,7 @@ Conflicts are enforced by the assignment commands under the technician lock
 (`conflict` rejection), not by a client preflight:
 
 - **Hard conflicts** (overlapping confirmed work): the command rejects; the inspector, focus bar or batch row shows the clash and offers **Forzar**, which is a second command with `conflictPolicy: 'allow'`.
-- Known unavailability (`technician_availability` plus approved vacations) is shown on the cell and is an overrideable conflict.
+- Known unavailability (`technician_availability`) is shown on the cell. As before the overhaul, it does not block an assignment on its own: the command lists it in the rejection only when there is also a schedule clash.
 - Job date types `off`/`travel` are not assignable days (`getAssignableJobDateKeys`, `src/features/matrix-v2/jobDays.ts`).
 
 ## Interaction Model
