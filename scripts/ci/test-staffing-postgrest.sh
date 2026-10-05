@@ -26,4 +26,6 @@ for attempt in {1..30}; do
 done
 curl --fail --silent http://127.0.0.1:18089/ >/dev/null
 STAFFING_TEST_REST_URL=http://127.0.0.1:18089 STAFFING_TEST_DB_CONTAINER="$container" \
-  npx vitest run tests/assignments/staffing-postgrest.integration.test.ts tests/assignments/staffing-removal-locks.integration.test.ts --maxWorkers=1
+  npx vitest run tests/assignments/staffing-postgrest.integration.test.ts tests/assignments/staffing-removal-locks.integration.test.ts \
+  tests/assignments/direct-assignment-commands.integration.test.ts \
+  tests/assignments/flex-reconciliation.integration.test.ts --maxWorkers=1

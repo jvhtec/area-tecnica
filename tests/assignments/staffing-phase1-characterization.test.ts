@@ -21,6 +21,12 @@ const driverAssignmentMigration = readRepoFile(
   "supabase/migrations/20260924134000_driver_assignment_delivery.sql",
 );
 const productionSchema = readRepoFile("supabase/migrations/00000000000000_production_schema.sql");
+const roleStatusMigration = readRepoFile(
+  "supabase/migrations/20261003213000_assignment_role_and_status_commands.sql",
+);
+const directAssignmentMigration = readRepoFile(
+  "supabase/migrations/20261003210000_atomic_direct_assignment_command.sql",
+);
 
 function indexOrFail(source: string, marker: string, fromIndex = 0) {
   const index = source.indexOf(marker, fromIndex);
@@ -182,47 +188,29 @@ describe("Staffing Phase 1 characterization", () => {
     });
   });
 
-  describe("direct assignment partial-commit behavior", () => {
-    it("persists the base job assignment before per-date timesheet mutation", () => {
-      const assignmentInsert = indexOrFail(
-        assignJobDialog,
-        ".from('job_assignments').insert(row)",
-      );
-      const timesheetSection = indexOrFail(
-        assignJobDialog,
-        "// Handle timesheet updates based on whether we're modifying the selected job",
-      );
-      expect(assignmentInsert).toBeLessThan(timesheetSection);
+  describe("direct assignment atomic command boundary", () => {
+    it("persists membership and schedule through one database command, not browser steps", () => {
+      expect(assignJobDialog).toContain("applyDirectAssignment(");
+      expect(assignJobDialog).not.toContain(".from('job_assignments')");
+      expect(assignJobDialog).not.toContain(".from('timesheets')");
+      expect(assignJobDialog).not.toContain("toggleTimesheetDay");
+      expect(assignJobDialog).not.toContain("syncTimesheetCategoriesForAssignment");
     });
 
-    it("does not transactionally roll back the base assignment when later timesheet operations fail", () => {
-      const timesheetStart = indexOrFail(
-        assignJobDialog,
-        "// Handle timesheet updates based on whether we're modifying the selected job",
-      );
-      const verification = indexOrFail(
-        assignJobDialog,
-        "// Verification: ensure at least one assignment row now exists for this job/tech",
-      );
-      const timesheetSection = assignJobDialog.slice(timesheetStart, verification);
-
-      expect(timesheetSection).toContain("throw new Error");
-      expect(timesheetSection).not.toContain(".from('job_assignments')");
+    it("runs Flex and notification side effects only after the command committed", () => {
+      expectOrdered(assignJobDialog, "const result = await applyDirectAssignment(", "runSideEffectsInBackground(result)");
+      expect(assignJobDialog).not.toContain("functions.invoke('manage-flex-crew-assignments'");
     });
 
     it("keeps confirmed assignments confirmed when a normal edit requests invited", () => {
-      expect(assignJobDialog).toContain(
-        "existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status",
+      expect(directAssignmentMigration).toContain(
+        "v_status := CASE WHEN v_existing.status = 'confirmed' THEN 'confirmed' ELSE p_status END::public.assignment_status;",
       );
     });
 
     it("represents multi-date coverage with active timesheets rather than one assignment_date value", () => {
-      expect(assignJobDialog).toContain(
-        "const desiredSingleDay = coverageMode !== 'full'",
-      );
-      expect(assignJobDialog).toContain(
-        "const desiredAssignmentDate = desiredSingleDay ? coverageDates[0] ?? null : null",
-      );
+      expect(directAssignmentMigration).toContain("v_single_day := p_coverage <> 'full';");
+      expect(directAssignmentMigration).toContain("v_assignment_date := CASE WHEN v_single_day THEN v_dates[1] END;");
       expect(assignJobDialog).toContain("existingTimesheetDateKeys");
       expect(productionSchema).toContain(
         'COMMENT ON COLUMN "public"."job_assignments"."single_day" IS \'DEPRECATED:',
@@ -234,26 +222,24 @@ describe("Staffing Phase 1 characterization", () => {
   });
 
   describe("assignment lifecycle RPC usage", () => {
-    it("routes assignment confirm/decline through manage_assignment_lifecycle", () => {
-      expect(assignmentStatusDialog).toContain(
-        "dataLayerClient.rpc('manage_assignment_lifecycle'",
-      );
-      expect(assignmentStatusDialog).toContain(
-        "p_delete_mode: isTourAssignment ? 'hard' : 'soft'",
+    it("routes manager confirm/decline through the status command, which wraps manage_assignment_lifecycle", () => {
+      expect(assignmentStatusDialog).toContain("setAssignmentStatus(");
+      expect(assignmentStatusDialog).not.toContain("manage_assignment_lifecycle");
+      expect(roleStatusMigration).toContain("v_lifecycle := public.manage_assignment_lifecycle(");
+      expect(roleStatusMigration).toContain(
+        "v_delete_mode := CASE WHEN v_existing.assignment_source = 'tour' THEN 'hard' ELSE 'soft' END;",
       );
     });
 
-    it("uses hard lifecycle cancellation for full matrix removal", () => {
-      expect(matrixAssignmentRemoval).toContain(
-        "dataLayerClient.rpc('manage_assignment_lifecycle'",
-      );
-      expect(matrixAssignmentRemoval).toContain("p_action: 'cancel'");
-      expect(matrixAssignmentRemoval).toContain("p_delete_mode: 'hard'");
+    it("removes whole matrix assignments through the atomic removal command", () => {
+      expect(matrixAssignmentRemoval).toContain("removeDirectAssignment(");
+      expect(matrixAssignmentRemoval).not.toContain("manage_assignment_lifecycle");
     });
 
-    it("allows one-date removal to delete only that timesheet", () => {
-      expect(matrixAssignmentRemoval).toContain(".from('timesheets')");
-      expect(matrixAssignmentRemoval).toContain(".eq('date', multiDateRemoval.currentDate)");
+    it("removes one date through the guarded date command, never a direct timesheet delete", () => {
+      expect(matrixAssignmentRemoval).toContain("removeAssignmentDate(");
+      expect(matrixAssignmentRemoval).toContain("dayResult.code !== 'last_date'");
+      expect(matrixAssignmentRemoval).not.toContain(".from('timesheets')");
     });
   });
 

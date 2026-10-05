@@ -103,7 +103,7 @@ describe("job deletion cleanup cascade", () => {
     createSupabaseFromMock();
   });
 
-  it("removes Flex crew assignments, dependent rows, Flex folders, then the job before broadcasting", async () => {
+  it("removes membership before Flex reconciliation, then dependent rows and the job before broadcasting", async () => {
     createSupabaseFromMock({
       crewCalls: [
         {
@@ -136,6 +136,9 @@ describe("job deletion cleanup cascade", () => {
       },
     });
     expect(mocks.deleteJobAssignments).toHaveBeenCalledWith("job-123");
+    expect(mocks.deleteJobAssignments.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.functionsInvoke.mock.invocationCallOrder[0],
+    );
     expect(mocks.deleteJobDepartments).toHaveBeenCalledWith("job-123");
     expect(mocks.deleteJobDateTypes).toHaveBeenCalledWith("job-123");
     expect(mocks.deleteFestivalLogos).toHaveBeenCalledWith("job-123");

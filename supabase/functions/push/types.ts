@@ -60,6 +60,10 @@ export type BroadcastBody = {
   doc_id?: string;
   file_name?: string;
   event_id?: string;
+  // Caller-supplied identity of one notification occurrence (e.g. an
+  // assignment command effect id). When valid, it is the dedupe key: each
+  // recipient gets the notification at most once, however often it is sent.
+  idempotency_key?: string;
   request_id?: string;
   event_type?: string;
   event_date?: string;

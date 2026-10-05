@@ -22,7 +22,6 @@ export type AssignableJob = {
 };
 
 export type JobAssignmentRow = Database["public"]["Tables"]["job_assignments"]["Row"];
-export type JobAssignmentUpdate = Database["public"]["Tables"]["job_assignments"]["Update"];
 export type ExistingAssignment = JobAssignmentRow & {
   jobs?: (Pick<AssignableJob, "title"> & { department?: string | null }) | null;
 };
@@ -79,11 +78,6 @@ export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) 
   return sortDateKeys(keys);
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object";
-
 export const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";
 
-export const getErrorCode = (error: unknown) =>
-  isRecord(error) && typeof error.code === "string" ? error.code : null;

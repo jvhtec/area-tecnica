@@ -77,6 +77,11 @@ SELECT throws_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000
 SELECT throws_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000001', ARRAY[NULL]::date[], false, NULL) $$, '22023', 'Valid accepted dates are required', 'null date is rejected');
 SELECT lives_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000002', ARRAY['2026-10-20']::date[], true, 'SND-FOH-R') $$, 'dryhire membership commits');
 SELECT is((SELECT count(*) FROM timesheets WHERE job_id = 'cc210000-0000-0000-0000-000000000002'), 0::bigint, 'dryhire keeps assignment-only contract');
+-- The sections below reuse one technician on overlapping dates across jobs.
+-- Acceptance refuses cross-job double-booking under the technician lock
+-- (20261003214000; covered by staffing_offer_conflict_under_lock.sql), so
+-- retire the previous job's schedule before each independent scenario.
+UPDATE timesheets SET is_active = false WHERE job_id = 'cc210000-0000-0000-0000-000000000001';
 SELECT lives_ok($$ SELECT assign_staffing_offer('cc310000-0000-0000-0000-000000000003', ARRAY['2026-10-20']::date[], true, 'SND-FOH-R') $$, 'tourdate commits');
 SELECT ok((SELECT is_schedule_only AND is_active AND source = 'staffing' FROM timesheets WHERE job_id = 'cc210000-0000-0000-0000-000000000003'), 'tourdate creates schedule-only staffing timesheet');
 
@@ -90,6 +95,7 @@ SELECT results_eq($$ SELECT date FROM timesheets WHERE job_id = 'cc210000-0000-0
 
 -- A draft created before role assignment has no category. The previous HTTP
 -- upsert fired the category UPDATE trigger; the atomic command must retain it.
+UPDATE timesheets SET is_active = false WHERE job_id = 'cc210000-0000-0000-0000-000000000003';
 INSERT INTO timesheets (job_id, technician_id, date)
 VALUES ('cc210000-0000-0000-0000-000000000004', 'cc110000-0000-0000-0000-000000000001', '2026-10-20');
 SELECT ok((SELECT category IS NULL FROM timesheets WHERE job_id = 'cc210000-0000-0000-0000-000000000004'), 'draft starts without a category');
