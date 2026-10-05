@@ -38,35 +38,10 @@ export interface OptimizedAssignmentMatrixProps {
   jobs: MatrixJob[];
 }
 
-export interface CellAction {
-  type:
-    | "select-job"
-    | "select-job-for-staffing"
-    | "assign"
-    | "unavailable"
-    | "confirm"
-    | "decline"
-    | "offer-details"
-    | "offer-details-wa"
-    | "offer-details-email"
-    | "availability-wa"
-    | "availability-email"
-    | "toggle-unavailable";
-  technicianId: string;
-  date: Date;
-  assignment?: any;
-  selectedJobId?: string;
-  singleDay?: boolean;
-  intendedPhase?: "availability" | "offer";
-  intendedChannel?: "email" | "whatsapp";
-}
-
 export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatrixProps {
   onNearEdgeScroll?: (direction: "before" | "after") => void;
   canExpandBefore?: boolean;
   canExpandAfter?: boolean;
-  allowDirectAssign?: boolean;
-  allowMarkUnavailable?: boolean;
   fridgeSet?: Set<string>;
   cellWidth?: number;
   cellHeight?: number;
@@ -74,13 +49,9 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   headerHeight?: number;
   mobile?: boolean;
   staffingDepartment?: string | null;
-  hideStaffingEmailButtons?: boolean;
-  hideStaffingWhatsappButtons?: boolean;
-  /** Matrix v2 (inspector, focus, batch) is switched on for this user. */
-  matrixV2?: boolean;
   /** Role slots per job, from the page's staffing-summary query. */
   roleSlotsByJob?: Map<string, RoleSlot[]>;
-  /** Job focus (Matrix v2): which job the grid is judged against, and the status new assignments get. */
+  /** Job focus: which job the grid is judged against, and the status new assignments get. */
   focusJobId?: string | null;
   focusStatus?: 'invited' | 'confirmed';
   onFocusJobChange?: (jobId: string | null) => void;

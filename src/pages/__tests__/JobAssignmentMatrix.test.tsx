@@ -61,10 +61,6 @@ vi.mock('@/components/matrix/OptimizedAssignmentMatrix', () => ({
       <div data-testid="matrix-technicians">{props.technicians.length}</div>
       <div data-testid="matrix-dates">{props.dates.length}</div>
       <div data-testid="matrix-jobs">{props.jobs.length}</div>
-      <div data-testid="allow-direct-assign">{String(props.allowDirectAssign)}</div>
-      <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
-      <div data-testid="hide-staffing-email-buttons">{String(props.hideStaffingEmailButtons)}</div>
-      <div data-testid="hide-staffing-whatsapp-buttons">{String(props.hideStaffingWhatsappButtons)}</div>
     </div>
   ),
 }));
@@ -270,81 +266,17 @@ describe('JobAssignmentMatrix', () => {
     });
   });
 
-  it('toggles direct assign mode', async () => {
-    const user = userEvent.setup();
-
-    render(<JobAssignmentMatrix />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('allow-direct-assign')).toHaveTextContent('false');
-    });
-
-    const directAssignToggle = screen.getAllByLabelText(/Alternar asignación directa/i)[0];
-    await user.click(directAssignToggle);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('allow-direct-assign')).toHaveTextContent('true');
-    });
-  });
-
-  it('lets users hide staffing email and WhatsApp buttons and persists the preference per user', async () => {
-    const user = userEvent.setup();
-
+  it('has no editing modes to switch on: a click on a cell is always the inspector', async () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
       expect(screen.getByTestId('optimized-matrix')).toBeInTheDocument();
     });
-
-    await user.click(screen.getAllByRole('switch', { name: /mostrar botones de email/i })[0]);
-    await user.click(screen.getAllByRole('switch', { name: /mostrar botones de whatsapp/i })[0]);
-
-    expect(screen.getByTestId('hide-staffing-email-buttons')).toHaveTextContent('true');
-    expect(screen.getByTestId('hide-staffing-whatsapp-buttons')).toHaveTextContent('true');
-    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-email-buttons:user-1')).toBe('true');
-    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-whatsapp-buttons:user-1')).toBe('true');
-  });
-
-  it('gives managers the new matrix by default: no editing modes to switch on', async () => {
-    useOptimizedAuthMock.mockReturnValue({
-      user: { id: 'manager-1' },
-      userDepartment: 'sound',
-      userRole: 'management',
-    });
-
-    render(<JobAssignmentMatrix />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('allow-mark-unavailable')).toHaveTextContent('false');
-    });
-    expect(screen.queryByLabelText(/Alternar marcar no disponible/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Alternar asignación directa/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Alternar marcar no disponible/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: /mostrar botones de email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: /mostrar botones de whatsapp/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Enfocar trabajo' }).length).toBeGreaterThan(0);
-  });
-
-  it('toggles mark unavailable mode for management users (legacy matrix)', async () => {
-    // The old matrix is still there for whoever chose it in Ajustes.
-    window.localStorage.setItem('matrix-v2', 'v1');
-    useOptimizedAuthMock.mockReturnValue({
-      user: { id: 'manager-1' },
-      userDepartment: 'sound',
-      userRole: 'management',
-    });
-
-    const user = userEvent.setup();
-
-    render(<JobAssignmentMatrix />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('allow-mark-unavailable')).toHaveTextContent('false');
-    });
-
-    const unavailableToggle = screen.getAllByLabelText(/Alternar marcar no disponible/i)[0];
-    await user.click(unavailableToggle);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('allow-mark-unavailable')).toHaveTextContent('true');
-    });
   });
 
   it('hides mark unavailable toggle for regular technicians', async () => {

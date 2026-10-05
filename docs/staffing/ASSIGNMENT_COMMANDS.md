@@ -11,12 +11,12 @@ transactions; it sends one command and treats the result as authoritative.
 
 | RPC | Purpose | Callers |
 | --- | --- | --- |
-| `apply_direct_assignment` | Create, modify (add/replace days, role, status) or **move** (`p_from_job_id`) a job/technician assignment | `AssignJobDialog` |
-| `remove_direct_assignment` | Remove membership + every day (+ non-final Hoja staff/contacts) | Matrix cell removal, `AssignJobDialog`, job-card removal |
-| `remove_assignment_date` | Remove one active day; refuses the last day of a membership (`last_date`) | Matrix cell removal |
+| `apply_direct_assignment` | Create, modify (add/replace days, role, status) or **move** (`p_from_job_id`) a job/technician assignment | Matrix command runner (`src/features/matrix-v2/commandRunner.ts`), `useJobAssignmentsRealtime` |
+| `remove_direct_assignment` | Remove membership + every day (+ non-final Hoja staff/contacts) | Matrix command runner, job-card removal |
+| `remove_assignment_date` | Remove one active day; refuses the last day of a membership (`last_date`) | Matrix command runner |
 | `change_assignment_role` | Set or clear one department role column; recategorizes/reprices unapproved active days | Job-card role selectors (`JobAssignmentDialog`) |
-| `set_assignment_status` | Manager confirm/decline; wraps `manage_assignment_lifecycle` after the shared locks (tour memberships hard-deleted on decline, decided server-side) | `AssignmentStatusDialog` |
-| `get_assignment_command_state` | Membership, active days and the **state token** for a pair | dialogs, before a command |
+| `set_assignment_status` | Manager confirm/decline; wraps `manage_assignment_lifecycle` after the shared locks (tour memberships hard-deleted on decline, decided server-side) | Matrix command runner |
+| `get_assignment_command_state` | Membership, active days and the **state token** for a pair | the runner and job-card dialogs, before a command |
 | `get_job_assignment_command_states` | Every member's token for one job plus the token of an absent pair (`absent_state_token`) | job-card dialogs (`useJobAssignmentsRealtime({ manageCommands })`) |
 
 All are `SECURITY DEFINER`, executable by `authenticated` but authorized
@@ -201,9 +201,7 @@ schedule for a job/technician pair now goes through a command:
 
 | Writer | Path | Status |
 | --- | --- | --- |
-| Assign/modify/move dialog | `AssignJobDialog` → `apply_direct_assignment` / `remove_direct_assignment` | **Converged** |
-| Matrix confirm/decline | `AssignmentStatusDialog` → `set_assignment_status` | **Converged** |
-| Matrix cell removal (day / whole) | `useMatrixCellAssignmentRemoval` → `remove_assignment_date` / `remove_direct_assignment` | **Converged** |
+| Matrix assign / modify / move / confirm / decline / remove (inspector, keyboard, job focus, batch) | `commandRunner` → `apply_direct_assignment` / `set_assignment_status` / `remove_assignment_date` / `remove_direct_assignment` / `unconfirm_assignment` | **Converged** |
 | Job card: whole removal | `JobAssignmentDialog` → `useJobAssignmentsRealtime.removeAssignment` → `remove_direct_assignment` | **Converged** |
 | Job card: role change | `JobAssignmentDialog` → `change_assignment_role` | **Converged** |
 | Department mobile add | `MobileAssignmentsDialog` → `useJobAssignmentsRealtime.addAssignment` → `apply_direct_assignment` (add mode; membership **and** days) | **Converged** |
@@ -265,8 +263,8 @@ Outside assignment state (deliberately not commands):
 3. Verify with `get_assignment_command_metrics()` and
    `get_assignment_consistency_issues()`; watch the reconciliation backlog.
 4. Run the PR #992 synthetic runtime as the controlled preflight
-   (`tests/assignments/matrix-failure.disposable.integration.test.tsx` now
-   expects a faulted date to roll back the whole command).
+   (`tests/assignments/matrix-failure.disposable.integration.test.tsx` calls the
+   commands directly and expects a faulted date to roll back the whole command).
 
 ### Flex retry ordering and recovery
 
@@ -340,6 +338,6 @@ does not require deleting additive database state.
   booking elsewhere on the same day. Run locally with
   `STAFFING_TEST_DB_CONTAINER=<container> ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL=<container>`.
 - Unit/component: `src/features/assignments/commands/__tests__`,
-  `AssignJobDialog.test.tsx`, `useMatrixCellAssignmentRemoval.phase1.test.tsx`,
+  `src/features/matrix-v2/__tests__/commandRunner.test.tsx` (runner, undo, deferred effects),
   `matrix-direct-write-guard.test.ts`, `assignment-writer-inventory.test.ts`,
   `assignment-role-registry.test.ts`.

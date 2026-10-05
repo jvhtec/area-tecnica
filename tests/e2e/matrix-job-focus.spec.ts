@@ -27,7 +27,7 @@ interface Body { [key: string]: unknown }
 const asBody = (body: unknown): Body => (typeof body === "object" && body !== null ? (body as Body) : {});
 
 /** A matrix with six technicians and one three-day job whose commands are stateful per technician. */
-async function openMatrix(page: Page, query = "?matriz=v2", options: { evaOff?: boolean } = {}) {
+async function openMatrix(page: Page, query = "", options: { evaOff?: boolean } = {}) {
   const assigned = new Map<string, { status: string; role: string; dates: string[] }>();
   const jobs = [
     { id: JOB_ID, title: "Festival Lúa", start_time: `${DAYS[0]}T08:00:00Z`, end_time: `${DAYS[2]}T18:00:00Z`, color: "#2563eb", status: "Confirmado", job_type: "single", job_departments: [{ department: "sound" }], job_assignments: [] },
@@ -127,7 +127,7 @@ test("opening the job from the toolbar focuses it: bar, dimmed days, fit and a f
 
 test("a six-person, three-day job is staffed in eight clicks", async ({ page }) => {
   test.skip(isMobileViewport(page), "Counts the desktop entry (toolbar picker + job).");
-  const { calls } = await openMatrix(page, "?matriz=v2", { evaOff: false });
+  const { calls } = await openMatrix(page, "", { evaOff: false });
   let clicks = 0;
   const click = async (action: () => Promise<void>) => { clicks += 1; await action(); };
 
@@ -157,7 +157,7 @@ test("a six-person, three-day job is staffed in eight clicks", async ({ page }) 
 });
 
 test("a click on a free day assigns just that day; the rows stay where they were", async ({ page }) => {
-  const { calls } = await openMatrix(page, `?matriz=v2&trabajo=${JOB_ID}`);
+  const { calls } = await openMatrix(page, `?trabajo=${JOB_ID}`);
   await expect(bar(page)).toBeVisible();
   await expect(cell(page, "t-ana", 2)).toBeVisible();
   const before = await columnOrder(page);
@@ -171,7 +171,7 @@ test("a click on a free day assigns just that day; the rows stay where they were
 });
 
 test("Confirmado in the bar confirms what is assigned next", async ({ page }) => {
-  const { calls } = await openMatrix(page, `?matriz=v2&trabajo=${JOB_ID}`);
+  const { calls } = await openMatrix(page, `?trabajo=${JOB_ID}`);
   await bar(page).getByRole("radio", { name: "Confirmado" }).click();
   await nameCell(page, "Beto").click();
   await expect.poll(() => applyCalls(calls).length).toBe(1);
@@ -179,14 +179,14 @@ test("Confirmado in the bar confirms what is assigned next", async ({ page }) =>
 });
 
 test("a day outside the job, or one already taken, still opens the inspector", async ({ page }) => {
-  const { calls } = await openMatrix(page, `?matriz=v2&trabajo=${JOB_ID}`);
+  const { calls } = await openMatrix(page, `?trabajo=${JOB_ID}`);
   await cell(page, "t-ana", 0).click();
   await expect(page.getByRole("dialog").filter({ hasText: "Ana" })).toBeVisible();
   expect(applyCalls(calls)).toHaveLength(0);
 });
 
 test("Esc and Salir leave the focus", async ({ page }) => {
-  await openMatrix(page, `?matriz=v2&trabajo=${JOB_ID}`);
+  await openMatrix(page, `?trabajo=${JOB_ID}`);
   await expect(bar(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(bar(page)).toBeHidden();
@@ -194,20 +194,14 @@ test("Esc and Salir leave the focus", async ({ page }) => {
   await expect(page.locator("[data-focus-dim]")).toHaveCount(0);
   await expect(page.locator("[data-focus-fit]")).toHaveCount(0);
 
-  await page.goto(`/job-assignment-matrix?matriz=v2&trabajo=${JOB_ID}`);
+  await page.goto(`/job-assignment-matrix?trabajo=${JOB_ID}`);
   await bar(page).getByRole("button", { name: "Salir" }).click();
   await expect(bar(page)).toBeHidden();
 });
 
 test("a dry-hire job cannot be focused, not even from the URL", async ({ page }) => {
-  await openMatrix(page, `?matriz=v2&trabajo=${DRY_JOB_ID}`);
+  await openMatrix(page, `?trabajo=${DRY_JOB_ID}`);
   await expect(cell(page, "t-ana", 1)).toBeVisible();
   await expect(bar(page)).toHaveCount(0);
   await expect(page.locator("[data-focus-dim]")).toHaveCount(0);
-});
-
-test("the legacy matrix has no focus", async ({ page }) => {
-  await openMatrix(page, `?matriz=v1&trabajo=${JOB_ID}`);
-  await expect(page.getByRole("button", { name: "Enfocar trabajo" })).toHaveCount(0);
-  await expect(bar(page)).toHaveCount(0);
 });

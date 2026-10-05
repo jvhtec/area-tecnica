@@ -20,7 +20,7 @@ import { dimmedColumnRuns, firstJobColumn, jobColumnRuns } from '@/features/matr
 import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
 
 interface Options {
-  v2: MatrixV2ViewConfig | undefined;
+  v2: MatrixV2ViewConfig;
   mobile: boolean;
   technicians: InspectorTechnician[];
   orderedTechnicians: Array<{ id: string }>;
@@ -171,7 +171,7 @@ export function useMatrixGridV2({
 
   const { activate } = keyboard;
   /** A click on a cell opens its inspector and makes it the active cell, so the keys carry on from there. */
-  const onInspect = React.useCallback((technicianId: string, date: Date, anchor: HTMLElement) => {
+  const onInspect = React.useCallback((technicianId: string, date: Date, anchor: HTMLElement | null) => {
     activate(technicianId, formatMadridDateKey(date));
     // In job focus a click on a free day of the job assigns it; anything else opens the inspector.
     if (v2?.focus?.onCellClick(technicianId, date, anchor)) return;

@@ -10,59 +10,6 @@ import {
   type MatrixCellHoverTooltipHandle,
 } from '@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip';
 import { formatUserName } from '@/utils/userName';
-import { createMockQueryBuilder } from '@/test/mockSupabase';
-
-// Hoisted mocks
-const {
-  useMutationMock,
-  fromMock,
-  toastFn,
-  supabaseMock,
-} = vi.hoisted(() => ({
-  useMutationMock: vi.fn(),
-  fromMock: vi.fn(),
-  toastFn: Object.assign(vi.fn(), {
-    error: vi.fn(),
-    success: vi.fn(),
-  }),
-  supabaseMock: {
-    from: vi.fn(),
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
-}));
-
-vi.mock('@tanstack/react-query', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
-  return {
-    ...actual,
-    useMutation: useMutationMock,
-  };
-});
-
-vi.mock('@/lib/supabase', () => ({
-  supabase: supabaseMock,
-}));
-
-vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: toastFn }),
-}));
-
-vi.mock('sonner', () => ({
-  toast: toastFn,
-}));
-
-vi.mock('@/features/staffing/hooks/useStaffing', () => ({
-  useSendStaffingEmail: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-  }),
-  useCancelStaffingRequest: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-  }),
-}));
 
 type MatrixCellProps = ComponentProps<typeof OptimizedMatrixCell>;
 type MatrixTechnician = MatrixCellProps['technician'];
@@ -107,8 +54,9 @@ const mockAssignment: MatrixAssignment = {
 
 // Owned by the matrix and passed down, so every cell render needs them.
 const requiredCellProps = {
-  sendStaffingEmail: vi.fn(),
-  cancelStaffing: vi.fn(),
+  onInspect: vi.fn(),
+  onConfirm: vi.fn(),
+  onDecline: vi.fn(),
 };
 
 const render = (ui: JSX.Element) => rtlRender(
@@ -148,8 +96,7 @@ const renderWithHoverTooltip = (
 };
 
 const getCellElement = () => {
-  // Not `.cursor-pointer`: read-only cells (no edit mode enabled) render
-  // cursor-default, so the cell is addressed by its stable data attribute.
+  // Addressed by its stable data attribute.
   const cell = document.querySelector('[data-matrix-cell]');
   expect(cell).toBeInTheDocument();
   return cell as HTMLElement;
@@ -157,31 +104,6 @@ const getCellElement = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useMutationMock.mockReturnValue({
-    mutate: vi.fn(),
-    isPending: false,
-  });
-  supabaseMock.from.mockImplementation((table: string) => {
-    if (table === 'technician_availability') {
-      return {
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-        upsert: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-      };
-    }
-    if (table === 'timesheets') {
-      return {
-        select: vi.fn(() =>
-          createMockQueryBuilder({
-            data: [],
-            error: null,
-          }),
-        ),
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
-      };
-    }
-    return createMockQueryBuilder();
-  });
-  supabaseMock.functions.invoke.mockResolvedValue({ data: null, error: null });
 });
 
 describe('OptimizedMatrixCell', () => {
@@ -197,7 +119,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -220,7 +141,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -239,7 +159,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -259,7 +178,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -283,38 +201,10 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
     expect(screen.getByText('Vacation')).toBeInTheDocument();
-  });
-
-  it('handles cell click to trigger action', async () => {
-    const onClickMock = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={onClickMock}
-        allowMarkUnavailable={true}
-      />
-    );
-
-    const cell = getCellElement();
-    await user.click(cell);
-
-    expect(onClickMock).toHaveBeenCalledWith('tech-1', mockDate, 'toggle-unavailable', undefined);
-
-    fireEvent.contextMenu(cell);
-    expect(onClickMock).toHaveBeenCalledWith('tech-1', mockDate, 'unavailable', undefined);
   });
 
   it('handles ctrl+click for cell selection', () => {
@@ -329,7 +219,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={onSelectMock}
-        onClick={vi.fn()}
       />
     );
 
@@ -354,7 +243,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
       />
     );
@@ -377,7 +265,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
       />
     );
@@ -385,225 +272,7 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getAllByText('O:?').length).toBeGreaterThan(0);
   });
 
-  it('shows availability request buttons when can ask availability', () => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-      />
-    );
-
-    expect(screen.getByTitle('Solicitar disponibilidad')).toBeInTheDocument();
-    expect(screen.getByTitle('Solicitar disponibilidad por WhatsApp')).toBeInTheDocument();
-  });
-
-  it('shows offer buttons when availability is confirmed', () => {
-    const staffingStatus: MatrixStaffingStatus = {
-      availability_status: 'confirmed',
-      offer_status: null,
-    };
-
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        staffingStatusByDateProvided={staffingStatus}
-      />
-    );
-
-    expect(screen.getByTitle('Enviar oferta')).toBeInTheDocument();
-    expect(screen.getByTitle('Enviar oferta por WhatsApp')).toBeInTheDocument();
-  });
-
-  it.each([
-    { availability_status: 'declined', offer_status: null },
-    { availability_status: 'confirmed', offer_status: 'declined' },
-    { availability_status: 'declined', offer_status: 'pending' },
-    { availability_status: 'pending', offer_status: 'declined' },
-    { availability_status: 'declined', offer_status: 'declined' },
-  ])('keeps declined staffing indicators without any staffing controls: %j', (staffingStatus) => {
-    const onClick = vi.fn();
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={onClick}
-        staffingStatusByDateProvided={staffingStatus}
-      />
-    );
-
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
-    const declinedBadge = screen.getByText(staffingStatus.availability_status === 'declined' ? 'A:✗' : 'O:✗');
-    expect(declinedBadge.closest('button')).toBeNull();
-    if (!staffingStatus.offer_status || staffingStatus.offer_status === 'declined') {
-      expect(screen.getByText('Rechazada')).toBeInTheDocument();
-    }
-    expect(onClick).not.toHaveBeenCalled();
-    expect(requiredCellProps.sendStaffingEmail).not.toHaveBeenCalled();
-    expect(requiredCellProps.cancelStaffing).not.toHaveBeenCalled();
-  });
-
-  it('preserves assignment confirmation, editing and removal controls when staffing is declined', () => {
-    const onClick = vi.fn();
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        assignment={{ ...mockAssignment, status: 'invited' }}
-        staffingStatusProvided={{ availability_status: 'declined', offer_status: 'pending' }}
-        allowDirectAssign
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={onClick}
-      />
-    );
-
-    expect(screen.queryByTitle('Reintentar solicitud de disponibilidad')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Cancelar oferta')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Eliminar asignación' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
-    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'confirm', undefined);
-    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
-    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'decline', undefined);
-    fireEvent.click(getCellElement());
-    expect(onClick).toHaveBeenLastCalledWith('tech-1', mockDate, 'assign', undefined);
-  });
-
-  it('keeps mark-unavailable available on a declined staffing cell', () => {
-    const onClick = vi.fn();
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        staffingStatusByDateProvided={{ availability_status: 'declined', offer_status: null }}
-        allowMarkUnavailable
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={onClick}
-      />
-    );
-
-    fireEvent.click(getCellElement());
-    expect(onClick).toHaveBeenCalledWith('tech-1', mockDate, 'toggle-unavailable', undefined);
-  });
-
-  it.each(['pending', 'confirmed', 'expired'])('preserves non-declined staffing controls for %s', (status) => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        staffingStatusByDateProvided={{ availability_status: status, offer_status: status }}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-      />
-    );
-
-    expect(screen.getByTitle('Reintentar solicitud de disponibilidad')).toBeInTheDocument();
-    expect(screen.getByTitle('Cancelar solicitud de disponibilidad')).toBeInTheDocument();
-    expect(screen.getByTitle('Reintentar oferta')).toBeInTheDocument();
-    expect(screen.getByTitle('Cancelar oferta')).toBeInTheDocument();
-    expect(screen.getByTitle('Enviar oferta (progreso manual)')).toBeInTheDocument();
-    expect(screen.getByTitle('Enviar oferta por WhatsApp (progreso manual)')).toBeInTheDocument();
-  });
-
-  // The remove button and the desktop staffing actions share the top-right
-  // corner and the actions carry z-10, so they must never both render. The
-  // other two gates already excluded assigned cells; canSendOffer did not, so a
-  // confirmed-availability assignment covered its own remove button.
-  it('keeps the remove button reachable on an assigned cell with confirmed availability', () => {
-    const staffingStatus: MatrixStaffingStatus = {
-      availability_status: 'confirmed',
-      offer_status: null,
-    };
-
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        // Not confirmed: a confirmed assignment nulls staffingStatus outright,
-        // and with an assignment the cell reads the by-job status, not by-date.
-        assignment={{ ...mockAssignment, status: 'invited' }}
-        staffingStatusProvided={staffingStatus}
-      />
-    );
-
-    expect(screen.getByTitle('Eliminar asignación')).toBeInTheDocument();
-    expect(screen.queryByTitle('Enviar oferta')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Enviar oferta por WhatsApp')).not.toBeInTheDocument();
-  });
-
-  it('can hide email staffing action buttons without hiding WhatsApp buttons', () => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        hideStaffingEmailButtons={true}
-      />
-    );
-
-    expect(screen.queryByTitle('Solicitar disponibilidad')).not.toBeInTheDocument();
-    expect(screen.getByTitle('Solicitar disponibilidad por WhatsApp')).toBeInTheDocument();
-  });
-
-  it('can hide WhatsApp staffing action buttons without hiding email buttons', () => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        hideStaffingWhatsappButtons={true}
-      />
-    );
-
-    expect(screen.getByTitle('Solicitar disponibilidad')).toBeInTheDocument();
-    expect(screen.queryByTitle('Solicitar disponibilidad por WhatsApp')).not.toBeInTheDocument();
-  });
-
-  it('hides staffing badges and action buttons once the assignment is confirmed', () => {
+  it('hides the staffing badges once the assignment is confirmed', () => {
     const staleStaffingStatus = {
       availability_status: 'confirmed',
       offer_status: 'sent',
@@ -619,7 +288,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         staffingStatusProvided={staleStaffingStatus}
       />
     );
@@ -627,10 +295,6 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.queryByText('C')).not.toBeInTheDocument();
     expect(screen.queryByText('A:✓')).not.toBeInTheDocument();
     expect(screen.queryByText('O:?')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Enviar oferta')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Enviar oferta por WhatsApp')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Solicitar disponibilidad')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Solicitar disponibilidad por WhatsApp')).not.toBeInTheDocument();
   });
 
   it('displays fridge indicator when technician is in fridge', () => {
@@ -643,7 +307,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         isFridge={true}
       />
     );
@@ -661,7 +324,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={true}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -685,7 +347,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         onPrefetch={onPrefetchMock}
       />
     );
@@ -708,7 +369,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         onRender={onRenderMock}
       />
     );
@@ -733,7 +393,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -743,27 +402,9 @@ describe('OptimizedMatrixCell', () => {
   it('does not repeat a legacy single-day badge on another scheduled date', () => {
     render(<OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
       assignment={{ ...mockAssignment, single_day: true, assignment_date: '2024-05-14' }}
-      width={160} height={60} isSelected={false} onSelect={vi.fn()} onClick={vi.fn()} />);
+      width={160} height={60} isSelected={false} onSelect={vi.fn()} />);
     expect(screen.queryByText(/Día único:/i)).not.toBeInTheDocument();
     expect(screen.getByText('Test Concert')).toBeInTheDocument();
-  });
-
-  it('shows delete button for assignments', () => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        assignment={mockAssignment}
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-      />
-    );
-
-    expect(screen.getByTitle('Eliminar asignación')).toBeInTheDocument();
   });
 
   it('handles assignment with color background for confirmed status', () => {
@@ -777,55 +418,11 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
     const cellDiv = container.querySelector('[style*="background"]');
     expect(cellDiv).toBeInTheDocument();
-  });
-
-  it('renders with mobile-specific styling when mobile prop is true', () => {
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        width={140}
-        height={80}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        mobile={true}
-      />
-    );
-
-    // Mobile-specific styles should be applied
-    const cell = getCellElement();
-    expect(cell).toBeInTheDocument();
-  });
-
-  it('blocks declined jobs from being re-assigned', () => {
-    const declinedJobIdsSet = new Set(['job-1']);
-
-    render(
-      <OptimizedMatrixCell
-        {...requiredCellProps}
-        technician={mockTechnician}
-        date={mockDate}
-        jobId="job-1"
-        width={160}
-        height={60}
-        isSelected={false}
-        onSelect={vi.fn()}
-        onClick={vi.fn()}
-        declinedJobIdsSet={declinedJobIdsSet}
-      />
-    );
-
-    // The cell should still render but may show declined indicator
-    const cell = getCellElement();
-    expect(cell).toBeInTheDocument();
   });
 
   it('renders assignment tooltip metadata when assigned_by and assigned_at are present', async () => {
@@ -847,7 +444,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />,
       profileNamesMap,
     );
@@ -873,7 +469,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
       />
     );
 
@@ -909,7 +504,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
       />,
       new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']]),
@@ -953,7 +547,6 @@ describe('OptimizedMatrixCell', () => {
         height={60}
         isSelected={false}
         onSelect={vi.fn()}
-        onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
       />
     );
@@ -966,5 +559,112 @@ describe('OptimizedMatrixCell', () => {
     });
     expect(screen.queryByText(/job-internal-availability/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/job-internal-offer/i)).not.toBeInTheDocument();
+  });
+
+  it('a click opens the inspector with the cell as its anchor, and so does a right-click', () => {
+    const onInspect = vi.fn();
+    render(
+      <OptimizedMatrixCell {...requiredCellProps} onInspect={onInspect} technician={mockTechnician} date={mockDate}
+        width={160} height={60} isSelected={false} onSelect={vi.fn()} />,
+    );
+    const cell = getCellElement();
+    fireEvent.click(cell);
+    expect(onInspect).toHaveBeenLastCalledWith('tech-1', mockDate, cell);
+    fireEvent.contextMenu(cell);
+    expect(onInspect).toHaveBeenCalledTimes(2);
+  });
+
+  it('on a phone a tap opens the inspector without an anchor (it is a sheet), or extends a selection', () => {
+    const onInspect = vi.fn();
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <OptimizedMatrixCell {...requiredCellProps} onInspect={onInspect} technician={mockTechnician} date={mockDate}
+        width={118} height={80} isSelected={false} onSelect={onSelect} mobile />,
+    );
+    fireEvent.click(getCellElement());
+    expect(onInspect).toHaveBeenLastCalledWith('tech-1', mockDate, null);
+
+    rerender(
+      <OptimizedMatrixCell {...requiredCellProps} onInspect={onInspect} technician={mockTechnician} date={mockDate}
+        width={118} height={80} isSelected={false} onSelect={onSelect} mobile selectionActive />,
+    );
+    fireEvent.click(getCellElement());
+    expect(onSelect).toHaveBeenLastCalledWith('tech-1', mockDate, true);
+    expect(onInspect).toHaveBeenCalledTimes(1);
+  });
+
+  it('a long press on a phone selects the cell, and the click that follows does nothing more', () => {
+    vi.useFakeTimers();
+    try {
+      const onInspect = vi.fn();
+      const onSelect = vi.fn();
+      render(
+        <OptimizedMatrixCell {...requiredCellProps} onInspect={onInspect} technician={mockTechnician} date={mockDate}
+          width={118} height={80} isSelected={false} onSelect={onSelect} mobile />,
+      );
+      const cell = getCellElement();
+      fireEvent.touchStart(cell);
+      vi.advanceTimersByTime(500);
+      expect(onSelect).toHaveBeenCalledWith('tech-1', mockDate, true);
+      fireEvent.click(cell);
+      expect(onInspect).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an invited cell offers ✓ and ✕, which confirm and decline without opening anything', () => {
+    const onConfirm = vi.fn();
+    const onDecline = vi.fn();
+    const onInspect = vi.fn();
+    render(
+      <OptimizedMatrixCell {...requiredCellProps} onConfirm={onConfirm} onDecline={onDecline} onInspect={onInspect}
+        technician={mockTechnician} date={mockDate} assignment={{ ...mockAssignment, status: 'invited' }}
+        width={160} height={60} isSelected={false} onSelect={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(onConfirm).toHaveBeenCalledWith('tech-1', mockDate);
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
+    expect(onDecline).toHaveBeenCalledWith('tech-1', mockDate);
+    expect(onInspect).not.toHaveBeenCalled();
+  });
+
+  it('a confirmed or empty cell has no ✓ ✕, no remove button and no staffing icons: the inspector does all of it', () => {
+    const { rerender } = render(
+      <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate} assignment={mockAssignment}
+        width={160} height={60} isSelected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByTitle('Eliminar asignación')).not.toBeInTheDocument();
+
+    rerender(
+      <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+        width={160} height={60} isSelected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByTitle('Solicitar disponibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Enviar oferta')).not.toBeInTheDocument();
+  });
+
+  it('shows what is in flight as read-only chips: resending or cancelling is done in the inspector', () => {
+    render(
+      <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+        staffingStatusByDateProvided={{ availability_status: 'requested', offer_status: 'sent' }}
+        width={160} height={60} isSelected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.getAllByText('A:?').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('O:?').length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByTitle(/Cancelar|Reintentar/)).not.toBeInTheDocument();
+  });
+
+  it('a phone cell is a labelled button naming the technician, the day and what it holds', () => {
+    render(
+      <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate} assignment={mockAssignment}
+        width={118} height={80} isSelected={false} onSelect={vi.fn()} mobile />,
+    );
+    const cell = getCellElement();
+    expect(cell).toHaveAttribute('role', 'button');
+    expect(cell.getAttribute('aria-label')).toMatch(/John Doe, 15 de mayo: Test Concert \(Confirmado\)/);
   });
 });

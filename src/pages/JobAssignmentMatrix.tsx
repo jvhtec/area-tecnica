@@ -4,7 +4,7 @@ import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { hasTechnicianSelfServiceAccess, isManagementRole } from '@/utils/permissions';
+import { hasTechnicianSelfServiceAccess } from '@/utils/permissions';
 import {
   buildSeasonalAvailabilityKey,
   fetchMatrixTimesheetAssignments,
@@ -14,7 +14,6 @@ import {
 import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageControls';
 import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
 import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
-import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
 import { formatMadridDateKey, madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
 import {
@@ -34,7 +33,6 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import { fetchStaffingSummary, staffingSummaryQueryKey, useJobRoleSlots } from '@/features/matrix-v2/roleSlotsQuery';
-import { useMatrixV2 } from '@/features/matrix-v2/useMatrixV2';
 import { JobFocusBar } from '@/features/matrix-v2/focus/JobFocusBar';
 import { useJobFocusSelection } from '@/features/matrix-v2/focus/useJobFocusSelection';
 import { isFocusableJob } from '@/features/matrix-v2/focus/focusableJob';
@@ -43,7 +41,7 @@ import { jobDayKeys } from '@/features/matrix-v2/jobDays';
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
-  const { user, userDepartment, userRole } = useOptimizedAuth();
+  const { userDepartment } = useOptimizedAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);
@@ -52,15 +50,6 @@ export default function JobAssignmentMatrix() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebouncedMatrixSearch(searchTerm);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [allowDirectAssign, setAllowDirectAssign] = useState(false);
-  const [allowMarkUnavailable, setAllowMarkUnavailable] = useState(false);
-  const {
-    hideStaffingEmailButtons,
-    setHideStaffingEmailButtons,
-    hideStaffingWhatsappButtons,
-    setHideStaffingWhatsappButtons,
-  } = useStaffingButtonPreferences(user?.id);
-  const canMarkUnavailable = isManagementRole(userRole);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
   const [showStaffingReminder, setShowStaffingReminder] = useState(false);
@@ -592,10 +581,6 @@ export default function JobAssignmentMatrix() {
     if (selectedSkills.length) c += selectedSkills.length;
     // Hiding the fridge is the default, so only the opened fridge is a filter.
     if (!hideFridge) c++;
-    if (allowDirectAssign) c++;
-    if (allowMarkUnavailable) c++;
-    if (hideStaffingEmailButtons) c++;
-    if (hideStaffingWhatsappButtons) c++;
     return c;
   }, [
     selectedDepartment,
@@ -603,15 +588,10 @@ export default function JobAssignmentMatrix() {
     debouncedSearch,
     selectedSkills,
     hideFridge,
-    allowDirectAssign,
-    allowMarkUnavailable,
-    hideStaffingEmailButtons,
-    hideStaffingWhatsappButtons,
   ]);
 
-  const { enabled: matrixV2 } = useMatrixV2();
   const roleSlotsByJob = useJobRoleSlots(staffingReminderQuery.data);
-  const { focusJobId, focusStatus, setFocusStatus, focusJob } = useJobFocusSelection(matrixV2);
+  const { focusJobId, focusStatus, setFocusStatus, focusJob } = useJobFocusSelection();
   // A job that takes no crew (dry hire, cancelled) is never focused, even when ?trabajo= names it.
   const focusedJob = useMemo(() => {
     const job = focusJobId ? yearJobs.find((candidate: MatrixJob) => candidate.id === focusJobId) : undefined;
@@ -657,15 +637,6 @@ export default function JobAssignmentMatrix() {
         hideFridge={hideFridge}
         setHideFridge={setHideFridge}
         fridgeCount={fridgeCount}
-        allowDirectAssign={allowDirectAssign}
-        setAllowDirectAssign={setAllowDirectAssign}
-        allowMarkUnavailable={allowMarkUnavailable}
-        setAllowMarkUnavailable={setAllowMarkUnavailable}
-        canMarkUnavailable={canMarkUnavailable}
-        hideStaffingEmailButtons={hideStaffingEmailButtons}
-        setHideStaffingEmailButtons={setHideStaffingEmailButtons}
-        hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
-        setHideStaffingWhatsappButtons={setHideStaffingWhatsappButtons}
         filtersOpen={filtersOpen}
         setFiltersOpen={setFiltersOpen}
         activeFilterCount={activeFilterCount}
@@ -685,13 +656,12 @@ export default function JobAssignmentMatrix() {
         handleReminderOpenChange={handleReminderOpenChange}
         outstandingJobsCount={outstandingJobsCount}
         outstandingJobsDescription={outstandingJobsDescription}
-        matrixV2={matrixV2}
         focusJobs={yearJobs}
         focusJobId={focusedJob?.id ?? null}
         onFocusJob={focusJob}
       />
 
-      {matrixV2 && focusedJob && (
+      {focusedJob && (
         <JobFocusBar
           job={focusedJob}
           slots={roleSlotsByJob.get(focusedJob.id)}
@@ -716,12 +686,7 @@ export default function JobAssignmentMatrix() {
             dates={dateRange}
             jobs={yearJobs}
             fridgeSet={fridgeSet}
-            allowDirectAssign={allowDirectAssign}
-            allowMarkUnavailable={allowMarkUnavailable}
-            hideStaffingEmailButtons={hideStaffingEmailButtons}
-            hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
             staffingDepartment={selectedDepartment}
-            matrixV2={matrixV2}
             roleSlotsByJob={roleSlotsByJob}
             focusJobId={focusedJob?.id ?? null}
             focusStatus={focusStatus}

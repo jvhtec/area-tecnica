@@ -23,7 +23,6 @@ import { PushNotificationMatrix } from '@/components/settings/PushNotificationMa
 import { PushNotificationSchedule, ShiftReminderSchedule } from '@/components/settings/PushNotificationSchedule'
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
-import { MatrixVersionSettings } from '@/components/settings/MatrixVersionSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
 import { WahaEndpointSettings } from '@/components/settings/WahaEndpointSettings'
@@ -129,7 +128,6 @@ const Settings = () => {
     'realtime-debug': false,
     'morning-summary': false,
     'shortcuts': false,
-    'matrix-version': false,
     'users': false,
     'company-settings': false,
     'dryhire-folders': false,
@@ -202,18 +200,6 @@ const Settings = () => {
                   <PushNotificationSchedule />
                   <ShiftReminderSchedule />
                 </div>
-              </CollapsibleCard>
-            )}
-
-            {isManagementUser && (
-              <CollapsibleCard
-                id="matrix-version"
-                title="Matriz de asignaciones"
-                description="Elige entre la nueva matriz y la anterior."
-                isOpen={collapsibleStates['matrix-version']}
-                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'matrix-version': open }))}
-              >
-                <MatrixVersionSettings />
               </CollapsibleCard>
             )}
 

@@ -1,50 +1,13 @@
 import type { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 
 /**
- * The matrix owns these mutations and threads `mutate` down to the cells, which
- * call it with an options object (`{ onSuccess, onError }`) to clear their own
- * retry spinner and to settle the promise the cancel dialog awaits.
- *
- * They are derived from the hooks rather than restated so the payload shapes
- * stay checked at the call sites. Previously these props were declared unary
- * (`(payload: unknown) => void`) and re-declared as `any` one level down, which
- * hid both the second argument and the payload: a handler typed to satisfy that
- * contract could legally drop the callbacks, leaving the retry button stuck on
- * "Reenviando…" and the cancel dialog's `Promise.all` pending forever.
+ * The matrix owns these mutations. They are derived from the hooks rather than
+ * restated so the payload shapes stay checked at the call sites. Sending goes
+ * through `mutateAsync`: each call has its own promise, which `mutate`'s per-call
+ * callbacks do not (only the latest call's fire), and a batch sends concurrently.
  */
-export type SendStaffingEmailMutate = ReturnType<typeof useSendStaffingEmail>['mutate'];
-export type CancelStaffingMutate = ReturnType<typeof useCancelStaffingRequest>['mutate'];
 export type SendStaffingEmailAsync = ReturnType<typeof useSendStaffingEmail>['mutateAsync'];
 export type CancelStaffingAsync = ReturnType<typeof useCancelStaffingRequest>['mutateAsync'];
-
-export type MatrixCellAction =
-  | 'select-job'
-  | 'select-job-for-staffing'
-  | 'assign'
-  | 'unavailable'
-  | 'confirm'
-  | 'decline'
-  | 'offer-details'
-  | 'offer-details-wa'
-  | 'offer-details-email'
-  | 'availability-wa'
-  | 'availability-email'
-  | 'toggle-unavailable';
-
-export interface TimesheetDateRow {
-  date: string;
-}
-
-export interface MultiDateRemovalState {
-  isOpen: boolean;
-  isLoading: boolean;
-  otherDates: string[];
-  otherDatesCount: number;
-  currentDate: string | null;
-  removeOption: 'single' | 'all';
-  /** Expected-state token loaded with the dates; null when the lookup failed. */
-  stateToken: string | null;
-}
 
 export interface MatrixStaffingStatus {
   availability_request_id?: string | null;
@@ -84,43 +47,17 @@ export interface OptimizedMatrixCellProps {
   // bound to it: one stable handler shared by every cell is what lets the memo
   // around OptimizedMatrixCell actually hold.
   onSelect: (technicianId: string, date: Date, selected: boolean) => void;
-  onClick: (technicianId: string, date: Date, action: MatrixCellAction, selectedJobId?: string) => void;
+  /** A plain click or tap: opens the inspector. The element is null on touch, where the inspector is a sheet. */
+  onInspect: (technicianId: string, date: Date, element: HTMLElement | null) => void;
+  /** The ✓ and ✕ of an invited cell. */
+  onConfirm: (technicianId: string, date: Date) => void;
+  onDecline: (technicianId: string, date: Date) => void;
   onPrefetch?: (technicianId: string) => void;
-  /**
-   * Touch entry point. A phone cell is one big target that opens the action
-   * sheet instead of hosting four icon buttons it has no room for.
-   */
-  onOpenSheet?: (technicianId: string, date: Date) => void;
-  /**
-   * Matrix v2: a plain click on any cell opens the inspector instead of the
-   * per-action dialogs. The cell hands back its own element so the inspector
-   * can sit next to it.
-   */
-  inspectorMode?: boolean;
-  onInspect?: (technicianId: string, date: Date, element: HTMLElement) => void;
   /** True while any cell is selected: on touch, a tap then extends the selection. */
   selectionActive?: boolean;
-  onOptimisticUpdate?: (technicianId: string, jobId: string, status: string) => void;
   onRender?: () => void;
-  jobId?: string;
-  allowDirectAssign?: boolean;
-  allowMarkUnavailable?: boolean;
-  declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: MatrixStaffingStatus | null;
   staffingStatusByDateProvided?: MatrixStaffingStatus | null;
   isFridge?: boolean;
   mobile?: boolean;
-  staffingDepartment?: string | null;
-  hideStaffingEmailButtons?: boolean;
-  hideStaffingWhatsappButtons?: boolean;
-  // Owned by the matrix, not the cell: one mutation observer for the grid
-  // instead of two per rendered cell.
-  sendStaffingEmail: SendStaffingEmailMutate;
-  isSendingStaffingEmail?: boolean;
-  cancelStaffing: CancelStaffingMutate;
-  isCancellingStaffing?: boolean;
 }
-
-export type AssignmentLifecycleResult = {
-  error?: string;
-};

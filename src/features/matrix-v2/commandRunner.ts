@@ -24,7 +24,7 @@ import {
   type SideEffectSummary,
   type SupersedeResult,
 } from '@/features/assignments/commands';
-import { getAssignableJobDateKeys } from '@/components/matrix/assignJobDialogTypes';
+import { getAssignableJobDateKeys } from '@/features/matrix-v2/jobDays';
 import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
 import { formatUserName } from '@/utils/userName';
 import {
