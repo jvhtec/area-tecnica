@@ -9,29 +9,36 @@ import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer } fr
 import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { LogisticsEventCard } from "./LogisticsEventCard";
+import { useCalendarFilters, type CalendarResourceFilters } from "./LogisticsCalendarFilters";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
 import { queryKeys } from "@/lib/react-query";
+import { matchesLogisticsCalendarScope, type LogisticsCalendarScope } from "@/features/logistics/calendarScope";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
 import { isLogisticsEventOnDay, type LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
   readOnly?: boolean;
+  scope?: LogisticsCalendarScope;
+  resourceFilters?: CalendarResourceFilters;
+  onResourceFiltersChange?: (filters: CalendarResourceFilters) => void;
 }
 
-export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsCalendarProps) => {
+export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all", resourceFilters, onResourceFiltersChange }: LogisticsCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const { toast } = useToast();
+  const filters = useCalendarFilters(format(startOfMonth(currentMonth), "yyyy-MM-dd"), format(endOfMonth(currentMonth), "yyyy-MM-dd"), resourceFilters, onResourceFiltersChange);
 
   const { data: events, isLoading } = useQuery({
     queryKey: queryKeys.scope("logistics-events"),
+    select: (data) => data.filter((event) => matchesLogisticsCalendarScope(event, scope) && filters.matches(event)),
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from("logistics_events")
         .select(`
@@ -129,6 +136,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
 
   return (
     <Card className="flex h-full min-w-0 flex-col">
+      <div className="p-4 pb-0">{filters.controls}</div>
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-xl font-bold">Calendario de logística</CardTitle>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -241,6 +249,8 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false }: LogisticsC
 
         {!readOnly && (
           <LogisticsEventDialog
+            initialEventType={scope === "personnel" ? "crew_transfer" : undefined}
+            initialTransportType={scope === "personnel" ? "furgoneta" : undefined}
             open={showEventDialog}
             onOpenChange={setShowEventDialog}
             selectedDate={currentMonth}

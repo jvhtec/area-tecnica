@@ -1,0 +1,12 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path=public,extensions;
+select plan(5);
+select has_column('public','logistics_operations','transport_company','Transport company is persisted');
+select ok(not has_table_privilege('authenticated','public.logistics_operations','UPDATE'),'Company cannot bypass the RPC');
+select ok(not has_function_privilege('anon','public.save_logistics_operation(jsonb,timestamptz)','EXECUTE'),'Anonymous company save denied');
+select set_config('request.jwt.claim.sub','',true);
+select throws_ok($$select public.save_logistics_operation('{"transport_company":"Transportes Ejemplo"}'::jsonb,null)$$,'42501','Solo gestión puede modificar este servicio.','Company writes require an authorized identity');
+select throws_ok($$insert into public.logistics_operations(entity_kind,entity_id,transport_company) values('material','00000000-0000-0000-0000-000000000001',repeat('a',201))$$,'23514',null,'Company name is limited to 200 characters');
+select * from finish();
+rollback;

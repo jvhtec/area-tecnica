@@ -32,6 +32,8 @@ import { getErrorMessage } from "@/utils/errorMessage";
 import { addMadridCalendarDays, formatMadridDateKey, formatMadridDayKey, isMadridWeekend } from "@/utils/timezoneUtils";
 
 import { DriverDayDialog, type MatrixRowTarget } from "./DriverDayDialog";
+import { useWorkshopAppointments } from "@/features/logistics/fleet/workshopApi";
+import { workshopBlocks, workshopOnDay } from "@/features/logistics/fleet/workshopModel";
 import { assignmentStatusClass } from "./matrixStyles";
 
 type MatrixMode = "drivers" | "vehicles";
@@ -80,6 +82,7 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
   const endKey = addMadridCalendarDays(startKey, span - 1);
   const dayKeys = useMemo(() => buildDayKeys(startKey, endKey), [startKey, endKey]);
   const { data, isLoading, error } = useLogisticsMatrix(startKey, endKey);
+  const workshop = useWorkshopAppointments(startKey, endKey);
 
   const assignments = useMemo(() => data?.assignments ?? [], [data?.assignments]);
   const eventsById = useMemo(() => new Map((data?.events ?? []).map((event) => [event.id, event])), [data?.events]);
@@ -164,6 +167,9 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
         )}
       </div>
 
+      {mode === "vehicles" && workshop.error && <p role="alert" className="text-sm text-destructive">No se ha podido comprobar la disponibilidad por taller. {getErrorMessage(workshop.error)}</p>}
+      {mode === "vehicles" && workshop.isLoading && <p role="status" className="text-sm text-muted-foreground">Comprobando citas de taller…</p>}
+
       {error ? (
         <Card><CardContent className="py-8 text-center text-sm text-destructive">{getErrorMessage(error)}</CardContent></Card>
       ) : isLoading || !data ? (
@@ -236,6 +242,11 @@ export function LogisticsDriverMatrix({ readOnly }: { readOnly: boolean }) {
                           {offLabel && (
                             <span className="block text-xs italic text-muted-foreground">{offLabel}</span>
                           )}
+                          {mode === "vehicles" && (workshop.data ?? []).filter((appointment) => appointment.vehicle_id === row.id && workshopBlocks(appointment) && workshopOnDay(appointment, dayKey)).map((appointment) => (
+                            <span key={appointment.id} className="block rounded border border-amber-400 bg-amber-50 p-1 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                              Taller · {appointment.reason}<span className="block">{appointment.workshop}</span>
+                            </span>
+                          ))}
                           {cellAssignments.map((assignment) => {
                             const event = eventsById.get(assignment.logistics_event_id);
                             const subtitle = chipSubtitle(assignment);

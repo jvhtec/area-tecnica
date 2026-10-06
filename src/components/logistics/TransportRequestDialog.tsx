@@ -179,6 +179,8 @@ export function TransportRequestDialog({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-transport-inbox") }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") }),
+      queryClient.invalidateQueries({ queryKey: ["logistics-work-requests"] }),
+      queryClient.invalidateQueries({ queryKey: ["logistics-operations"] }),
     ]);
     onSubmitted?.();
   };
@@ -330,6 +332,7 @@ export function TransportRequestDialog({
 
             {!isLoading && !isError && view === "form" && (
               <form onSubmit={submit} className="min-w-0 space-y-5">
+                <div className="rounded-md bg-muted p-3 text-sm"><strong>1. Indica qué necesitas y la ruta</strong><p className="text-muted-foreground">El evento y el departamento ya están seleccionados. Logística completará después el vehículo concreto y el conductor.</p></div>
                 <div className="min-w-0 space-y-2">
                   <Label htmlFor="transport-description">Qué necesitas</Label>
                   <Input id="transport-description" {...form.register("description")} placeholder="PA principal, recogida de subalquiler, devolución…" />
@@ -342,7 +345,7 @@ export function TransportRequestDialog({
                     <Input id="transport-needed-at" type="datetime-local" {...form.register("neededAt")} />
                   </div>
                   <div className="min-w-0 space-y-2">
-                    <Label htmlFor="transport-movement-type">Tipo de movimiento</Label>
+                    <Label htmlFor="transport-movement-type">¿Qué hay que hacer?</Label>
                     <Select value={form.watch("movementType")} onValueChange={(value) => form.setValue("movementType", value as TransportMovementType, { shouldDirty: true })}>
                       <SelectTrigger id="transport-movement-type" className="w-full min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -373,7 +376,7 @@ export function TransportRequestDialog({
                     />
                     {form.formState.errors.destination && <p className="text-xs text-destructive">{form.formState.errors.destination.message}</p>}
                   </div>
-                  <div className="min-w-0 space-y-2">
+                  <details className="min-w-0 space-y-2 rounded-md border p-3"><summary className="cursor-pointer text-sm font-medium">Prioridad y Hoja de Ruta (opcional)</summary>
                     <Label htmlFor="transport-priority">Prioridad</Label>
                     <Select value={form.watch("priority")} onValueChange={(value) => form.setValue("priority", value as TransportPriority, { shouldDirty: true })}>
                       <SelectTrigger id="transport-priority" className="w-full min-w-0"><SelectValue /></SelectTrigger>
@@ -381,14 +384,15 @@ export function TransportRequestDialog({
                         {Object.entries(TRANSPORT_PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                  </div>
                   <div className="flex min-w-0 items-center gap-2 self-end rounded-md border p-3">
                     <Checkbox id="transport-hoja" checked={form.watch("isHojaRelevant")} onCheckedChange={(checked) => form.setValue("isHojaRelevant", checked === true, { shouldDirty: true })} />
                     <Label htmlFor="transport-hoja" className="min-w-0 cursor-pointer break-words font-normal">Incluir en Hoja de Ruta</Label>
                   </div>
+                  </details>
                 </div>
 
                 <div className="min-w-0 space-y-3">
+                  <p className="text-sm font-medium">2. Elige la capacidad de transporte</p>
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                     <Label>Vehículos / capacidad</Label>
                     <Button type="button" size="sm" variant="secondary" disabled={items.fields.length >= 20} onClick={() => items.append({ transport_type: "trailer", leftover_space_meters: null })}>
@@ -438,11 +442,11 @@ export function TransportRequestDialog({
                   {form.formState.errors.items?.message && <p className="text-xs text-destructive">{form.formState.errors.items.message}</p>}
                 </div>
 
-                <div className="min-w-0 space-y-2">
+                <details className="min-w-0 space-y-2 rounded-md border p-3"><summary className="cursor-pointer text-sm font-medium">Añadir instrucciones (opcional)</summary>
                   <Label htmlFor="transport-note">Notas</Label>
                   <Textarea id="transport-note" {...form.register("note")} rows={3} placeholder="Accesos, contacto, restricciones, devolución…" />
                   {form.formState.errors.note && <p className="text-xs text-destructive">{form.formState.errors.note.message}</p>}
-                </div>
+                </details>
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
                   <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => requests.length ? setView("list") : onOpenChange(false)}>
