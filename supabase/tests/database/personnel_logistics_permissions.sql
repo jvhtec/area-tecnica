@@ -1,0 +1,15 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path = public, extensions;
+select plan(8);
+select ok((select relrowsecurity from pg_class where oid = 'public.personnel_logistics_plans'::regclass), 'Personnel plans enforce RLS');
+select ok(not has_table_privilege('anon', 'public.personnel_logistics_plans', 'SELECT'), 'Anonymous users cannot read personnel plans');
+select ok(not has_table_privilege('authenticated', 'public.personnel_logistics_plans', 'INSERT'), 'Authenticated users cannot bypass the save RPC');
+select ok(not has_table_privilege('authenticated', 'public.personnel_logistics_plans', 'UPDATE'), 'Authenticated users cannot bypass concurrency checks');
+select ok(not has_function_privilege('anon', 'public.save_personnel_logistics_plan(jsonb,timestamptz)', 'EXECUTE'), 'Anonymous users cannot save');
+select ok(not has_function_privilege('anon', 'public.list_personnel_logistics_plans(date,date)', 'EXECUTE'), 'Anonymous users cannot list');
+select set_config('request.jwt.claim.sub', '', true);
+select throws_ok($$select public.list_personnel_logistics_plans('2026-10-01','2026-10-31')$$, '42501', 'No tienes permiso para consultar logística de personal.', 'Missing user identity cannot list');
+select throws_ok($$select public.save_personnel_logistics_plan('{}'::jsonb,null)$$, '42501', 'Solo administración y gestión pueden modificar logística de personal.', 'Missing user identity cannot save');
+select * from finish();
+rollback;

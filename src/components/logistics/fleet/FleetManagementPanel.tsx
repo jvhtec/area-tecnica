@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,11 @@ import { formatMadridDateKey } from "@/utils/timezoneUtils";
 
 import { DriverDetailsDialog } from "./DriverDetailsDialog";
 import { VehicleFormDialog } from "./VehicleFormDialog";
+import { WorkshopCalendar } from "./WorkshopCalendar";
+import { VehicleWorkshopCalendar } from "./VehicleWorkshopCalendar";
+import { WorkshopReportDialog } from "./WorkshopReportDialog";
+import { DriverLeavePanel } from "./DriverLeavePanel";
+import { FleetHistoryPanel } from "./FleetHistoryPanel";
 
 /** "X caducada" in red, "X caduca pronto" in amber, nothing otherwise. */
 function DocumentBadge({ label, expiry, todayKey }: { label: string; expiry: string | null; todayKey: string }) {
@@ -46,6 +51,7 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
   const { data, isLoading, error } = useLogisticsMatrix(todayKey, todayKey);
   const [vehicleDialog, setVehicleDialog] = useState<{ vehicle: FleetVehicle | null } | null>(null);
   const [editingDriver, setEditingDriver] = useState<MatrixDriver | null>(null);
+  const [calendarVehicle, setCalendarVehicle] = useState<FleetVehicle | null>(null);
   const confirm = useConfirm();
 
   const vehicles = data?.vehicles ?? [];
@@ -55,7 +61,7 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
   const removeVehicle = async (vehicle: FleetVehicle) => {
     const confirmed = await confirm({
       title: "¿Eliminar vehículo?",
-      description: `${vehicleLabel(vehicle)} se quitará de la flota. Si ya tiene asignaciones, desactívalo en su lugar.`,
+      description: `${vehicleLabel(vehicle)} se quitará de la flota. Si ya tiene asignaciones o citas de taller, desactívalo en su lugar.`,
       confirmText: "Eliminar",
       destructive: true,
     });
@@ -84,6 +90,10 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
 
   return (
     <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+      <div className="xl:col-span-2"><WorkshopReportDialog vehicles={vehicles} /></div>
+      <DriverLeavePanel readOnly={readOnly} />
+      <FleetHistoryPanel />
+      <WorkshopCalendar vehicles={vehicles} readOnly={readOnly} />
       <Card className="min-w-0">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
           <div>
@@ -122,6 +132,9 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" aria-label={`Calendario de ${vehicle.name}`} onClick={() => setCalendarVehicle(vehicle)}>
+                      <CalendarDays className="mr-1 h-4 w-4" /> Calendario
+                    </Button>
                     {!vehicle.is_active && <Badge variant="secondary">Inactivo</Badge>}
                     {!readOnly && (
                       <>
@@ -185,6 +198,7 @@ export function FleetManagementPanel({ readOnly }: { readOnly: boolean }) {
         </CardContent>
       </Card>
 
+      {calendarVehicle && <VehicleWorkshopCalendar key={calendarVehicle.id} vehicle={calendarVehicle} readOnly={readOnly} onClose={() => setCalendarVehicle(null)} />}
       <VehicleFormDialog
         open={Boolean(vehicleDialog)}
         onOpenChange={(open) => { if (!open) setVehicleDialog(null); }}

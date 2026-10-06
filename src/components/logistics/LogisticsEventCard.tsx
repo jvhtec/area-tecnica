@@ -45,9 +45,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   drivers,
 }: LogisticsEventCardProps) {
   const isCrewTransfer = event.event_type === "crew_transfer";
-  const defaultColor = event.event_type === "load"
-    ? "rgb(191, 219, 254)"
-    : isCrewTransfer ? "rgb(254, 215, 170)" : "rgb(187, 247, 208)";
+  const defaultColor = isCrewTransfer ? "rgb(139, 92, 246)" : "rgb(14, 165, 233)";
   const EventTypeIcon = event.event_type === "load" ? Package : isCrewTransfer ? Users : PackageCheck;
   const borderColor = event.color || defaultColor;
   const transportProvider = event.transport_provider;

@@ -75,6 +75,9 @@ describe("app route manifest", () => {
   it("fans logistics source tables into the aggregate fleet query key", () => {
     const aggregateKey = ["transport_driver_assignments"];
     const logistics = subscriptionProfiles.logistics;
+    expect(logistics).toContainEqual(expect.objectContaining({
+      table: "fleet_workshop_appointments", queryKey: ["fleet_workshop_appointments"],
+    }));
 
     for (const table of [
       "jobs",
