@@ -84,7 +84,8 @@ serve(async (request) => {
           }
         }
         if (!manifestId) { results.pending++; continue; }
-        const { data: acquired, error: lockError } = await db.rpc("claim_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id });
+        const lockToken = crypto.randomUUID();
+        const { data: acquired, error: lockError } = await db.rpc("claim_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id, p_token: lockToken });
         if (lockError) throw lockError;
         if (!acquired) { results.pending++; continue; }
         try {
@@ -131,7 +132,7 @@ serve(async (request) => {
         }
         results.published++;
         } finally {
-          const { error: releaseError } = await db.rpc("release_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id });
+          const { error: releaseError } = await db.rpc("release_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id, p_token: lockToken });
           if (releaseError) results.errors.push(job.id);
         }
       }
