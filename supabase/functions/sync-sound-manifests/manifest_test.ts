@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { isPublishableStatus, manifestReportUrl, manifestStatusId } from "./manifest.ts";
+import { headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
 Deno.test("only Preparado and Enviado are publishable", () => {
   assertEquals(isPublishableStatus("70b2de6c-aee8-11df-b8d5-00e08175e43e"), true);
@@ -31,4 +31,16 @@ Deno.test("report uses manifest id and ELEMENT_VIEW_ID", () => {
   assertEquals(url.searchParams.get("ELEMENT_VIEW_ID"), "54110f73-c28a-11f1-bdc7-02e7c1b689d7");
   assertEquals(url.searchParams.get("PROJECT_ELEMENT_DEFINITION_ID"), "9945d54c-af32-11df-b8d5-00e08175e43e");
   assertThrows(() => manifestReportUrl("../another-job"));
+});
+
+Deno.test("filename uses job title, date and manifest number safely", () => {
+  const name = soundManifestFileName({
+    jobTitle: "Concierto: Madrid / Sala",
+    startTime: "2026-10-12T18:00:00Z",
+    manifestId: "58db6132-8762-483b-a290-c6741f0f5c35",
+    documentNumber: "MS/0042",
+  });
+  assertEquals(name, "Manifiesto de salida - Sonido - 2026-10-12 - Concierto Madrid Sala - MS 0042 - 58db6132.pdf");
+  assertEquals(headerText({ data: { displayString: "MS-0042" } }), "MS-0042");
+  assertEquals(headerText({ data: "MS-0042" }), "MS-0042");
 });
