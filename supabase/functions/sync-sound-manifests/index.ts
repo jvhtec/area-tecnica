@@ -78,7 +78,7 @@ serve(async (request) => {
         const manifestId = ids[0];
         if (!manifestId) { results.pending++; continue; }
         // Flex element status must be read from the manifest itself, not from its Pull Sheet.
-        const manifest = await flexJson(`/element/${encodeURIComponent(manifestId)}`, token);
+        const manifest = await flexJson(`/element/${encodeURIComponent(manifestId)}/header-data/?codeList=statusId`, token);
         const statusId = manifestStatusId(manifest);
         if (!isPublishableStatus(statusId)) { results.pending++; continue; }
         const pdf = await fetchPdf(manifestId, token);
