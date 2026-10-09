@@ -75,7 +75,8 @@ export function soundManifestFileName(args: {
   documentNumber?: string | null;
 }): string {
   const clean = (text: string, max: number) =>
-    text.normalize("NFC").replace(/[\\/<>:"|?*\x00-\x1f]/g, " ")
+    text.normalize("NFC").replace(/[\\/<>:"|?*]/g, " ")
+      .replace(/[^\P{Cc}]/gu, " ")
       .replace(/\s+/g, " ").trim().replace(/[. ]+$/g, "").slice(0, max);
   const date = /^\d{4}-\d{2}-\d{2}/.exec(args.startTime)?.[0] ?? "sin-fecha";
   const job = clean(args.jobTitle, 85) || "Trabajo";
