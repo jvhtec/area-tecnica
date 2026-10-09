@@ -84,14 +84,26 @@ serve(async (request) => {
           }
         }
         if (!manifestId) { results.pending++; continue; }
+        const { data: acquired, error: lockError } = await db.rpc("claim_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id });
+        if (lockError) throw lockError;
+        if (!acquired) { results.pending++; continue; }
+        try {
         const pdf = await fetchPdf(manifestId, token);
         const fingerprint = await sha256(pdf);
-        const base = `${PREFIX}/${job.id}/${manifestId}`;
+        const base = `${PREFIX}/${job.id}/${sheet.element_id}`;
         const path = `${base}/${fingerprint}.pdf`;
         const { data: previous, error: previousError } = await db.from("job_documents")
           .select("id,file_path").eq("job_id", job.id).like("file_path", `${base}/%`);
         if (previousError) throw previousError;
-        if (previous?.some((doc) => doc.file_path === path)) { results.unchanged++; continue; }
+        if (previous?.some((doc) => doc.file_path === path)) {
+          const redundant = previous.filter((doc) => doc.file_path !== path);
+          if (redundant.length) {
+            const { error: staleError } = await db.from("job_documents").delete().in("id", redundant.map((doc) => doc.id));
+            if (staleError) throw staleError;
+            await db.storage.from(BUCKET).remove(redundant.map((doc) => doc.file_path));
+          }
+          results.unchanged++; continue;
+        }
         const { error: uploadError } = await db.storage.from(BUCKET)
           .upload(path, pdf, { contentType: "application/pdf", upsert: false, cacheControl: "0" });
         if (uploadError && !String(uploadError.message).toLowerCase().includes("already exists")) throw uploadError;
@@ -118,6 +130,10 @@ serve(async (request) => {
           } else void deletionError;
         }
         results.published++;
+        } finally {
+          const { error: releaseError } = await db.rpc("release_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id });
+          if (releaseError) results.errors.push(job.id);
+        }
       }
     } catch (error) {
       void error;
