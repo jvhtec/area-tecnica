@@ -259,6 +259,10 @@ try {
   remediation = verifiedBracesRemediation(rawReport, productionReport, repoRoot);
 } catch (error) {
   writeSummary(rawSnapshot);
+  for (const name of ["braces", "chokidar", "fast-glob", "micromatch", "tailwindcss", "@tailwindcss/typography", "tailwindcss-animate"]) {
+    const entry = rawReport.vulnerabilities?.[name];
+    if (entry) console.error(`Audit graph ${name}: ${JSON.stringify({ severity: entry.severity, via: entry.via, nodes: entry.nodes })}`);
+  }
   console.error(`Dependency remediation verification failed: ${error.message}`);
   process.exit(1);
 }
