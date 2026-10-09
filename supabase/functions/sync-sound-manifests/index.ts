@@ -8,13 +8,11 @@ const BUCKET = "job-documents";
 const PREFIX = "flex-reports/sound-manifests";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HOUR = 3_600_000;
-const BATCH_SIZE = 40;
+const BATCH_SIZE = 200;
 
 type Row = Record<string, unknown>;
 const asRecord = (value: unknown): Row | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Row : null;
-const stringValue = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
 
 function flexHeaders(token: string): HeadersInit {
   return { "X-Auth-Token": token, apikey: token, "X-Requested-With": "XMLHttpRequest", "X-API-Client": "flex5-desktop" };
@@ -54,7 +52,7 @@ serve(async (request) => {
   // Scan upcoming jobs, never depend on a user opening the application.
   const { data: jobs, error: jobsError } = await db.from("jobs")
     .select("id,title,start_time,status")
-    .gte("start_time", new Date(now).toISOString())
+    .gte("start_time", new Date(now - 48 * HOUR).toISOString())
     .lte("start_time", new Date(now + 48 * HOUR).toISOString())
     .order("start_time", { ascending: true }).limit(BATCH_SIZE);
   if (jobsError) return new Response("Job discovery failed", { status: 500 });
@@ -75,13 +73,17 @@ serve(async (request) => {
         // Prefer the shipping manifest when present, but verify its own status.
         const ids = [warehouse.shipManifestId, warehouse.prepManifestId]
           .filter((value): value is string => typeof value === "string" && UUID.test(value));
-        const manifestId = ids[0];
+        let manifestId: string | undefined;
+        let manifestNumber: string | null = null;
+        for (const candidate of [...new Set(ids)]) {
+          const header = await flexJson(`/element/${encodeURIComponent(candidate)}/header-data/?codeList=statusId&codeList=documentNumber`, token);
+          if (isPublishableStatus(manifestStatusId(header))) {
+            manifestId = candidate;
+            manifestNumber = headerText(asRecord(header)?.documentNumber);
+            break;
+          }
+        }
         if (!manifestId) { results.pending++; continue; }
-        // Flex element status must be read from the manifest itself, not from its Pull Sheet.
-        const manifest = await flexJson(`/element/${encodeURIComponent(manifestId)}/header-data/?codeList=statusId&codeList=documentNumber`, token);
-        const statusId = manifestStatusId(manifest);
-        const manifestNumber = headerText(asRecord(manifest)?.documentNumber);
-        if (!isPublishableStatus(statusId)) { results.pending++; continue; }
         const pdf = await fetchPdf(manifestId, token);
         const fingerprint = await sha256(pdf);
         const base = `${PREFIX}/${job.id}/${manifestId}`;
