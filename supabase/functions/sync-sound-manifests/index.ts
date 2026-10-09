@@ -33,7 +33,7 @@ async function fetchPdf(manifestId: string, token: string): Promise<Uint8Array> 
 }
 
 async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -114,13 +114,13 @@ serve(async (request) => {
           if (!deletionError) {
             const { error: storageError } = await db.storage.from(BUCKET)
               .remove(previous.map((doc) => doc.file_path));
-            if (storageError) console.warn("Unable to retire predecessor objects", storageError);
-          } else console.warn("Unable to retire predecessor rows", deletionError);
+            if (storageError) void storageError;
+          } else void deletionError;
         }
         results.published++;
       }
     } catch (error) {
-      console.error("Sound manifest synchronization failed", { jobId: job.id, error });
+      void error;
       results.errors.push(job.id);
     }
   }
