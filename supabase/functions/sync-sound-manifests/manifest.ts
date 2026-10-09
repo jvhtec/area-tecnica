@@ -18,7 +18,10 @@ export function manifestStatusId(value: unknown): string | null {
   if (typeof status === "string") return UUID.test(status) ? status.toLowerCase() : null;
   if (status && typeof status === "object" && !Array.isArray(status)) {
     const nested = status as Record<string, unknown>;
-    return typeof nested.id === "string" && UUID.test(nested.id) ? nested.id.toLowerCase() : null;
+    const option = nested.data && typeof nested.data === "object" && !Array.isArray(nested.data)
+      ? nested.data as Record<string, unknown>
+      : nested;
+    return typeof option.id === "string" && UUID.test(option.id) ? option.id.toLowerCase() : null;
   }
   return null;
 }
