@@ -55,3 +55,32 @@ export function decodeFlexPdf(raw: Uint8Array): Uint8Array {
   if (!magic(decoded)) throw new Error("Flex did not return a PDF");
   return decoded;
 }
+
+/** Flex header fields are wrapped in { data: ... }; never use object stringification. */
+export function headerText(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["data", "preferredDisplayString", "displayString", "name"]) {
+    const text = headerText(record[key]);
+    if (text) return text;
+  }
+  return null;
+}
+
+export function soundManifestFileName(args: {
+  jobTitle: string;
+  startTime: string;
+  manifestId: string;
+  documentNumber?: string | null;
+}): string {
+  const clean = (text: string, max: number) =>
+    text.normalize("NFC").replace(/[\\/<>:"|?*\\x00-\\x1f]/g, " ")
+      .replace(/\\s+/g, " ").trim().replace(/[. ]+$/g, "").slice(0, max);
+  const date = /^\\d{4}-\\d{2}-\\d{2}/.exec(args.startTime)?.[0] ?? "sin-fecha";
+  const job = clean(args.jobTitle, 85) || "Trabajo";
+  const number = clean(args.documentNumber ?? "", 45);
+  // Include a stable manifest suffix even when Flex has no document number.
+  const suffix = args.manifestId.slice(0, 8);
+  return `Manifiesto de salida - Sonido - ${date} - ${job}${number ? ` - ${number}` : ""} - ${suffix}.pdf`;
+}
