@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
+import { requireServiceRoleRequest } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { decodeFlexPdf, headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
@@ -43,9 +44,7 @@ serve(createHttpHandler(async (request) => {
   const url = Deno.env.get("SUPABASE_URL");
   const token = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN");
   if (!serviceKey || !url || !token) return new Response("Service configuration unavailable", { status: 503 });
-  if (request.headers.get("Authorization") !== `Bearer ${serviceKey}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  requireServiceRoleRequest(request, serviceKey);
   const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const now = Date.now();
   const results = { checked: 0, published: 0, unchanged: 0, pending: 0, errors: [] as string[] };
