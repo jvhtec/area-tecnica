@@ -10,7 +10,7 @@ This worker is deliberately **not scheduled** until the live Flex status respons
 - The job document is technician-visible.
 
 ## Validation required before scheduling
-1. Verify `GET /element/{manifestId}` is supported and identify the authoritative status field in its JSON response. Current implementation fails closed if that field is absent. **Do not enable scheduling on assumptions about this route.**
+1. **Confirmed:** `GET /element/{manifestId}/header-data/?codeList=statusId` returns a `statusId` field whose `data.id` is the authoritative status option. Verify the response against a prepared manifest during integration testing.
 2. Confirm `flex_folders` Sound Pull Sheet mapping across single jobs, festivals, and tour dates.
 3. Verify report response is valid PDF/base64 PDF using a prepared manifest.
 4. Check `job_documents.read_only` and nullable `uploaded_by` against production schema.
