@@ -23,3 +23,6 @@ A server-side service-role-only worker with strict status ID allowlist, report g
 
 ## Daytime polling window
 The cron invokes its database wrapper hourly, but the wrapper calls Flex only at **09:00, 11:00, 13:00, 15:00, 17:00 and 19:00 Europe/Madrid**. The timezone guard preserves local hours across daylight-saving changes. No overnight calls are made.
+
+## Activation and concurrency
+The migration does **not** activate the cron automatically. After staging validation, explicitly create the `sound-manifest-sync` cron entry with `cron.schedule('sound-manifest-sync', '0 * * * *', 'SELECT public.invoke_sound_manifest_sync()')`; the wrapper restricts execution to 09:00–19:00 Europe/Madrid every two hours. `claim_sound_manifest_slot` leases each pull-sheet publication for ten minutes, with token-checked release. A prepared manifest is replaced by a shipping manifest in the same pull-sheet slot.
