@@ -20,6 +20,8 @@ Deno.test("manifest status parser fails closed", () => {
     "4dc8c4ec-aee9-11df-b8d5-00e08175e43e");
   assertEquals(manifestStatusId({ unrelated: { statusId: "70b2de6c-aee8-11df-b8d5-00e08175e43e" } }), null);
   assertEquals(manifestStatusId({ status: "Preparado" }), null);
+  assertEquals(manifestStatusId({ statusId: { data: { id: "4dc8c4ec-aee9-11df-b8d5-00e08175e43e", name: "Enviado", domainId: "status-option" }, fieldType: "statusId" } }),
+    "4dc8c4ec-aee9-11df-b8d5-00e08175e43e");
 });
 
 Deno.test("report uses manifest id and ELEMENT_VIEW_ID", () => {
