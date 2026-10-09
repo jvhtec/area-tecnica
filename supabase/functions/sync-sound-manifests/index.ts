@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
-import { decodeFlexPdf, isPublishableStatus, manifestReportUrl, manifestStatusId } from "./manifest.ts";
+import { decodeFlexPdf, headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
 const FLEX_BASE = "https://sectorpro.flexrentalsolutions.com/f5/api";
 const BUCKET = "job-documents";
@@ -53,7 +53,7 @@ serve(async (request) => {
   const results = { checked: 0, published: 0, unchanged: 0, pending: 0, errors: [] as string[] };
   // Scan upcoming jobs, never depend on a user opening the application.
   const { data: jobs, error: jobsError } = await db.from("jobs")
-    .select("id,start_time,status")
+    .select("id,title,start_time,status")
     .gte("start_time", new Date(now).toISOString())
     .lte("start_time", new Date(now + 48 * HOUR).toISOString())
     .order("start_time", { ascending: true }).limit(BATCH_SIZE);
@@ -78,8 +78,9 @@ serve(async (request) => {
         const manifestId = ids[0];
         if (!manifestId) { results.pending++; continue; }
         // Flex element status must be read from the manifest itself, not from its Pull Sheet.
-        const manifest = await flexJson(`/element/${encodeURIComponent(manifestId)}/header-data/?codeList=statusId`, token);
+        const manifest = await flexJson(`/element/${encodeURIComponent(manifestId)}/header-data/?codeList=statusId&codeList=documentNumber`, token);
         const statusId = manifestStatusId(manifest);
+        const manifestNumber = headerText(asRecord(manifest)?.documentNumber);
         if (!isPublishableStatus(statusId)) { results.pending++; continue; }
         const pdf = await fetchPdf(manifestId, token);
         const fingerprint = await sha256(pdf);
@@ -94,7 +95,7 @@ serve(async (request) => {
         if (uploadError && !String(uploadError.message).toLowerCase().includes("already exists")) throw uploadError;
         const { data: created, error: insertError } = await db.from("job_documents").insert({
           job_id: job.id,
-          file_name: `Manifiesto Sonido - ${manifestId.slice(0, 8)}.pdf`,
+          file_name: soundManifestFileName({ jobTitle: job.title ?? "Trabajo", startTime: job.start_time, manifestId, documentNumber: manifestNumber }),
           file_path: path,
           file_type: "application/pdf",
           file_size: pdf.byteLength,
