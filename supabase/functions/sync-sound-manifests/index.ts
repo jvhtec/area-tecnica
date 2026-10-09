@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createHttpHandler } from "../_shared/http.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { decodeFlexPdf, headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
@@ -37,8 +38,7 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-serve(async (request) => {
-  if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+serve(createHttpHandler(async (request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const url = Deno.env.get("SUPABASE_URL");
   const token = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN");
@@ -142,4 +142,4 @@ serve(async (request) => {
     }
   }
   return new Response(JSON.stringify(results), { headers: { "Content-Type": "application/json" } });
-});
+}, { allowedMethods: ["POST"] }));
