@@ -47,6 +47,11 @@ BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'sound-manifest-sync') THEN
     PERFORM cron.unschedule('sound-manifest-sync');
   END IF;
+  -- Explicitly opt in after staging verification; migration alone never activates publishing.
+  IF current_setting('app.sound_manifest_sync_enabled', true) IS DISTINCT FROM 'on' THEN
+    RAISE NOTICE '[sound_manifest_sync] schedule disabled pending explicit activation';
+    RETURN;
+  END IF;
   PERFORM cron.schedule(
     'sound-manifest-sync',
     '0 * * * *',
