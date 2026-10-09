@@ -6,7 +6,6 @@ import { validateAuditReport } from './audit-report.mjs';
 
 const advisoryId = 1240992;
 const affected = ['braces', 'chokidar', 'fast-glob', 'micromatch', 'tailwindcss'];
-const optionalPlugins = ['@tailwindcss/typography', 'tailwindcss-animate'];
 
 /** Preserve raw findings; recognize this fix only for an exact verified dev graph. */
 export function verifiedBracesRemediation(report, productionReport, root) {
@@ -29,23 +28,39 @@ export function verifiedBracesRemediation(report, productionReport, root) {
     const resolver = createRequire(join(root, path, 'index.js'));
     if (realpathSync(resolver.resolve('braces')) !== expectedEntry) throw new Error('Installed consumer resolves an unverified braces copy');
   }
-  const admitted = [...affected, ...optionalPlugins.filter(name => Object.hasOwn(packages, name))];
-  for (const name of admitted) {
-    const entry = packages[name];
-    if (!entry || entry.severity !== 'high' || !Array.isArray(entry.nodes) || entry.nodes.length !== 1 || entry.nodes[0] !== `node_modules/${name}` || lock.packages[entry.nodes[0]]?.dev !== true || productionReport.vulnerabilities?.[name]) {
-      throw new Error('Backport remediation requires the exact development-only advisory graph');
-    }
-    if (optionalPlugins.includes(name) && (entry.via?.length !== 1 || entry.via[0] !== 'tailwindcss')) throw new Error('Tailwind plugin has an unrelated advisory path');
-    if (!Array.isArray(entry.via) || !entry.via.length || entry.via.some(item => typeof item === 'string'
-      ? !affected.includes(item) : !item || item.source !== advisoryId || item.name !== 'braces' || item.url !== 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm')) {
-      throw new Error('Backport remediation refuses additional advisory paths');
-    }
-  }
+  // Remove only paths attributable to the verified braces backport.
+  // Other advisories (including transitive Tailwind advisories) must remain visible.
   const unresolved = structuredClone(report);
-  for (const name of admitted) delete unresolved.vulnerabilities[name];
-  const counts = unresolved.metadata?.vulnerabilities;
-  if (!counts || counts.high < admitted.length || counts.total < admitted.length) throw new Error('Inconsistent audit severity counts');
-  counts.high -= admitted.length;
-  counts.total -= admitted.length;
-  return { report: unresolved, remediated: [{ advisoryId, packages: admitted, reason: 'Installed depth backport bytes verified; exact development-only graph; raw advisory remains visible.' }] };
+  const remediated = [];
+  const clean = new Set();
+  for (const name of affected) {
+    const entry = packages[name];
+    if (!entry) continue;
+    if (!Array.isArray(entry.nodes) || entry.nodes.length !== 1 ||
+        entry.nodes[0] !== `node_modules/${name}` ||
+        lock.packages[entry.nodes[0]]?.dev !== true ||
+        productionReport.vulnerabilities?.[name]) {
+      throw new Error('Backport remediation requires a development-only advisory graph');
+    }
+    const other = entry.via.some(item => typeof item === 'string'
+      ? !clean.has(item)
+      : !item || item.source !== advisoryId || item.name !== 'braces' ||
+        item.url !== 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm');
+    if (!other) clean.add(name);
+  }
+  // A clean package may still be referenced by a dependent with an unrelated advisory.
+  // Never discard that dependent's complete audit entry.
+  for (const name of clean) {
+    delete unresolved.vulnerabilities[name];
+    remediated.push(name);
+  }
+  const counts = unresolved.metadata.vulnerabilities;
+  for (const name of remediated) {
+    const severity = packages[name].severity;
+    counts[severity]--;
+    counts.total--;
+  }
+  validateAuditReport(unresolved);
+  return { report: unresolved, remediated: [{ advisoryId, packages: remediated,
+    reason: 'Verified installed braces backport; unrelated advisory paths remain unresolved.' }] };
 }

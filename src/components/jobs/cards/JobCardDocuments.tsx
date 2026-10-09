@@ -33,7 +33,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   }
 
   const handleToggleVisibility = async (doc: JobDocument) => {
-    if (doc.read_only || doc.document_kind === 'hoja_de_ruta') {
+    if (doc.read_only || doc.document_kind === 'hoja_de_ruta' || doc.file_path.startsWith('flex-reports/presupuestos/')) {
       return;
     }
     try {
@@ -67,7 +67,8 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
         {documents.map((doc) => {
           const isTemplate = doc.template_type === 'soundvision';
           const isPublishedHoja = doc.document_kind === 'hoja_de_ruta';
-          const isReadOnly = Boolean(doc.read_only) || isPublishedHoja;
+          const isFlexQuote = doc.file_path.startsWith('flex-reports/presupuestos/');
+          const isReadOnly = Boolean(doc.read_only) || isPublishedHoja || isFlexQuote;
           return (
             <div
               key={doc.id}
@@ -102,7 +103,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                 onView={() => handleViewDocument(doc)}
                 onDownload={() => handleDownload(doc)}
                 onDelete={canManageDocuments && !isReadOnly ? () => onDeleteDocument(doc) : undefined}
-                visibilityControl={canManageDocuments ? (
+                visibilityControl={canManageDocuments && !isFlexQuote ? (
                   <div className="mr-auto flex min-w-0 items-center gap-2">
                     <span className="text-xs text-muted-foreground select-none">Visible para técnicos</span>
                     <Switch
