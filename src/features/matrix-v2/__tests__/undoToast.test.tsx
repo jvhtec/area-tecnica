@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { MatrixUndo } from '../types';
