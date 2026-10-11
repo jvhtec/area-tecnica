@@ -69,6 +69,12 @@ describe.skipIf(!process.env.STAFFING_EDGE_TEST_URL)('real assignment-command pe
   }, 200_000);
 
   function bind(client = manager.client) {
+    // One tracker per test. A second trackLocalFunctions on the same client
+    // would spy on the first spy and recurse until the stack overflows.
+    if (background) {
+      if (binding.client === client) return;
+      throw new Error('This test already tracks another client; bind one client per test');
+    }
     binding.client = client;
     background = trackLocalFunctions(client);
   }

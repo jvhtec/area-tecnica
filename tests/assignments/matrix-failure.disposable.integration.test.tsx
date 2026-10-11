@@ -70,6 +70,12 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
   }, 200_000);
 
   function bind(client = manager.client) {
+    // One tracker per test. A second trackLocalFunctions on the same client
+    // would spy on the first spy and recurse until the stack overflows.
+    if (background) {
+      if (binding.client === client) return;
+      throw new Error('This test already tracks another client; bind one client per test');
+    }
     binding.client = client;
     background = trackLocalFunctions(client);
   }
@@ -124,9 +130,14 @@ describe.skipIf(!process.env.STAFFING_DISPOSABLE_MANIFEST && !process.env.STAFFI
     const item = await job();
     await h.armFault(item.id, tech.id, manager.id, '2027-10-22');
     bind();
-    const outcome = await sparse(item.id).then(result => result, (error: unknown) => error);
-    // The database rejects the command as a whole, whether the client surfaces it as a result or an error.
-    expect(outcome instanceof AssignmentCommandError || (outcome as { ok?: boolean }).ok === false).toBe(true);
+    const failure = await sparse(item.id).then(
+      (result) => { throw new Error(`The faulted command should fail, but it returned ${JSON.stringify(result)}`); },
+      (error: unknown) => error,
+    );
+    if (!(failure instanceof AssignmentCommandError)) throw failure;
+    // It is the armed date fault that rolled the command back, not a stale
+    // token or a clash, which would also leave no rows behind.
+    expect(failure.cause).toMatchObject({ code: 'P0001', message: 'LOCAL_MATRIX_OWNED_DATE_FAILURE' });
     await background!.drain();
     expect(await dates(item.id)).toEqual([]);
     expect(await members(item.id)).toEqual([]);
