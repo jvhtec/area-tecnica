@@ -46,11 +46,11 @@ function setup(mobile: boolean) {
   let current!: MatrixV2ViewConfig;
   function Harness() {
     const { v2Config } = useMatrixV2Config({
-      enabled: true, ready: true, jobs: [job], technicians, dates: [date], baseOrderedTechnicians: technicians,
+      ready: true, jobs: [job], technicians, dates: [date], baseOrderedTechnicians: technicians,
       allAssignments: [], getAssignmentForCell, getAvailabilityForCell: () => undefined,
       isManagementUser: true, roleSlotsByJob, declinedJobsByTech: new Map(), focusJobId: null, focusStatus: 'invited',
     });
-    current = v2Config!;
+    current = v2Config;
     const env: InspectorEnvironment = {
       runner: current.runner, getTechnician: (id) => technicians.find((technician) => technician.id === id),
       getJob: () => job, getJobsForDate: () => [job], getAssignmentForCell, getAvailabilityForCell: () => undefined,

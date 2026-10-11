@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OptimizedAssignmentMatrixView } from '../OptimizedAssignmentMatrixView';
 import type { OptimizedAssignmentMatrixViewProps } from '../OptimizedAssignmentMatrixView';
+import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 
 // The view owns its scroll state; tests drive it through this stand-in.
 const scrollState = vi.hoisted(() => ({
@@ -31,48 +32,22 @@ vi.mock('../../TechnicianRow', () => ({
 }));
 
 vi.mock('../../DateHeader', () => ({
-  DateHeader: ({ date }: any) => (
-    <div data-testid="date-header">{date.toISOString()}</div>
-  ),
-}));
-
-vi.mock('../../OptimizedMatrixCell', () => ({
-  OptimizedMatrixCell: ({ technician, date, allowMarkUnavailable }: any) => (
-    <div
-      data-testid={`cell-${technician.id}-${date.toISOString()}`}
-      data-allow-mark-unavailable={String(allowMarkUnavailable)}
-    >
-      Cell
+  DateHeader: ({ date, onJobClick }: any) => (
+    <div data-testid="date-header">
+      {date.toISOString()}
+      <button type="button" onClick={() => onJobClick?.('job-1')}>fila de trabajo</button>
     </div>
   ),
 }));
 
-vi.mock('../../SelectJobDialog', () => ({
-  SelectJobDialog: () => <div data-testid="select-job-dialog">Select Job Dialog</div>,
-}));
-
-vi.mock('../../StaffingJobSelectionDialog', () => ({
-  StaffingJobSelectionDialog: () => (
-    <div data-testid="staffing-job-selection-dialog">Staffing Job Selection Dialog</div>
+vi.mock('../../OptimizedMatrixCell', () => ({
+  OptimizedMatrixCell: ({ technician, date, onInspect, onConfirm, onDecline }: any) => (
+    <div data-testid={`cell-${technician.id}-${date.toISOString()}`}>
+      <button type="button" onClick={(event) => onInspect(technician.id, date, event.currentTarget)}>inspeccionar</button>
+      <button type="button" onClick={() => onConfirm(technician.id, date)}>confirmar</button>
+      <button type="button" onClick={() => onDecline(technician.id, date)}>rechazar</button>
+    </div>
   ),
-}));
-
-vi.mock('../../AssignJobDialog', () => ({
-  AssignJobDialog: () => <div data-testid="assign-job-dialog">Assign Job Dialog</div>,
-}));
-
-vi.mock('../../AssignmentStatusDialog', () => ({
-  AssignmentStatusDialog: () => <div data-testid="assignment-status-dialog">Assignment Status Dialog</div>,
-}));
-
-vi.mock('../../MarkUnavailableDialog', () => ({
-  MarkUnavailableDialog: () => (
-    <div data-testid="mark-unavailable-dialog">Mark Unavailable Dialog</div>
-  ),
-}));
-
-vi.mock('../../OfferDetailsDialog', () => ({
-  OfferDetailsDialog: () => <div data-testid="offer-details-dialog">Offer Details Dialog</div>,
 }));
 
 vi.mock('@/components/users/CreateUserDialog', () => ({
@@ -94,6 +69,22 @@ const mockJobs = [
   { id: 'job-1', title: 'Concert A', start_time: '2024-05-01T10:00:00Z', end_time: '2024-05-01T22:00:00Z' },
 ];
 
+const createV2 = (overrides: Partial<MatrixV2ViewConfig> = {}): MatrixV2ViewConfig => ({
+  runner: { run: vi.fn(), releaseAll: vi.fn(), loadState: vi.fn() },
+  roleSlotsByJob: new Map(),
+  lastRoleByTechnician: new Map(),
+  inspectorTarget: null,
+  toggleInspector: vi.fn(),
+  openInspector: vi.fn(),
+  closeInspector: vi.fn(),
+  quickConfirm: vi.fn(),
+  toggleUnavailable: vi.fn(),
+  focus: null,
+  setFocusJob: vi.fn(),
+  toggleFocusJob: vi.fn(),
+  ...overrides,
+});
+
 const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>): OptimizedAssignmentMatrixViewProps => ({
   isFetching: false,
   isInitialLoading: false,
@@ -107,8 +98,6 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   technicians: mockTechnicians,
   orderedTechnicians: mockTechnicians,
   fridgeSet: new Set(),
-  allowDirectAssign: false,
-  allowMarkUnavailable: false,
   mobile: false,
   cycleTechSort: vi.fn(),
   getSortLabel: () => '',
@@ -116,54 +105,24 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   setCreateUserOpen: vi.fn(),
   createUserOpen: false,
   qc: { invalidateQueries: vi.fn() },
-  setSortJobId: vi.fn(),
   getJobsForDate: () => mockJobs,
   getAssignmentForCell: () => null,
   getAvailabilityForCell: () => null,
   selectedCells: new Set(),
   staffingMaps: { byJob: new Map(), byDate: new Map() },
   handleCellSelect: vi.fn(),
-  handleCellClick: vi.fn(),
   handleCellPrefetch: vi.fn(),
-  handleOptimisticUpdate: vi.fn(),
   incrementCellRender: vi.fn(),
   declinedJobsByTech: new Map(),
-  cellAction: null,
-  currentTechnician: null,
-  closeDialogs: vi.fn(),
-  handleJobSelected: vi.fn(),
-  handleStaffingActionSelected: vi.fn(),
-  forcedStaffingAction: undefined,
-  forcedStaffingChannel: undefined,
   jobs: mockJobs,
-  offerChannel: 'email',
-  toast: vi.fn(),
-  sendStaffingEmail: vi.fn(),
-  isSendingStaffingEmail: false,
-  cancelStaffing: vi.fn(),
   sendStaffingEmailAsync: vi.fn(),
   cancelStaffingAsync: vi.fn(),
-  isCancellingStaffing: false,
-  checkTimeConflictEnhanced: vi.fn(),
-  availabilityDialog: null,
-  setAvailabilityDialog: vi.fn(),
-  availabilityCoverage: 'single',
-  setAvailabilityCoverage: vi.fn(),
-  availabilitySingleDate: null,
-  setAvailabilitySingleDate: vi.fn(),
-  availabilityMultiDates: [],
-  setAvailabilityMultiDates: vi.fn(),
-  availabilitySending: false,
-  setAvailabilitySending: vi.fn(),
-  handleEmailError: vi.fn(),
-  conflictDialog: null,
-  setConflictDialog: vi.fn(),
-  isGlobalCellSelected: () => false,
   techMedalRankings: new Map(),
   techLastYearMedalRankings: new Map(),
   clearCellSelection: vi.fn(),
   onReplaceSelection: vi.fn(),
   profileNamesMap: new Map(),
+  v2: createV2(),
   ...overrides,
 });
 
@@ -212,12 +171,31 @@ describe('OptimizedAssignmentMatrixView', () => {
     expect(cells.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('forwards allowMarkUnavailable to OptimizedMatrixCell', () => {
-    const props = createMockProps({ allowMarkUnavailable: true });
-    render(<OptimizedAssignmentMatrixView {...props} />);
+  it('a click on a cell opens (or toggles) its inspector', async () => {
+    const toggleInspector = vi.fn();
+    const user = userEvent.setup();
+    render(<OptimizedAssignmentMatrixView {...createMockProps({ v2: createV2({ toggleInspector }) })} />);
+    await user.click(screen.getAllByText('inspeccionar')[0]);
+    expect(toggleInspector).toHaveBeenCalledWith('tech-1', mockDates[0], expect.any(HTMLElement));
+  });
 
-    const cells = screen.getAllByTestId(/cell-tech-/);
-    expect(cells[0]).toHaveAttribute('data-allow-mark-unavailable', 'true');
+  it('the ✓ of a cell confirms at once, and the ✕ asks first, in the inspector', async () => {
+    const quickConfirm = vi.fn();
+    const openInspector = vi.fn();
+    const user = userEvent.setup();
+    render(<OptimizedAssignmentMatrixView {...createMockProps({ v2: createV2({ quickConfirm, openInspector }) })} />);
+    await user.click(screen.getAllByText('confirmar')[0]);
+    expect(quickConfirm).toHaveBeenCalledWith('tech-1', mockDates[0]);
+    await user.click(screen.getAllByText('rechazar')[0]);
+    expect(openInspector).toHaveBeenCalledWith('tech-1', mockDates[0], null, 'decline');
+  });
+
+  it('a job row in a date header focuses that job', async () => {
+    const toggleFocusJob = vi.fn();
+    const user = userEvent.setup();
+    render(<OptimizedAssignmentMatrixView {...createMockProps({ v2: createV2({ toggleFocusJob }) })} />);
+    await user.click(screen.getAllByText('fila de trabajo')[0]);
+    expect(toggleFocusJob).toHaveBeenCalledWith('job-1');
   });
 
   it('shows Add User button for management users', () => {
@@ -283,147 +261,11 @@ describe('OptimizedAssignmentMatrixView', () => {
     expect(cycleTechSort).toHaveBeenCalled();
   });
 
-  it('shows SelectJobDialog when cellAction type is select-job', () => {
-    const currentTechnician = mockTechnicians[0];
-    const props = createMockProps({
-      cellAction: { type: 'select-job', technicianId: 'tech-1', date: mockDates[0] },
-      currentTechnician,
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('select-job-dialog')).toBeInTheDocument();
-  });
-
-  it('shows AssignJobDialog when cellAction type is assign', () => {
-    const props = createMockProps({
-      cellAction: { type: 'assign', technicianId: 'tech-1', date: mockDates[0] },
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('assign-job-dialog')).toBeInTheDocument();
-  });
-
-  it('shows MarkUnavailableDialog when cellAction type is unavailable', () => {
-    const props = createMockProps({
-      cellAction: { type: 'unavailable', technicianId: 'tech-1', date: mockDates[0] },
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('mark-unavailable-dialog')).toBeInTheDocument();
-  });
-
-  it('shows StaffingJobSelectionDialog when cellAction type is select-job-for-staffing', () => {
-    const currentTechnician = mockTechnicians[0];
-    const props = createMockProps({
-      cellAction: { type: 'select-job-for-staffing', technicianId: 'tech-1', date: mockDates[0] },
-      currentTechnician,
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('staffing-job-selection-dialog')).toBeInTheDocument();
-  });
-
-  it('shows OfferDetailsDialog when cellAction type is offer-details', () => {
-    const currentTechnician = mockTechnicians[0];
-    const props = createMockProps({
-      cellAction: {
-        type: 'offer-details',
-        technicianId: 'tech-1',
-        date: mockDates[0],
-        selectedJobId: 'job-1',
-      },
-      currentTechnician,
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('offer-details-dialog')).toBeInTheDocument();
-  });
-
-  it('shows AssignmentStatusDialog for confirm action', () => {
-    const props = createMockProps({
-      cellAction: {
-        type: 'confirm',
-        technicianId: 'tech-1',
-        date: mockDates[0],
-        assignment: { job_id: 'job-1' },
-      },
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('assignment-status-dialog')).toBeInTheDocument();
-  });
-
-  it('shows AssignmentStatusDialog for decline action', () => {
-    const props = createMockProps({
-      cellAction: {
-        type: 'decline',
-        technicianId: 'tech-1',
-        date: mockDates[0],
-        assignment: { job_id: 'job-1' },
-      },
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByTestId('assignment-status-dialog')).toBeInTheDocument();
-  });
-
   it('shows CreateUserDialog when createUserOpen is true', () => {
     const props = createMockProps({ createUserOpen: true, isManagementUser: true });
     render(<OptimizedAssignmentMatrixView {...props} />);
 
     expect(screen.getByTestId('create-user-dialog')).toBeInTheDocument();
-  });
-
-  it('opens availability dialog when availabilityDialog is set', () => {
-    const props = createMockProps({
-      availabilityDialog: {
-        open: true,
-        jobId: 'job-1',
-        profileId: 'tech-1',
-        dateIso: '2024-05-01',
-        singleDay: true,
-        channel: 'email',
-      },
-      currentTechnician: mockTechnicians[0],
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    // Retitled with the flow's rebuild: the sheet leads with the action and puts
-    // the technician, job and channel in its description line.
-    expect(screen.getByText(/Pedir disponibilidad/i)).toBeInTheDocument();
-  });
-
-  it('opens conflict dialog when conflictDialog is set', () => {
-    const props = createMockProps({
-      conflictDialog: {
-        open: true,
-        details: {
-          conflicts: [
-            {
-              job_name: 'Overlapping Event',
-              job_type: 'festival',
-              start_time: '2024-05-01T10:00:00Z',
-              end_time: '2024-05-01T20:00:00Z',
-            },
-          ],
-          unavailability: [],
-        },
-        originalPayload: {},
-      },
-    });
-
-    render(<OptimizedAssignmentMatrixView {...props} />);
-
-    expect(screen.getByText(/Conflicto de agenda detectado/i)).toBeInTheDocument();
-    expect(screen.getByText('Overlapping Event')).toBeInTheDocument();
   });
 
   it('uses mobile-optimized dimensions when mobile prop is true', () => {

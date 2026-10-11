@@ -17,7 +17,7 @@ const outcome = { ok: true as const, noop: false, result: makeResult(), undo: nu
 
 function setup() {
   const options = {
-    enabled: true, ready: true, jobs: [makeJob(JOB_A)], technicians, dates: [date], baseOrderedTechnicians: technicians,
+    ready: true, jobs: [makeJob(JOB_A)], technicians, dates: [date], baseOrderedTechnicians: technicians,
     allAssignments: [], getAssignmentForCell: () => undefined, getAvailabilityForCell: () => undefined,
     isManagementUser: true, declinedJobsByTech: new Map<string, Set<string>>(), focusJobId: JOB_A, focusStatus: 'invited' as const,
   };

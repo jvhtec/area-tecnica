@@ -10,7 +10,7 @@ export type FocusStatus = 'invited' | 'confirmed';
  * The status starts at Invitado every session: confirming straight away is a
  * deliberate switch, never a remembered default.
  */
-export function useJobFocusSelection(enabled: boolean) {
+export function useJobFocusSelection() {
   const [jobId, setJobId] = useState<string | null>(() =>
     (typeof window === 'undefined' ? null : focusJobIdFromSearch(window.location.search)));
   const [status, setStatus] = useState<FocusStatus>('invited');
@@ -24,7 +24,7 @@ export function useJobFocusSelection(enabled: boolean) {
   // Esc leaves focus, unless it is closing something else: a popover, the
   // inspector or a dialog. Registered in the capture phase, ahead of Radix's own
   // handler, so the layer that Esc closes is still in the document to be seen.
-  const focused = enabled && jobId !== null;
+  const focused = jobId !== null;
   useEffect(() => {
     if (!focused) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -52,5 +52,5 @@ export function useJobFocusSelection(enabled: boolean) {
     }
   }, []);
 
-  return { focusJobId: enabled ? jobId : null, focusStatus: status, setFocusStatus: setStatus, focusJob };
+  return { focusJobId: jobId, focusStatus: status, setFocusStatus: setStatus, focusJob };
 }

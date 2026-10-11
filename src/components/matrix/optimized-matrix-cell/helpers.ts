@@ -1,9 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 
-import type { AssignmentLifecycleResult, MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
-
-export const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
 
 export const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
 
@@ -40,7 +38,3 @@ export const offerStatusLabel = (status?: string | null) => {
   if (normalizedStatus === 'declined') return 'Rechazada';
   return null;
 };
-
-export const readAssignmentLifecycleResult = (value: unknown): AssignmentLifecycleResult => (
-  value && typeof value === 'object' ? value as AssignmentLifecycleResult : {}
-);

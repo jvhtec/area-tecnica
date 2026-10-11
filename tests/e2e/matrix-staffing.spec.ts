@@ -29,8 +29,6 @@ interface Options {
   requested?: string;
   /** Names of the technicians to have in the grid. */
   technicians?: typeof TECHS;
-  /** The query string to open the matrix with; `?matriz=v2` stores the choice, an empty one leaves the default. */
-  query?: string;
   /** localStorage entries to have in place on load (the harness clears storage on every navigation). */
   storage?: Record<string, string>;
 }
@@ -75,7 +73,7 @@ async function openMatrix(page: Page, options: Options = {}) {
   await page.addInitScript((entries) => {
     for (const [key, value] of Object.entries(entries)) window.localStorage.setItem(key, value);
   }, options.storage ?? {});
-  await page.goto(`/job-assignment-matrix${options.query ?? "?matriz=v2"}`);
+  await page.goto(`/job-assignment-matrix`);
   return { calls };
 }
 
@@ -227,18 +225,4 @@ test("offers to a selection take the job's open slots in turn", async ({ page })
   await expect.poll(() => sends(calls).length).toBe(3);
   expect(sends(calls).map((body) => body.role)).toEqual(["SND-MON-E", "SND-PA-T", "SND-PA-T"]);
   for (const body of sends(calls)) expect(body).toMatchObject({ phase: "offer", channel: "whatsapp", message: "Carga a las 8 en la puerta B" });
-});
-
-test("the new matrix is what a manager gets without asking, and a stored choice brings the old one back", async ({ page }) => {
-  test.skip(isMobileViewport(page), "These controls are in the desktop toolbar; on a phone they sit behind Filtros.");
-  await openMatrix(page, { query: "" });
-  await expect(page.getByRole("button", { name: "Enfocar trabajo" }).first()).toBeVisible();
-  await expect(page.getByLabel(/Alternar asignación directa/)).toHaveCount(0);
-});
-
-test("a manager who chose the old matrix in Ajustes keeps getting it", async ({ page }) => {
-  test.skip(isMobileViewport(page), "These controls are in the desktop toolbar; on a phone they sit behind Filtros.");
-  await openMatrix(page, { query: "", storage: { "matrix-v2": "v1" } });
-  await expect(page.getByLabel(/Alternar asignación directa/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Enfocar trabajo" })).toHaveCount(0);
 });

@@ -1,10 +1,10 @@
-import type { SendStaffingEmailMutate } from '@/components/matrix/optimized-matrix-cell/types';
+import type { SendStaffingEmailAsync } from '@/components/matrix/optimized-matrix-cell/types';
 
 export type StaffingPhase = 'availability' | 'offer';
 export type StaffingChannel = 'email' | 'whatsapp';
 
 /** What `send-staffing-email` takes; unchanged by the composer. */
-export type StaffingSendPayload = Parameters<SendStaffingEmailMutate>[0];
+export type StaffingSendPayload = Parameters<SendStaffingEmailAsync>[0];
 
 export interface StaffingRequestInput {
   jobId: string;
