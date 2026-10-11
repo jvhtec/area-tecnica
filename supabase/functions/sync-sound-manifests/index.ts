@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
 import { requireServiceRoleRequest } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
@@ -14,19 +14,23 @@ const HOUR = 3_600_000;
 const BATCH_SIZE = 200;
 
 type Row = Record<string, unknown>;
+/** Reject arrays and primitive Flex responses before reading named header fields. */
 const asRecord = (value: unknown): Row | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Row : null;
 
+/** Authenticate server-side Flex requests using the established desktop API headers. */
 function flexHeaders(token: string): HeadersInit {
   return { "X-Auth-Token": token, apikey: token, "X-Requested-With": "XMLHttpRequest", "X-API-Client": "flex5-desktop" };
 }
 
+/** Fetch Flex JSON with shared retry bounds; unsuccessful responses never qualify a manifest. */
 async function flexJson(path: string, token: string): Promise<unknown> {
   const response = await fetchWithRetry(FLEX_BASE + path, { headers: flexHeaders(token) });
   if (!response.ok) throw new Error(`Flex ${path}: HTTP ${response.status}`);
   return response.json();
 }
 
+/** Download and validate the manifest PDF before any publication mutation. */
 async function fetchPdf(manifestId: string, token: string): Promise<Uint8Array> {
   const response = await fetchWithRetry(manifestReportUrl(manifestId), { headers: flexHeaders(token) });
   if (!response.ok) throw new Error(`Flex PDF HTTP ${response.status}`);
@@ -35,9 +39,24 @@ async function fetchPdf(manifestId: string, token: string): Promise<Uint8Array> 
   return decodeFlexPdf(raw);
 }
 
+/** Fingerprint validated PDF bytes to identify immutable versions and unchanged runs. */
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Retire only orphaned objects after metadata deletion, preserving shared job paths. */
+async function removeUnreferencedPdfs(db: SupabaseClient, candidates: string[]): Promise<void> {
+  const paths = [...new Set(candidates)];
+  if (!paths.length) return;
+  const { data: remaining, error: remainingError } = await db.from("job_documents")
+    .select("file_path").in("file_path", paths);
+  if (remainingError) throw remainingError;
+  const referenced = new Set((remaining ?? []).map((doc) => doc.file_path));
+  const removable = paths.filter((path) => !referenced.has(path));
+  if (!removable.length) return;
+  const { error: storageError } = await db.storage.from(BUCKET).remove(removable);
+  if (storageError) throw storageError;
 }
 
 serve(createHttpHandler(async (request) => {
@@ -101,8 +120,7 @@ serve(createHttpHandler(async (request) => {
           if (redundant.length) {
             const { error: staleError } = await db.from("job_documents").delete().in("id", redundant.map((doc) => doc.id));
             if (staleError) throw staleError;
-            const { error: storageError } = await db.storage.from(BUCKET).remove(redundant.map((doc) => doc.file_path));
-            if (storageError) throw storageError;
+            await removeUnreferencedPdfs(db, redundant.map((doc) => doc.file_path));
           }
           results.unchanged++; continue;
         }
@@ -126,9 +144,7 @@ serve(createHttpHandler(async (request) => {
           const { error: deletionError } = await db.from("job_documents").delete()
             .in("id", previous.map((doc) => doc.id));
           if (deletionError) throw deletionError;
-          const { error: storageError } = await db.storage.from(BUCKET)
-            .remove(previous.map((doc) => doc.file_path));
-          if (storageError) throw storageError;
+          await removeUnreferencedPdfs(db, previous.map((doc) => doc.file_path));
         }
         results.published++;
         } finally {

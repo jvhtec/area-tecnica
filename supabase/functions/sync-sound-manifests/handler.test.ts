@@ -16,27 +16,40 @@ const prefix = `flex-reports/sound-manifests/${job.id}/${sheet}`;
 type Result = { data?: unknown; error?: { message: string } | null };
 const request = (authorization = "Bearer fixture-service") => new Request("https://example.test", { method: "POST", headers: { authorization } });
 
-function database(previous: { id: string; file_path: string }[] = [], options: { insertError?: boolean; deleteError?: boolean; releaseError?: boolean; claim?: boolean } = {}) {
+function database(previous: { id: string; file_path: string }[] = [], options: {
+  insertError?: boolean; deleteError?: boolean; releaseError?: boolean; claim?: boolean;
+  references?: { file_path: string }[]; referencesError?: boolean;
+} = {}) {
   const events: string[] = [];
   const queue: Result[] = [
     { data: [job] }, { data: [{ element_id: sheet }] }, { data: previous },
-    { data: options.insertError ? null : { id: "new-document" }, error: options.insertError ? { message: "insert failed" } : null },
-    { error: options.deleteError ? { message: "delete failed" } : null },
   ];
   const queries: { table: string; filters: unknown[][] }[] = [];
   const inserts: Record<string, unknown>[] = [];
+  const remove = vi.fn(async (_paths: string[]) => { events.push("remove"); return { error: null }; });
   const db = {
     from: vi.fn((table: string) => {
-      const result = queue.shift();
+      let result = queue.shift();
       const filters: unknown[][] = [];
       queries.push({ table, filters });
       const query = {
-        select: vi.fn(() => query), gte: vi.fn(() => query), lte: vi.fn(() => query),
+        select: vi.fn((columns: string) => {
+          if (columns === "file_path") {
+            events.push("references");
+            result = { data: options.references ?? [], error: options.referencesError ? { message: "reference lookup failed" } : null };
+          }
+          return query;
+        }), gte: vi.fn(() => query), lte: vi.fn(() => query),
         order: vi.fn(() => query), limit: vi.fn(() => query),
         eq: vi.fn((...args: unknown[]) => { filters.push(["eq", ...args]); return query; }),
         like: vi.fn((...args: unknown[]) => { filters.push(["like", ...args]); return query; }),
-        insert: vi.fn((row: Record<string, unknown>) => { events.push("insert"); inserts.push(row); return query; }),
-        delete: vi.fn(() => { events.push("delete"); return query; }), in: vi.fn(() => query),
+        insert: vi.fn((row: Record<string, unknown>) => {
+          events.push("insert"); inserts.push(row);
+          result = { data: options.insertError ? null : { id: "new-document" }, error: options.insertError ? { message: "insert failed" } : null };
+          return query;
+        }),
+        delete: vi.fn(() => { events.push("delete"); result = { error: options.deleteError ? { message: "delete failed" } : null }; return query; }),
+        in: vi.fn((...args: unknown[]) => { filters.push(["in", ...args]); return query; }),
         single: vi.fn(async () => result),
         then: (resolve: (result: Result | undefined) => unknown) => Promise.resolve(result).then(resolve),
       };
@@ -49,11 +62,11 @@ function database(previous: { id: string; file_path: string }[] = [], options: {
     }),
     storage: { from: vi.fn(() => ({
       upload: vi.fn(async () => { events.push("upload"); return { error: null }; }),
-      remove: vi.fn(async () => { events.push("remove"); return { error: null }; }),
+      remove,
     })) },
   };
   mocks.createClient.mockReturnValue(db);
-  return { db, events, inserts, queries, queue };
+  return { db, events, inserts, queries, queue, remove };
 }
 
 function flex(status = prepared, shippedStatus: string | null = null) {
@@ -93,7 +106,7 @@ describe("Sound manifest worker", () => {
     expect(mocks.fetch.mock.calls.find(([url]) => url.includes("generate-pdf"))?.[0]).toContain(`PROJECT_ELEMENT_ID=${ship}`);
     expect(fixture.queries[2].filters).toContainEqual(["like", "file_path", `${prefix}/%`]);
     expect(fixture.inserts[0]).toMatchObject({ job_id: job.id, visible_to_tech: true, read_only: true, uploaded_by: null });
-    expect(fixture.events).toEqual(["claim_sound_manifest_slot", "upload", "insert", "delete", "remove", "release_sound_manifest_slot"]);
+    expect(fixture.events).toEqual(["claim_sound_manifest_slot", "upload", "insert", "delete", "references", "remove", "release_sound_manifest_slot"]);
   });
 
   it("falls back to prepared when the shipping status is not eligible", async () => {
@@ -139,5 +152,32 @@ describe("Sound manifest worker", () => {
     mocks.fetch.mockImplementation(async (url: string) => url.includes("generate-pdf") ? new Response("<html>error</html>") : original(url));
     expect((await handler(request())).status).toBe(500);
     expect(fixture.events).toEqual(["claim_sound_manifest_slot", "release_sound_manifest_slot"]);
+  });
+
+  it("preserves shared predecessor PDFs and removes only unreferenced paths after replacement", async () => {
+    const shared = `${prefix}/shared.pdf`, orphan = `${prefix}/orphan.pdf`;
+    const fixture = database([{ id: "shared", file_path: shared }, { id: "orphan", file_path: orphan }], { references: [{ file_path: shared }] });
+    expect(await (await handler(request())).json()).toMatchObject({ published: 1, errors: [] });
+    expect(fixture.remove).toHaveBeenCalledExactlyOnceWith([orphan]);
+    expect(fixture.queries.at(-1)?.filters).toEqual([["in", "file_path", [shared, orphan]]]);
+    expect(fixture.events.indexOf("references")).toBeGreaterThan(fixture.events.indexOf("delete"));
+  });
+
+  it("preserves shared stale PDFs during unchanged-version cleanup", async () => {
+    const bytes = new TextEncoder().encode("%PDF-1.7\nfixture\n%%EOF");
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), byte => byte.toString(16).padStart(2, "0")).join("");
+    const shared = `${prefix}/shared.pdf`;
+    const fixture = database([{ id: "current", file_path: `${prefix}/${hash}.pdf` }, { id: "shared", file_path: shared }], { references: [{ file_path: shared }] });
+    expect(await (await handler(request())).json()).toMatchObject({ unchanged: 1, errors: [] });
+    expect(fixture.remove).not.toHaveBeenCalled();
+    expect(fixture.queries.at(-1)?.filters).toEqual([["in", "file_path", [shared]]]);
+    expect(fixture.events).toEqual(["claim_sound_manifest_slot", "delete", "references", "release_sound_manifest_slot"]);
+  });
+
+  it("fails closed on a reference lookup error without deleting Storage objects", async () => {
+    const fixture = database([{ id: "previous", file_path: `${prefix}/old.pdf` }], { referencesError: true });
+    expect((await handler(request())).status).toBe(500);
+    expect(fixture.remove).not.toHaveBeenCalled();
+    expect(fixture.events.at(-1)).toBe("release_sound_manifest_slot");
   });
 });

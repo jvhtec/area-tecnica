@@ -6,6 +6,7 @@ export const PUBLISHABLE_MANIFEST_STATUS_IDS = new Set([
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Allow only authoritative Preparado/Enviado status UUIDs, never display labels. */
 export function isPublishableStatus(statusId: unknown): boolean {
   return typeof statusId === "string" && PUBLISHABLE_MANIFEST_STATUS_IDS.has(statusId.toLowerCase());
 }
@@ -26,6 +27,7 @@ export function manifestStatusId(value: unknown): string | null {
   return null;
 }
 
+/** Build the operation-confirmed report request for a validated manifest UUID. */
 export function manifestReportUrl(manifestId: string): string {
   if (!UUID.test(manifestId)) throw new Error("Invalid Flex manifest ID");
   const url = new URL("https://sectorpro.flexrentalsolutions.com/f5/api/report/generate/generate-pdf");
@@ -46,6 +48,7 @@ export function manifestReportUrl(manifestId: string): string {
 
 /** Flex may return base64 text with application/pdf content type. */
 export function decodeFlexPdf(raw: Uint8Array): Uint8Array {
+  /** Recognize the binary PDF header before accepting direct or decoded report bytes. */
   const magic = (bytes: Uint8Array) => bytes.length > 4 && bytes[0] === 37 &&
     bytes[1] === 80 && bytes[2] === 68 && bytes[3] === 70 && bytes[4] === 45;
   if (magic(raw)) return raw;
@@ -68,12 +71,14 @@ export function headerText(value: unknown): string | null {
   return null;
 }
 
+/** Describe a manifest using Madrid's calendar date and safe, bounded header text. */
 export function soundManifestFileName(args: {
   jobTitle: string;
   startTime: string;
   manifestId: string;
   documentNumber?: string | null;
 }): string {
+  /** Strip filename separators and control characters without mangling ordinary text. */
   const clean = (text: string, max: number) =>
     text.normalize("NFC").replace(/[\\/<>:"|?*]/g, " ")
       .replace(/[^\P{Cc}]/gu, " ")

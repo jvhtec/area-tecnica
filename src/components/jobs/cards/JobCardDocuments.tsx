@@ -32,6 +32,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     return null;
   }
 
+  /** Toggle editable document visibility while preserving published and quote restrictions. */
   const handleToggleVisibility = async (doc: JobDocument) => {
     if (doc.read_only || doc.document_kind === 'hoja_de_ruta' || doc.file_path.startsWith('flex-reports/presupuestos/')) {
       return;
