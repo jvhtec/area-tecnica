@@ -38,6 +38,8 @@ interface Options {
   declinedJobsByTech: Map<string, Set<string>>;
   fridgeSet?: Set<string>;
   roleSlotsByJob: Map<string, RoleSlot[]>;
+  /** Pair membership when the staffing query catches up before the grid query. */
+  hasStaffingAssignment?: (jobId: string, technicianId: string, role: string) => boolean;
   lastRoleByTechnician: Map<string, string>;
   openInspector: (technicianId: string, date: Date, anchor: HTMLElement | null) => void;
 }
@@ -45,15 +47,56 @@ interface Options {
 const roleHeld = (assignment: MatrixTimesheetAssignment | undefined): string | null =>
   assignment?.sound_role || assignment?.lights_role || assignment?.video_role || null;
 
+interface FocusReservation {
+  jobId: string;
+  technicianId: string;
+  role: string;
+  consumesSlot: boolean;
+  pending: boolean;
+}
+
+const reservationKey = (jobId: string, technicianId: string) => JSON.stringify([jobId, technicianId]);
+const reservationVisible = (reservation: Pick<FocusReservation, 'jobId' | 'technicianId' | 'role'>, options: Options) =>
+  options.hasStaffingAssignment?.(reservation.jobId, reservation.technicianId, reservation.role) === true
+  || options.dates.some((date) => {
+    const row = options.getAssignmentForCell(reservation.technicianId, date);
+    return row?.job_id === reservation.jobId && row.status !== 'declined'
+      && [row.sound_role, row.lights_role, row.video_role].includes(reservation.role);
+  });
+
+function releaseVisibleReservations(reservations: Map<string, FocusReservation>, options: Options) {
+  for (const [key, reservation] of reservations) {
+    if (!reservation.pending && reservationVisible(reservation, options)) reservations.delete(key);
+  }
+}
+
+/** Count membership once, even when prediction and summary arrive separately. */
+function effectiveFocusSlots(jobId: string, reservations: Map<string, FocusReservation>, options: Options): RoleSlot[] | undefined {
+  return options.roleSlotsByJob.get(jobId)?.map((slot) => {
+    const visibleMembers = options.technicians.filter((technician) =>
+      reservationVisible({ jobId, technicianId: technician.id, role: slot.code }, options)).length;
+    const hiddenReservations = [...reservations.values()].filter((reservation) =>
+      reservation.jobId === jobId && reservation.role === slot.code && reservation.consumesSlot
+      && !reservationVisible(reservation, options)).length;
+    const occupied = Math.max(slot.filled, visibleMembers);
+    return { ...slot, open: Math.max(Math.min(slot.open, slot.required - occupied) - hiddenReservations, 0) };
+  });
+}
+
 /**
  * Job focus: the grid is judged against one job. Fit is recomputed as the grid's
  * data changes, but the order of the rows is fixed when the job is entered, so a
  * row never moves under the cursor while a crew is being built.
  */
 export function useMatrixJobFocus(options: Options) {
+  // This ref survives job changes and is written before the first async call.
+  const reservations = React.useRef(new Map<string, FocusReservation>());
+  const optionsRef = React.useRef(options);
+  optionsRef.current = options;
+  React.useEffect(() => { releaseVisibleReservations(reservations.current, options); });
   const {
     focusJobId, status, ready, jobs, technicians, dates, runner, getAssignmentForCell, getAvailabilityForCell,
-    declinedJobsByTech, fridgeSet, roleSlotsByJob, lastRoleByTechnician, openInspector,
+    declinedJobsByTech, fridgeSet, lastRoleByTechnician, openInspector,
   } = options;
 
   const job = React.useMemo(() => (focusJobId ? jobs.find((candidate) => candidate.id === focusJobId) ?? null : null), [jobs, focusJobId]);
@@ -102,29 +145,46 @@ export function useMatrixJobFocus(options: Options) {
   const jobTitle = job?.title ?? '';
   const assignDays = React.useCallback((technicianId: string, days: string[], anchor: HTMLElement | null, anchorDate: Date | null) => {
     if (!job) return;
+    releaseVisibleReservations(reservations.current, optionsRef.current);
+    const key = reservationKey(job.id, technicianId);
+    if (reservations.current.has(key)) return;
     const technician = techniciansById.get(technicianId);
     if (!technician) return;
     // Someone already on the job keeps the role they hold there.
     const existingDate = visibleJobDayKeys.map((key) => datesByKey.get(key)).find((date) => date && getAssignmentForCell(technicianId, date)?.job_id === job.id);
+    const existingRole = roleHeld(existingDate ? getAssignmentForCell(technicianId, existingDate) : undefined);
     const plan = planFocusAssign({
       technician,
       jobId: job.id,
       days,
       jobDays: allJobDays,
       status,
-      slots: roleSlotsByJob.get(job.id),
+      slots: effectiveFocusSlots(job.id, reservations.current, optionsRef.current),
       lastRoleCode: lastRoleByTechnician.get(technicianId) ?? null,
-      existingRole: roleHeld(existingDate ? getAssignmentForCell(technicianId, existingDate) : undefined),
+      existingRole,
     });
     const target = anchorDate ?? datesByKey.get(days[0] ?? visibleJobDayKeys[0] ?? '') ?? null;
     const inspect = () => { if (target) openInspector(technicianId, target, anchor); };
     if (plan.kind === 'inspect') {
-      if (plan.reason === 'role') toast.info('Elige el rol de esta persona: puede encajar en varios niveles.');
+      if (plan.reason === 'role') toast.info('Elige el rol de esta persona antes de asignarla.');
       inspect();
       return;
     }
-    void runFocusAssign(runner, plan, { name: nameOf(technician), jobTitle, openInspector: inspect });
-  }, [job, techniciansById, datesByKey, getAssignmentForCell, visibleJobDayKeys, allJobDays, status, roleSlotsByJob, lastRoleByTechnician, openInspector, runner, jobTitle]);
+    const reservation: FocusReservation = {
+      jobId: job.id, technicianId, role: plan.intent.role, consumesSlot: !existingRole, pending: true,
+    };
+    reservations.current.set(key, reservation);
+    void runFocusAssign(runner, plan, { name: nameOf(technician), jobTitle, openInspector: inspect }).then((ok) => {
+      if (!ok) reservations.current.delete(key);
+      else {
+        reservation.pending = false;
+        releaseVisibleReservations(reservations.current, optionsRef.current);
+      }
+    }).catch(() => {
+      reservations.current.delete(key);
+      toast.error('No se pudo asignar a esta persona. Vuelve a intentarlo.');
+    });
+  }, [job, techniciansById, datesByKey, getAssignmentForCell, visibleJobDayKeys, allJobDays, status, lastRoleByTechnician, openInspector, runner, jobTitle]);
 
   const onCellClick = React.useCallback((technicianId: string, date: Date, anchor: HTMLElement | null) => {
     if (!job) return false;

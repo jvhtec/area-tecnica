@@ -65,4 +65,15 @@ export interface InspectorTarget {
   anchor: HTMLElement | null;
   /** Opens with a destructive step already asked (the cell's ✕, the Supr key). */
   intent?: 'decline' | 'remove';
+  /** The exact staffing request retained while the manager chooses its role. */
+  staffingDraft?: StaffingDraft;
+}
+
+export interface StaffingDraft {
+  jobId: string;
+  phase: StaffingPhase;
+  days: string[];
+  channel: StaffingChannel;
+  department: string | null;
+  message: string;
 }

@@ -132,9 +132,9 @@ describe('query cache integration', () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(key, [makeMatrixRow({ date: '2026-10-13' })]);
     queryClient.setQueryData([STAFFING_SUMMARY_SCOPE, 'a,b'], { summaries: [], assignments: [] });
-    const snapshot = snapshotMatrixCaches(queryClient);
+    const snapshot = snapshotMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_1 });
 
-    patchMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_1 }, view({ dates: ['2026-10-14', '2026-10-15'] }), getJob);
+    patchMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_1 }, view({ dates: ['2026-10-14', '2026-10-15'] }), getJob, snapshot);
     const patched = queryClient.getQueryData<ReturnType<typeof makeMatrixRow>[]>(key) ?? [];
     expect(patched.map((r) => r.date).sort()).toEqual(['2026-10-14', '2026-10-15']);
     expect(queryClient.getQueryData<{ assignments: unknown[] }>([STAFFING_SUMMARY_SCOPE, 'a,b'])?.assignments).toHaveLength(1);
@@ -149,6 +149,191 @@ describe('query cache integration', () => {
     queryClient.setQueryData([MATRIX_ASSIGNMENTS_SCOPE, 'weird'], { not: 'rows' });
     queryClient.setQueryData([STAFFING_SUMMARY_SCOPE, 'weird'], 'nope');
     expect(() => patchMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_1 }, view(), getJob)).not.toThrow();
+  });
+
+  it('rolls back A without erasing B or newer staffing requirements', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const otherIds = { jobId: JOB_A, technicianId: TECH_2 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    const original = makeMatrixRow({ assigned_at: 'original-time', assigned_by: 'manager', source: 'tour', is_schedule_only: true });
+    queryClient.setQueryData(key, [original, makeMatrixRow({ technician_id: TECH_2 })]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [original] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    patchMatrixCaches(queryClient, ids, view({ status: 'declined' }), getJob, snapshot);
+    patchMatrixCaches(queryClient, otherIds, view({ technicianId: TECH_2, status: 'confirmed', dates: ['2026-10-15'] }), getJob);
+    queryClient.setQueryData(summaryKey, (payload: { assignments: unknown[] }) => ({
+      ...payload, summaries: [{ job_id: JOB_A, required: 5 }], refreshed: true,
+    }));
+
+    restoreMatrixCaches(queryClient, snapshot);
+    const rows = queryClient.getQueryData<ReturnType<typeof makeMatrixRow>[]>(key)!;
+    expect(rows.filter((row) => row.technician_id === TECH_1)).toEqual([original]);
+    expect(rows.find((row) => row.technician_id === TECH_2)).toMatchObject({ status: 'confirmed', date: '2026-10-15' });
+    expect(queryClient.getQueryData(summaryKey)).toMatchObject({
+      summaries: [{ job_id: JOB_A, required: 5 }], refreshed: true,
+      assignments: expect.arrayContaining([expect.objectContaining({ technician_id: TECH_2, status: 'confirmed' })]),
+    });
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(summaryKey)?.isInvalidated).toBe(true);
+  });
+
+  it.each([false, true])('preserves a newer same-pair patch even when its values equal the prediction (%s)', (sameValues) => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [makeMatrixRow()] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    const prediction = view({ status: 'confirmed' });
+    patchMatrixCaches(queryClient, ids, prediction, getJob, snapshot);
+    patchMatrixCaches(queryClient, ids, sameValues ? prediction : view({ status: 'declined' }), getJob);
+    const latestMatrix = queryClient.getQueryData(key);
+    const latestSummary = queryClient.getQueryData(summaryKey);
+
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toBe(latestMatrix);
+    expect(queryClient.getQueryData(summaryKey)).toBe(latestSummary);
+  });
+
+  it('preserves same-pair updates made outside the patch helper', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [makeMatrixRow()] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    patchMatrixCaches(queryClient, ids, view({ status: 'confirmed' }), getJob, snapshot);
+    queryClient.setQueryData(key, [makeMatrixRow({ status: 'declined' })]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [makeMatrixRow({ status: 'declined' })] });
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toEqual([makeMatrixRow({ status: 'declined' })]);
+    expect(queryClient.getQueryData(summaryKey)).toMatchObject({ assignments: [expect.objectContaining({ status: 'declined' })] });
+  });
+
+  it('restores a removed pair while preserving another pair commit', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    const original = makeMatrixRow();
+    queryClient.setQueryData(key, [original]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [original] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    patchMatrixCaches(queryClient, ids, null, getJob, snapshot);
+    patchMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_2 }, view({ technicianId: TECH_2, status: 'confirmed' }), getJob);
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toEqual(expect.arrayContaining([original, expect.objectContaining({ technician_id: TECH_2, status: 'confirmed' })]));
+    expect(queryClient.getQueryData(summaryKey)).toMatchObject({ assignments: expect.arrayContaining([original, expect.objectContaining({ technician_id: TECH_2 })]) });
+  });
+
+  it.each(['helper', 'external'])('does not resurrect a newer absent pair written by %s', (writer) => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [makeMatrixRow()] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    patchMatrixCaches(queryClient, ids, null, getJob, snapshot);
+    if (writer === 'helper') patchMatrixCaches(queryClient, ids, null, getJob);
+    else {
+      queryClient.setQueryData(key, []);
+      queryClient.setQueryData(summaryKey, { summaries: [], assignments: [] });
+    }
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toEqual([]);
+    expect(queryClient.getQueryData(summaryKey)).toEqual({ summaries: [], assignments: [] });
+  });
+
+  it('removes a new predicted pair while keeping a concurrently added pair', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    queryClient.setQueryData(key, []);
+    queryClient.setQueryData(summaryKey, { summaries: [], assignments: [] });
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    expect(snapshot.entries.every((entry) => entry.before.length === 0)).toBe(true);
+    patchMatrixCaches(queryClient, ids, view(), getJob, snapshot);
+    patchMatrixCaches(queryClient, { jobId: JOB_A, technicianId: TECH_2 }, view({ technicianId: TECH_2 }), getJob);
+    restoreMatrixCaches(queryClient, snapshot);
+    const rows = queryClient.getQueryData<ReturnType<typeof makeMatrixRow>[]>(key)!;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.technician_id === TECH_2)).toBe(true);
+    expect(queryClient.getQueryData(summaryKey)).toMatchObject({ assignments: [expect.objectContaining({ technician_id: TECH_2 })] });
+  });
+
+  it('restores each window from its pair-only snapshot and leaves out-of-scope queries alone', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const oneDayKey = [MATRIX_ASSIGNMENTS_SCOPE, [JOB_A], [TECH_1], '2026-10-14', '2026-10-14'];
+    const outsiderKey = [MATRIX_ASSIGNMENTS_SCOPE, [JOB_A], [TECH_2], '2026-10-12', '2026-10-19'];
+    const first = makeMatrixRow({ date: '2026-10-13' });
+    const second = makeMatrixRow({ date: '2026-10-14', assigned_by: 'second-manager' });
+    queryClient.setQueryData(key, [first, makeMatrixRow({ technician_id: TECH_2 })]);
+    queryClient.setQueryData(oneDayKey, [second]);
+    queryClient.setQueryData(outsiderKey, []);
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    expect(snapshot.entries.flatMap((entry) => entry.before)).toEqual([first, second]);
+    patchMatrixCaches(queryClient, ids, view({ dates: ['2026-10-15'] }), getJob, snapshot);
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toEqual(expect.arrayContaining([first]));
+    expect(queryClient.getQueryData(oneDayKey)).toEqual([second]);
+    expect(queryClient.getQueryData(outsiderKey)).toEqual([]);
+  });
+
+  it('leaves caches loaded after snapshot intact and does not recreate removed caches', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    const summaryKey = [STAFFING_SUMMARY_SCOPE, 'a,b'];
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    queryClient.setQueryData(summaryKey, { summaries: ['new'], assignments: [] });
+    patchMatrixCaches(queryClient, ids, view(), getJob, snapshot);
+    const latest = queryClient.getQueryData(summaryKey);
+    queryClient.removeQueries({ queryKey: key, exact: true });
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryState(key)).toBeUndefined();
+    expect(queryClient.getQueryData(summaryKey)).toBe(latest);
+    expect(queryClient.getQueryState(summaryKey)?.isInvalidated).toBe(true);
+  });
+
+  it('does not restore into a removed and recreated query', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
+    patchMatrixCaches(queryClient, ids, view(), getJob, snapshot);
+    queryClient.removeQueries({ queryKey: key, exact: true });
+    queryClient.setQueryData(key, [makeMatrixRow({ status: 'confirmed' })]);
+    restoreMatrixCaches(queryClient, snapshot);
+    expect(queryClient.getQueryData(key)).toEqual([makeMatrixRow({ status: 'confirmed' })]);
+  });
+
+  it('does not restore when no prediction claimed the snapshot or ids were omitted', () => {
+    const queryClient = new QueryClient();
+    const ids = { jobId: JOB_A, technicianId: TECH_1 };
+    queryClient.setQueryData(key, [makeMatrixRow()]);
+    const scoped = snapshotMatrixCaches(queryClient, ids);
+    const unscoped = snapshotMatrixCaches(queryClient);
+    patchMatrixCaches(queryClient, ids, view({ status: 'confirmed' }), getJob);
+    const latest = queryClient.getQueryData(key);
+    restoreMatrixCaches(queryClient, scoped);
+    restoreMatrixCaches(queryClient, unscoped);
+    expect(queryClient.getQueryData(key)).toBe(latest);
+  });
+
+  it('keeps ownership of another pending prediction when a different rollback moves its rows', () => {
+    const queryClient = new QueryClient();
+    const firstIds = { jobId: JOB_A, technicianId: TECH_1 };
+    const secondIds = { jobId: JOB_A, technicianId: TECH_2 };
+    const before = [makeMatrixRow(), makeMatrixRow({ technician_id: TECH_2 })];
+    queryClient.setQueryData(key, before);
+    const firstSnapshot = snapshotMatrixCaches(queryClient, firstIds);
+    patchMatrixCaches(queryClient, firstIds, view({ status: 'confirmed' }), getJob, firstSnapshot);
+    const secondSnapshot = snapshotMatrixCaches(queryClient, secondIds);
+    patchMatrixCaches(queryClient, secondIds, view({ technicianId: TECH_2, status: 'declined' }), getJob, secondSnapshot);
+    restoreMatrixCaches(queryClient, firstSnapshot);
+    restoreMatrixCaches(queryClient, secondSnapshot);
+    expect(queryClient.getQueryData(key)).toEqual(before);
   });
 });
 

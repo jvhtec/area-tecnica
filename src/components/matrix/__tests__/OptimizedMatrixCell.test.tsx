@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import React, { type ComponentProps } from 'react';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
@@ -10,6 +11,16 @@ import {
   type MatrixCellHoverTooltipHandle,
 } from '@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip';
 import { formatUserName } from '@/utils/userName';
+import { CellInspectorBody } from '@/features/matrix-v2/inspector/CellInspectorBody';
+import type { InspectorEnvironment } from '@/features/matrix-v2/inspector/environment';
+import { makeJob, makeMatrixRow, makeRow, makeState } from '@/features/matrix-v2/__tests__/fixtures';
+
+const { getStateMock } = vi.hoisted(() => ({ getStateMock: vi.fn() }));
+
+vi.mock('@/features/assignments/commands', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/assignments/commands')>()),
+  getAssignmentCommandState: getStateMock,
+}));
 
 type MatrixCellProps = ComponentProps<typeof OptimizedMatrixCell>;
 type MatrixTechnician = MatrixCellProps['technician'];
@@ -627,6 +638,43 @@ describe('OptimizedMatrixCell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
     expect(onDecline).toHaveBeenCalledWith('tech-1', mockDate);
     expect(onInspect).not.toHaveBeenCalled();
+  });
+
+  it('cancelling the decline confirmation leaves the assignment and its cache untouched', async () => {
+    const user = userEvent.setup();
+    const assignment = { ...mockAssignment, status: 'invited' };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const cacheKey = ['optimized-matrix-assignments'];
+    client.setQueryData(cacheKey, assignment);
+    const runner = { run: vi.fn(), releaseAll: vi.fn(), loadState: vi.fn() };
+    const job = makeJob('job-1');
+    const matrixRow = makeMatrixRow({ job_id: job.id, technician_id: mockTechnician.id, job });
+    getStateMock.mockResolvedValue(makeState({ exists: true, assignment: makeRow(), dates: ['2026-10-13', '2026-10-14'] }));
+    const env: InspectorEnvironment = {
+      runner, getTechnician: () => mockTechnician, getJob: () => job, getJobsForDate: () => [job],
+      getAssignmentForCell: () => matrixRow, getAvailabilityForCell: () => undefined,
+      roleSlotsByJob: new Map(), lastRoleByTechnician: new Map(), declinedJobIds: () => new Set(),
+      isFridge: () => false, staffingByDate: () => null, profileNames: new Map(),
+      canAssign: true, canMarkUnavailable: true,
+      staffing: { send: vi.fn(), cancel: vi.fn(), channel: 'email', setChannel: vi.fn(), department: 'sound' },
+    };
+    function Harness() {
+      const [inspecting, setInspecting] = React.useState(false);
+      return <>
+        <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+          assignment={assignment} width={160} height={60} isSelected={false} onSelect={vi.fn()}
+          onDecline={() => setInspecting(true)} />
+        {inspecting && <CellInspectorBody env={env} onClose={() => setInspecting(false)}
+          target={{ technicianId: mockTechnician.id, date: mockDate, dateKey: '2024-05-15', anchor: null, intent: 'decline' }} />}
+      </>;
+    }
+    render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
+    await user.click(screen.getByRole('button', { name: 'Rechazar' }));
+    const confirmation = await screen.findByRole('alertdialog');
+    await user.click(within(confirmation).getByRole('button', { name: 'Volver' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(client.getQueryData(cacheKey)).toEqual(assignment);
   });
 
   it('a confirmed or empty cell has no ✓ ✕, no remove button and no staffing icons: the inspector does all of it', () => {

@@ -196,7 +196,7 @@ describe("Staffing Phase 1 characterization", () => {
 
     it("runs Flex and notification side effects only after the command committed", () => {
       // Effects are held for the undo window and only scheduled from a committed result.
-      expectOrdered(matrixCommandRunner, "const holdEffects = (result: AssignmentCommandResult)", "scheduleDeferredEffects(result.command_id");
+      expectOrdered(matrixCommandRunner, "const holdEffects = (result: AssignmentCommandResult", "scheduleDeferredEffects(result.command_id");
       expect(matrixCommandRunner).not.toContain("functions.invoke('manage-flex-crew-assignments'");
     });
 

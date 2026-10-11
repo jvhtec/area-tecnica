@@ -15,14 +15,14 @@ import {
   removeDirectAssignment,
   runAssignmentSideEffects,
   setAssignmentStatus,
-  supersedeAssignmentSideEffects,
-  unconfirmAssignment,
+  undoAssignmentCommand,
+  getAssignmentCommandUndoWindow,
+  releaseAssignmentCommandEffects,
   type AssignmentCommandCode,
   type AssignmentCommandResult,
   type AssignmentCommandState,
   type SideEffectContext,
   type SideEffectSummary,
-  type SupersedeResult,
 } from '@/features/assignments/commands';
 import { getAssignableJobDateKeys } from '@/features/matrix-v2/jobDays';
 import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
@@ -61,13 +61,14 @@ export interface RunnerCommands {
   changeAssignmentRole: typeof changeAssignmentRole;
   removeDirectAssignment: typeof removeDirectAssignment;
   removeAssignmentDate: typeof removeAssignmentDate;
-  unconfirmAssignment: typeof unconfirmAssignment;
+  undoAssignmentCommand: typeof undoAssignmentCommand;
+  getAssignmentCommandUndoWindow: typeof getAssignmentCommandUndoWindow;
+  releaseAssignmentCommandEffects: typeof releaseAssignmentCommandEffects;
   getAssignmentCommandState: typeof getAssignmentCommandState;
 }
 
 export interface RunnerEffects {
   run: (commandId: string, result: AssignmentCommandResult, context: SideEffectContext) => Promise<SideEffectSummary>;
-  supersede: (commandIds: string[]) => Promise<SupersedeResult>;
 }
 
 export interface MatrixCommandRunnerDeps {
@@ -77,7 +78,6 @@ export interface MatrixCommandRunnerDeps {
   /** Replaced in tests. */
   commands?: Partial<RunnerCommands>;
   effects?: Partial<RunnerEffects>;
-  undoWindowMs?: number;
   now?: () => number;
   /** Told when a command's post-commit effects ran, so the UI can report failures. */
   onEffectsSettled?: (commandId: string, summary: SideEffectSummary) => void;
@@ -172,11 +172,6 @@ function predictView(
 
 const sameDates = (a: string[], b: string[]) => unique(a).join('|') === unique(b).join('|');
 
-type InverseSpec = {
-  /** Runs the inverse command; `expectedStateToken` is the state right after the change. */
-  run: (commandId: string, expectedStateToken: string) => Promise<AssignmentCommandResult>;
-};
-
 export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): MatrixCommandRunner {
   const { queryClient, getJob, getTechnician } = deps;
   const commands: RunnerCommands = {
@@ -185,21 +180,26 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
     changeAssignmentRole,
     removeDirectAssignment,
     removeAssignmentDate,
-    unconfirmAssignment,
+    undoAssignmentCommand,
+    getAssignmentCommandUndoWindow,
+    releaseAssignmentCommandEffects,
     getAssignmentCommandState,
     ...deps.commands,
   };
   const effects: RunnerEffects = {
     run: runAssignmentSideEffects,
-    supersede: supersedeAssignmentSideEffects,
     ...deps.effects,
   };
-  const undoWindowMs = deps.undoWindowMs ?? UNDO_WINDOW_MS;
   const now = deps.now ?? Date.now;
   const held = new Set<DeferredEffects>();
   // A retry of the same decision after a transport failure reuses its id, so a
   // command that did commit is replayed by the database instead of repeated.
-  const pendingIds = new Map<string, string>();
+  const pendingDecisions = new Map<string, {
+    commandId: string;
+    state: AssignmentCommandState;
+    fromState: AssignmentCommandState | null;
+  }>();
+  const activeRuns = new Map<string, Promise<MatrixRunOutcome>>();
 
   const contextFor = (technicianId: string): SideEffectContext => {
     const technician = getTechnician(technicianId);
@@ -209,9 +209,11 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
     };
   };
 
-  const runEffects = (result: AssignmentCommandResult) => {
-    if (result.side_effects.length === 0) return Promise.resolve(null);
-    return effects.run(result.command_id, result, contextFor(result.technician_id)).then(
+  const runEffects = async (result: AssignmentCommandResult) => {
+    try {
+      const released = await commands.releaseAssignmentCommandEffects(result.command_id);
+      if (!released || result.side_effects.length === 0) return null;
+      return await effects.run(result.command_id, result, contextFor(result.technician_id)).then(
       (summary) => {
         deps.onEffectsSettled?.(result.command_id, summary);
         return summary;
@@ -220,15 +222,19 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
         console.error('Assignment side effects could not run', error);
         return null;
       },
-    );
+      );
+    } catch (error) {
+      // The durable plan remains retryable; a failed release must not bypass it.
+      console.error('Assignment effects could not be released', error);
+      return null;
+    }
   };
 
-  const holdEffects = (result: AssignmentCommandResult): DeferredEffects | null => {
-    if (result.side_effects.length === 0) return null;
+  const holdEffects = (result: AssignmentCommandResult, expiresAt: number): DeferredEffects => {
     const deferred = scheduleDeferredEffects(result.command_id, () => {
       held.delete(deferred);
       return runEffects(result);
-    }, undoWindowMs, now);
+    }, Math.max(0, expiresAt - now()), now);
     held.add(deferred);
     return deferred;
   };
@@ -304,169 +310,128 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
     }
   };
 
-  /** The command that takes the change back, or null when it cannot be done in one atomic step. */
-  const inverseOf = (
-    intent: MatrixIntent,
-    state: AssignmentCommandState,
-    result: AssignmentCommandResult,
-  ): InverseSpec | null => {
-    const { jobId, technicianId } = intent;
-    const source = intent.source;
+  /** Only changes whose prior decision can be restored by one guarded command. */
+  const canUndo = (intent: MatrixIntent, state: AssignmentCommandState, result: AssignmentCommandResult): boolean => {
     switch (intent.kind) {
       case 'assign': {
-        if (intent.fromJobId) return null; // a move is confirmed inline instead
-        if (!state.exists || !state.assignment) {
-          return { run: (commandId, token) => commands.removeDirectAssignment({ commandId, jobId, technicianId, expectedStateToken: token, source }) };
-        }
-        const previous = state.assignment;
+        if (intent.fromJobId) return false;
+        if (!state.exists || !state.assignment) return true;
         const after = result.assignment;
-        if (!after) return null;
-        // Only an invited or confirmed pair can be put back by one command; a
-        // declined one cannot be re-declined without undoing more than this change.
-        if (previous.status !== 'invited' && previous.status !== 'confirmed') return null;
         const department = roleDepartmentForCode(intent.role);
-        if (!department) return null;
-        const previousRole = roleOf(state, department);
-        const roleChanged = previousRole !== intent.role;
-        const datesChanged = !sameDates(state.dates, result.dates);
-        const upgraded = previous.status === 'invited' && after.status === 'confirmed';
-        if (upgraded && !roleChanged && !datesChanged) {
-          return { run: (commandId, token) => commands.unconfirmAssignment({ commandId, jobId, technicianId, expectedStateToken: token, source }) };
-        }
-        // Two writes (reopen + restore) would not be atomic: confirm inline instead.
-        if (upgraded) return null;
-        if (!previousRole || state.dates.length === 0) return null;
-        return {
-          run: (commandId, token) => commands.applyDirectAssignment({
-            commandId,
-            jobId,
-            technicianId,
-            role: previousRole,
-            status: previous.status === 'confirmed' ? 'confirmed' : 'invited',
-            coverage: 'multi',
-            dates: state.dates,
-            mode: 'replace',
-            expectedStateToken: token,
-            conflictPolicy: 'reject',
-            source,
-          }),
-        };
+        if (!after || !department) return false;
+        if (state.assignment.status !== 'invited' && state.assignment.status !== 'confirmed') return false;
+        const priorRole = roleOf(state, department);
+        const upgraded = state.assignment.status === 'invited' && after.status === 'confirmed';
+        if (upgraded) return priorRole === intent.role && sameDates(state.dates, result.dates)
+          && state.assignment.single_day === after.single_day
+          && state.assignment.assignment_date === after.assignment_date
+          && state.assignment.sound_role === after.sound_role
+          && state.assignment.lights_role === after.lights_role
+          && state.assignment.video_role === after.video_role
+          && state.assignment.production_role === after.production_role;
+        return !!priorRole && state.dates.length > 0;
       }
-      case 'confirm': {
-        // unconfirm goes back to invited, so it is only the inverse of confirming an invitation.
-        if (state.assignment?.status !== 'invited') return null;
-        return { run: (commandId, token) => commands.unconfirmAssignment({ commandId, jobId, technicianId, expectedStateToken: token, source }) };
-      }
-      case 'role': {
-        const previousRole = roleOf(state, intent.department);
-        return {
-          run: (commandId, token) => commands.changeAssignmentRole({
-            commandId, jobId, technicianId, department: intent.department, role: previousRole, syncCategory: true, expectedStateToken: token, source,
-          }),
-        };
-      }
-      default:
-        return null;
+      case 'confirm': return state.assignment?.status === 'invited';
+      case 'role': return true;
+      default: return false;
     }
   };
 
   const buildUndo = (
-    deferred: DeferredEffects | null,
+    deferred: DeferredEffects,
+    expiresAt: number,
     original: AssignmentCommandResult,
-    inverse: InverseSpec,
+    priorState: AssignmentCommandState,
     intent: MatrixIntent,
   ): MatrixUndo => {
-    // Without effects to hold the window is only the toast; the undo itself
-    // stays valid for the same time so the behaviour does not depend on them.
-    const expiresAt = deferred?.expiresAt ?? now() + undoWindowMs;
-    let used = false;
-    const isOpen = () => !used && now() < expiresAt && (deferred ? deferred.isPending() : true);
-
-    const undo = async (): Promise<MatrixUndoOutcome> => {
-      if (!isOpen()) {
-        return { ok: false, reason: 'expired', message: 'Ya no se puede deshacer: el cambio ya se ha comunicado.' };
-      }
-      used = true;
-      if (deferred && !deferred.cancel()) {
-        return { ok: false, reason: 'expired', message: 'Ya no se puede deshacer: el cambio ya se ha comunicado.' };
-      }
-      const token = original.state_token;
-      if (!token) {
-        deferred?.releaseSoon();
-        return { ok: false, reason: 'failed', message: ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE };
-      }
-      let inverseResult: AssignmentCommandResult;
+    const commandId = createAssignmentCommandId();
+    let finished = false;
+    let attempted = false;
+    let active: Promise<MatrixUndoOutcome> | null = null;
+    // An uncertain response can be replayed with this same packet even after
+    // expiry. The database admits only a stored replay after that deadline.
+    const isOpen = () => !finished && (attempted || (now() < expiresAt && deferred.isPending()));
+    const executeUndo = async (): Promise<MatrixUndoOutcome> => {
+      if (!isOpen()) return { ok: false, reason: 'expired', message: 'Ya no se puede deshacer: el cambio ya se ha comunicado.' };
+      if (!original.state_token) return { ok: false, reason: 'failed', message: ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE };
+      if (!attempted && !deferred.cancel()) return { ok: false, reason: 'expired', message: 'Ya no se puede deshacer: el cambio ya se ha comunicado.' };
+      attempted = true;
+      let result: AssignmentCommandResult;
       try {
-        inverseResult = await inverse.run(createAssignmentCommandId(), token);
+        result = await commands.undoAssignmentCommand({
+          commandId, originalCommandId: original.command_id,
+          expectedStateToken: original.state_token, priorState,
+        });
       } catch (error) {
-        deferred?.releaseSoon();
         const failed = failureFromError(error);
+        if (!failed.retryable && failed.code !== 'unknown' && failed.code !== 'concurrent_write') finished = true;
+        // Keep the original deadline after an uncertain outcome. If undo did
+        // commit, release sees the durable cancelled relationship and refuses.
+        deferred.releaseSoon(finished ? 0 : Math.max(0, expiresAt - now()));
         return { ok: false, reason: 'failed', message: failed.message };
       }
-      if (!inverseResult.ok) {
-        deferred?.releaseSoon();
-        const failed = failureFromRejection(inverseResult);
+      finished = true;
+      if (!result.ok) {
+        deferred.releaseSoon(0);
+        const failed = failureFromRejection(result);
         reconcileAssignmentViews(queryClient, { technicianId: intent.technicianId, jobIds: [intent.jobId] });
-        return {
-          ok: false,
-          reason: failed.stale ? 'stale' : 'rejected',
-          message: failed.stale
-            ? 'No se pudo deshacer: otra persona ha modificado la asignación.'
-            : failed.message,
-        };
+        return { ok: false, reason: failed.stale ? 'stale' : 'rejected', message: failed.stale
+          ? 'No se pudo deshacer: otra persona ha modificado la asignación.' : failed.message };
       }
-
-      patchMatrixCaches(queryClient, { jobId: intent.jobId, technicianId: intent.technicianId }, pairViewFromResult(inverseResult), getJob);
-      rememberState(inverseResult);
+      deferred.cancel();
+      held.delete(deferred);
+      if (!result.replayed) {
+        patchMatrixCaches(queryClient, { jobId: intent.jobId, technicianId: intent.technicianId }, pairViewFromResult(result), getJob);
+        rememberState(result);
+      }
       reconcileAssignmentViews(queryClient, { technicianId: intent.technicianId, jobIds: [intent.jobId] });
-
-      // Cancel what never ran. Anything that already ran means the technician
-      // or Flex heard about the change, so the inverse is announced too.
-      let announceInverse = true;
-      if (deferred) {
-        try {
-          const first = await effects.supersede([original.command_id]);
-          if (first.not_superseded === 0) {
-            const second = await effects.supersede([inverseResult.command_id]);
-            announceInverse = second.not_superseded > 0;
-          }
-        } catch {
-          // Could not cancel: keep both sides consistent by letting both run.
-          // The timer was cancelled above, so it has to be re-armed (release
-          // alone would be a no-op).
-          deferred.releaseSoon(0);
-        }
-      }
-      if (announceInverse) void runEffects(inverseResult);
+      // Restoration and both cancellations already committed in the RPC.
       return { ok: true };
     };
-
-    return { commandId: original.command_id, expiresAt, isOpen, undo, release: () => deferred?.release() };
+    const undo = (): Promise<MatrixUndoOutcome> => {
+      if (active) return active;
+      const request = executeUndo();
+      active = request;
+      void request.then(() => { active = null; }, () => { active = null; });
+      return request;
+    };
+    return { commandId: original.command_id, expiresAt, isOpen, undo, release: () => {
+      if (!attempted) finished = true;
+      deferred.release();
+    } };
   };
 
   const run = async (intent: MatrixIntent): Promise<MatrixRunOutcome> => {
     const ids = { jobId: intent.jobId, technicianId: intent.technicianId };
     const fromJobId = intent.kind === 'assign' ? intent.fromJobId ?? null : null;
 
+    // Retry an uncertain outcome with its original tokens. Reading a newer
+    // token would authorize overwriting a colleague's subsequent decision.
+    const decisionKey = JSON.stringify(intent);
+    const pending = pendingDecisions.get(decisionKey);
     let state: AssignmentCommandState;
     let fromState: AssignmentCommandState | null = null;
     try {
       // Fail closed: a command sent without the state it was decided on could
       // overwrite a colleague's change.
-      state = await loadState(intent.jobId, intent.technicianId);
-      if (fromJobId) fromState = await loadState(fromJobId, intent.technicianId);
+      if (pending) {
+        state = pending.state;
+        fromState = pending.fromState;
+      } else {
+        state = await loadState(intent.jobId, intent.technicianId);
+        if (fromJobId) fromState = await loadState(fromJobId, intent.technicianId);
+      }
     } catch (error) {
       const failed = failureFromError(error);
       return { ...failed, message: failed.code === 'unknown' ? ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE : failed.message };
     }
 
-    const fingerprint = JSON.stringify([intent, state.state_token, fromState?.state_token ?? null]);
-    const commandId = pendingIds.get(fingerprint) ?? createAssignmentCommandId();
-    pendingIds.set(fingerprint, commandId);
+    const commandId = pending?.commandId ?? createAssignmentCommandId();
+    pendingDecisions.set(decisionKey, { commandId, state, fromState });
 
-    const snapshot = snapshotMatrixCaches(queryClient);
+    const snapshot = snapshotMatrixCaches(queryClient, ids);
     const predicted = predictView(intent, state, getJob(intent.jobId));
-    if (predicted !== undefined) patchMatrixCaches(queryClient, ids, predicted, getJob);
+    if (predicted !== undefined) patchMatrixCaches(queryClient, ids, predicted, getJob, snapshot);
 
     let result: AssignmentCommandResult;
     try {
@@ -475,11 +440,11 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
       restoreMatrixCaches(queryClient, snapshot);
       const failed = failureFromError(error);
       // Network and unknown failures may have committed: keep the id for a retry.
-      if (!failed.retryable && failed.code !== 'unknown') pendingIds.delete(fingerprint);
+      if (!failed.retryable && failed.code !== 'unknown') pendingDecisions.delete(decisionKey);
       if (failed.stale) reconcileAssignmentViews(queryClient, { technicianId: intent.technicianId, jobIds: [intent.jobId, fromJobId] });
       return failed;
     }
-    pendingIds.delete(fingerprint);
+    pendingDecisions.delete(decisionKey);
 
     if (!result.ok) {
       restoreMatrixCaches(queryClient, snapshot);
@@ -488,25 +453,43 @@ export function createMatrixCommandRunner(deps: MatrixCommandRunnerDeps): Matrix
       return failed;
     }
 
-    patchMatrixCaches(queryClient, ids, pairViewFromResult(result), getJob);
-    if (fromJobId) patchMatrixCaches(queryClient, { jobId: fromJobId, technicianId: intent.technicianId }, null, getJob);
-    rememberState(result);
+    if (!result.replayed) {
+      patchMatrixCaches(queryClient, ids, pairViewFromResult(result), getJob);
+      if (fromJobId) patchMatrixCaches(queryClient, { jobId: fromJobId, technicianId: intent.technicianId }, null, getJob);
+      rememberState(result);
+    }
     reconcileAssignmentViews(queryClient, { technicianId: intent.technicianId, jobIds: [intent.jobId, fromJobId] });
-
     if (result.outcome === 'noop') return { ok: true, noop: true, result, undo: null };
 
-    const deferred = holdEffects(result);
-    const inverse = inverseOf(intent, state, result);
-    if (!inverse) {
-      // Not undoable (decline, removal, move): its effects run right away.
-      if (deferred) deferred.release();
-      return { ok: true, noop: false, result, undo: null };
+    if (canUndo(intent, state, result)) {
+      try {
+        const window = await commands.getAssignmentCommandUndoWindow(result.command_id);
+        const expiresAt = window.undo_expires_at ? Date.parse(window.undo_expires_at) : NaN;
+        if (window.eligible && Number.isFinite(expiresAt) && expiresAt > now()) {
+          const deferred = holdEffects(result, expiresAt);
+          return { ok: true, noop: false, result, undo: buildUndo(deferred, expiresAt, result, state, intent) };
+        }
+      } catch (error) {
+        console.error('Assignment undo window could not be loaded', error);
+      }
     }
-    return { ok: true, noop: false, result, undo: buildUndo(deferred, result, inverse, intent) };
+    void runEffects(result);
+    return { ok: true, noop: false, result, undo: null };
   };
 
   return {
-    run,
+    run: (intent) => {
+      const key = JSON.stringify(intent);
+      const active = activeRuns.get(key);
+      if (active) return active;
+      const request = run(intent);
+      activeRuns.set(key, request);
+      const clear = () => {
+        if (activeRuns.get(key) === request) activeRuns.delete(key);
+      };
+      void request.then(clear, clear);
+      return request;
+    },
     loadState,
     releaseAll: () => {
       for (const deferred of [...held]) deferred.release();

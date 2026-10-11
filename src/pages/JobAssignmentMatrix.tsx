@@ -688,6 +688,7 @@ export default function JobAssignmentMatrix() {
             fridgeSet={fridgeSet}
             staffingDepartment={selectedDepartment}
             roleSlotsByJob={roleSlotsByJob}
+            staffingAssignments={staffingReminderQuery.data?.assignments}
             focusJobId={focusedJob?.id ?? null}
             focusStatus={focusStatus}
             onFocusJobChange={focusJob}

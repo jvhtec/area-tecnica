@@ -51,6 +51,8 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   staffingDepartment?: string | null;
   /** Role slots per job, from the page's staffing-summary query. */
   roleSlotsByJob?: Map<string, RoleSlot[]>;
+  /** Membership from the same staffing summary as the slot counts. */
+  staffingAssignments?: readonly import('@/features/matrix-v2/roleSlots').RoleSlotAssignmentRow[];
   /** Job focus: which job the grid is judged against, and the status new assignments get. */
   focusJobId?: string | null;
   focusStatus?: 'invited' | 'confirmed';

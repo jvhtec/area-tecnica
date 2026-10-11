@@ -135,10 +135,10 @@ function AssignFormView({
 /* ------------------------------------------------------------------------- */
 
 function EmptyView({ env, target, onClose }: BodyProps) {
-  const [composing, setComposing] = React.useState(false);
+  const [composing, setComposing] = React.useState(!!target.staffingDraft);
   const technician = env.getTechnician(target.technicianId);
   const composer = useStaffingComposer({ env, technician, target, onDone: onClose });
-  if (composing) return <StaffingView composer={composer} onBack={() => setComposing(false)} />;
+  if (composing) return <StaffingView composer={composer} onBack={target.staffingDraft ? onClose : () => setComposing(false)} />;
   return <EmptyAssignView env={env} target={target} onClose={onClose} onCompose={() => setComposing(true)} />;
 }
 
@@ -362,6 +362,7 @@ function UnavailableView({ env, target, onClose }: BodyProps) {
 /** The inspector's content for one cell. Keyed by cell so its state never leaks to the next. */
 export function CellInspectorBody(props: BodyProps) {
   const summary = useInspectorSummary(props.env, props.target);
+  if (props.target.staffingDraft) return <EmptyView key={JSON.stringify(props.target.staffingDraft)} {...props} />;
   if (summary.view === 'assignment') return <AssignedView {...props} />;
   if (summary.view === 'unavailable') return <UnavailableView {...props} />;
   return <EmptyView {...props} />;

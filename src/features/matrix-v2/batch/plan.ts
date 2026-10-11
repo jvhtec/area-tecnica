@@ -229,7 +229,11 @@ export function planStaffingRows(
     if (phase === 'offer') {
       const discipline = roleDisciplineForDepartment(technician.department);
       role = suggestRole({ technician, slots: departmentSlots(slots, discipline), lastRoleCode: lookups.lastRole(technicianId) }).code;
-      if (!role) return void rows.push({ ...row, status: 'needs-role', message: 'Elige el rol: puede encajar en varios niveles', openAt: { technicianId, dateKey: days[0] } });
+      if (!role) return void rows.push({
+        ...row, status: 'needs-role', message: 'Elige el rol: puede encajar en varios niveles',
+        summary: `${job.title} · ${dayRangeLabel(days)}`, openAt: { technicianId, dateKey: days[0] },
+        staffingDraft: { jobId, phase, days, channel, department, message: description },
+      });
       const taken = slots.find((slot) => slot.code === role);
       if (taken) {
         taken.open = Math.max(taken.open - 1, 0);

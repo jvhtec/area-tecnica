@@ -636,12 +636,52 @@ export type Database = {
         }
         Relationships: []
       }
+      assignment_command_undos: {
+        Row: {
+          created_at: string
+          inverse_command_id: string
+          original_command_id: string
+          request: Json
+          request_hash: string
+        }
+        Insert: {
+          created_at?: string
+          inverse_command_id: string
+          original_command_id: string
+          request: Json
+          request_hash: string
+        }
+        Update: {
+          created_at?: string
+          inverse_command_id?: string
+          original_command_id?: string
+          request?: Json
+          request_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_command_undos_inverse_command_id_fkey"
+            columns: ["inverse_command_id"]
+            isOneToOne: true
+            referencedRelation: "assignment_commands"
+            referencedColumns: ["command_id"]
+          },
+          {
+            foreignKeyName: "assignment_command_undos_original_command_id_fkey"
+            columns: ["original_command_id"]
+            isOneToOne: true
+            referencedRelation: "assignment_commands"
+            referencedColumns: ["command_id"]
+          },
+        ]
+      }
       assignment_commands: {
         Row: {
           actor_id: string | null
           command_id: string
           command_type: string
           created_at: string
+          effects_claimed_at: string | null
           error_code: string | null
           from_job_id: string | null
           job_id: string
@@ -656,12 +696,15 @@ export type Database = {
           side_effects_updated_at: string | null
           source: string
           technician_id: string
+          undo_expires_at: string | null
+          undone_by_command_id: string | null
         }
         Insert: {
           actor_id?: string | null
           command_id: string
           command_type: string
           created_at?: string
+          effects_claimed_at?: string | null
           error_code?: string | null
           from_job_id?: string | null
           job_id: string
@@ -676,12 +719,15 @@ export type Database = {
           side_effects_updated_at?: string | null
           source: string
           technician_id: string
+          undo_expires_at?: string | null
+          undone_by_command_id?: string | null
         }
         Update: {
           actor_id?: string | null
           command_id?: string
           command_type?: string
           created_at?: string
+          effects_claimed_at?: string | null
           error_code?: string | null
           from_job_id?: string | null
           job_id?: string
@@ -696,8 +742,18 @@ export type Database = {
           side_effects_updated_at?: string | null
           source?: string
           technician_id?: string
+          undo_expires_at?: string | null
+          undone_by_command_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assignment_commands_undone_by_command_id_fkey"
+            columns: ["undone_by_command_id"]
+            isOneToOne: true
+            referencedRelation: "assignment_commands"
+            referencedColumns: ["command_id"]
+          },
+        ]
       }
       assignment_notifications: {
         Row: {
@@ -3053,6 +3109,36 @@ export type Database = {
             referencedColumns: ["job_id"]
           },
         ]
+      }
+      flex_crew_reconciliation_gates: {
+        Row: {
+          acquired_at: string | null
+          flex_element_id: string
+          outstanding_operation: Json | null
+          owned_contacts: Json
+          owner_token: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          acquired_at?: string | null
+          flex_element_id: string
+          outstanding_operation?: Json | null
+          owned_contacts?: Json
+          owner_token?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          acquired_at?: string | null
+          flex_element_id?: string
+          outstanding_operation?: Json | null
+          owned_contacts?: Json
+          owner_token?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       flex_folders: {
         Row: {
@@ -12582,6 +12668,15 @@ export type Database = {
           status: string
         }[]
       }
+      admit_flex_crew_operation: {
+        Args: {
+          p_element: string
+          p_operation: Json
+          p_owner: string
+          p_state_token: string
+        }
+        Returns: undefined
+      }
       allocate_flex_provisioning_sequence: {
         Args: {
           p_minimum?: number
@@ -12651,6 +12746,15 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
+      assign_staffing_offer: {
+        Args: {
+          p_dates: string[]
+          p_request_id: string
+          p_role?: string
+          p_single_day: boolean
+        }
+        Returns: string
+      }
       assign_transport_driver: {
         Args: {
           p_assignment_id?: string
@@ -12667,6 +12771,12 @@ export type Database = {
       assignment_approved_dates: {
         Args: { p_dates?: string[]; p_job_id: string; p_technician_id: string }
         Returns: string[]
+      }
+      assignment_command_has_unrun_effects: {
+        Args: {
+          p_command: Database["public"]["Tables"]["assignment_commands"]["Row"]
+        }
+        Returns: boolean
       }
       assignment_command_reject: {
         Args: {
@@ -12710,6 +12820,10 @@ export type Database = {
       assignment_state_token: {
         Args: { p_job_id: string; p_technician_id: string }
         Returns: string
+      }
+      assignment_undo_normalize_snapshot: {
+        Args: { p_state: Json }
+        Returns: Json
       }
       attempt_whatsapp_send: {
         Args: {
@@ -12765,6 +12879,11 @@ export type Database = {
         Returns: boolean
       }
       can_manage_users: { Args: never; Returns: boolean }
+      can_read_festival_job: { Args: { p_job_id: string }; Returns: boolean }
+      can_read_festival_shift: {
+        Args: { p_shift_id: string }
+        Returns: boolean
+      }
       can_read_job_document_storage: {
         Args: { p_path: string }
         Returns: boolean
@@ -12817,6 +12936,10 @@ export type Database = {
       }
       claim_assignment_side_effects: {
         Args: { p_command_id: string; p_lease_seconds?: number }
+        Returns: Json
+      }
+      claim_flex_crew_reconciliation: {
+        Args: { p_department: string; p_job_id: string }
         Returns: Json
       }
       claim_push_schedule: {
@@ -12889,11 +13012,7 @@ export type Database = {
         Returns: string
       }
       copy_festival_shifts: {
-        Args: {
-          p_job_id: string
-          p_source_date: string
-          p_target_date: string
-        }
+        Args: { p_job_id: string; p_source_date: string; p_target_date: string }
         Returns: {
           copied_assignments: number
           copied_shifts: number
@@ -12987,6 +13106,10 @@ export type Database = {
         Args: { _job_id: string; _technician_id: string }
         Returns: Json
       }
+      festival_department_matches: {
+        Args: { p_candidate: string; p_department: string }
+        Returns: boolean
+      }
       find_declined_with_active_timesheets: {
         Args: never
         Returns: {
@@ -13040,6 +13163,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      flex_crew_reconciliation_projection: {
+        Args: { p_element: string }
+        Returns: Json
+      }
       get_active_timesheet_counts_by_technician: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: {
@@ -13060,6 +13187,10 @@ export type Database = {
       }
       get_assignment_command_state: {
         Args: { p_job_id: string; p_technician_id: string }
+        Returns: Json
+      }
+      get_assignment_command_undo_window: {
+        Args: { p_command_id: string }
         Returns: Json
       }
       get_assignment_consistency_issues: {
@@ -13683,6 +13814,10 @@ export type Database = {
           soft_conflict: boolean
         }[]
       }
+      read_flex_crew_reconciliation: {
+        Args: { p_element: string; p_owner: string }
+        Returns: Json
+      }
       record_assignment_side_effects: {
         Args: { p_claim_token: string; p_command_id: string; p_results: Json }
         Returns: Json
@@ -13696,6 +13831,14 @@ export type Database = {
         Returns: undefined
       }
       refresh_v_job_staffing_summary: { Args: never; Returns: undefined }
+      release_assignment_command_effects: {
+        Args: { p_command_id: string }
+        Returns: Json
+      }
+      release_flex_crew_reconciliation: {
+        Args: { p_element: string; p_owner: string; p_state_token?: string }
+        Returns: undefined
+      }
       remove_assignment_date: {
         Args: {
           p_actor_id?: string
@@ -14029,6 +14172,20 @@ export type Database = {
         Args: { p_request_id: string; p_stage: string }
         Returns: undefined
       }
+      settle_flex_crew_add: {
+        Args: {
+          p_crew_call: string
+          p_element: string
+          p_line_item: string
+          p_owner: string
+          p_technician: string
+        }
+        Returns: undefined
+      }
+      settle_flex_crew_operation: {
+        Args: { p_element: string; p_owner: string; p_uncertain: boolean }
+        Returns: undefined
+      }
       staffing_role_prefix: { Args: { p_role_code: string }; Returns: string }
       stop_sharing_driver_location: { Args: never; Returns: Json }
       submit_job_expense: {
@@ -14171,6 +14328,15 @@ export type Database = {
         }
         Returns: Json
       }
+      undo_assignment_command: {
+        Args: {
+          p_command_id: string
+          p_expected_state_token: string
+          p_original_command_id: string
+          p_prior_state: Json
+        }
+        Returns: Json
+      }
       update_tour_dates: { Args: never; Returns: undefined }
       upsert_job_prep_days: {
         Args: { p_dates: string[]; p_job_id: string }
@@ -14195,6 +14361,16 @@ export type Database = {
           p_department: string
           p_package_size: string
           p_tour_id: string
+        }
+        Returns: undefined
+      }
+      write_flex_crew_mapping: {
+        Args: {
+          p_crew_call: string
+          p_element: string
+          p_line_item: string
+          p_owner: string
+          p_technician: string
         }
         Returns: undefined
       }
@@ -14371,12 +14547,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -14400,11 +14576,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -14425,11 +14601,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -14450,11 +14626,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -14467,11 +14643,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

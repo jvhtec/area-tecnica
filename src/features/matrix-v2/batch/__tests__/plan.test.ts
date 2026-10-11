@@ -154,6 +154,19 @@ describe('removal', () => {
 });
 
 describe('planStaffingRows', () => {
+  it('retains the exact offer draft when its role needs a manager decision', () => {
+    const base = lookups({ slots: [], unavailable: [cellKey('t1', D1)] });
+    const [row] = planStaffingRows(block(['t1'], [D0, D1, D2]), JOB_A, 'offer', 'whatsapp', null, {
+      ...base, job: () => makeJob(JOB_A, { description: '  Carga por la puerta B  ' }),
+    });
+    expect(row).toMatchObject({
+      status: 'needs-role', openAt: { technicianId: 't1', dateKey: D2 },
+      staffingDraft: { jobId: JOB_A, phase: 'offer', days: [D2], channel: 'whatsapp', department: null, message: 'Carga por la puerta B' },
+    });
+    expect(row.staffing).toBeUndefined();
+    expect(row.intents).toEqual([]);
+  });
+
   it('one availability request per person, for the days that belong to the job', () => {
     const rows = planStaffingRows(block(['t1', 't2'], [D0, D1, D2]), JOB_A, 'availability', 'whatsapp', 'sound', lookups());
     expect(rows).toHaveLength(2);

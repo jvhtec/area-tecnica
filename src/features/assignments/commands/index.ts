@@ -9,6 +9,9 @@ export {
   requireCommitted,
   setAssignmentStatus,
   unconfirmAssignment,
+  undoAssignmentCommand,
+  getAssignmentCommandUndoWindow,
+  releaseAssignmentCommandEffects,
 } from '@/features/assignments/commands/client';
 export {
   ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
@@ -44,6 +47,8 @@ export type {
   SetAssignmentStatusInput,
   SupersedeResult,
   UnconfirmAssignmentInput,
+  UndoAssignmentCommandInput,
+  AssignmentUndoWindow,
 } from '@/features/assignments/commands/types';
 export {
   fetchAssignmentConsistencyIssues,

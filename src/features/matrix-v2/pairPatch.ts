@@ -157,18 +157,97 @@ export function patchStaffingSummary(
   return { ...payload, assignments: [...rest, row] };
 }
 
-export type CacheSnapshot = Array<[QueryKey, unknown]>;
+type PairIds = { jobId: string; technicianId: string };
+type PairCacheRow = MatrixTimesheetAssignment | RoleSlotAssignmentRow;
 
-const SNAPSHOT_SCOPES = [MATRIX_ASSIGNMENTS_SCOPE, STAFFING_SUMMARY_SCOPE];
-
-export function snapshotMatrixCaches(queryClient: QueryClient): CacheSnapshot {
-  return SNAPSHOT_SCOPES.flatMap((scope) =>
-    queryClient.getQueriesData({ queryKey: queryKeys.scope(scope) }).map(([key, data]): [QueryKey, unknown] => [key, data]));
+interface PairCacheSnapshot {
+  key: QueryKey;
+  /** A removed/recreated query must never inherit an old operation's ownership. */
+  query: object;
+  kind: 'matrix' | 'staffing';
+  before: PairCacheRow[];
+  expected?: PairCacheRow[];
+  expectedUpdateCount?: number;
 }
 
-/** Puts back what the snapshot held, then lets the refetch settle the truth. */
+export interface CacheSnapshot {
+  ids?: PairIds;
+  token: symbol;
+  entries: PairCacheSnapshot[];
+}
+
+const SNAPSHOT_SCOPES = [MATRIX_ASSIGNMENTS_SCOPE, STAFFING_SUMMARY_SCOPE];
+const pairOwners = new WeakMap<object, Map<string, symbol>>();
+const pairPredictions = new WeakMap<object, Map<string, { ids: PairIds; entry: PairCacheSnapshot }>>();
+const pairKey = (ids: PairIds) => JSON.stringify([ids.jobId, ids.technicianId]);
+const matchesPair = (row: PairCacheRow, ids: PairIds) =>
+  row.job_id === ids.jobId && row.technician_id === ids.technicianId;
+const sameRows = (left: PairCacheRow[], right: PairCacheRow[]) =>
+  left.length === right.length && left.every((row, index) => row === right[index]);
+
+/** Carry untouched predictions across structural sharing caused by row moves. */
+function setPairCacheData(queryClient: QueryClient, key: QueryKey, data: unknown) {
+  const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+  const rows = isRowArray(data) ? data : isSummaryPayload(data) ? data.assignments : null;
+  const preserved = rows && query ? [...(pairPredictions.get(query)?.values() ?? [])].filter(({ ids, entry }) =>
+    entry.expected && sameRows(rows.filter((row) => matchesPair(row, ids)), entry.expected)) : [];
+  queryClient.setQueryData(key, data);
+  const stored = queryClient.getQueryData(key);
+  const storedRows = isRowArray(stored) ? stored : isSummaryPayload(stored) ? stored.assignments : null;
+  if (storedRows) {
+    for (const { ids, entry } of preserved) {
+      entry.expected = storedRows.filter((row) => matchesPair(row, ids));
+      entry.expectedUpdateCount = queryClient.getQueryState(key)?.dataUpdateCount;
+    }
+  }
+}
+
+/**
+ * Capture only this operation's pair. Pass the result as the fifth argument to
+ * its optimistic patchMatrixCaches call, before awaiting the command. Omitted
+ * ids capture nothing: unscoped callers can invalidate but cannot roll back.
+ */
+export function snapshotMatrixCaches(queryClient: QueryClient, ids?: PairIds): CacheSnapshot {
+  const snapshot: CacheSnapshot = { ids: ids ? { ...ids } : undefined, token: Symbol('matrix-pair'), entries: [] };
+  if (!ids) return snapshot;
+  for (const scope of SNAPSHOT_SCOPES) {
+    for (const [key, data] of queryClient.getQueriesData({ queryKey: queryKeys.scope(scope) })) {
+      const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+      if (!query) continue;
+      if (scope === MATRIX_ASSIGNMENTS_SCOPE && isRowArray(data)) {
+        snapshot.entries.push({ key, query, kind: 'matrix', before: data.filter((row) => matchesPair(row, ids)) });
+      } else if (scope === STAFFING_SUMMARY_SCOPE && isSummaryPayload(data)) {
+        snapshot.entries.push({ key, query, kind: 'staffing', before: data.assignments.filter((row) => matchesPair(row, ids)) });
+      }
+    }
+  }
+  return snapshot;
+}
+
+/** Restore only rows still owned by the prediction; refetch settles the truth. */
 export function restoreMatrixCaches(queryClient: QueryClient, snapshot: CacheSnapshot) {
-  for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
+  const { ids } = snapshot;
+  if (ids) {
+    const id = pairKey(ids);
+    for (const entry of snapshot.entries) {
+      const query = queryClient.getQueryCache().find({ queryKey: entry.key, exact: true });
+      const owners = query ? pairOwners.get(query) : undefined;
+      const expected = entry.expected;
+      if (query !== entry.query || owners?.get(id) !== snapshot.token || !expected) continue;
+      const data = queryClient.getQueryData(entry.key);
+      const rows = entry.kind === 'matrix' && isRowArray(data)
+        ? data : entry.kind === 'staffing' && isSummaryPayload(data) ? data.assignments : null;
+      // A realtime/refetch writer changing the pair also loses ownership.
+      // Absence has no row identity: an external write must also match revision.
+      const ownsAbsence = expected.length > 0 || queryClient.getQueryState(entry.key)?.dataUpdateCount === entry.expectedUpdateCount;
+      if (rows && ownsAbsence && sameRows(rows.filter((row) => matchesPair(row, ids)), expected)) {
+        const restored = [...rows.filter((row) => !matchesPair(row, ids)), ...entry.before];
+        setPairCacheData(queryClient, entry.key, entry.kind === 'matrix' ? restored : { ...data as StaffingSummaryPayload, assignments: restored });
+      }
+      owners?.delete(id);
+      pairPredictions.get(query)?.delete(id);
+    }
+  }
   for (const scope of SNAPSHOT_SCOPES) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.scope(scope) });
   }
@@ -179,23 +258,55 @@ const isRowArray = (data: unknown): data is MatrixTimesheetAssignment[] => Array
 const isSummaryPayload = (data: unknown): data is StaffingSummaryPayload =>
   typeof data === 'object' && data !== null && 'assignments' in data && Array.isArray(data.assignments);
 
+/** Even an identical/null committed patch supersedes the older prediction. */
+function claimPairPatch(queryClient: QueryClient, key: QueryKey, ids: PairIds, snapshot?: CacheSnapshot) {
+  const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+  if (!query) return;
+  let owners = pairOwners.get(query);
+  if (!owners) {
+    owners = new Map();
+    pairOwners.set(query, owners);
+  }
+  const entry = snapshot?.ids && pairKey(snapshot.ids) === pairKey(ids)
+    ? snapshot.entries.find((candidate) => candidate.query === query) : undefined;
+  owners.set(pairKey(ids), entry ? snapshot!.token : Symbol('matrix-pair'));
+  if (!entry) {
+    pairPredictions.get(query)?.delete(pairKey(ids));
+    return;
+  }
+  let predictions = pairPredictions.get(query);
+  if (!predictions) {
+    predictions = new Map();
+    pairPredictions.set(query, predictions);
+  }
+  predictions.set(pairKey(ids), { ids: { ...ids }, entry });
+  const data = queryClient.getQueryData(key);
+  const rows = entry.kind === 'matrix' && isRowArray(data)
+    ? data : entry.kind === 'staffing' && isSummaryPayload(data) ? data.assignments : null;
+  if (rows) entry.expected = rows.filter((row) => matchesPair(row, ids));
+  entry.expectedUpdateCount = queryClient.getQueryState(key)?.dataUpdateCount;
+}
+
 /** Applies a pair view to every cached matrix and staffing-summary query. */
 export function patchMatrixCaches(
   queryClient: QueryClient,
   ids: { jobId: string; technicianId: string },
   pair: PairView | null,
   getJob: (jobId: string) => MatrixJob | undefined,
+  snapshot?: CacheSnapshot,
 ) {
   for (const [key, data] of queryClient.getQueriesData({ queryKey: queryKeys.scope(MATRIX_ASSIGNMENTS_SCOPE) })) {
     if (!isRowArray(data)) continue;
     const scope = readMatrixQueryScope(key, getJob);
     if (!scope) continue;
     const next = patchMatrixRows(data, ids, pair, scope);
-    if (next !== data) queryClient.setQueryData(key, next);
+    if (next !== data) setPairCacheData(queryClient, key, next);
+    if (next !== data || pair === null) claimPairPatch(queryClient, key, ids, snapshot);
   }
   for (const [key, data] of queryClient.getQueriesData({ queryKey: queryKeys.scope(STAFFING_SUMMARY_SCOPE) })) {
     if (!isSummaryPayload(data)) continue;
     const next = patchStaffingSummary(data, ids, pair);
-    if (next !== data) queryClient.setQueryData(key, next);
+    if (next !== data) setPairCacheData(queryClient, key, next);
+    if (next !== data || pair === null) claimPairPatch(queryClient, key, ids, snapshot);
   }
 }

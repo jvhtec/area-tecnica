@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { bootstrapApp, isMobileViewport } from "./support/app";
+import { assignmentCommandLedger, assignmentEffects, assertAtomicUndo, assertNoAssignmentEffects } from "./support/assignmentCommands";
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const day = (offset: number) => {
@@ -42,11 +43,18 @@ async function openMatrix(page: Page, query = "", options: { evaOff?: boolean } 
   };
   const pairState = (technicianId: string) => {
     const entry = assigned.get(technicianId);
-    return { exists: !!entry, assignment: row(technicianId), dates: entry?.dates ?? [], state_token: `token-${technicianId}-${entry?.dates.length ?? 0}` };
+    return { exists: !!entry, assignment: row(technicianId), dates: entry?.dates ?? [], state_token: `token-${technicianId}-${entry?.dates.join("+") ?? "none"}-${entry?.status ?? ""}-${entry?.role ?? ""}` };
   };
+  const ledger = assignmentCommandLedger({
+    read: pairState,
+    restore: (technicianId, prior) => {
+      if (prior.exists && prior.assignment) assigned.set(technicianId, { status: String(prior.assignment.status), role: String(prior.assignment.sound_role), dates: [...prior.dates] });
+      else assigned.delete(technicianId);
+    },
+  });
   const result = (id: string, technicianId: string) => ({
     ok: true, outcome: "committed", command_id: id, job_id: JOB_ID, technician_id: technicianId, state_token: pairState(technicianId).state_token,
-    replayed: false, assignment: row(technicianId), dates: assigned.get(technicianId)?.dates ?? [], side_effects: [], warnings: [],
+    replayed: false, assignment: row(technicianId), dates: assigned.get(technicianId)?.dates ?? [], side_effects: assignmentEffects(JOB_ID, id), warnings: [],
   });
 
   const calls = await bootstrapApp(page, {
@@ -66,32 +74,34 @@ async function openMatrix(page: Page, query = "", options: { evaOff?: boolean } 
       technician_fridge: [], availability_schedules: [], vacation_requests: [], profiles: [], skills: [], staffing_requests: [], staffing_events: [],
     },
     rpc: {
+      ...ledger.rpc,
       get_profiles_with_skills: TECHS.map(({ id, first }) => ({ id, first_name: first, last_name: "Test", email: `${id}@example.test`, department: "sound", role: "technician", skills: [] })),
       get_job_staffing_summary: [], get_active_timesheet_counts_by_technician: [], get_assignment_matrix_staffing: [],
       get_assignment_matrix_staffing_filtered: [], get_staffing_requests_matrix_filtered: [],
       get_assignment_command_state: ({ body }) => pairState(String(asBody(body).p_technician_id)),
       apply_direct_assignment: ({ body }) => {
         const input = asBody(body);
+        return ledger.commit(input, () => {
         const technicianId = String(input.p_technician_id);
         const dates = input.p_coverage === "full" ? DAYS : (input.p_dates as string[]);
         const existing = assigned.get(technicianId);
         assigned.set(technicianId, { status: String(input.p_status), role: String(input.p_role), dates: [...new Set([...(existing?.dates ?? []), ...dates])].sort() });
         return result(String(input.p_command_id), technicianId);
+        });
       },
       remove_direct_assignment: ({ body }) => {
         const input = asBody(body);
+        return ledger.commit(input, () => {
         const technicianId = String(input.p_technician_id);
         assigned.delete(technicianId);
         return { ...result(String(input.p_command_id), technicianId), removed: { job_id: JOB_ID, deleted_timesheets: 3, deleted_assignment: true, assignment: null } };
+        }, false);
       },
-      claim_assignment_side_effects: { claim_token: "claim-1", effects: [] },
-      record_assignment_side_effects: { ok: true },
-      supersede_assignment_side_effects: { superseded: 0, not_superseded: 0, commands: [] },
     },
     functions: { push: { ok: true }, "manage-flex-crew-assignments": { ok: true } },
   });
   await page.goto(`/job-assignment-matrix${query}`);
-  return { calls, assigned };
+  return { calls, assigned, ledger };
 }
 
 const applyCalls = (calls: Awaited<ReturnType<typeof openMatrix>>["calls"]) =>
@@ -168,6 +178,21 @@ test("a click on a free day assigns just that day; the rows stay where they were
   await expect(cell(page, "t-ana", 2)).toContainText("Festival Lúa");
   await expect(page.locator("[data-focus-fit='partial']")).toHaveText("Asignado 1/3");
   expect(await columnOrder(page)).toEqual(before);
+});
+
+test("Deshacer in job focus atomically restores the prior schedule without notifying anyone", async ({ page }) => {
+  const { calls, assigned, ledger } = await openMatrix(page, `?trabajo=${JOB_ID}`);
+  await cell(page, "t-ana", 2).click();
+  await expect.poll(() => applyCalls(calls).length).toBe(1);
+  const originalId = String(applyCalls(calls)[0].p_command_id);
+  const toast = page.getByRole("region", { name: /Notifications/ }).getByRole("status").filter({ hasText: "Ana Test invitado" });
+  await toast.getByRole("button", { name: "Deshacer" }).click();
+  await expect.poll(() => calls.rpcCalls.filter((call) => call.name === "undo_assignment_command").length).toBe(1);
+  assertAtomicUndo(calls, ledger, originalId);
+  expect(assigned.has("t-ana")).toBe(false);
+  await expect(cell(page, "t-ana", 2)).not.toContainText("Festival Lúa");
+  await page.waitForTimeout(9_500);
+  assertNoAssignmentEffects(calls);
 });
 
 test("Confirmado in the bar confirms what is assigned next", async ({ page }) => {

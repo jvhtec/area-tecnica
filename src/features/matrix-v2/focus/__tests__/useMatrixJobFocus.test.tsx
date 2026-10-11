@@ -21,6 +21,15 @@ const dates = dayKeys.map((key) => {
 const slots = new Map<string, RoleSlot[]>([[JOB_A, [{ code: 'SND-MON-E', department: 'sound', required: 2, filled: 0, invited: 0, open: 2 }]]]);
 
 const okOutcome = { ok: true as const, noop: false, result: makeResult(), undo: null };
+const oneSlot = (code = 'SND-MON-E', required = 1, filled = 0): RoleSlot => ({
+  code, department: 'sound', required, filled, invited: filled, open: Math.max(required - filled, 0),
+});
+const rejectedOutcome = { ok: false as const, code: 'conflict' as const, message: 'Conflicto', stale: false, conflict: null, result: null, retryable: false };
+function deferredRun() {
+  let finish!: (outcome: Awaited<ReturnType<MatrixCommandRunner['run']>>) => void;
+  const promise = new Promise<Awaited<ReturnType<MatrixCommandRunner['run']>>>((resolve) => { finish = resolve; });
+  return { promise, finish };
+}
 
 function setup(options: {
   assignments?: MatrixTimesheetAssignment[];
@@ -47,6 +56,7 @@ function setup(options: {
     getAvailabilityForCell: () => undefined,
     declinedJobsByTech: options.declined ?? new Map<string, Set<string>>(),
     roleSlotsByJob: options.slotsByJob ?? slots,
+    hasStaffingAssignment: undefined as Parameters<typeof useMatrixJobFocus>[0]['hasStaffingAssignment'],
     lastRoleByTechnician: new Map<string, string>(),
     openInspector,
   };
@@ -173,5 +183,166 @@ describe('useMatrixJobFocus', () => {
     expect(message).toBe('Ya tiene otro trabajo');
     options.action.onClick();
     expect(openInspector).toHaveBeenCalledWith(TECH_1, dates[1], null);
+  });
+
+  it('reserves the sole remaining slot before a second fast click can take it', async () => {
+    const { view, run, openInspector, props } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]]]) });
+    view.rerender({ ...props, lastRoleByTechnician: new Map([[TECH_2, 'SND-MON-E']]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => {
+      view.result.current.focus?.onCellClick(TECH_1, dates[1], null);
+      view.result.current.focus?.onCellClick(TECH_2, dates[1], null);
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(openInspector).toHaveBeenCalledWith(TECH_2, dates[1], null);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('reserves the first role and picks the other available role on the next fast click', async () => {
+    const { view, run } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot(), oneSlot('SND-PA-T')]]]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => {
+      view.result.current.focus?.onNameClick(TECH_1);
+      view.result.current.focus?.onNameClick(TECH_2);
+    });
+    expect(run.mock.calls.map(([intent]) => intent.kind === 'assign' && intent.role)).toEqual(['SND-MON-E', 'SND-PA-T']);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('ignores duplicate clicks for the same job and technician while pending', async () => {
+    const { view, run } = setup();
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => {
+      view.result.current.focus?.onCellClick(TECH_1, dates[1], null);
+      view.result.current.focus?.onCellClick(TECH_1, dates[2], null);
+      view.result.current.focus?.onNameClick(TECH_1);
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it.each(['rejected', 'thrown'])('releases the reservation after a %s command', async (failure) => {
+    const { view, run, openInspector } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]]]) });
+    if (failure === 'rejected') run.mockResolvedValueOnce(rejectedOutcome);
+    else run.mockRejectedValueOnce(new Error('Offline'));
+    await act(async () => { view.result.current.focus?.onNameClick(TECH_1); });
+    act(() => { view.result.current.focus?.onNameClick(TECH_2); });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ technicianId: TECH_2, role: 'SND-MON-E' }));
+    expect(openInspector).not.toHaveBeenCalled();
+  });
+
+  it('keeps successful reservations until the read model catches up', async () => {
+    const { view, run, openInspector, props } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]]]) });
+    await act(async () => { view.result.current.focus?.onNameClick(TECH_1); });
+    view.rerender({ ...props, lastRoleByTechnician: new Map([[TECH_2, 'SND-MON-E']]) });
+    act(() => { view.result.current.focus?.onNameClick(TECH_2); });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(openInspector).toHaveBeenCalledWith(TECH_2, dates[1], null);
+  });
+
+  it('does not double-count a pending reservation painted into both caches', async () => {
+    const { view, run, props } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 2)]]]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => { view.result.current.focus?.onCellClick(TECH_1, dates[1], null); });
+    view.rerender({ ...props,
+      getAssignmentForCell: (technicianId: string) => technicianId === TECH_1 ? makeMatrixRow({ sound_role: 'SND-MON-E' }) : undefined,
+      roleSlotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 2, 1)]]]),
+    });
+    act(() => {
+      view.result.current.focus?.onCellClick(TECH_1, dates[2], null);
+      view.result.current.focus?.onNameClick(TECH_2);
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls.map(([intent]) => intent.technicianId)).toEqual([TECH_1, TECH_2]);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('keeps capacity occupied when the matrix paints before the staffing summary', async () => {
+    const { view, run, props, openInspector } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]]]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => { view.result.current.focus?.onNameClick(TECH_1); });
+    view.rerender({ ...props,
+      getAssignmentForCell: (technicianId: string) => technicianId === TECH_1 ? makeMatrixRow({ sound_role: 'SND-MON-E' }) : undefined,
+      lastRoleByTechnician: new Map([[TECH_2, 'SND-MON-E']]),
+    });
+    act(() => { view.result.current.focus?.onNameClick(TECH_2); });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(openInspector).toHaveBeenCalledWith(TECH_2, dates[1], null);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('retires a caught-up success so a later removal frees the slot', async () => {
+    const { view, run, props } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]]]) });
+    await act(async () => { view.result.current.focus?.onNameClick(TECH_1); });
+    view.rerender({ ...props,
+      getAssignmentForCell: (technicianId: string) => technicianId === TECH_1 ? makeMatrixRow({ sound_role: 'SND-MON-E' }) : undefined,
+      roleSlotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 1, 1)]]]),
+    });
+    view.rerender(props);
+    act(() => { view.result.current.focus?.onNameClick(TECH_2); });
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves pending reservations across job changes without blocking another job', async () => {
+    const { view, run, props, openInspector } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot()]], [JOB_B, [oneSlot()]]]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => { view.result.current.focus?.onNameClick(TECH_1); });
+    view.rerender({ ...props, focusJobId: JOB_B });
+    await act(async () => { view.result.current.focus?.onNameClick(TECH_1); });
+    expect(run).toHaveBeenCalledTimes(2);
+    view.rerender({ ...props, lastRoleByTechnician: new Map([[TECH_2, 'SND-MON-E']]) });
+    act(() => {
+      view.result.current.focus?.onNameClick(TECH_1);
+      view.result.current.focus?.onNameClick(TECH_2);
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(openInspector).toHaveBeenCalledWith(TECH_2, dates[1], null);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('does not double-count exact summary membership before the grid catches up', async () => {
+    const { view, run, props } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 2)]]]) });
+    const pending = deferredRun();
+    run.mockReturnValueOnce(pending.promise);
+    act(() => { view.result.current.focus?.onNameClick(TECH_1); });
+    view.rerender({ ...props,
+      roleSlotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 2, 1)]]]),
+      hasStaffingAssignment: (jobId, technicianId, role) => jobId === JOB_A && technicianId === TECH_1 && role === 'SND-MON-E',
+    });
+    act(() => {
+      view.result.current.focus?.onNameClick(TECH_1);
+      view.result.current.focus?.onNameClick(TECH_2);
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls.map(([intent]) => intent.technicianId)).toEqual([TECH_1, TECH_2]);
+    await act(async () => { pending.finish(okOutcome); });
+  });
+
+  it('counts same-role reservations per membership and releases only the failed one', async () => {
+    const { view, run, props, openInspector } = setup({ slotsByJob: new Map([[JOB_A, [oneSlot('SND-MON-E', 2)]]]) });
+    const first = deferredRun();
+    const second = deferredRun();
+    run.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    view.rerender({ ...props, lastRoleByTechnician: new Map([[TECH_3, 'SND-MON-E']]) });
+    act(() => {
+      view.result.current.focus?.onNameClick(TECH_1);
+      view.result.current.focus?.onNameClick(TECH_2);
+      view.result.current.focus?.onNameClick(TECH_3);
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(openInspector).toHaveBeenCalledWith(TECH_3, dates[1], null);
+    await act(async () => { first.finish(rejectedOutcome); });
+    act(() => { view.result.current.focus?.onNameClick(TECH_3); });
+    expect(run).toHaveBeenCalledTimes(3);
+    act(() => { view.result.current.focus?.onNameClick(TECH_1); });
+    expect(run).toHaveBeenCalledTimes(3);
+    await act(async () => { second.finish(okOutcome); });
   });
 });

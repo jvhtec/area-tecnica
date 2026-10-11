@@ -47,12 +47,12 @@ class RunnerTests(unittest.TestCase):
         with patch.object(runner.subprocess, 'run', side_effect=self.child), patch('builtins.print'):
             return runner.run(self.root, self.checkout, Path('/local/supabase'), Path('/local/node'), 55800)
 
-    def test_runs_four_separate_real_suites_then_teardown_without_exporting_secrets(self):
+    def test_runs_five_separate_real_suites_then_teardown_without_exporting_secrets(self):
         summary = self.invoke()
-        self.assertEqual(sum(item['passed'] for item in summary['suites']), 44)
+        self.assertEqual(sum(item['passed'] for item in summary['suites']), 53)
         self.assertTrue(summary['ownedTeardownPassed'])
         self.assertEqual(self.calls[-1][0][3], 'teardown')
-        self.assertEqual(len(self.calls), 12)
+        self.assertEqual(len(self.calls), 13)
         for args, kwargs in self.calls:
             self.assertTrue(kwargs['check'])
             self.assertFalse(kwargs.get('shell', False))

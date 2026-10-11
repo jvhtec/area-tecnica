@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { bootstrapApp, isMobileViewport } from "./support/app";
+import { assignmentCommandLedger, assignmentEffects, assertAtomicUndo, assertNoAssignmentEffects } from "./support/assignmentCommands";
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const day = (offset: number) => {
@@ -39,14 +40,21 @@ async function openMatrix(page: Page, options: Options = {}) {
   const row = (technicianId: string) => {
     const entry = assigned.get(technicianId);
     return entry
-      ? { id: `assignment-${technicianId}`, status: entry.status, sound_role: entry.role, lights_role: null, video_role: null, production_role: null, single_day: false, assignment_date: null, assignment_source: "direct" }
+      ? { id: `assignment-${technicianId}`, status: entry.status, sound_role: entry.role, lights_role: null, video_role: null, production_role: null, single_day: entry.dates.length === 1, assignment_date: entry.dates.length === 1 ? entry.dates[0] : null, assignment_source: "direct" }
       : null;
   };
-  const token = (technicianId: string) => `token-${technicianId}-${assigned.get(technicianId)?.dates.join("+") ?? "none"}-${assigned.get(technicianId)?.status ?? ""}`;
+  const token = (technicianId: string) => `token-${technicianId}-${assigned.get(technicianId)?.dates.join("+") ?? "none"}-${assigned.get(technicianId)?.status ?? ""}-${assigned.get(technicianId)?.role ?? ""}`;
   const pairState = (technicianId: string) => ({ exists: assigned.has(technicianId), assignment: row(technicianId), dates: assigned.get(technicianId)?.dates ?? [], state_token: token(technicianId) });
+  const ledger = assignmentCommandLedger({
+    read: pairState,
+    restore: (technicianId, prior) => {
+      if (prior.exists && prior.assignment) assigned.set(technicianId, { status: String(prior.assignment.status), role: String(prior.assignment.sound_role), dates: [...prior.dates] });
+      else assigned.delete(technicianId);
+    },
+  });
   const result = (id: string, technicianId: string, extra: Body = {}) => ({
     ok: true, outcome: "committed", command_id: id, job_id: JOB_ID, technician_id: technicianId, state_token: token(technicianId),
-    replayed: false, assignment: row(technicianId), dates: assigned.get(technicianId)?.dates ?? [], side_effects: [], warnings: [], ...extra,
+    replayed: false, assignment: row(technicianId), dates: assigned.get(technicianId)?.dates ?? [], side_effects: assignmentEffects(JOB_ID, id), warnings: [], ...extra,
   });
   const rejection = (id: string, technicianId: string, code: Rejection) => ({
     ok: false, outcome: "rejected", code, message: code === "conflict" ? "Ya tiene otro trabajo esos días" : "Cambió mientras tanto", command_id: id, job_id: JOB_ID, technician_id: technicianId,
@@ -61,18 +69,20 @@ async function openMatrix(page: Page, options: Options = {}) {
     auth: { role: "management", department: "sound" },
     tables: {
       jobs: [job], job_date_types: [],
-      job_assignments: () => [...assigned].map(([technicianId, entry]) => ({ job_id: JOB_ID, technician_id: technicianId, status: entry.status, sound_role: entry.role, single_day: false, assignment_date: null, assigned_at: `${day(0)}T09:00:00Z`, assigned_by: null })),
+      job_assignments: () => [...assigned].map(([technicianId, entry]) => ({ job_id: JOB_ID, technician_id: technicianId, status: entry.status, sound_role: entry.role, single_day: entry.dates.length === 1, assignment_date: entry.dates.length === 1 ? entry.dates[0] : null, assigned_at: `${day(0)}T09:00:00Z`, assigned_by: null })),
       timesheets: () => [...assigned].flatMap(([technicianId, entry]) => entry.dates.map((date) => ({ id: `ts-${technicianId}-${date}`, job_id: JOB_ID, technician_id: technicianId, date, is_active: true, source: "direct" }))),
       job_required_roles_summary: [{ job_id: JOB_ID, department: "sound", roles: [{ role_code: "SND-PA-T", quantity: 6 }] }],
       technician_availability: [], technician_fridge: [], availability_schedules: [], vacation_requests: [], profiles: [], skills: [], staffing_requests: [], staffing_events: [],
     },
     rpc: {
+      ...ledger.rpc,
       get_profiles_with_skills: TECHS.map(({ id, first }) => ({ id, first_name: first, last_name: "Test", email: `${id}@example.test`, department: "sound", role: "technician", skills: [] })),
       get_job_staffing_summary: [], get_active_timesheet_counts_by_technician: [], get_assignment_matrix_staffing: [],
       get_assignment_matrix_staffing_filtered: [], get_staffing_requests_matrix_filtered: [],
       get_assignment_command_state: ({ body }) => pairState(String(input(body).p_technician_id)),
       apply_direct_assignment: ({ body }) => {
         const args = input(body);
+        return ledger.commit(args, () => {
         const technicianId = String(args.p_technician_id);
         const next = rejections.get(technicianId)?.shift();
         if (next) return rejection(String(args.p_command_id), technicianId, next);
@@ -80,42 +90,39 @@ async function openMatrix(page: Page, options: Options = {}) {
         const existing = assigned.get(technicianId);
         assigned.set(technicianId, { status: String(args.p_status), role: String(args.p_role), dates: [...new Set([...(existing?.dates ?? []), ...dates])].sort() });
         return result(String(args.p_command_id), technicianId);
+        });
       },
       remove_direct_assignment: ({ body }) => {
         const args = input(body);
+        return ledger.commit(args, () => {
         const technicianId = String(args.p_technician_id);
         assigned.delete(technicianId);
         return result(String(args.p_command_id), technicianId, { removed: { job_id: JOB_ID, deleted_timesheets: 2, deleted_assignment: true, assignment: null } });
+        }, false);
       },
       remove_assignment_date: ({ body }) => {
         const args = input(body);
+        return ledger.commit(args, () => {
         const technicianId = String(args.p_technician_id);
         const entry = assigned.get(technicianId);
         if (entry) entry.dates = entry.dates.filter((date) => date !== args.p_date);
         return result(String(args.p_command_id), technicianId);
+        }, false);
       },
       set_assignment_status: ({ body }) => {
         const args = input(body);
+        return ledger.commit(args, () => {
         const technicianId = String(args.p_technician_id);
         const entry = assigned.get(technicianId);
         if (entry) entry.status = "confirmed";
         return result(String(args.p_command_id), technicianId);
+        });
       },
-      unconfirm_assignment: ({ body }) => {
-        const args = input(body);
-        const technicianId = String(args.p_technician_id);
-        const entry = assigned.get(technicianId);
-        if (entry) entry.status = "invited";
-        return result(String(args.p_command_id), technicianId);
-      },
-      claim_assignment_side_effects: { claim_token: "claim-1", effects: [] },
-      record_assignment_side_effects: { ok: true },
-      supersede_assignment_side_effects: { superseded: 0, not_superseded: 0, commands: [] },
     },
     functions: { push: { ok: true }, "manage-flex-crew-assignments": { ok: true } },
   });
   await page.goto("/job-assignment-matrix");
-  return { calls, assigned };
+  return { calls, assigned, ledger };
 }
 
 type Calls = Awaited<ReturnType<typeof openMatrix>>["calls"];
@@ -208,7 +215,7 @@ test("shift-click extends the selection from the last cell", async ({ page }) =>
 });
 
 test("assigning a selection to a job runs one command per person and one Deshacer undoes them all", async ({ page }) => {
-  const { calls } = await openMatrix(page);
+  const { calls, assigned, ledger } = await openMatrix(page);
   await pick(page, block(["t-ana", "t-beto", "t-carla"], [D1, D2]));
   await expect(bar(page)).toContainText("6 celdas · 3 personas");
 
@@ -226,12 +233,15 @@ test("assigning a selection to a job runs one command per person and one Deshace
   const toast = toastWith(page, "3 personas asignadas");
   await expect(toast.getByRole("button", { name: "Deshacer" })).toBeVisible();
   await toast.getByRole("button", { name: "Deshacer" }).click();
-  await expect.poll(() => rpcBodies(calls, "remove_direct_assignment").length).toBe(3);
-  await expect(cell(page, "t-ana", D1)).not.toContainText("Gira Lúa");
+  await expect.poll(() => rpcBodies(calls, "undo_assignment_command").length).toBe(3);
+  for (const original of rpcBodies(calls, "apply_direct_assignment")) {
+    assertAtomicUndo(calls, ledger, String(original.p_command_id));
+    expect(assigned.has(String(original.p_technician_id))).toBe(false);
+    for (const date of [D1, D2]) await expect(cell(page, String(original.p_technician_id), date)).not.toContainText("Gira Lúa");
+  }
   // Nobody was told: the changes were taken back inside the undo window.
   await page.waitForTimeout(9_500);
-  expect(calls.rpcCalls.map((call) => call.name)).not.toContain("claim_assignment_side_effects");
-  expect(calls.functionCalls.map((call) => call.name)).not.toContain("push");
+  assertNoAssignmentEffects(calls);
 });
 
 test("Confirmado in the popover assigns confirmed", async ({ page }) => {
@@ -288,7 +298,7 @@ test("a pair that changed elsewhere meanwhile fails alone and Reintentar goes th
 });
 
 test("Confirmar confirms every invitation, and one Deshacer takes them back", async ({ page }) => {
-  const { calls } = await openMatrix(page, { initial: {
+  const { calls, assigned, ledger } = await openMatrix(page, { initial: {
     "t-ana": { status: "invited", dates: [D1, D2] }, "t-beto": { status: "invited", dates: [D1, D2] }, "t-carla": { status: "invited", dates: [D1, D2] },
   } });
   await pick(page, block(["t-ana", "t-beto", "t-carla"], [D1]));
@@ -299,7 +309,15 @@ test("Confirmar confirms every invitation, and one Deshacer takes them back", as
   const toast = toastWith(page, "3 asignaciones confirmadas");
   await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "Deshacer" }).click();
-  await expect.poll(() => rpcBodies(calls, "unconfirm_assignment").length).toBe(3);
+  await expect.poll(() => rpcBodies(calls, "undo_assignment_command").length).toBe(3);
+  for (const original of rpcBodies(calls, "set_assignment_status")) {
+    const technicianId = String(original.p_technician_id);
+    assertAtomicUndo(calls, ledger, String(original.p_command_id));
+    expect(assigned.get(technicianId)).toEqual({ status: "invited", role: "SND-PA-T", dates: [D1, D2] });
+    await expect(cell(page, technicianId, D1)).toHaveAttribute("data-matrix-cell-state", "pending");
+  }
+  await page.waitForTimeout(9_500);
+  assertNoAssignmentEffects(calls);
 });
 
 test("Quitar asks once, inline, with the count; removing every day removes the assignment", async ({ page }) => {
