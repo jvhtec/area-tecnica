@@ -55,7 +55,7 @@ describe("matrix mutation surfaces use the assignment command layer", () => {
     ["src/hooks/useJobAssignmentsRealtime.ts", "removeDirectAssignment("],
     ["src/hooks/useJobAssignmentsRealtime.ts", "applyDirectAssignment("],
     ["src/features/matrix-v2/commandRunner.ts", "applyDirectAssignment("],
-    ["src/features/matrix-v2/commandRunner.ts", "unconfirmAssignment("],
+    ["src/features/matrix-v2/commandRunner.ts", "undoAssignmentCommand("],
     ["src/features/matrix-v2/inspector/useCellInspectorModel.ts", "env.runner.run("],
     ["src/features/matrix-v2/focus/focusAssign.ts", "runner.run("],
     ["src/features/matrix-v2/batch/runBatch.ts", "runner.run("],

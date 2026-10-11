@@ -9,6 +9,13 @@ import { loadStaffingHandler, StaffingDatabase } from '../../supabase/functions/
 // HTTP/PostgREST, SQL RPCs, constraints and triggers are real; delivery/auth are
 // stubbed by the shared handler runner. See the review document for provisioning.
 const endpoint = process.env.STAFFING_TEST_REST_URL;
+const container = process.env.STAFFING_TEST_DB_CONTAINER;
+const localEndpoint = endpoint?.match(/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):([1-9]\d{0,4})\/?$/);
+const permitted = Boolean(localEndpoint && Number(localEndpoint[1]) <= 65535 && container) && (
+  (process.env.GITHUB_ACTIONS === 'true' && container === 'supabase_db_syldobdcdsgfgjtbuwxm')
+  || process.env.ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL === container
+  || (endpoint === 'http://127.0.0.1:18089' && container === 'supabase_db_pr990staffingreview')
+);
 const realFetch = globalThis.fetch;
 const techId = 'cb910000-0000-0000-0000-000000000001';
 const managerId = 'cb910000-0000-0000-0000-000000000002';
@@ -18,7 +25,7 @@ let afterPendingRead: (() => Promise<void>) | undefined;
 
 describe.skipIf(!endpoint)('staffing handlers against isolated PostgREST', () => {
   beforeAll(async () => {
-    if (endpoint !== 'http://127.0.0.1:18089') throw new Error('This fixture suite only permits the disposable local review endpoint');
+    if (!permitted) throw new Error('Only an explicitly admitted loopback disposable test target is permitted');
     client = createClient(endpoint, 'local-review-placeholder', {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { fetch: async (input, init) => {

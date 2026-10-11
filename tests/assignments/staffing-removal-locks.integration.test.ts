@@ -53,6 +53,7 @@ class SqlSession {
 describe.skipIf(!container)('atomic acceptance versus assignment removal locks', () => {
   it.each(['lifecycle', 'timesheets', 'recreated', 'job', 'profile', 'creator'] as const)('serializes acceptance after %s removal without a deadlock', async mode => {
     if (container !== 'supabase_db_pr990staffingreview'
+      && process.env.ASSIGNMENT_COMMAND_TEST_ALLOW_LOCAL !== container
       && !(process.env.GITHUB_ACTIONS === 'true' && container === 'supabase_db_syldobdcdsgfgjtbuwxm')) {
       throw new Error('Only the disposable review or GitHub Actions database is permitted');
     }

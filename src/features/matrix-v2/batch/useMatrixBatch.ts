@@ -22,6 +22,7 @@ import { markUnavailableManyWithUndo } from '@/features/matrix-v2/unavailability
 import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
 import type { MatrixJob } from '@/hooks/useOptimizedMatrixData';
 import { madridDateKeyToCalendarDate } from '@/utils/timezoneUtils';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Kind = 'assign' | 'confirm' | 'remove' | 'availability' | 'offer';
 
@@ -61,7 +62,19 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
   const [rows, setRowsState] = React.useState<BatchRow[]>([]);
   const rowsRef = React.useRef<BatchRow[]>([]);
   const [running, setRunning] = React.useState(false);
+  const runningRef = React.useRef(false);
   const [dismissed, setDismissed] = React.useState(false);
+
+  const begin = React.useCallback(() => {
+    if (runningRef.current) return false;
+    runningRef.current = true;
+    setRunning(true);
+    return true;
+  }, []);
+  const finish = React.useCallback(() => {
+    runningRef.current = false;
+    setRunning(false);
+  }, []);
 
   const setRows = React.useCallback((next: BatchRow[] | ((previous: BatchRow[]) => BatchRow[])) => {
     rowsRef.current = typeof next === 'function' ? next(rowsRef.current) : next;
@@ -103,7 +116,9 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
     else toast.success(title, { description });
   }, []);
 
-  const execute = React.useCallback(async (planned: BatchRow[], kind: Kind) => {
+  // Removal already owns the operation while reading state; it uses this same
+  // row execution without releasing and reacquiring the guard between phases.
+  const executeRows = React.useCallback(async (planned: BatchRow[], kind: Kind) => {
     if (!runner) return;
     if (planned.length === 0) {
       toast.info('No hay nada que hacer con esta selección.');
@@ -111,28 +126,38 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
     }
     setDismissed(false);
     setRows(planned);
-    setRunning(true);
+    const final = await runBatch(runner, planned, { onRow: replaceRow, sendStaffing });
+    setRows(final);
+    report(final, kind);
+  }, [runner, setRows, replaceRow, report, sendStaffing]);
+
+  const execute = React.useCallback(async (planned: BatchRow[], kind: Kind) => {
+    if (!runner || runningRef.current) return;
+    if (planned.length === 0) return executeRows(planned, kind);
+    if (!begin()) return;
     try {
-      const final = await runBatch(runner, planned, { onRow: replaceRow, sendStaffing });
-      setRows(final);
-      report(final, kind);
+      await executeRows(planned, kind);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'No se pudo aplicar el cambio a la selección.'));
     } finally {
-      setRunning(false);
+      finish();
       clearSelection();
     }
-  }, [runner, setRows, replaceRow, report, clearSelection, sendStaffing]);
+  }, [runner, begin, executeRows, finish, clearSelection]);
 
   const assignTo = React.useCallback((jobId: string, status: 'invited' | 'confirmed') => {
+    if (runningRef.current) return;
     void execute(planAssignRows(selectedCells, jobId, status, lookups), 'assign');
   }, [execute, selectedCells, lookups]);
 
   /** Availability requests or offers for everyone selected, on the person's usual channel. */
   const requestStaffing = React.useCallback((jobId: string, phase: StaffingPhase) => {
-    if (!staffing) return;
+    if (!staffing || runningRef.current) return;
     void execute(planStaffingRows(selectedCells, jobId, phase, staffing.channel, staffing.department, lookups), phase);
   }, [execute, selectedCells, lookups, staffing]);
 
   const confirm = React.useCallback(() => {
+    if (runningRef.current) return;
     const plan = planConfirmRows(selectedCells, lookups);
     if (plan.rows.length === 0) {
       const reasons = [
@@ -149,31 +174,39 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
 
   /** Reads each pair's real days first: removing a pair's last day is a removal of the assignment. */
   const remove = React.useCallback(async () => {
+    if (runningRef.current) return;
     const { pairs } = groupAssignedPairs(selectedCells, lookups);
     if (pairs.length === 0 || !runner) {
       toast.info('No hay asignaciones que quitar en esta selección.');
       clearSelection();
       return;
     }
-    setRunning(true);
-    const states = new Map<string, AssignmentCommandState>();
-    const queue = [...pairs];
-    const worker = async () => {
-      for (let pair = queue.shift(); pair; pair = queue.shift()) {
-        try {
-          // The runner's own cache: the removal commands that follow reuse this read.
-          states.set(pairKey(pair.technicianId, pair.jobId), await runner.loadState(pair.jobId, pair.technicianId));
-        } catch {
-          // The row is skipped with a reason rather than guessed at.
+    if (!begin()) return;
+    try {
+      const states = new Map<string, AssignmentCommandState>();
+      const queue = [...pairs];
+      const worker = async () => {
+        for (let pair = queue.shift(); pair; pair = queue.shift()) {
+          try {
+            // The runner's own cache: the removal commands that follow reuse this read.
+            states.set(pairKey(pair.technicianId, pair.jobId), await runner.loadState(pair.jobId, pair.technicianId));
+          } catch {
+            // The row is skipped with a reason rather than guessed at.
+          }
         }
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(STATE_READS_IN_FLIGHT, pairs.length) }, worker));
-    setRunning(false);
-    await execute(buildRemoveRows(pairs, states, lookups), 'remove');
-  }, [selectedCells, lookups, runner, execute, clearSelection]);
+      };
+      await Promise.all(Array.from({ length: Math.min(STATE_READS_IN_FLIGHT, pairs.length) }, worker));
+      await executeRows(buildRemoveRows(pairs, states, lookups), 'remove');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'No se pudieron quitar las asignaciones.'));
+    } finally {
+      finish();
+      clearSelection();
+    }
+  }, [selectedCells, lookups, runner, begin, executeRows, finish, clearSelection]);
 
   const markUnavailable = React.useCallback(async () => {
+    if (runningRef.current) return;
     if (!canEdit) {
       toast.error('Solo managers y administradores pueden marcar disponibilidad.');
       return;
@@ -189,30 +222,41 @@ export function useMatrixBatch({ v2, canEdit, selectedCells, clearSelection, loo
       clearSelection();
       return;
     }
-    setRunning(true);
-    const result = await markUnavailableManyWithUndo(groups);
-    setRunning(false);
-    if (!result.ok) toast.error(result.message);
-    else if (withAssignment > 0) toast.info(`${plural(withAssignment, 'celda con asignación se dejó', 'celdas con asignación se dejaron')} como estaban.`);
-    clearSelection();
-  }, [canEdit, selectedCells, lookups, clearSelection]);
+    if (!begin()) return;
+    try {
+      const result = await markUnavailableManyWithUndo(groups);
+      if (!result.ok) toast.error(result.message);
+      else if (withAssignment > 0) toast.info(`${plural(withAssignment, 'celda con asignación se dejó', 'celdas con asignación se dejaron')} como estaban.`);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'No se pudo marcar la selección como no disponible.'));
+    } finally {
+      finish();
+      clearSelection();
+    }
+  }, [canEdit, selectedCells, lookups, begin, finish, clearSelection]);
 
   /** Runs one row again; Forzar accepts the clash it stopped on. */
   const rerun = React.useCallback(async (rowId: string, force: boolean) => {
     const row = rowsRef.current.find((candidate) => candidate.id === rowId);
-    if (!row || !runner || row.status !== 'failed') return;
-    const finished = await runRow(runner, retryRow(row, { force }), replaceRow, sendStaffing);
-    if (finished.status === 'done') {
-      const undo = batchReversible([finished]) ? combineUndos(finished.undos) : null;
-      const title = `${finished.name}: cambio aplicado`;
-      if (undo) showUndoToast({ title, description: finished.summary, undo });
-      else toast.success(title, { description: finished.summary });
+    if (!row || !runner || row.status !== 'failed' || !begin()) return;
+    try {
+      const finished = await runRow(runner, retryRow(row, { force }), replaceRow, sendStaffing);
+      if (finished.status === 'done') {
+        const undo = batchReversible([finished]) ? combineUndos(finished.undos) : null;
+        const title = `${finished.name}: cambio aplicado`;
+        if (undo) showUndoToast({ title, description: finished.summary, undo });
+        else toast.success(title, { description: finished.summary });
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'No se pudo volver a aplicar el cambio.'));
+    } finally {
+      finish();
     }
-  }, [runner, replaceRow, sendStaffing]);
+  }, [runner, replaceRow, sendStaffing, begin, finish]);
 
   const openRow = React.useCallback((row: BatchRow) => {
     const date = row.openAt ? madridDateKeyToCalendarDate(row.openAt.dateKey) : null;
-    if (row.openAt && date) v2?.openInspector(row.openAt.technicianId, date, null);
+    if (row.openAt && date) v2?.openInspector(row.openAt.technicianId, date, null, undefined, row.staffingDraft);
   }, [v2]);
 
   const problems = React.useMemo(() => (dismissed ? [] : problemRows(rows)), [rows, dismissed]);

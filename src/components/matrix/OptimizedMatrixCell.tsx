@@ -263,12 +263,12 @@ export const OptimizedMatrixCell = memo(({
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
 
-    // Optimistic update
-    onOptimisticUpdate?.(action === 'confirm' ? 'confirmed' : 'declined');
+    // V2 owns prediction in the runner; decline first asks for confirmation.
+    if (!inspectorMode) onOptimisticUpdate?.(action === 'confirm' ? 'confirmed' : 'declined');
 
     // Then trigger actual update
     onClick(action);
-  }, [onClick, onOptimisticUpdate]);
+  }, [onClick, onOptimisticUpdate, inspectorMode]);
 
   // One vocabulary for the whole grid: the state decides both the cell wash and
   // the rounded status card drawn inside it (see matrixCellVisuals).

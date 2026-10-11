@@ -43,9 +43,14 @@ export function planFocusAssign(input: FocusAssignInput): FocusAssignPlan {
   const { technician, jobId, days, jobDays, status, slots, lastRoleCode, existingRole, source = 'matrix-focus' } = input;
   if (days.length === 0) return { kind: 'inspect', reason: 'no-days' };
   const discipline = roleDisciplineForDepartment(technician.department);
+  const departmentSlots = slotsForDepartment(slots, discipline);
+  // Automatic clicks may fill requirements; exceeding them needs an explicit choice.
+  if (!existingRole && departmentSlots.length > 0 && !departmentSlots.some((slot) => slot.open > 0)) {
+    return { kind: 'inspect', reason: 'role' };
+  }
   const role = existingRole ?? suggestRole({
     technician,
-    slots: slotsForDepartment(slots, discipline),
+    slots: departmentSlots,
     lastRoleCode: lastRoleCode ?? null,
   }).code;
   if (!role) return { kind: 'inspect', reason: 'role' };
@@ -73,12 +78,13 @@ export async function runFocusAssign(
   runner: MatrixCommandRunner,
   plan: Extract<FocusAssignPlan, { kind: 'run' }>,
   { name, jobTitle, openInspector }: { name: string; jobTitle: string; openInspector: () => void },
-): Promise<void> {
+): Promise<boolean> {
   const outcome = await runner.run(plan.intent);
   if (!outcome.ok) {
     toast.error(outcome.message, { action: { label: 'Abrir celda', onClick: openInspector } });
-    return;
+    return false;
   }
   const verb = plan.intent.status === 'confirmed' ? 'confirmado' : 'invitado';
   reportDone(`${name} ${verb}`, outcome, `${jobTitle} · ${dayRangeLabel(plan.days)}`);
+  return true;
 }

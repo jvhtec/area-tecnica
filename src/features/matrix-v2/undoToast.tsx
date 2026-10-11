@@ -15,6 +15,19 @@ interface UndoToastOptions {
  */
 export function showUndoToast({ title, description, undo, onUndone }: UndoToastOptions) {
   const remaining = Math.max(undo.expiresAt - Date.now(), 1_000);
+  const attempt = async () => {
+    const outcome = await undo.undo();
+    if (outcome.ok) {
+      toast.success('Cambio deshecho');
+      onUndone?.();
+    } else {
+      toast.error(outcome.message, {
+        action: outcome.reason === 'failed' && undo.isOpen()
+          ? { label: 'Volver a intentar', onClick: () => { void attempt(); } }
+          : undefined,
+      });
+    }
+  };
   return toast.custom(
     (id) => (
       <div
@@ -30,13 +43,7 @@ export function showUndoToast({ title, description, undo, onUndone }: UndoToastO
           className="shrink-0 rounded-md px-2 py-1 text-sm font-bold underline underline-offset-4 hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={async () => {
             toast.dismiss(id);
-            const outcome = await undo.undo();
-            if (outcome.ok) {
-              toast.success('Cambio deshecho');
-              onUndone?.();
-            } else {
-              toast.error(outcome.message);
-            }
+            await attempt();
           }}
         >
           Deshacer

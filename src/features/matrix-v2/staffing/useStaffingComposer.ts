@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -50,31 +50,46 @@ export interface InFlightRequest {
  * resend the availability request, or cancel it.
  */
 export function useStaffingComposer({ env, technician, target, onDone }: Options) {
-  const { technicianId, date, dateKey } = target;
+  const { technicianId, date, dateKey, staffingDraft: draft } = target;
   const staffing = env.staffingByDate(technicianId, dateKey);
   const api = env.staffing;
   const name = technicianDisplayName(technician);
   const discipline = roleDisciplineForDepartment(technician?.department);
   const declined = env.declinedJobIds(technicianId);
+  const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<StaffingConflictSummary | null>(null);
+  const rejected = useRef<{ payload: StaffingSendPayload; fingerprint: string } | null>(null);
+  const editVersion = useRef(0);
+  const clearDecision = useCallback(() => {
+    editVersion.current += 1;
+    rejected.current = null;
+    setConflict(null);
+    setError(null);
+  }, []);
 
   const availabilityOut = staffing?.availability_status === 'requested';
   const offerOut = staffing?.offer_status === 'sent';
   const availabilityConfirmed = staffing?.availability_status === 'confirmed' && !offerOut && staffing?.offer_status !== 'confirmed';
 
-  const [pickedPhase, setPickedPhase] = useState<StaffingPhase | null>(null);
+  const [pickedPhase, setPickedPhase] = useState<StaffingPhase | null>(draft?.phase ?? null);
   // Once they have said yes, the next thing to send is the offer.
   const phase = pickedPhase ?? (availabilityConfirmed ? 'offer' : 'availability');
 
   const jobOptions = useMemo<JobOption[]>(
-    () => env.getJobsForDate(date).filter(isFocusableJob).map((job) => ({
-      job,
-      declined: declined?.has(job.id) ?? false,
-      open: slotsForDepartment(env.roleSlotsByJob.get(job.id), discipline).filter((slot) => slot.open > 0),
-    })),
-    [env, date, declined, discipline],
+    () => {
+      const jobs = env.getJobsForDate(date);
+      const draftJob = draft ? env.getJob(draft.jobId) : undefined;
+      const options = draft ? [...jobs.filter((job) => job.id !== draft.jobId), ...(draftJob ? [draftJob] : [])] : jobs;
+      return options.filter(isFocusableJob).map((job) => ({
+        job,
+        declined: declined?.has(job.id) ?? false,
+        open: slotsForDepartment(env.roleSlotsByJob.get(job.id), discipline).filter((slot) => slot.open > 0),
+      }));
+    },
+    [env, date, declined, discipline, draft],
   );
   const selectable = jobOptions.filter((option) => !option.declined);
-  const [pickedJobId, setPickedJobId] = useState<string | null>(null);
+  const [pickedJobId, setPickedJobId] = useState<string | null>(draft?.jobId ?? null);
   const defaultJobId = useMemo(() => {
     const confirmedFor = staffing?.availability_job_id;
     if (availabilityConfirmed && confirmedFor && selectable.some((option) => option.job.id === confirmedFor)) return confirmedFor;
@@ -85,14 +100,21 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
   const job = jobOptions.find((option) => option.job.id === jobId)?.job;
   const jobDays = useMemo(() => jobDayKeys(job), [job]);
 
-  const [pickedDays, setPickedDays] = useState<{ jobId: string; days: string[] } | null>(null);
-  const days = pickedDays && pickedDays.jobId === jobId ? pickedDays.days : jobDays;
+  const [pickedDays, setPickedDays] = useState<{ jobId: string; days: string[] } | null>(
+    draft ? { jobId: draft.jobId, days: draft.days } : null,
+  );
+  const days = useMemo(() => {
+    const selected = pickedDays && pickedDays.jobId === jobId ? pickedDays.days : jobDays;
+    // A retained selection can shrink with the real job, but cannot widen to it.
+    return draft ? selected.filter((day) => jobDays.includes(day)) : selected;
+  }, [pickedDays, jobId, jobDays, draft]);
   const toggleDay = useCallback((key: string) => {
+    clearDecision();
     const next = new Set(days);
     if (next.has(key)) next.delete(key);
     else next.add(key);
     setPickedDays({ jobId, days: [...next].sort() });
-  }, [days, jobId]);
+  }, [days, jobId, clearDecision]);
 
   const suggestion = useMemo(() => suggestRole({
     technician: technician ?? { department: null, skills: null },
@@ -102,14 +124,21 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
   const [pickedRole, setPickedRole] = useState<string | null>(null);
   const role = pickedRole ?? suggestion.code;
 
-  const [pickedMessage, setPickedMessage] = useState<{ jobId: string; text: string } | null>(null);
+  const [pickedMessage, setPickedMessage] = useState<{ jobId: string; text: string } | null>(
+    draft ? { jobId: draft.jobId, text: draft.message } : null,
+  );
   const message = pickedMessage && pickedMessage.jobId === jobId ? pickedMessage.text : jobDescription(job);
   const [messageOpen, setMessageOpen] = useState(false);
+  const [pickedChannel, setPickedChannel] = useState<StaffingChannel | null>(null);
+  const channel = draft ? pickedChannel ?? draft.channel : api.channel;
+  const department = draft ? draft.department : api.department;
 
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<StaffingConflictSummary | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState<StaffingPhase | null>(null);
+
+  // Include whole-job dates and derived defaults: they can change without a form edit.
+  const fingerprint = JSON.stringify({ technicianId, dateKey, jobId, phase, days, jobDays, role, message, channel, department });
+  useEffect(clearDecision, [fingerprint, clearDecision]);
 
   const inFlight = useMemo<InFlightRequest[]>(() => {
     const requests: InFlightRequest[] = [];
@@ -127,9 +156,12 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
   }, [availabilityOut, offerOut, staffing]);
 
   const needsRole = phase === 'offer';
-  const canSend = !busy && !!job && !!env.canAssign && days.length > 0 && (!needsRole || !!role);
+  const canSend = !busy && !!job && !!env.canAssign && days.length > 0 && (!needsRole || !!role)
+    && (!draft || (!declined?.has(jobId) && !env.isFridge(technicianId)));
 
-  const run = useCallback(async (payload: StaffingSendPayload, success: (channel: string | null) => string) => {
+  const run = useCallback(async (payload: StaffingSendPayload, success: (channel: string | null) => string, decisionFingerprint?: string) => {
+    const version = editVersion.current;
+    rejected.current = null;
     setBusy(true);
     setError(null);
     setConflict(null);
@@ -138,7 +170,12 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
       toast.success(success(result?.channel ?? null));
       onDone();
     } catch (cause) {
-      if (cause instanceof ConflictError) setConflict(describeStaffingConflict(cause.details));
+      // A late failure cannot restore an approval invalidated by a semantic edit.
+      if (version !== editVersion.current) return;
+      if (cause instanceof ConflictError) {
+        if (decisionFingerprint) rejected.current = { payload, fingerprint: decisionFingerprint };
+        setConflict(describeStaffingConflict(cause.details));
+      }
       else setError(getErrorMessage(cause, 'No se pudo enviar la solicitud'));
     } finally {
       setBusy(false);
@@ -147,24 +184,32 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
 
   const send = useCallback(async (overrideConflicts = false) => {
     if (!job || !canSend) return;
-    const payload = buildStaffingPayload({
-      jobId: job.id, technicianId, phase, channel: api.channel, department: api.department,
-      days, jobDays, role: needsRole ? role : null, message: needsRole ? message : null, overrideConflicts,
+    const decision = rejected.current;
+    if (overrideConflicts && (!decision || decision.fingerprint !== fingerprint)) return;
+    const payload = overrideConflicts && decision ? { ...decision.payload, override_conflicts: true } : buildStaffingPayload({
+      jobId: job.id, technicianId, phase, channel, department,
+      days, jobDays, role: needsRole ? role : null, message: needsRole ? message : null,
     });
-    const via = (used: string | null) => (used === 'whatsapp' ? 'WhatsApp' : used === 'email' ? 'Email' : channelLabel(api.channel));
+    // Even a retained selection covering today's whole job stays date-scoped.
+    if (draft) {
+      payload.single_day = true;
+      payload.dates = [...new Set(days)].sort();
+      if (payload.dates.length === 1) payload.target_date = payload.dates[0];
+    }
+    const via = (used: string | null) => (used === 'whatsapp' ? 'WhatsApp' : used === 'email' ? 'Email' : channelLabel(channel));
     await run(payload, (used) => (phase === 'offer'
       ? `Oferta de ${role ? labelForCode(role) : 'rol'} enviada a ${name} por ${via(used)}`
-      : `Disponibilidad pedida a ${name} por ${via(used)}`));
-  }, [job, canSend, technicianId, phase, api.channel, api.department, days, jobDays, needsRole, role, message, run, name]);
+      : `Disponibilidad pedida a ${name} por ${via(used)}`), fingerprint);
+  }, [job, canSend, technicianId, phase, channel, department, days, jobDays, needsRole, role, message, run, name, fingerprint, draft]);
 
   const resend = useCallback(async (request: InFlightRequest) => {
     const requestJobId = request.jobIds[0];
     if (!requestJobId || !request.requestId) return;
     await run(
-      buildResendPayload({ jobId: requestJobId, technicianId, channel: api.channel, department: api.department, requestId: request.requestId }),
-      (used) => `Solicitud reenviada a ${name} por ${used === 'whatsapp' ? 'WhatsApp' : used === 'email' ? 'Email' : channelLabel(api.channel)}`,
+      buildResendPayload({ jobId: requestJobId, technicianId, channel, department, requestId: request.requestId }),
+      (used) => `Solicitud reenviada a ${name} por ${used === 'whatsapp' ? 'WhatsApp' : used === 'email' ? 'Email' : channelLabel(channel)}`,
     );
-  }, [run, technicianId, api.channel, api.department, name]);
+  }, [run, technicianId, channel, department, name]);
 
   const cancel = useCallback(async (request: InFlightRequest) => {
     setBusy(true);
@@ -182,13 +227,13 @@ export function useStaffingComposer({ env, technician, target, onDone }: Options
   }, [api, technicianId, onDone]);
 
   return {
-    name, phase, setPhase: setPickedPhase,
-    jobOptions, jobId, pickJob: setPickedJobId, job, jobDays, days, toggleDay,
-    selectAllDays: () => setPickedDays({ jobId, days: jobDays }),
-    selectThisDayOnly: () => setPickedDays({ jobId, days: [dateKey] }),
-    suggestion, role, pickRole: setPickedRole, needsRole,
-    message, setMessage: (text: string) => setPickedMessage({ jobId, text }), messageOpen, setMessageOpen,
-    channel: api.channel, setChannel: api.setChannel,
+    name, phase, setPhase: (value: StaffingPhase) => { clearDecision(); setPickedPhase(value); },
+    jobOptions, jobId, pickJob: (value: string) => { clearDecision(); setPickedJobId(value); }, job, jobDays, days, toggleDay,
+    selectAllDays: () => { clearDecision(); setPickedDays({ jobId, days: jobDays }); },
+    selectThisDayOnly: () => { clearDecision(); setPickedDays({ jobId, days: [dateKey] }); },
+    suggestion, role, pickRole: (value: string) => { clearDecision(); setPickedRole(value); }, needsRole,
+    message, setMessage: (text: string) => { clearDecision(); setPickedMessage({ jobId, text }); }, messageOpen, setMessageOpen,
+    channel, setChannel: (value: StaffingChannel) => { clearDecision(); if (draft) setPickedChannel(value); api.setChannel(value); },
     busy, error, conflict, canSend,
     inFlight, confirmingCancel, askCancel: setConfirmingCancel,
     send, resend, cancel,

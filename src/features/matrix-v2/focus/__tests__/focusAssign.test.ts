@@ -60,4 +60,22 @@ describe('planFocusAssign', () => {
   it('has nothing to do without days', () => {
     expect(plan({ days: [] })).toEqual({ kind: 'inspect', reason: 'no-days' });
   });
+
+  it('asks for an explicit role when requirements are full instead of reusing the last role', () => {
+    expect(plan({ slots: [slot('SND-MON-E', 0)], lastRoleCode: 'SND-MON-E' })).toEqual({ kind: 'inspect', reason: 'role' });
+  });
+
+  it('keeps an existing member\'s role even when requirements are full', () => {
+    expect(plan({ slots: [slot('SND-MON-E', 0)], existingRole: 'SND-MON-E' })).toMatchObject({ kind: 'run', intent: { role: 'SND-MON-E' } });
+  });
+
+  it('preserves suggestions when the discipline has no requirements', () => {
+    expect(plan({ slots: [], lastRoleCode: 'SND-MON-E' })).toMatchObject({ kind: 'run', intent: { role: 'SND-MON-E' } });
+    expect(plan({ slots: [slot('LGT-BRD-E', 0, 'lights')], lastRoleCode: 'SND-MON-E' })).toMatchObject({ kind: 'run', intent: { role: 'SND-MON-E' } });
+    expect(plan({ slots: [], technician: makeTechnician(TECH_1, { skills: [{ name: 'RF' }] }) })).toMatchObject({ kind: 'run', intent: { role: 'SND-RF-E' } });
+  });
+
+  it('asks instead of falling back to a unique skill when requirements are full', () => {
+    expect(plan({ slots: [slot('SND-MON-E', 0)], technician: makeTechnician(TECH_1, { skills: [{ name: 'RF' }] }) })).toEqual({ kind: 'inspect', reason: 'role' });
+  });
 });

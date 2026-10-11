@@ -16,6 +16,7 @@ SUITES = [
     ('tests/assignments/staffing-campaigns.edge.integration.test.ts', 27),
     ('tests/assignments/matrix-dialog.local.integration.test.tsx', 8),
     ('tests/assignments/matrix-failure.disposable.integration.test.tsx', 3),
+    ('tests/assignments/matrix-undo.local.integration.test.tsx', 9),
 ]
 
 

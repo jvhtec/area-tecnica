@@ -111,7 +111,7 @@ test("a request is composed in the cell's own panel: intent, job and days are al
 
   await panel.getByRole("button", { name: "Pedir disponibilidad" }).click();
   await expect.poll(() => sends(calls).length).toBe(1);
-  expect(sends(calls)[0]).toMatchObject({ job_id: JOB_ID, profile_id: "t-ana", phase: "availability", channel: "email", single_day: false });
+  expect(sends(calls)[0]).toEqual({ job_id: JOB_ID, profile_id: "t-ana", phase: "availability", channel: "email", department: "sound", single_day: false });
   await expect(toastText(page, /Disponibilidad pedida a Ana Test por Email/)).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
@@ -122,7 +122,7 @@ test("picked days go out as a list, and the button says how many", async ({ page
   await panel.getByRole("button", { name: "Solo este día" }).click();
   await panel.getByRole("button", { name: "Pedir disponibilidad (1 día)" }).click();
   await expect.poll(() => sends(calls).length).toBe(1);
-  expect(sends(calls)[0]).toMatchObject({ single_day: true, dates: [D1], target_date: D1 });
+  expect(sends(calls)[0]).toEqual({ job_id: JOB_ID, profile_id: "t-ana", phase: "availability", channel: "email", department: "sound", single_day: true, dates: [D1], target_date: D1 });
 });
 
 test("the channel is remembered for next time", async ({ page }) => {
@@ -150,7 +150,7 @@ test("an offer suggests the open slot's role and includes the job description un
   await expect(panel.getByRole("textbox")).toHaveCount(0);
   await panel.getByRole("button", { name: "Enviar oferta" }).click();
   await expect.poll(() => sends(calls).length).toBe(1);
-  expect(sends(calls)[0]).toMatchObject({ phase: "offer", role: "SND-MON-E", message: "Carga a las 8 en la puerta B", single_day: false });
+  expect(sends(calls)[0]).toEqual({ job_id: JOB_ID, profile_id: "t-ana", phase: "offer", channel: "email", department: "sound", role: "SND-MON-E", message: "Carga a las 8 en la puerta B", single_day: false });
 });
 
 test("a clash is shown in the panel and Enviar igualmente sends it accepting the clash", async ({ page }) => {
@@ -166,7 +166,7 @@ test("a clash is shown in the panel and Enviar igualmente sends it accepting the
 
   await alert.getByRole("button", { name: "Enviar igualmente" }).click();
   await expect.poll(() => sends(calls).length).toBe(2);
-  expect(sends(calls)[1]).toMatchObject({ profile_id: "t-ana", override_conflicts: true });
+  expect(sends(calls)[1]).toEqual({ ...sends(calls)[0], override_conflicts: true });
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -178,7 +178,7 @@ test("a request that is already out can be resent on the chosen channel", async 
 
   await panel.getByRole("button", { name: "Reenviar por Email" }).click();
   await expect.poll(() => sends(calls).length).toBe(1);
-  expect(sends(calls)[0]).toMatchObject({ phase: "availability", resend_request_id: "req-1", profile_id: "t-ana" });
+  expect(sends(calls)[0]).toEqual({ job_id: JOB_ID, profile_id: "t-ana", phase: "availability", channel: "email", department: "sound", resend_request_id: "req-1" });
 });
 
 test("a request that is already out is cancelled after one inline confirmation", async ({ page }) => {
@@ -212,7 +212,7 @@ test("selecting people and asking for availability sends one request each; one c
 
   await panel.getByRole("button", { name: "Enviar igualmente" }).click();
   await expect.poll(() => sends(calls).length).toBe(4);
-  expect(sends(calls)[3]).toMatchObject({ profile_id: "t-beto", override_conflicts: true });
+  expect(sends(calls)[3]).toEqual({ ...sends(calls).find((body) => body.profile_id === "t-beto" && !body.override_conflicts), override_conflicts: true });
   expect(sends(calls).slice(0, 3).filter((body) => body.override_conflicts)).toHaveLength(0);
   await expect(results(page)).toBeHidden();
 });

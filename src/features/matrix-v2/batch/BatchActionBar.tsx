@@ -15,6 +15,7 @@ interface BatchActionBarProps {
   cells: number;
   people: number;
   canEdit: boolean;
+  running?: boolean;
   progress: { done: number; total: number } | null;
   jobs: BatchBarJob[];
   /** What Quitar would take away, for its confirmation. */
@@ -34,8 +35,8 @@ const CHANNEL_OPTIONS = [['email', 'Email'], ['whatsapp', 'WhatsApp']] as const;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-const Segmented = <T extends string>({ label, options, value, onChange }: {
-  label: string; options: ReadonlyArray<readonly [T, string]>; value: T; onChange: (value: T) => void;
+const Segmented = <T extends string>({ label, options, value, onChange, disabled }: {
+  label: string; options: ReadonlyArray<readonly [T, string]>; value: T; onChange: (value: T) => void; disabled: boolean;
 }) => (
   <div role="radiogroup" aria-label={label} className="mb-2 inline-flex rounded-md border bg-background p-0.5">
     {options.map(([option, text]) => (
@@ -44,6 +45,7 @@ const Segmented = <T extends string>({ label, options, value, onChange }: {
         type="button"
         role="radio"
         aria-checked={value === option}
+        disabled={disabled}
         onClick={() => onChange(option)}
         className={cn('rounded px-2.5 py-1 text-xs font-medium', value === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
       >
@@ -76,6 +78,7 @@ function JobChooser({ label, icon, jobs, busy, options, onPick }: {
               <li key={job.id}>
                 <button
                   type="button"
+                  disabled={busy}
                   className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
                   onClick={() => {
                     setOpen(false);
@@ -101,10 +104,10 @@ function JobChooser({ label, icon, jobs, busy, options, onPick }: {
  * with the count of what goes. The actions are one row that scrolls sideways:
  * wrapped over several rows on a phone the bar covered the grid it acts on.
  */
-export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal, onAssign, onRequest, channel, onChannelChange, onConfirm, onRemove, onMarkUnavailable, onClear }: BatchActionBarProps) {
+export function BatchActionBar({ cells, people, canEdit, running = false, progress, jobs, removal, onAssign, onRequest, channel, onChannelChange, onConfirm, onRemove, onMarkUnavailable, onClear }: BatchActionBarProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [status, setStatus] = useState<'invited' | 'confirmed'>('invited');
-  const busy = progress !== null;
+  const busy = running || progress !== null;
 
   return (
     <section
@@ -115,7 +118,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
     >
       <span className="shrink-0 pl-1 text-xs font-semibold" aria-live="polite">
         {busy
-          ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />Aplicando {progress.done}/{progress.total}…</span>
+          ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />{progress ? `Aplicando ${progress.done}/${progress.total}…` : 'Aplicando…'}</span>
           : `${plural(cells, 'celda', 'celdas')} · ${plural(people, 'persona', 'personas')}`}
       </span>
 
@@ -126,7 +129,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
             icon={<Briefcase className="mr-1.5 h-4 w-4" aria-hidden="true" />}
             jobs={jobs}
             busy={busy}
-            options={<Segmented label="Estado al asignar" options={[['invited', 'Invitado'], ['confirmed', 'Confirmado']] as const} value={status} onChange={setStatus} />}
+            options={<Segmented label="Estado al asignar" options={[['invited', 'Invitado'], ['confirmed', 'Confirmado']] as const} value={status} onChange={setStatus} disabled={busy} />}
             onPick={(jobId) => onAssign(jobId, status)}
           />
           <Button type="button" size="sm" variant="outline" className="h-9" disabled={busy} onClick={onConfirm}>
@@ -138,7 +141,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
             icon={<MailPlus className="mr-1.5 h-4 w-4" aria-hidden="true" />}
             jobs={jobs}
             busy={busy}
-            options={<Segmented label="Canal" options={CHANNEL_OPTIONS} value={channel} onChange={onChannelChange} />}
+            options={<Segmented label="Canal" options={CHANNEL_OPTIONS} value={channel} onChange={onChannelChange} disabled={busy} />}
             onPick={(jobId) => onRequest(jobId, 'availability')}
           />
           <JobChooser
@@ -146,7 +149,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
             icon={<Send className="mr-1.5 h-4 w-4" aria-hidden="true" />}
             jobs={jobs}
             busy={busy}
-            options={<Segmented label="Canal" options={CHANNEL_OPTIONS} value={channel} onChange={onChannelChange} />}
+            options={<Segmented label="Canal" options={CHANNEL_OPTIONS} value={channel} onChange={onChannelChange} disabled={busy} />}
             onPick={(jobId) => onRequest(jobId, 'offer')}
           />
           <Button type="button" size="sm" variant="outline" className="h-9" disabled={busy} onClick={onMarkUnavailable}>
@@ -173,6 +176,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
               size="sm"
               variant="destructive"
               className="h-9"
+              disabled={busy}
               onClick={() => {
                 setConfirmingRemove(false);
                 onRemove();
@@ -181,7 +185,7 @@ export function BatchActionBar({ cells, people, canEdit, progress, jobs, removal
               Quitar
             </Button>
           )}
-          <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setConfirmingRemove(false)}>
+          <Button type="button" size="sm" variant="outline" className="h-9" disabled={busy} onClick={() => setConfirmingRemove(false)}>
             Cancelar
           </Button>
         </div>

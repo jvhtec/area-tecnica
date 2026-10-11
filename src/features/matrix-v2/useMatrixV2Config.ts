@@ -9,7 +9,7 @@ import type { FocusStatus } from '@/features/matrix-v2/focus/useJobFocusSelectio
 import { findMatrixCellElement } from '@/features/matrix-v2/inspector/anchor';
 import type { InspectorTarget } from '@/features/matrix-v2/inspector/environment';
 import { runQuickConfirm, runToggleUnavailable } from '@/features/matrix-v2/quickActions';
-import type { RoleSlot } from '@/features/matrix-v2/roleSlots';
+import type { RoleSlot, RoleSlotAssignmentRow } from '@/features/matrix-v2/roleSlots';
 import type { MatrixCommandSource, MatrixTechnicianRef } from '@/features/matrix-v2/types';
 import { useMatrixCommandRunner } from '@/features/matrix-v2/useMatrixCommandRunner';
 import type { MatrixV2ViewConfig } from '@/features/matrix-v2/viewConfig';
@@ -29,6 +29,8 @@ interface Options {
   getAvailabilityForCell: (technicianId: string, date: Date) => { status?: string | null } | undefined;
   isManagementUser: boolean;
   roleSlotsByJob: Map<string, RoleSlot[]>;
+  /** Membership from the same authoritative summary that supplies roleSlotsByJob. */
+  staffingAssignments?: readonly RoleSlotAssignmentRow[];
   declinedJobsByTech: Map<string, Set<string>>;
   fridgeSet?: Set<string>;
   focusJobId: string | null;
@@ -43,7 +45,7 @@ interface Options {
  */
 export function useMatrixV2Config<T extends Technician>({
   enabled, ready, jobs, technicians, dates, baseOrderedTechnicians, allAssignments, getAssignmentForCell,
-  getAvailabilityForCell, isManagementUser, roleSlotsByJob, declinedJobsByTech, fridgeSet, focusJobId, focusStatus, onFocusJobChange,
+  getAvailabilityForCell, isManagementUser, roleSlotsByJob, staffingAssignments, declinedJobsByTech, fridgeSet, focusJobId, focusStatus, onFocusJobChange,
 }: Options & { baseOrderedTechnicians: T[] }) {
   // The one entry point for changing an assignment, and the role each
   // technician held last (so a quick assignment can start from it).
@@ -62,10 +64,14 @@ export function useMatrixV2Config<T extends Technician>({
   }, [allAssignments, enabled]);
 
   const [inspectorTarget, setInspectorTarget] = useState<InspectorTarget | null>(null);
-  const closeInspector = useCallback(() => setInspectorTarget(null), []);
-  const openInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent']) => {
+  // Each open creates a new object, including reopening the same cell. Async
+  // completion owns that exact generation; it must not close a later inspector.
+  const closeInspector = useCallback(() => {
+    setInspectorTarget((current) => (current === inspectorTarget ? null : current));
+  }, [inspectorTarget]);
+  const openInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent'], staffingDraft?: InspectorTarget['staffingDraft']) => {
     const dateKey = formatMadridDateKey(date);
-    setInspectorTarget({ technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey), intent });
+    setInspectorTarget({ technicianId, date, dateKey, anchor: anchor ?? findMatrixCellElement(technicianId, dateKey), intent, staffingDraft });
   }, []);
   const toggleInspector = useCallback((technicianId: string, date: Date, anchor: HTMLElement | null) => {
     const dateKey = formatMadridDateKey(date);
@@ -89,6 +95,21 @@ export function useMatrixV2Config<T extends Technician>({
     void runToggleUnavailable({ technicianId, dateKey, unavailable, canEdit: isManagementUser });
   }, [getAvailabilityForCell, isManagementUser]);
 
+  const staffingMembership = useMemo(() => {
+    const membership = new Set<string>();
+    for (const row of staffingAssignments ?? []) {
+      if (!row.job_id || !row.technician_id || row.status?.toLowerCase() === 'declined') continue;
+      for (const role of [row.sound_role, row.lights_role, row.video_role, row.production_role]) {
+        if (role?.trim() && role.trim().toLowerCase() !== 'none') {
+          membership.add(JSON.stringify([row.job_id, row.technician_id, role.trim()]));
+        }
+      }
+    }
+    return membership;
+  }, [staffingAssignments]);
+  const hasStaffingAssignment = useCallback((jobId: string, technicianId: string, role: string) =>
+    staffingMembership.has(JSON.stringify([jobId, technicianId, role])), [staffingMembership]);
+
   const { focus, applyOrder } = useMatrixJobFocus({
     focusJobId: enabled ? focusJobId : null,
     status: focusStatus,
@@ -102,6 +123,7 @@ export function useMatrixV2Config<T extends Technician>({
     declinedJobsByTech,
     fridgeSet,
     roleSlotsByJob,
+    hasStaffingAssignment,
     lastRoleByTechnician,
     openInspector,
   });

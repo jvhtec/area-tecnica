@@ -8,6 +8,7 @@ import {
   commandResultSchema,
   commandStateSchema,
   jobCommandStatesSchema,
+  undoWindowSchema,
   type ApplyDirectAssignmentInput,
   type AssignmentCommandResult,
   type AssignmentCommandState,
@@ -17,6 +18,8 @@ import {
   type UnconfirmAssignmentInput,
   type RemoveAssignmentDateInput,
   type RemoveDirectAssignmentInput,
+  type AssignmentUndoWindow,
+  type UndoAssignmentCommandInput,
 } from '@/features/assignments/commands/types';
 
 /** One id per logical decision; reuse it for transport retries of that decision. */
@@ -146,6 +149,35 @@ export function unconfirmAssignment(input: UnconfirmAssignmentInput): Promise<As
     p_expected_state_token: input.expectedStateToken ?? undefined,
     p_source: input.source ?? 'matrix',
   }));
+}
+
+/** Restore a held decision and cancel both effect plans in one database transaction. */
+export function undoAssignmentCommand(input: UndoAssignmentCommandInput): Promise<AssignmentCommandResult> {
+  return execute(() => supabase.rpc('undo_assignment_command', {
+    p_command_id: input.commandId,
+    p_original_command_id: input.originalCommandId,
+    p_expected_state_token: input.expectedStateToken,
+    p_prior_state: input.priorState,
+  }));
+}
+
+/** Read the original server deadline; a replay never starts a fresh undo window. */
+export async function getAssignmentCommandUndoWindow(commandId: string): Promise<AssignmentUndoWindow> {
+  const { data, error } = await supabase.rpc('get_assignment_command_undo_window', { p_command_id: commandId });
+  if (error) throw classifyAssignmentRpcError(error);
+  const parsed = undoWindowSchema.safeParse(data);
+  if (!parsed.success) throw new AssignmentCommandError('unknown', { message: 'Ventana de deshacer no reconocida', cause: parsed.error });
+  return parsed.data;
+}
+
+/** Close the hold before claiming effects; an atomically undone command stays cancelled. */
+export async function releaseAssignmentCommandEffects(commandId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('release_assignment_command_effects', { p_command_id: commandId });
+  if (error) throw classifyAssignmentRpcError(error);
+  if (typeof data !== 'object' || data === null || !('released' in data) || typeof data.released !== 'boolean') {
+    throw new AssignmentCommandError('unknown', { message: 'Respuesta de liberación no reconocida' });
+  }
+  return data.released;
 }
 
 /** Authoritative membership + active dates + expected-state token for a pair. */

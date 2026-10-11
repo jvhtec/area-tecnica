@@ -17,6 +17,13 @@ const DAYS_AFTER = 60;
 const JOBS = 45;
 const CPU_THROTTLE = Number(process.env.MATRIX_PERF_CPU_THROTTLE ?? 4);
 
+/** Model PostgREST's page cap so fetchAllPages terminates on dense fixtures. */
+const readPage = (rows: Array<Record<string, unknown>>, url: URL) => {
+  const offset = Number(url.searchParams.get('offset') ?? 0);
+  const limit = Math.min(1000, Number(url.searchParams.get('limit') ?? 1000));
+  return rows.slice(offset, offset + limit);
+};
+
 const dayKey = (offset: number) => {
   const date = new Date();
   date.setUTCHours(12, 0, 0, 0);
@@ -171,8 +178,8 @@ test("assignment matrix stays smooth on a dense dataset", async ({ page }) => {
       availability_schedules: [],
       technician_availability: [],
       vacation_requests: [],
-      timesheets: data.timesheets,
-      job_assignments: data.assignments,
+      timesheets: ({ url }: { url: URL }) => readPage(data.timesheets, url),
+      job_assignments: ({ url }: { url: URL }) => readPage(data.assignments, url),
       staffing_requests: data.staffingRequests,
       staffing_events: [],
       profiles: [],

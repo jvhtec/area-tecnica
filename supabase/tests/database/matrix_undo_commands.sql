@@ -116,8 +116,8 @@ SELECT is((SELECT value->>'code' FROM results WHERE name = 'stale'), 'stale_stat
 INSERT INTO results SELECT 'unconfirm', public.unconfirm_assignment('a0310000-0000-0000-0000-000000000017', 'a0210000-0000-0000-0000-000000000001',
   'a0110000-0000-0000-0000-000000000002', (SELECT value->>'state_token' FROM results WHERE name = 'confirm'), 'matrix-undo');
 SELECT ok((SELECT value->>'outcome' = 'committed' AND value->'assignment'->>'status' = 'invited'
-  AND value->'side_effects' = '[]'::jsonb AND value->'dates' = '["2027-01-11", "2027-01-12"]'::jsonb
-  FROM results WHERE name = 'unconfirm'), 'unconfirm commits, keeps the schedule and plans no effects');
+  AND jsonb_array_length(value->'side_effects') = 1 AND value->'dates' = '["2027-01-11", "2027-01-12"]'::jsonb
+  FROM results WHERE name = 'unconfirm'), 'standalone unconfirm commits, keeps the schedule and plans invited compensation');
 SELECT ok((SELECT value->>'state_token' = (SELECT value->>'prior_state_token' FROM results WHERE name = 'confirm')
   FROM results WHERE name = 'unconfirm'), 'the resulting state equals the state before the confirm');
 INSERT INTO results SELECT 'replay', public.unconfirm_assignment('a0310000-0000-0000-0000-000000000017', 'a0210000-0000-0000-0000-000000000001',
@@ -130,8 +130,8 @@ SELECT is((SELECT response_time FROM job_assignments WHERE job_id = 'a0210000-00
   'the confirmation timestamp is cleared');
 SELECT is((SELECT count(*) FROM assignment_audit_log WHERE action = 'unconfirmed' AND job_id = 'a0210000-0000-0000-0000-000000000001'), 1::bigint,
   'the committed unconfirm is audited once');
-SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'a0310000-0000-0000-0000-000000000017'), 'none',
-  'the ledger records the unconfirm without effects');
+SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'a0310000-0000-0000-0000-000000000017'), 'pending',
+  'the ledger records standalone invited compensation');
 SET LOCAL ROLE authenticated;
 
 -- A decline cannot be reopened by this command.
@@ -185,62 +185,12 @@ SELECT throws_ok($$ SELECT public.supersede_assignment_side_effects(ARRAY['a0310
 
 SELECT set_config('request.jwt.claim.sub', 'a0110000-0000-0000-0000-000000000001', true);
 SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"a0110000-0000-0000-0000-000000000001"}', true);
-INSERT INTO results SELECT 'supersede', public.supersede_assignment_side_effects(ARRAY['a0310000-0000-0000-0000-000000000030']::uuid[]);
-SELECT ok((SELECT (value->>'superseded')::int = 2 AND (value->>'not_superseded')::int = 0 FROM results WHERE name = 'supersede'),
-  'both never-run effects are superseded');
+SELECT throws_ok($$ SELECT public.supersede_assignment_side_effects(ARRAY['a0310000-0000-0000-0000-000000000030']::uuid[]) $$,
+  '22023', 'verified unclaimed undo required', 'the author cannot cancel an ordinary command without verified atomic undo');
 RESET ROLE;
-SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'a0310000-0000-0000-0000-000000000030'), 'superseded',
-  'the command is marked superseded');
-SELECT is((SELECT count(*) FROM assignment_commands c, jsonb_array_elements(c.side_effects) e
-  WHERE c.command_id = 'a0310000-0000-0000-0000-000000000030' AND e->>'status' = 'superseded' AND e ? 'superseded_at'), 2::bigint,
-  'each effect keeps its identity and records when it was superseded');
-SET LOCAL ROLE authenticated;
-
--- A superseded command can no longer be claimed or retried.
-SELECT is((public.claim_assignment_side_effects('a0310000-0000-0000-0000-000000000030', 120))->>'claim_token', NULL,
-  'superseded effects cannot be claimed');
-SELECT is((SELECT count(*) FROM public.get_assignment_side_effect_backlog(50, interval '0 seconds')
-  WHERE command_id = 'a0310000-0000-0000-0000-000000000030'), 0::bigint, 'superseded effects never reach the reconciliation backlog');
-SELECT ok(EXISTS (SELECT 1 FROM public.get_assignment_command_metrics(now() - interval '1 hour')
-  WHERE command_type = 'apply_direct_assignment' AND side_effects_status = 'superseded'), 'metrics expose superseded commands');
--- Idempotent: nothing left to cancel.
-INSERT INTO results SELECT 'supersede_again', public.supersede_assignment_side_effects(ARRAY['a0310000-0000-0000-0000-000000000030']::uuid[]);
-SELECT ok((SELECT (value->>'superseded')::int = 0 AND (value->>'not_superseded')::int = 0 FROM results WHERE name = 'supersede_again'),
-  'superseding twice is harmless');
-
--- Effects already running or already run are reported, not cancelled.
-RESET ROLE;
-DELETE FROM job_assignments WHERE job_id = 'a0210000-0000-0000-0000-000000000005';
-SET LOCAL ROLE authenticated;
-INSERT INTO results SELECT 'effects2', public.apply_direct_assignment('a0310000-0000-0000-0000-000000000031', 'a0210000-0000-0000-0000-000000000005',
-  'a0110000-0000-0000-0000-000000000002', 'SND-FOH-E', 'invited', 'full', NULL, 'replace',
-  pg_temp.tok('a0210000-0000-0000-0000-000000000005', 'a0110000-0000-0000-0000-000000000002'));
-INSERT INTO results SELECT 'claim', public.claim_assignment_side_effects('a0310000-0000-0000-0000-000000000031', 120);
-INSERT INTO results SELECT 'supersede_claimed', public.supersede_assignment_side_effects(ARRAY['a0310000-0000-0000-0000-000000000031']::uuid[]);
-SELECT ok((SELECT (value->>'superseded')::int = 0 AND (value->>'not_superseded')::int = 2 FROM results WHERE name = 'supersede_claimed'),
-  'effects under a live claim are not superseded');
-SELECT ok((SELECT value->>'side_effects_status' = 'succeeded' FROM (
-  SELECT public.record_assignment_side_effects('a0310000-0000-0000-0000-000000000031', (SELECT (value->>'claim_token')::uuid FROM results WHERE name = 'claim'),
-    '[{"index":0,"status":"succeeded"},{"index":1,"status":"succeeded"}]'::jsonb) AS value) r),
-  'the claim holder can still report after a refused supersede');
-
--- Mixed command: one effect ran, the other failed and is then cancelled.
-RESET ROLE;
-DELETE FROM job_assignments WHERE job_id = 'a0210000-0000-0000-0000-000000000005';
-SET LOCAL ROLE authenticated;
-INSERT INTO results SELECT 'effects3', public.apply_direct_assignment('a0310000-0000-0000-0000-000000000032', 'a0210000-0000-0000-0000-000000000005',
-  'a0110000-0000-0000-0000-000000000002', 'SND-FOH-E', 'invited', 'full', NULL, 'replace',
-  pg_temp.tok('a0210000-0000-0000-0000-000000000005', 'a0110000-0000-0000-0000-000000000002'));
-INSERT INTO results SELECT 'claim3', public.claim_assignment_side_effects('a0310000-0000-0000-0000-000000000032', 120);
-SELECT ok((public.record_assignment_side_effects('a0310000-0000-0000-0000-000000000032', (SELECT (value->>'claim_token')::uuid FROM results WHERE name = 'claim3'),
-  '[{"index":0,"status":"succeeded"},{"index":1,"status":"failed","error":"boom"}]'::jsonb))->>'side_effects_status' = 'failed',
-  'fixture: one effect succeeded, one failed');
-INSERT INTO results SELECT 'supersede_mixed', public.supersede_assignment_side_effects(ARRAY['a0310000-0000-0000-0000-000000000032']::uuid[]);
-SELECT ok((SELECT (value->>'superseded')::int = 1 AND (value->>'not_superseded')::int = 1 FROM results WHERE name = 'supersede_mixed'),
-  'the failed effect is cancelled, the one that ran is reported');
-RESET ROLE;
-SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'a0310000-0000-0000-0000-000000000032'), 'succeeded',
-  'a command whose remaining effects ran or were cancelled is succeeded, not pending');
-
+SELECT is((SELECT side_effects_status FROM assignment_commands WHERE command_id = 'a0310000-0000-0000-0000-000000000030'), 'pending',
+  'refused supersession preserves the ordinary effect plan');
+SELECT is((SELECT count(*) FROM assignment_command_undos WHERE original_command_id = 'a0310000-0000-0000-0000-000000000030'), 0::bigint,
+  'public supersession never manufactures an undo relationship');
 SELECT * FROM finish();
 ROLLBACK;

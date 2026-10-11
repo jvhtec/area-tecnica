@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import React, { type ComponentProps } from 'react';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
@@ -11,6 +12,9 @@ import {
 } from '@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip';
 import { formatUserName } from '@/utils/userName';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
+import { CellInspectorBody } from '@/features/matrix-v2/inspector/CellInspectorBody';
+import type { InspectorEnvironment } from '@/features/matrix-v2/inspector/environment';
+import { makeJob, makeMatrixRow, makeRow, makeState } from '@/features/matrix-v2/__tests__/fixtures';
 
 // Hoisted mocks
 const {
@@ -18,8 +22,10 @@ const {
   fromMock,
   toastFn,
   supabaseMock,
+  getStateMock,
 } = vi.hoisted(() => ({
   useMutationMock: vi.fn(),
+  getStateMock: vi.fn(),
   fromMock: vi.fn(),
   toastFn: Object.assign(vi.fn(), {
     error: vi.fn(),
@@ -31,6 +37,11 @@ const {
       invoke: vi.fn(),
     },
   },
+}));
+
+vi.mock('@/features/assignments/commands', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/assignments/commands')>()),
+  getAssignmentCommandState: getStateMock,
 }));
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
@@ -185,6 +196,70 @@ beforeEach(() => {
 });
 
 describe('OptimizedMatrixCell', () => {
+  it.each(['confirm', 'decline'] as const)('hands %s to v2 without calling the cell cache update', (action) => {
+    const onClick = vi.fn();
+    const onOptimisticUpdate = vi.fn();
+    render(<OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+      assignment={{ ...mockAssignment, status: 'invited' }} width={160} height={60} isSelected={false}
+      onSelect={vi.fn()} onClick={onClick} onOptimisticUpdate={onOptimisticUpdate} inspectorMode />);
+    fireEvent.click(screen.getByRole('button', { name: action === 'confirm' ? 'Confirmar' : 'Rechazar' }));
+    expect(onClick).toHaveBeenCalledExactlyOnceWith('tech-1', mockDate, action, undefined);
+    expect(onOptimisticUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['confirm', 'decline'] as const)('preserves the legacy optimistic update for %s', (action) => {
+    const onClick = vi.fn();
+    const onOptimisticUpdate = vi.fn();
+    render(<OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+      assignment={{ ...mockAssignment, status: 'invited' }} width={160} height={60} isSelected={false}
+      onSelect={vi.fn()} onClick={onClick} onOptimisticUpdate={onOptimisticUpdate} />);
+    fireEvent.click(screen.getByRole('button', { name: action === 'confirm' ? 'Confirmar' : 'Rechazar' }));
+    expect(onOptimisticUpdate).toHaveBeenCalledExactlyOnceWith('tech-1', 'job-1', action === 'confirm' ? 'confirmed' : 'declined');
+    expect(onClick).toHaveBeenCalledExactlyOnceWith('tech-1', mockDate, action, undefined);
+  });
+
+  it('keeps the assignment cache invited when the v2 decline confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const assignment = { ...mockAssignment, status: 'invited' };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const cacheKey = ['optimized-matrix-assignments'];
+    client.setQueryData(cacheKey, assignment);
+    const onOptimisticUpdate = vi.fn((_technicianId: string, _jobId: string, status: string) => {
+      client.setQueryData(cacheKey, { ...assignment, status });
+    });
+    const runner = { run: vi.fn(), releaseAll: vi.fn(), loadState: vi.fn() };
+    const job = makeJob('job-1');
+    const matrixRow = makeMatrixRow({ job_id: job.id, technician_id: mockTechnician.id, job });
+    getStateMock.mockResolvedValue(makeState({ exists: true, assignment: makeRow(), dates: ['2026-10-13', '2026-10-14'] }));
+    const env: InspectorEnvironment = {
+      runner, getTechnician: () => mockTechnician, getJob: () => job, getJobsForDate: () => [job],
+      getAssignmentForCell: () => matrixRow, getAvailabilityForCell: () => undefined,
+      roleSlotsByJob: new Map(), lastRoleByTechnician: new Map(), declinedJobIds: () => new Set(),
+      isFridge: () => false, staffingByDate: () => null, profileNames: new Map(),
+      canAssign: true, canMarkUnavailable: true,
+      staffing: { send: vi.fn(), cancel: vi.fn(), channel: 'email', setChannel: vi.fn(), department: 'sound' },
+    };
+    function Harness() {
+      const [inspecting, setInspecting] = React.useState(false);
+      return <>
+        <OptimizedMatrixCell {...requiredCellProps} technician={mockTechnician} date={mockDate}
+          assignment={assignment} width={160} height={60} isSelected={false} onSelect={vi.fn()}
+          inspectorMode onOptimisticUpdate={onOptimisticUpdate}
+          onClick={(_id, _date, action) => { if (action === 'decline') setInspecting(true); }} />
+        {inspecting && <CellInspectorBody env={env} onClose={() => setInspecting(false)}
+          target={{ technicianId: mockTechnician.id, date: mockDate, dateKey: '2024-05-15', anchor: null, intent: 'decline' }} />}
+      </>;
+    }
+    render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
+    await user.click(screen.getByRole('button', { name: 'Rechazar' }));
+    const confirmation = await screen.findByRole('alertdialog');
+    await user.click(within(confirmation).getByRole('button', { name: 'Volver' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(onOptimisticUpdate).not.toHaveBeenCalled();
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(client.getQueryData(cacheKey)).toEqual(assignment);
+  });
+
   it('renders basic cell with technician name in tooltip', async () => {
     const user = userEvent.setup();
 

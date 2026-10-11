@@ -13,7 +13,7 @@ export interface MatrixV2ViewConfig {
   inspectorTarget: InspectorTarget | null;
   /** Opens the inspector, or closes it when it is already open on that cell (a second click). */
   toggleInspector: (technicianId: string, date: Date, anchor: HTMLElement | null) => void;
-  openInspector: (technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent']) => void;
+  openInspector: (technicianId: string, date: Date, anchor: HTMLElement | null, intent?: InspectorTarget['intent'], staffingDraft?: InspectorTarget['staffingDraft']) => void;
   closeInspector: () => void;
   /** Confirms an invited technician at once (with Deshacer). */
   quickConfirm: (technicianId: string, date: Date, source?: MatrixCommandSource) => void;

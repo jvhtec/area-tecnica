@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { bootstrapApp, isMobileViewport } from "./support/app";
+import { assignmentCommandLedger, assertAtomicUndo, assertNoAssignmentEffects } from "./support/assignmentCommands";
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const day = (offset: number) => {
@@ -25,19 +26,30 @@ async function openMatrix(page: Page, options: { initiallyAssigned?: boolean; qu
     id: JOB_ID, title: "Gira Lúa", start_time: `${day(1)}T08:00:00Z`, end_time: `${day(2)}T18:00:00Z`,
     color: "#2563eb", status: "Confirmado", job_type: "single", job_departments: [{ department: "sound" }], job_assignments: [],
   };
-  const state = { assigned: options.initiallyAssigned ?? false, status: "invited", role: "SND-MON-E", token: options.initiallyAssigned ? "t-assigned" : "t0", removed: 0 };
+  const state = { assigned: options.initiallyAssigned ?? false, status: "invited", role: "SND-MON-E", token: options.initiallyAssigned ? "t-assigned" : "t0", removed: 0, undone: 0, dates: options.initiallyAssigned ? [day(1), day(2)] : [] as string[] };
   const row = () => ({
     id: "assignment-1", status: state.status, sound_role: state.role, lights_role: null, video_role: null,
     production_role: null, single_day: false, assignment_date: null, assignment_source: "direct",
   });
-  const pairState = () => ({ exists: state.assigned, assignment: state.assigned ? row() : null, dates: state.assigned ? [day(1), day(2)] : [], state_token: state.token });
+  const pairState = () => ({ exists: state.assigned, assignment: state.assigned ? row() : null, dates: [...state.dates], state_token: state.token });
+  const ledger = assignmentCommandLedger({
+    read: pairState,
+    restore: (_technicianId, prior) => {
+      state.assigned = prior.exists;
+      state.status = String(prior.assignment?.status ?? "invited");
+      state.role = String(prior.assignment?.sound_role ?? "SND-MON-E");
+      state.dates = [...prior.dates];
+      state.token = prior.state_token;
+      state.undone += 1;
+    },
+  });
   const effects = (id: string) => [
     { kind: "flex", action: "add", job_id: JOB_ID, department: "sound", status: "pending", effect_id: `${id}:0` },
     { kind: "notification", action: "job.assignment.direct", job_id: JOB_ID, status: "pending", effect_id: `${id}:1` },
   ];
   const result = (id: string, extra: Body = {}) => ({
     ok: true, outcome: "committed", command_id: id, job_id: JOB_ID, technician_id: TECH_ID, state_token: state.token,
-    replayed: false, assignment: state.assigned ? row() : null, dates: state.assigned ? [day(1), day(2)] : [], side_effects: [], warnings: [], ...extra,
+    replayed: false, assignment: state.assigned ? row() : null, dates: [...state.dates], side_effects: [], warnings: [], ...extra,
   });
 
   const calls = await bootstrapApp(page, {
@@ -45,50 +57,54 @@ async function openMatrix(page: Page, options: { initiallyAssigned?: boolean; qu
     tables: {
       jobs: [job], job_date_types: [],
       job_assignments: () => (state.assigned ? [{ job_id: JOB_ID, technician_id: TECH_ID, status: state.status, sound_role: state.role, single_day: false, assignment_date: null, assigned_at: `${day(0)}T09:00:00Z`, assigned_by: null }] : []),
-      timesheets: () => (state.assigned ? [day(1), day(2)].map((date, index) => ({ id: `ts-${index}`, job_id: JOB_ID, technician_id: TECH_ID, date, is_active: true, source: "direct" })) : []),
+      timesheets: () => state.dates.map((date, index) => ({ id: `ts-${index}`, job_id: JOB_ID, technician_id: TECH_ID, date, is_active: true, source: "direct" })),
       job_required_roles_summary: [{ job_id: JOB_ID, department: "sound", roles: [{ role_code: "SND-MON-E", quantity: 1 }, { role_code: "SND-PA-T", quantity: 2 }] }],
       technician_fridge: [], availability_schedules: [], technician_availability: [], vacation_requests: [], profiles: [], skills: [], staffing_requests: [], staffing_events: [],
     },
     rpc: {
+      ...ledger.rpc,
       get_profiles_with_skills: [{ id: TECH_ID, first_name: "Marta", last_name: "Ibáñez", email: "marta@example.test", department: "sound", role: "technician", skills: [{ name: "Monitores", is_primary: true }] }],
       get_job_staffing_summary: [], get_active_timesheet_counts_by_technician: [], get_assignment_matrix_staffing: [],
       get_assignment_matrix_staffing_filtered: [], get_staffing_requests_matrix_filtered: [],
       get_assignment_command_state: () => pairState(),
       apply_direct_assignment: ({ body }) => {
         const input = asBody(body);
-        state.assigned = true;
-        state.status = input.p_status === "confirmed" ? "confirmed" : "invited";
-        state.role = String(input.p_role);
-        state.token = "t1";
-        return result(String(input.p_command_id), { side_effects: effects(String(input.p_command_id)) });
-      },
-      remove_direct_assignment: ({ body }) => {
-        state.assigned = false;
-        state.removed += 1;
-        state.token = "t2";
-        return result(String(asBody(body).p_command_id), {
-          removed: { job_id: JOB_ID, deleted_timesheets: 2, deleted_assignment: true, assignment: null },
-          side_effects: [{ kind: "notification", action: "assignment.removed", job_id: JOB_ID, status: "pending", effect_id: "x:0" }],
+        return ledger.commit(input, () => {
+          state.assigned = true;
+          state.status = input.p_status === "confirmed" ? "confirmed" : "invited";
+          state.role = String(input.p_role);
+          state.token = "t1";
+          state.dates = input.p_coverage === "full" ? [day(1), day(2)] : [...input.p_dates as string[]];
+          return result(String(input.p_command_id), { side_effects: effects(String(input.p_command_id)) });
         });
       },
+      remove_direct_assignment: ({ body }) => {
+        const input = asBody(body);
+        return ledger.commit(input, () => {
+          state.assigned = false;
+          state.dates = [];
+          state.removed += 1;
+          state.token = "t2";
+          return result(String(input.p_command_id), {
+            removed: { job_id: JOB_ID, deleted_timesheets: 2, deleted_assignment: true, assignment: null },
+            side_effects: [{ kind: "notification", action: "assignment.removed", job_id: JOB_ID, status: "pending", effect_id: "x:0" }],
+          });
+        }, false);
+      },
       set_assignment_status: ({ body }) => {
-        state.status = "confirmed";
-        state.token = "t3";
-        return result(String(asBody(body).p_command_id), { side_effects: [{ kind: "notification", action: "job.assignment.confirmed", job_id: JOB_ID, status: "pending", effect_id: "c:0" }] });
+        const input = asBody(body);
+        return ledger.commit(input, () => {
+          state.status = input.p_action === "confirm" ? "confirmed" : "declined";
+          if (state.status === "declined") state.dates = [];
+          state.token = "t3";
+          return result(String(input.p_command_id), { side_effects: [{ kind: "notification", action: "job.assignment.confirmed", job_id: JOB_ID, status: "pending", effect_id: "c:0" }] });
+        }, input.p_action === "confirm");
       },
-      unconfirm_assignment: ({ body }) => {
-        state.status = "invited";
-        state.token = "t4";
-        return result(String(asBody(body).p_command_id));
-      },
-      claim_assignment_side_effects: ({ body }) => ({ claim_token: "claim-1", effects: effects(String(asBody(body).p_command_id)).map((effect, index) => ({ ...effect, index })) }),
-      record_assignment_side_effects: { ok: true },
-      supersede_assignment_side_effects: ({ body }) => ({ superseded: 2, not_superseded: 0, commands: (asBody(body).p_command_ids as string[]).map((id) => ({ command_id: id, superseded: 2, not_superseded: 0 })) }),
     },
     functions: { push: { ok: true }, "manage-flex-crew-assignments": { ok: true } },
   });
   await page.goto(`/job-assignment-matrix${options.query ?? "?matriz=v2"}`);
-  return { calls, state };
+  return { calls, state, ledger };
 }
 
 /** A toast, not the grid's screen-reader announcement (also a status region). */
@@ -123,24 +139,21 @@ test("a click on an empty cell opens the inspector and assigns in one step", asy
 });
 
 test("Deshacer takes the assignment back and nobody is notified", async ({ page }) => {
-  const { calls, state } = await openMatrix(page);
+  const { calls, state, ledger } = await openMatrix(page);
   await cell(page, 1).click();
   await inspector(page).getByRole("button", { name: "Asignar", exact: true }).click();
   const toast = toastWith(page, "Marta");
   await expect(toast).toBeVisible();
   await toast.getByRole("button", { name: "Deshacer" }).click();
 
-  await expect.poll(() => state.removed).toBe(1);
-  const remove = asBody(calls.rpcCalls.find((call) => call.name === "remove_direct_assignment")?.body);
-  expect(remove).toMatchObject({ p_expected_state_token: "t1", p_job_id: JOB_ID });
-  await expect.poll(() => rpcNames(calls).filter((name) => name === "supersede_assignment_side_effects").length).toBe(2);
+  await expect.poll(() => state.undone).toBe(1);
+  const originalId = String(asBody(calls.rpcCalls.find((call) => call.name === "apply_direct_assignment")?.body).p_command_id);
+  assertAtomicUndo(calls, ledger, originalId);
   await expect(cell(page, 1)).not.toContainText("Gira Lúa");
 
   // Past the undo window nothing was claimed, no Flex call, no notification.
   await page.waitForTimeout(9_500);
-  expect(rpcNames(calls)).not.toContain("claim_assignment_side_effects");
-  expect(calls.functionCalls.map((call) => call.name)).not.toContain("push");
-  expect(calls.functionCalls.map((call) => call.name)).not.toContain("manage-flex-crew-assignments");
+  assertNoAssignmentEffects(calls);
 });
 
 test("without Deshacer the effects go out when the window closes", async ({ page }) => {
@@ -156,7 +169,7 @@ test("without Deshacer the effects go out when the window closes", async ({ page
 });
 
 test("an invited technician is confirmed in one click, and it can be undone", async ({ page }) => {
-  const { calls, state } = await openMatrix(page, { initiallyAssigned: true });
+  const { calls, state, ledger } = await openMatrix(page, { initiallyAssigned: true });
   await expect(cell(page, 1)).toContainText("Gira Lúa");
   await cell(page, 1).click();
 
@@ -168,7 +181,12 @@ test("an invited technician is confirmed in one click, and it can be undone", as
 
   await toastWith(page, "confirmado").getByRole("button", { name: "Deshacer" }).click();
   await expect.poll(() => state.status).toBe("invited");
-  expect(asBody(calls.rpcCalls.find((call) => call.name === "unconfirm_assignment")?.body)).toMatchObject({ p_expected_state_token: "t3" });
+  const originalId = String(asBody(calls.rpcCalls.find((call) => call.name === "set_assignment_status")?.body).p_command_id);
+  assertAtomicUndo(calls, ledger, originalId);
+  await expect(cell(page, 1)).toContainText("Gira Lúa");
+  await expect(cell(page, 1)).toHaveAttribute("data-matrix-cell-state", "pending");
+  await page.waitForTimeout(9_500);
+  assertNoAssignmentEffects(calls);
 });
 
 test("removing an assignment asks inside the inspector, not in a dialog", async ({ page }) => {
@@ -235,11 +253,17 @@ test.describe("without editing modes", () => {
 
   test("the cell's ✕ opens the inspector already asking to decline", async ({ page }) => {
     test.skip(isMobileViewport(page), "The phone cell has no icon buttons: it opens the sheet.");
-    const { state } = await openMatrix(page, { initiallyAssigned: true });
+    const { calls, state } = await openMatrix(page, { initiallyAssigned: true });
     await cell(page, 1).getByTitle("Rechazar", { exact: true }).click();
     const confirm = inspector(page).getByRole("alertdialog");
     await expect(confirm).toContainText("¿Rechazar en nombre de Marta?");
     expect(state.status).toBe("invited");
+    await confirm.getByRole("button", { name: "Volver" }).click();
+    await expect(confirm).toBeHidden();
+    expect(rpcNames(calls)).not.toContain("set_assignment_status");
+    await expect(cell(page, 1)).toContainText("Gira Lúa");
+    await expect(cell(page, 1)).toHaveAttribute("data-matrix-cell-state", "pending");
+    await expect(cell(page, 1).getByTitle("Rechazar", { exact: true })).toBeVisible();
   });
 
   test("right-click opens the inspector", async ({ page }) => {

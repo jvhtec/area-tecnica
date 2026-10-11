@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +24,7 @@ import type { InspectorEnvironment, InspectorTarget, InspectorTechnician } from 
 import { buildJobRoleSlots } from '@/features/matrix-v2/roleSlots';
 import type { StaffingSendPayload } from '@/features/matrix-v2/staffing/payload';
 import { ConflictError } from '@/features/staffing/hooks/useStaffing';
+import { useStaffingComposer, type StaffingComposer } from '@/features/matrix-v2/staffing/useStaffingComposer';
 import { JOB_A, JOB_B, TECH_1, makeJob, makeState } from '@/features/matrix-v2/__tests__/fixtures';
 
 const technician: InspectorTechnician = {
@@ -42,7 +43,7 @@ interface Setup {
   focusJobId?: string;
 }
 
-async function openComposer(options: Setup = {}) {
+function composerEnvironment(options: Setup = {}) {
   const jobs = options.jobs ?? [makeJob(JOB_A, { description: 'Carga a las 8 en la puerta B' })];
   const send = vi.fn(options.send ?? ((payload: StaffingSendPayload) => Promise.resolve({ channel: payload.channel })));
   const cancel = vi.fn(() => Promise.resolve());
@@ -67,6 +68,11 @@ async function openComposer(options: Setup = {}) {
     focusJobId: options.focusJobId,
     staffing: { send, cancel, channel: options.channel ?? 'email', setChannel, department: 'sound' },
   };
+  return { env, send, cancel, setChannel, onClose };
+}
+
+async function openComposer(options: Setup = {}) {
+  const { env, send, cancel, setChannel, onClose } = composerEnvironment(options);
   const user = userEvent.setup();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -191,6 +197,121 @@ describe('what is already out', () => {
 });
 
 describe('when the server objects', () => {
+  const conflictError = () => new ConflictError('Conflict', { conflicts: [{ job_name: 'Boda Sol' }] });
+
+  it.each([
+    ['job', /Trabajo job-b/],
+    ['phase', 'Oferta'],
+    ['dates', 'Solo este día'],
+    ['channel', 'WhatsApp'],
+  ])('clears the rejected request after editing %s and sends without an override', async (field, label) => {
+    const send = vi.fn().mockRejectedValueOnce(conflictError()).mockResolvedValue({ channel: 'email' });
+    const { user } = await openComposer({ send, jobs: [makeJob(JOB_A), makeJob(JOB_B)], focusJobId: JOB_A });
+    await user.click(screen.getByRole('button', { name: 'Pedir disponibilidad' }));
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole(field === 'dates' ? 'button' : 'radio', { name: label }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enviar igualmente' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^(Pedir disponibilidad|Enviar oferta)/ }));
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1][0]).not.toHaveProperty('override_conflicts');
+    if (field === 'job') expect(send.mock.calls[1][0].job_id).toBe(JOB_B);
+    if (field === 'phase') expect(send.mock.calls[1][0].phase).toBe('offer');
+    if (field === 'dates') expect(send.mock.calls[1][0].dates).toEqual([DATE_KEY]);
+  });
+
+  const semanticEdits: Array<[string, (composer: StaffingComposer) => void]> = [
+    ['job', (composer) => composer.pickJob(JOB_B)],
+    ['phase', (composer) => composer.setPhase('availability')],
+    ['dates', (composer) => composer.selectThisDayOnly()],
+    ['toggle day', (composer) => composer.toggleDay(DATE_KEY)],
+    ['all days', (composer) => composer.selectAllDays()],
+    ['role', (composer) => composer.pickRole('SND-FOH-E')],
+    ['channel', (composer) => composer.setChannel('whatsapp')],
+    ['message', (composer) => composer.setMessage('Nos vemos en el muelle')],
+  ];
+
+  it.each(semanticEdits)('clears conflict and refuses a forced send after editing %s', async (_field, edit) => {
+    const { env, send, onClose } = composerEnvironment({
+      jobs: [makeJob(JOB_A), makeJob(JOB_B)], focusJobId: JOB_A,
+      send: () => Promise.reject(conflictError()),
+    });
+    const { result } = renderHook(() => useStaffingComposer({ env, technician, target: target(), onDone: onClose }));
+    act(() => result.current.setPhase('offer'));
+    await act(() => result.current.send());
+    expect(result.current.conflict).not.toBeNull();
+    act(() => edit(result.current));
+    expect(result.current.conflict).toBeNull();
+    await act(() => result.current.send(true));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it.each(semanticEdits)('clears a send error after editing %s', async (_field, edit) => {
+    const { env, onClose } = composerEnvironment({
+      jobs: [makeJob(JOB_A), makeJob(JOB_B)], focusJobId: JOB_A,
+      send: () => Promise.reject(new Error('No se pudo enviar')),
+    });
+    const { result } = renderHook(() => useStaffingComposer({ env, technician, target: target(), onDone: onClose }));
+    act(() => result.current.setPhase('offer'));
+    await act(() => result.current.send());
+    expect(result.current.error).toBe('No se pudo enviar');
+    act(() => edit(result.current));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('refuses a forced send without a server rejection', async () => {
+    const { env, send, onClose } = composerEnvironment();
+    const { result } = renderHook(() => useStaffingComposer({ env, technician, target: target(), onDone: onClose }));
+    await act(() => result.current.send(true));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale override callback after the selected job changes', async () => {
+    const { env, send, onClose } = composerEnvironment({
+      jobs: [makeJob(JOB_A), makeJob(JOB_B)], focusJobId: JOB_A, send: () => Promise.reject(conflictError()),
+    });
+    const { result } = renderHook(() => useStaffingComposer({ env, technician, target: target(), onDone: onClose }));
+    await act(() => result.current.send());
+    const staleSend = result.current.send;
+    act(() => result.current.pickJob(JOB_B));
+    await act(() => staleSend(true));
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['channel', 'department', 'job dates'] as const)('invalidates the rejected decision when %s changes in the environment', async (field) => {
+    const { env, send, onClose } = composerEnvironment({ send: () => Promise.reject(conflictError()) });
+    const { result, rerender } = renderHook(({ environment }) => useStaffingComposer({
+      env: environment, technician, target: target(), onDone: onClose,
+    }), { initialProps: { environment: env } });
+    await act(() => result.current.send());
+    expect(result.current.conflict).not.toBeNull();
+    const environment: InspectorEnvironment = field === 'job dates'
+      ? { ...env, getJobsForDate: () => [makeJob(JOB_A, { end_time: '2026-10-15T20:00:00+02:00' })] }
+      : { ...env, staffing: { ...env.staffing, ...(field === 'channel' ? { channel: 'whatsapp' as const } : { department: 'lights' }) } };
+    rerender({ environment });
+    expect(result.current.conflict).toBeNull();
+    await act(() => result.current.send(true));
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restore a late conflict after the decision was edited', async () => {
+    let rejectRequest!: (cause: unknown) => void;
+    const { env, send, onClose } = composerEnvironment({
+      jobs: [makeJob(JOB_A), makeJob(JOB_B)], focusJobId: JOB_A,
+      send: () => new Promise((_resolve, reject) => { rejectRequest = reject; }),
+    });
+    const { result } = renderHook(() => useStaffingComposer({ env, technician, target: target(), onDone: onClose }));
+    let request!: Promise<void>;
+    act(() => { request = result.current.send(); });
+    act(() => result.current.pickJob(JOB_B));
+    await act(async () => { rejectRequest(conflictError()); await request; });
+    expect(result.current.busy).toBe(false);
+    expect(result.current.conflict).toBeNull();
+    await act(() => result.current.send(true));
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the clash inline and "Enviar igualmente" sends again accepting it', async () => {
     const send = vi.fn()
       .mockRejectedValueOnce(new ConflictError('Conflict', { conflicts: [{ job_name: 'Boda Sol', start_time: '2026-10-13T08:00:00Z', end_time: '2026-10-14T18:00:00Z' }], unavailability: [{ date: '2026-10-15', reason: 'Vacaciones' }] }))
@@ -204,7 +325,7 @@ describe('when the server objects', () => {
     expect(screen.queryByRole('button', { name: 'Pedir disponibilidad' })).not.toBeInTheDocument();
 
     await user.click(within(alert).getByRole('button', { name: 'Enviar igualmente' }));
-    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ override_conflicts: true, phase: 'availability' }));
+    expect(send).toHaveBeenLastCalledWith({ ...send.mock.calls[0][0], override_conflicts: true });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 

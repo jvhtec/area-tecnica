@@ -26,10 +26,11 @@ type Mocks = {
   role: Mock<RunnerCommands['changeAssignmentRole']>;
   remove: Mock<RunnerCommands['removeDirectAssignment']>;
   removeDate: Mock<RunnerCommands['removeAssignmentDate']>;
-  unconfirm: Mock<RunnerCommands['unconfirmAssignment']>;
+  undo: Mock<RunnerCommands['undoAssignmentCommand']>;
+  window: Mock<RunnerCommands['getAssignmentCommandUndoWindow']>;
+  release: Mock<RunnerCommands['releaseAssignmentCommandEffects']>;
   getState: Mock<RunnerCommands['getAssignmentCommandState']>;
   runEffects: Mock<RunnerEffects['run']>;
-  supersede: Mock<RunnerEffects['supersede']>;
   settled: Mock<NonNullable<MatrixCommandRunnerDeps['onEffectsSettled']>>;
 };
 
@@ -43,10 +44,11 @@ function setup(initialState = makeState()) {
     role: vi.fn<RunnerCommands['changeAssignmentRole']>(),
     remove: vi.fn<RunnerCommands['removeDirectAssignment']>(),
     removeDate: vi.fn<RunnerCommands['removeAssignmentDate']>(),
-    unconfirm: vi.fn<RunnerCommands['unconfirmAssignment']>(),
+    undo: vi.fn<RunnerCommands['undoAssignmentCommand']>(),
+    window: vi.fn<RunnerCommands['getAssignmentCommandUndoWindow']>().mockImplementation(async () => ({ eligible: true, undo_expires_at: new Date(Date.now() + UNDO_WINDOW_MS).toISOString() })),
+    release: vi.fn<RunnerCommands['releaseAssignmentCommandEffects']>().mockResolvedValue(true),
     getState: vi.fn<RunnerCommands['getAssignmentCommandState']>().mockResolvedValue(initialState),
     runEffects: vi.fn<RunnerEffects['run']>().mockResolvedValue({ attempted: 2, failed: 0, recorded: true }),
-    supersede: vi.fn<RunnerEffects['supersede']>().mockResolvedValue({ superseded: 2, not_superseded: 0, commands: [] }),
     settled: vi.fn<NonNullable<MatrixCommandRunnerDeps['onEffectsSettled']>>(),
   };
   const deps: MatrixCommandRunnerDeps = {
@@ -55,10 +57,11 @@ function setup(initialState = makeState()) {
     getTechnician: (id) => (id === TECH_1 ? makeTechnician(TECH_1) : undefined),
     commands: {
       applyDirectAssignment: mocks.apply, setAssignmentStatus: mocks.status, changeAssignmentRole: mocks.role,
-      removeDirectAssignment: mocks.remove, removeAssignmentDate: mocks.removeDate, unconfirmAssignment: mocks.unconfirm,
+      removeDirectAssignment: mocks.remove, removeAssignmentDate: mocks.removeDate, undoAssignmentCommand: mocks.undo,
+      getAssignmentCommandUndoWindow: mocks.window, releaseAssignmentCommandEffects: mocks.release,
       getAssignmentCommandState: mocks.getState,
     },
-    effects: { run: mocks.runEffects, supersede: mocks.supersede },
+    effects: { run: mocks.runEffects },
     onEffectsSettled: mocks.settled,
   };
   return { runner: createMatrixCommandRunner(deps), queryClient, mocks };
@@ -182,6 +185,34 @@ describe('createMatrixCommandRunner', () => {
       expect(ids[0]).toBe(ids[1]);
     });
 
+    it('replays the original request after the state cache expires and another manager changes it', async () => {
+      const { runner, mocks } = setup();
+      mocks.getState.mockResolvedValueOnce(makeState({ state_token: 'original-token' }))
+        .mockResolvedValueOnce(makeState({ exists: true, assignment: makeRow({ sound_role: 'SND-PA-T' }), dates: ['2026-10-13'], state_token: 'colleague-token' }));
+      mocks.apply.mockRejectedValueOnce(new AssignmentCommandError('network')).mockResolvedValueOnce(makeResult({ side_effects: [] }));
+      expect(await runner.run(assignIntent())).toMatchObject({ ok: false, code: 'network' });
+      await vi.advanceTimersByTimeAsync(11_000);
+      await runner.run(assignIntent());
+      expect(mocks.apply.mock.calls[1][0]).toEqual(mocks.apply.mock.calls[0][0]);
+      expect(mocks.getState).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares one in-flight request and undo handle for concurrent retries of the same decision', async () => {
+      const { runner, mocks } = setup();
+      let finish!: (value: AssignmentCommandResult) => void;
+      mocks.apply.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+      const first = runner.run(assignIntent());
+      const second = runner.run(assignIntent());
+      expect(second).toBe(first);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.apply).toHaveBeenCalledTimes(1);
+      finish(makeResult());
+      const [one, two] = await Promise.all([first, second]);
+      expect(two).toBe(one);
+      await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+      expect(mocks.runEffects).toHaveBeenCalledTimes(1);
+    });
+
     it('uses a new command id after a definitive rejection', async () => {
       const { runner, mocks } = setup();
       mocks.apply
@@ -211,109 +242,163 @@ describe('createMatrixCommandRunner', () => {
     });
   });
 
-  describe('undo', () => {
-    it('removes a new assignment with the post-change token and cancels both sets of effects', async () => {
-      const { runner, mocks, queryClient } = setup();
+  describe('atomic undo', () => {
+    it('sends one guarded undo packet and never dispatches either cancelled plan', async () => {
+      const prior = makeState();
+      const { runner, mocks, queryClient } = setup(prior);
       mocks.apply.mockResolvedValue(makeResult({ state_token: 'after-assign' }));
-      mocks.remove.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: null, dates: [], state_token: 'after-undo', side_effects: [
-        { kind: 'notification', action: 'assignment.removed', job_id: JOB_A, status: 'pending', effect_id: 'undo-1:0' },
-      ] }));
+      mocks.undo.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: null, dates: [], side_effects: [] }));
       const outcome = mustSucceed(await runner.run(assignIntent()));
       expect(rowsOf(queryClient)).toHaveLength(2);
-
-      const undone = await outcome.undo?.undo();
-      expect(undone).toEqual({ ok: true });
-      expect(mocks.remove).toHaveBeenCalledWith(expect.objectContaining({ jobId: JOB_A, technicianId: TECH_1, expectedStateToken: 'after-assign' }));
-      expect(mocks.supersede).toHaveBeenNthCalledWith(1, ['command-1']);
-      expect(mocks.supersede).toHaveBeenNthCalledWith(2, ['undo-1']);
+      expect(await outcome.undo?.undo()).toEqual({ ok: true });
+      expect(mocks.undo).toHaveBeenCalledWith({ commandId: expect.any(String), originalCommandId: 'command-1', expectedStateToken: 'after-assign', priorState: prior });
+      expect(mocks.remove).not.toHaveBeenCalled();
       expect(rowsOf(queryClient)).toEqual([]);
-
       await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS * 2);
+      expect(mocks.release).not.toHaveBeenCalled();
       expect(mocks.runEffects).not.toHaveBeenCalled();
     });
 
-    it('announces the inverse when the original effects had already run', async () => {
+    it('uses the server deadline instead of a new eight seconds on receipt', async () => {
       const { runner, mocks } = setup();
       mocks.apply.mockResolvedValue(makeResult());
-      mocks.remove.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: null, dates: [] }));
-      mocks.supersede.mockResolvedValue({ superseded: 0, not_superseded: 2, commands: [] });
+      const deadline = Date.now() + 2_000;
+      mocks.window.mockResolvedValue({ eligible: true, undo_expires_at: new Date(deadline).toISOString() });
       const outcome = mustSucceed(await runner.run(assignIntent()));
-      await outcome.undo?.undo();
-      expect(mocks.supersede).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(0);
-      expect(mocks.runEffects).toHaveBeenCalledWith('undo-1', expect.anything(), expect.anything());
-    });
-
-    it('refuses after the window and leaves the change alone', async () => {
-      const { runner, mocks } = setup();
-      mocks.apply.mockResolvedValue(makeResult());
-      const outcome = mustSucceed(await runner.run(assignIntent()));
-      await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+      expect(outcome.undo?.expiresAt).toBe(deadline);
+      await vi.advanceTimersByTimeAsync(2_000);
       expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'expired' });
-      expect(mocks.remove).not.toHaveBeenCalled();
+      expect(mocks.undo).not.toHaveBeenCalled();
+      expect(mocks.release).toHaveBeenCalledWith('command-1');
     });
 
-    it('a stale undo keeps the original effects: they run soon instead of being lost', async () => {
+    it('offers no undo when the authoritative hold cannot be read', async () => {
       const { runner, mocks } = setup();
       mocks.apply.mockResolvedValue(makeResult());
-      mocks.remove.mockResolvedValue(makeResult({ ok: false, outcome: 'rejected', code: 'stale_state', assignment: null, dates: [], side_effects: [] }));
+      mocks.window.mockRejectedValue(new AssignmentCommandError('network'));
+      expect(mustSucceed(await runner.run(assignIntent())).undo).toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.release).toHaveBeenCalledWith('command-1');
+    });
+
+    it('refuses a communicated change before making any inverse mutation', async () => {
+      const { runner, mocks } = setup();
+      mocks.apply.mockResolvedValue(makeResult());
+      mocks.undo.mockResolvedValue(makeResult({ ok: false, outcome: 'rejected', code: 'invalid_transition', side_effects: [] }));
       const outcome = mustSucceed(await runner.run(assignIntent()));
-      expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'stale' });
-      expect(mocks.supersede).not.toHaveBeenCalled();
-      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'rejected' });
+      expect(mocks.remove).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(0);
       expect(mocks.runEffects).toHaveBeenCalledWith('command-1', expect.anything(), expect.anything());
     });
 
-    it('a transport failure while undoing also keeps the original effects', async () => {
+    it('a stale undo leaves the original plan retryable and does not mutate through another RPC', async () => {
       const { runner, mocks } = setup();
       mocks.apply.mockResolvedValue(makeResult());
-      mocks.remove.mockRejectedValue(new AssignmentCommandError('network'));
+      mocks.undo.mockResolvedValue(makeResult({ ok: false, outcome: 'rejected', code: 'stale_state', side_effects: [] }));
+      const outcome = mustSucceed(await runner.run(assignIntent()));
+      expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'stale' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.runEffects).toHaveBeenCalledWith('command-1', expect.anything(), expect.anything());
+      expect(mocks.remove).not.toHaveBeenCalled();
+    });
+
+    it('replays the same undo packet after a lost response, even after the deadline', async () => {
+      const { runner, mocks } = setup();
+      mocks.apply.mockResolvedValue(makeResult());
+      mocks.undo.mockRejectedValueOnce(new AssignmentCommandError('network'))
+        .mockResolvedValueOnce(makeResult({ command_id: 'undo-1', assignment: null, dates: [], replayed: true, side_effects: [] }));
+      // The lost response may have committed cancellation in SQL.
+      mocks.release.mockResolvedValue(false);
       const outcome = mustSucceed(await runner.run(assignIntent()));
       expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'failed' });
-      await vi.advanceTimersByTimeAsync(1_000);
-      expect(mocks.runEffects).toHaveBeenCalledTimes(1);
-    });
-
-    it('lets both sets of effects run when they could not be cancelled', async () => {
-      const { runner, mocks } = setup();
-      mocks.apply.mockResolvedValue(makeResult());
-      mocks.remove.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: null, dates: [] }));
-      mocks.supersede.mockRejectedValue(new Error('rpc down'));
-      const outcome = mustSucceed(await runner.run(assignIntent()));
+      await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS + 1);
       expect(await outcome.undo?.undo()).toEqual({ ok: true });
-      await vi.advanceTimersByTimeAsync(0);
-      expect(mocks.runEffects.mock.calls.map(([id]) => id).sort()).toEqual(['command-1', 'undo-1']);
+      expect(mocks.undo.mock.calls[1][0]).toEqual(mocks.undo.mock.calls[0][0]);
+      expect(mocks.runEffects).not.toHaveBeenCalled();
     });
 
-    it('can only be used once', async () => {
+    it('shares a concurrent undo and marks a known success used', async () => {
       const { runner, mocks } = setup();
       mocks.apply.mockResolvedValue(makeResult());
-      mocks.remove.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: null, dates: [] }));
+      let finish!: (value: AssignmentCommandResult) => void;
+      mocks.undo.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
       const outcome = mustSucceed(await runner.run(assignIntent()));
-      await outcome.undo?.undo();
+      const first = outcome.undo!.undo();
+      const second = outcome.undo!.undo();
+      expect(second).toBe(first);
+      expect(mocks.undo).toHaveBeenCalledTimes(1);
+      finish(makeResult({ assignment: null, dates: [], side_effects: [] }));
+      expect(await first).toEqual({ ok: true });
       expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'expired' });
-      expect(mocks.remove).toHaveBeenCalledTimes(1);
     });
 
-    it('restores the previous days and role when it was a modification', async () => {
-      const previous = makeState({ exists: true, assignment: makeRow({ sound_role: 'SND-PA-T' }), dates: ['2026-10-13'], state_token: 'before' });
-      const { runner, mocks } = setup(previous);
-      mocks.apply
-        .mockResolvedValueOnce(makeResult({ dates: ['2026-10-13', '2026-10-14'], assignment: makeRow({ sound_role: 'SND-FOH-E' }), state_token: 'after' }))
-        .mockResolvedValueOnce(makeResult({ command_id: 'undo-1', dates: ['2026-10-13'], assignment: makeRow({ sound_role: 'SND-PA-T' }) }));
+    it('retains the exact uncertain undo packet through transient profile contention', async () => {
+      const { runner, mocks } = setup();
+      mocks.apply.mockResolvedValue(makeResult());
+      mocks.undo.mockRejectedValueOnce(new AssignmentCommandError('network'))
+        .mockRejectedValueOnce(new AssignmentCommandError('concurrent_write'))
+        .mockResolvedValueOnce(makeResult({ assignment: null, dates: [], replayed: true, side_effects: [] }));
+      mocks.release.mockResolvedValue(false);
+      const outcome = mustSucceed(await runner.run(assignIntent()));
+      expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'failed' });
+      await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS + 1);
+      expect(await outcome.undo?.undo()).toMatchObject({ ok: false, reason: 'failed' });
+      expect(outcome.undo?.isOpen()).toBe(true);
+      expect(await outcome.undo?.undo()).toEqual({ ok: true });
+      expect(mocks.undo.mock.calls).toHaveLength(3);
+      expect(mocks.undo.mock.calls[1][0]).toEqual(mocks.undo.mock.calls[0][0]);
+      expect(mocks.undo.mock.calls[2][0]).toEqual(mocks.undo.mock.calls[0][0]);
+      expect(mocks.runEffects).not.toHaveBeenCalled();
+    });
+
+    it('offers atomic undo for an apply that only upgrades invited status', async () => {
+      const prior = makeState({ exists: true, assignment: makeRow(), dates: ['2026-10-13', '2026-10-14'] });
+      const { runner, mocks } = setup(prior);
+      mocks.apply.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed' }) }));
+      mocks.undo.mockResolvedValue(makeResult({ assignment: prior.assignment }));
+      const outcome = mustSucceed(await runner.run(assignIntent({ status: 'confirmed' })));
+      expect(outcome.undo).not.toBeNull();
+      expect(await outcome.undo?.undo()).toEqual({ ok: true });
+      expect(mocks.undo).toHaveBeenCalledWith(expect.objectContaining({ priorState: prior }));
+    });
+
+    it.each([
+      { single_day: true, assignment_date: '2026-10-13' },
+      { lights_role: 'LGT-TECH' },
+    ])('does not offer a pure-status inverse when other membership fields changed: %j', async (changed) => {
+      const prior = makeState({ exists: true, assignment: makeRow(), dates: ['2026-10-13', '2026-10-14'] });
+      const { runner, mocks } = setup(prior);
+      mocks.apply.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed', ...changed }) }));
+      expect(mustSucceed(await runner.run(assignIntent({ status: 'confirmed' }))).undo).toBeNull();
+      expect(mocks.window).not.toHaveBeenCalled();
+    });
+
+    it('passes the complete prior scope, dates and roles to the guarded server restoration', async () => {
+      const prior = makeState({ exists: true, assignment: makeRow({ sound_role: 'SND-PA-T', single_day: true, assignment_date: '2026-10-13' }), dates: ['2026-10-13'], state_token: 'before' });
+      const { runner, mocks } = setup(prior);
+      mocks.apply.mockResolvedValue(makeResult({ state_token: 'after' }));
+      mocks.undo.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: prior.assignment, dates: prior.dates, side_effects: [] }));
       const outcome = mustSucceed(await runner.run(assignIntent({ mode: 'add' })));
       await outcome.undo?.undo();
-      expect(mocks.apply).toHaveBeenLastCalledWith(expect.objectContaining({
-        role: 'SND-PA-T', coverage: 'multi', dates: ['2026-10-13'], mode: 'replace', expectedStateToken: 'after', status: 'invited',
-      }));
+      expect(mocks.undo).toHaveBeenCalledWith(expect.objectContaining({ priorState: prior, expectedStateToken: 'after' }));
+      expect(mocks.apply).toHaveBeenCalledTimes(1);
     });
 
-    it('offers no undo for a modification that needs two writes to reverse', async () => {
-      const previous = makeState({ exists: true, assignment: makeRow({ status: 'invited', sound_role: 'SND-PA-T' }), dates: ['2026-10-13'] });
-      const { runner, mocks } = setup(previous);
+    it('does not dispatch effects if releasing the durable hold fails', async () => {
+      const { runner, mocks } = setup();
+      mocks.apply.mockResolvedValue(makeResult());
+      mocks.release.mockRejectedValue(new AssignmentCommandError('network'));
+      await runner.run(assignIntent());
+      await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS);
+      expect(mocks.runEffects).not.toHaveBeenCalled();
+    });
+
+    it('offers no undo for a modification that needs multiple commands to restore', async () => {
+      const prior = makeState({ exists: true, assignment: makeRow({ status: 'invited', sound_role: 'SND-PA-T' }), dates: ['2026-10-13'] });
+      const { runner, mocks } = setup(prior);
       mocks.apply.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed', sound_role: 'SND-FOH-E' }), dates: ['2026-10-13', '2026-10-14'] }));
-      const outcome = mustSucceed(await runner.run(assignIntent({ status: 'confirmed' })));
-      expect(outcome.undo).toBeNull();
+      expect(mustSucceed(await runner.run(assignIntent({ status: 'confirmed' }))).undo).toBeNull();
     });
   });
 
@@ -327,12 +412,12 @@ describe('createMatrixCommandRunner', () => {
         assignment: makeRow({ status: 'confirmed' }), state_token: 'after',
         side_effects: [{ kind: 'notification', action: 'job.assignment.confirmed', job_id: JOB_A, status: 'pending', effect_id: 'command-1:0' }],
       }));
-      mocks.unconfirm.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: makeRow({ status: 'invited' }), side_effects: [] }));
+      mocks.undo.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: makeRow({ status: 'invited' }), side_effects: [] }));
       const outcome = mustSucceed(await runner.run({ kind: 'confirm', technicianId: TECH_1, jobId: JOB_A, source: 'matrix-keyboard' }));
       expect(mocks.status).toHaveBeenCalledWith(expect.objectContaining({ action: 'confirm', source: 'matrix-keyboard', expectedStateToken: 'before' }));
       expect(rowsOf(queryClient).every((row) => row.status === 'confirmed')).toBe(true);
       expect(await outcome.undo?.undo()).toEqual({ ok: true });
-      expect(mocks.unconfirm).toHaveBeenCalledWith(expect.objectContaining({ expectedStateToken: 'after' }));
+      expect(mocks.undo).toHaveBeenCalledWith(expect.objectContaining({ expectedStateToken: 'after', priorState: pair }));
       expect(rowsOf(queryClient).every((row) => row.status === 'invited')).toBe(true);
       await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS * 2);
       expect(mocks.runEffects).not.toHaveBeenCalled();
@@ -357,17 +442,18 @@ describe('createMatrixCommandRunner', () => {
       mocks.apply.mockResolvedValue(makeResult({ assignment: makeRow({ status: 'confirmed', sound_role: 'SND-FOH-E' }), dates: ['2026-10-13'] }));
       const outcome = mustSucceed(await runner.run(assignIntent({ status: 'confirmed', coverage: 'multi', dates: ['2026-10-13'] })));
       expect(outcome.undo).toBeNull();
-      expect(mocks.unconfirm).not.toHaveBeenCalled();
+      expect(mocks.undo).not.toHaveBeenCalled();
     });
 
     it('a role change is undone by restoring the previous role', async () => {
       const { runner, mocks } = setup(makeState({ ...pair, assignment: makeRow({ sound_role: 'SND-PA-T' }) }));
-      mocks.role.mockResolvedValueOnce(makeResult({ assignment: makeRow({ sound_role: 'SND-FOH-R' }), state_token: 'after', side_effects: [] }))
-        .mockResolvedValueOnce(makeResult({ command_id: 'undo-1', assignment: makeRow({ sound_role: 'SND-PA-T' }), side_effects: [] }));
+      mocks.role.mockResolvedValueOnce(makeResult({ assignment: makeRow({ sound_role: 'SND-FOH-R' }), state_token: 'after', side_effects: [] }));
+      mocks.undo.mockResolvedValue(makeResult({ command_id: 'undo-1', assignment: makeRow({ sound_role: 'SND-PA-T' }), side_effects: [] }));
       const outcome = mustSucceed(await runner.run({ kind: 'role', technicianId: TECH_1, jobId: JOB_A, role: 'SND-FOH-R', department: 'sound', source: 'matrix-inspector' }));
       expect(outcome.undo).not.toBeNull();
       await outcome.undo?.undo();
-      expect(mocks.role).toHaveBeenLastCalledWith(expect.objectContaining({ department: 'sound', role: 'SND-PA-T', expectedStateToken: 'after' }));
+      expect(mocks.undo).toHaveBeenCalledWith(expect.objectContaining({ expectedStateToken: 'after', priorState: expect.objectContaining({ assignment: expect.objectContaining({ sound_role: 'SND-PA-T' }) }) }));
+      expect(mocks.role).toHaveBeenCalledTimes(1);
     });
 
     it('decline and removal are final: no undo, effects released at once', async () => {
