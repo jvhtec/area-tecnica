@@ -18,9 +18,19 @@ import {
 } from "@/components/matrix/optimized-assignment-matrix/MatrixCellHoverTooltip";
 import { formatUserName } from "@/utils/userName";
 import { MatrixDialogs } from "@/components/matrix/optimized-assignment-matrix/MatrixDialogs";
+import { MatrixInspectorHost } from "@/features/matrix-v2/inspector/MatrixInspectorHost";
+import type { MatrixV2ViewConfig } from "@/features/matrix-v2/viewConfig";
+import { useMatrixGridV2 } from "@/features/matrix-v2/useMatrixGridV2";
+import { MatrixShortcutHelp } from "@/features/matrix-v2/keyboard/MatrixShortcutHelp";
+import { FocusColumnOverlay } from "@/features/matrix-v2/focus/FocusColumnOverlay";
+import { BatchLayer } from "@/features/matrix-v2/batch/BatchLayer";
+import { useSelectionDerivations } from "./useSelectionDerivations";
+import { SelectionOverlay } from "@/features/matrix-v2/batch/SelectionOverlay";
 import type {
+  CancelStaffingAsync,
   CancelStaffingMutate,
   MatrixCellAction,
+  SendStaffingEmailAsync,
   SendStaffingEmailMutate,
 } from "@/components/matrix/optimized-matrix-cell/types";
 
@@ -82,6 +92,9 @@ export interface OptimizedAssignmentMatrixViewProps {
   sendStaffingEmail: SendStaffingEmailMutate;
   isSendingStaffingEmail: boolean;
   cancelStaffing: CancelStaffingMutate;
+  /** Matrix v2 sends through these: each call has its own promise, which `mutate`'s per-call callbacks do not (only the latest call's fire). */
+  sendStaffingEmailAsync: SendStaffingEmailAsync;
+  cancelStaffingAsync: CancelStaffingAsync;
   isCancellingStaffing: boolean;
   checkTimeConflictEnhanced: any;
   availabilityDialog: any;
@@ -102,8 +115,14 @@ export interface OptimizedAssignmentMatrixViewProps {
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   clearCellSelection: () => void;
+  /** Replaces the selection wholesale (drag and shift-click ranges). */
+  onReplaceSelection: (keys: Set<string>) => void;
+  /** Whose remembered staffing channel the Matrix v2 composer uses. */
+  staffingUserId?: string | null;
   /** Grid-selected days for the offer's technician, clamped to the job. */
   offerSeedDates?: string[];
+  /** Present when the new Matrix (inspector, focus, batch) is switched on. */
+  v2?: MatrixV2ViewConfig;
 }
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
@@ -162,6 +181,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   sendStaffingEmail,
   isSendingStaffingEmail,
   cancelStaffing,
+  sendStaffingEmailAsync,
+  cancelStaffingAsync,
   isCancellingStaffing,
   checkTimeConflictEnhanced,
   availabilityDialog,
@@ -181,7 +202,10 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   techMedalRankings,
   techLastYearMedalRankings,
   clearCellSelection,
+  onReplaceSelection,
+  staffingUserId,
   offerSeedDates,
+  v2,
 }: OptimizedAssignmentMatrixViewProps) => {
   // Scroll position and the virtualised window are owned here rather than by
   // the matrix container, so a scroll step re-renders this view alone.
@@ -217,52 +241,29 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
 
   // Touch action sheet: one instance for the grid, opened by tapping a cell.
   const [sheetTarget, setSheetTarget] = React.useState<MatrixMobileCellTarget | null>(null);
+  // Matrix v2: one inspector for the grid, whose state the container owns so the
+  // cell buttons and the keyboard can open it too. Desktop anchors it to the
+  // clicked cell; a phone gets the same content as a bottom sheet (no anchor).
+  const keyboardHintId = React.useId();
   const handleOpenSheet = React.useCallback(
     (technicianId: string, date: Date) => {
+      if (v2) {
+        // A tap on a phone is a click: in job focus it assigns a free day of the job.
+        if (!v2.focus?.onCellClick(technicianId, date, null)) v2.openInspector(technicianId, date, null);
+        return;
+      }
       const technician = technicians.find((t) => t.id === technicianId);
       if (technician) setSheetTarget({ technician, date });
     },
-    [technicians],
+    [technicians, v2],
   );
   const closeSheet = React.useCallback(() => setSheetTarget(null), []);
 
   const selectionActive = mobile && selectedCells.size > 0;
+  const inspectorTarget = v2?.inspectorTarget ?? null;
+  const closeInspector = v2?.closeInspector;
 
-  // Selection per row, so selecting a cell re-renders the rows whose selection
-  // changed instead of every row (each used to receive the whole set). Cell
-  // keys are `${technicianId}-${yyyy-MM-dd}`; the id is a uuid with dashes of
-  // its own, so the day key is read off the end.
-  const selectedDateKeysByTech = React.useMemo(() => {
-    const byTech = new Map<string, Set<string>>();
-    selectedCells.forEach((cellKey) => {
-      const technicianId = cellKey.slice(0, -11);
-      let keys = byTech.get(technicianId);
-      if (!keys) {
-        keys = new Set<string>();
-        byTech.set(technicianId, keys);
-      }
-      keys.add(cellKey.slice(-10));
-    });
-    return byTech;
-  }, [selectedCells]);
-
-  // Cell keys are `${technicianId}-${yyyy-MM-dd}`, and the id is a uuid that
-  // carries dashes of its own, so the day key is read off the end.
-  const selectionAnchor = React.useMemo(() => {
-    if (!selectedCells.size) return null;
-    const [first] = Array.from(selectedCells);
-    const technicianId = first.slice(0, -11);
-    const date = madridDateKeyToCalendarDate(first.slice(-10));
-    return date ? { technicianId, date } : null;
-  }, [selectedCells]);
-
-  const selectedCountForSheet = React.useMemo(() => {
-    if (!sheetTarget) return 0;
-    const prefix = `${sheetTarget.technician.id}-`;
-    let count = 0;
-    selectedCells.forEach((key) => { if (key.startsWith(prefix)) count += 1; });
-    return count;
-  }, [selectedCells, sheetTarget]);
+  const { selectedDateKeysByTech, selectionAnchor, selectedCountForSheet } = useSelectionDerivations(selectedCells, sheetTarget?.technician.id ?? null);
 
   // Anchored to the viewport, not to this layout: the matrix container runs past
   // the fold on a phone, so an absolutely positioned control at its bottom edge
@@ -322,12 +323,41 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     [handleMainScroll],
   );
 
+  // Matrix v2: the inspector's environment, the keyboard model and its actions.
+  const v2Grid = useMatrixGridV2({
+    v2,
+    mobile,
+    technicians,
+    orderedTechnicians,
+    dates,
+    jobs,
+    getJobsForDate,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+    declinedJobsByTech,
+    fridgeSet,
+    staffingMaps,
+    profileNamesMap,
+    isManagementUser,
+    grid: { cellWidth: CELL_WIDTH, cellHeight: CELL_HEIGHT, technicianWidth: TECHNICIAN_WIDTH, headerHeight: HEADER_HEIGHT },
+    scrollRef: mainScrollRef,
+    selectedCells,
+    clearSelection: clearCellSelection,
+    onReplaceSelection,
+    sendStaffingEmail: sendStaffingEmailAsync,
+    cancelStaffing: cancelStaffingAsync,
+    staffingDepartment: staffingDepartment ?? null,
+    staffingUserId: staffingUserId ?? null,
+  });
+  const { inspectorEnv, keyboard, onInspect: handleInspectAndActivate, focus, focusOverlay, gridHandlers, previewRects, batchLayer } = v2Grid;
+
   // DateHeader is memoized and runs queries keyed off these props; rebuilding
   // them inline per render defeated the memo and re-fired those queries.
   const technicianIds = React.useMemo(() => technicians.map((t) => t.id), [technicians]);
   const handleDateHeaderJobClick = React.useCallback(
-    (jobId: string) => setSortJobId((prev) => (prev === jobId ? null : jobId)),
-    [setSortJobId],
+    // Under Matrix v2 the header's job row focuses the job; before, it only sorted by it.
+    (jobId: string) => (v2 ? v2.toggleFocusJob(jobId) : setSortJobId((prev) => (prev === jobId ? null : jobId))),
+    [setSortJobId, v2],
   );
 
   return (
@@ -343,7 +373,23 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           on the compositor: no scroll sync in JavaScript, and they cannot trail
           the grid when the main thread is busy. */}
       <TooltipProvider>
-        <div ref={mainScrollRef} className="matrix-main-scroll" onScroll={handleGridScroll}>
+        <div
+          ref={mainScrollRef}
+          className="matrix-main-scroll"
+          onScroll={handleGridScroll}
+          {...(v2 && !mobile
+            ? {
+              tabIndex: 0,
+              role: "application",
+              "aria-label": "Matriz de asignaciones",
+              "aria-describedby": keyboardHintId,
+              "aria-activedescendant": keyboard.activeDescendant,
+              "data-matrix-grid": "true",
+              onKeyDown: keyboard.onKeyDown,
+              onFocus: keyboard.onFocus,
+            }
+            : {})}
+        >
           <div
             className="matrix-canvas"
             style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: HEADER_HEIGHT + matrixHeight }}
@@ -486,6 +532,16 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                   );
                 })}
               </div>
+              {focusOverlay && (
+                <FocusColumnOverlay
+                  part="header"
+                  {...focusOverlay}
+                  cellWidth={CELL_WIDTH}
+                  technicianWidth={TECHNICIAN_WIDTH}
+                  headerHeight={HEADER_HEIGHT}
+                  bodyHeight={matrixHeight}
+                />
+              )}
             </div>
 
             <div className="matrix-body" style={{ width: TECHNICIAN_WIDTH + matrixWidth, height: matrixHeight }}>
@@ -507,6 +563,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     compact={mobile}
                     medalRank={techMedalRankings.get(technician.id)}
                     lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
+                    focusFit={focus?.fits.get(technician.id)}
+                    onFocusAssign={focus?.onNameClick}
                   />
                 ))}
               </div>
@@ -517,6 +575,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 onMouseOver={mobile ? undefined : handleGridMouseOver}
                 onMouseLeave={mobile ? undefined : hideCellTooltip}
                 onMouseDown={mobile ? undefined : hideCellTooltip}
+                {...gridHandlers}
               >
                 {orderedTechnicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => (
                   <MatrixGridRow
@@ -544,6 +603,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                     onSelect={handleCellSelect}
                     onClick={handleCellClick}
                     onOpenSheet={handleOpenSheet}
+                    inspectorMode={!!v2}
+                    onInspect={handleInspectAndActivate}
                     onPrefetch={handleCellPrefetch}
                     onOptimisticUpdate={handleOptimisticUpdate}
                     onRender={incrementCellRender}
@@ -555,9 +616,39 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 ))}
               </div>
             </div>
+            {focusOverlay && (
+              <FocusColumnOverlay
+                part="body"
+                {...focusOverlay}
+                cellWidth={CELL_WIDTH}
+                technicianWidth={TECHNICIAN_WIDTH}
+                headerHeight={HEADER_HEIGHT}
+                bodyHeight={matrixHeight}
+              />
+            )}
+            {previewRects.length > 0 && (
+              <SelectionOverlay rects={previewRects} cellWidth={CELL_WIDTH} cellHeight={CELL_HEIGHT} technicianWidth={TECHNICIAN_WIDTH} headerHeight={HEADER_HEIGHT} />
+            )}
+            {keyboard.ring && (
+              <div
+                aria-hidden="true"
+                data-matrix-active-ring="true"
+                className="pointer-events-none absolute z-[25] rounded-md ring-2 ring-primary ring-offset-1 ring-offset-background"
+                style={{ left: keyboard.ring.left, top: keyboard.ring.top, width: keyboard.ring.width, height: keyboard.ring.height }}
+              />
+            )}
           </div>
         </div>
       </TooltipProvider>
+
+      {v2 && !mobile && (
+        <>
+          <p id={keyboardHintId} className="sr-only">
+            Usa las flechas para moverte por la matriz, Intro para abrir una celda y ? para ver los atajos.
+          </p>
+          <div role="status" aria-live="polite" className="sr-only">{keyboard.announcement}</div>
+        </>
+      )}
 
       {!mobile && <MatrixCellHoverTooltip ref={hoverTooltipRef} resolve={resolveCellTooltip} />}
 
@@ -580,7 +671,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      {selectionActive && (
+      {selectionActive && !v2 && (
         <div
           className="fixed inset-x-2 z-30 flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-xl backdrop-blur"
           style={{ bottom: floatingBottom }}
@@ -611,7 +702,14 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         </div>
       )}
 
-      <MatrixMobileCellSheet
+      {v2 && <BatchLayer {...batchLayer} />}
+
+      {inspectorEnv && closeInspector && (
+        <MatrixInspectorHost env={inspectorEnv} target={inspectorTarget} onClose={closeInspector} mobile={mobile} />
+      )}
+      {v2 && !mobile && <MatrixShortcutHelp open={keyboard.helpOpen} onOpenChange={keyboard.setHelpOpen} />}
+
+      {!v2 && <MatrixMobileCellSheet
         target={sheetTarget}
         onClose={closeSheet}
         assignment={sheetTarget ? getAssignmentForCell(sheetTarget.technician.id, sheetTarget.date) : undefined}
@@ -633,7 +731,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         sendStaffingEmail={sendStaffingEmail}
         cancelStaffing={cancelStaffing}
         isCancellingStaffing={isCancellingStaffing}
-      />
+      />}
 
       <MatrixDialogs
         cellAction={cellAction}

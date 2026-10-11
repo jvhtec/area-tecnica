@@ -19,6 +19,7 @@ export const REJECTION_CODES = [
   'dryhire_job',
   'invalid_role',
   'approved_timesheet',
+  'invalid_transition',
 ] as const;
 export type AssignmentRejectionCode = (typeof REJECTION_CODES)[number];
 
@@ -57,7 +58,7 @@ export const sideEffectSchema = z.object({
   action: z.string(),
   job_id: z.string(),
   department: z.enum(['sound', 'lights']).optional(),
-  status: z.enum(['pending', 'succeeded', 'failed']),
+  status: z.enum(['pending', 'succeeded', 'failed', 'superseded']),
   attempts: z.number().optional(),
   last_error: z.string().nullable().optional(),
   effect_id: z.string().optional(),
@@ -130,6 +131,19 @@ export const commandStateSchema = z.object({
 });
 export type AssignmentCommandState = z.infer<typeof commandStateSchema>;
 
+export const undoWindowSchema = z.object({
+  undo_expires_at: z.string().datetime({ offset: true }).nullable(),
+  eligible: z.boolean(),
+});
+export type AssignmentUndoWindow = z.infer<typeof undoWindowSchema>;
+
+export interface UndoAssignmentCommandInput {
+  commandId: string;
+  originalCommandId: string;
+  expectedStateToken: string;
+  priorState: AssignmentCommandState;
+}
+
 export const jobCommandStatesSchema = z.object({
   job_id: z.string(),
   absent_state_token: z.string(),
@@ -188,3 +202,17 @@ export interface SetAssignmentStatusInput extends RemoveDirectAssignmentInput {
   action: 'confirm' | 'decline';
   notes?: string | null;
 }
+
+/** Inverse of a manager confirm (confirmed -> invited), used by the undo window. */
+export type UnconfirmAssignmentInput = RemoveDirectAssignmentInput;
+
+export const supersedeResultSchema = z.object({
+  superseded: z.number().int().nonnegative(),
+  not_superseded: z.number().int().nonnegative(),
+  commands: z.array(z.object({
+    command_id: z.string(),
+    superseded: z.number().int().nonnegative(),
+    not_superseded: z.number().int().nonnegative(),
+  })),
+});
+export type SupersedeResult = z.infer<typeof supersedeResultSchema>;

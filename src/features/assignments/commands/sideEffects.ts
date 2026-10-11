@@ -4,9 +4,11 @@ import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotifica
 import { getErrorMessage } from '@/utils/errorMessage';
 import {
   sideEffectSchema,
+  supersedeResultSchema,
   type AssignmentCommandResult,
   type AssignmentCommandRow,
   type AssignmentSideEffect,
+  type SupersedeResult,
 } from '@/features/assignments/commands/types';
 
 export interface SideEffectContext {
@@ -159,4 +161,18 @@ export async function runAssignmentSideEffects(
   });
   if (error) console.warn('Could not record assignment side-effect outcomes', { commandId, error });
   return { attempted: reports.length, failed, recorded: !error };
+}
+
+/**
+ * Cancels the post-commit effects of commands the manager just undid, as long
+ * as they have not run. `not_superseded > 0` means something already ran (or is
+ * running), so the caller must let the inverse command's own effects run too:
+ * the technician or Flex already heard about the original change.
+ */
+export async function supersedeAssignmentSideEffects(commandIds: string[]): Promise<SupersedeResult> {
+  const { data, error } = await supabase.rpc('supersede_assignment_side_effects', { p_command_ids: commandIds });
+  if (error) throw error;
+  const parsed = supersedeResultSchema.safeParse(data);
+  if (!parsed.success) throw new Error('Respuesta de cancelación de efectos no reconocida');
+  return parsed.data;
 }

@@ -14,6 +14,9 @@ import {
   requireCommitted,
   runAssignmentSideEffects,
   setAssignmentStatus,
+  undoAssignmentCommand,
+  getAssignmentCommandUndoWindow,
+  releaseAssignmentCommandEffects,
   type AssignmentCommandResult,
 } from '@/features/assignments/commands';
 
@@ -53,6 +56,34 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('atomic assignment undo', () => {
+  const prior = { exists: false, assignment: null, dates: [], state_token: 'before' };
+  it('retries the exact undo packet after losing the response', async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: { message: 'Failed to fetch' } })
+      .mockResolvedValueOnce({ data: result({ replayed: true, side_effects: [] }), error: null });
+    const pending = undoAssignmentCommand({ commandId: 'undo-1', originalCommandId: 'cmd-1', expectedStateToken: 'after', priorState: prior });
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toMatchObject({ replayed: true });
+    expect(rpcMock.mock.calls).toEqual(Array(2).fill(['undo_assignment_command', {
+      p_command_id: 'undo-1', p_original_command_id: 'cmd-1', p_expected_state_token: 'after', p_prior_state: prior,
+    }]));
+  });
+  it('reads and validates the server deadline', async () => {
+    const window = { eligible: true, undo_expires_at: '2026-10-05T17:00:08+00:00' };
+    rpcMock.mockResolvedValue({ data: window, error: null });
+    await expect(getAssignmentCommandUndoWindow('cmd-1')).resolves.toEqual(window);
+    expect(rpcMock).toHaveBeenCalledWith('get_assignment_command_undo_window', { p_command_id: 'cmd-1' });
+    rpcMock.mockResolvedValue({ data: { eligible: true, undo_expires_at: 'tomorrow' }, error: null });
+    await expect(getAssignmentCommandUndoWindow('cmd-1')).rejects.toMatchObject({ code: 'unknown' });
+  });
+  it('refuses malformed release responses and preserves a cancelled decision', async () => {
+    rpcMock.mockResolvedValue({ data: { released: false }, error: null });
+    await expect(releaseAssignmentCommandEffects('cmd-1')).resolves.toBe(false);
+    rpcMock.mockResolvedValue({ data: { released: 'yes' }, error: null });
+    await expect(releaseAssignmentCommandEffects('cmd-1')).rejects.toMatchObject({ code: 'unknown' });
+  });
 });
 
 describe('applyDirectAssignment', () => {

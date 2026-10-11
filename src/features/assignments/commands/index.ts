@@ -8,6 +8,10 @@ export {
   removeDirectAssignment,
   requireCommitted,
   setAssignmentStatus,
+  unconfirmAssignment,
+  undoAssignmentCommand,
+  getAssignmentCommandUndoWindow,
+  releaseAssignmentCommandEffects,
 } from '@/features/assignments/commands/client';
 export {
   ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
@@ -21,7 +25,7 @@ export {
   jobAssignmentCommandStatesKey,
   reconcileAssignmentViews,
 } from '@/features/assignments/commands/reconcile';
-export { runAssignmentSideEffects } from '@/features/assignments/commands/sideEffects';
+export { runAssignmentSideEffects, supersedeAssignmentSideEffects } from '@/features/assignments/commands/sideEffects';
 export type { SideEffectContext, SideEffectSummary } from '@/features/assignments/commands/sideEffects';
 export { conflictDetailsSchema } from '@/features/assignments/commands/types';
 export type {
@@ -31,7 +35,9 @@ export type {
   AssignmentCommandRow,
   AssignmentCommandState,
   AssignmentConflictDetails,
+  AssignmentConflictPolicy,
   AssignmentCoverage,
+  AssignmentCoverageMode,
   AssignmentRoleDepartment,
   AssignmentSideEffect,
   ChangeAssignmentRoleInput,
@@ -39,6 +45,10 @@ export type {
   RemoveAssignmentDateInput,
   RemoveDirectAssignmentInput,
   SetAssignmentStatusInput,
+  SupersedeResult,
+  UnconfirmAssignmentInput,
+  UndoAssignmentCommandInput,
+  AssignmentUndoWindow,
 } from '@/features/assignments/commands/types';
 export {
   fetchAssignmentConsistencyIssues,

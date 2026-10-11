@@ -28,6 +28,8 @@ import {
   type MedalRank,
 } from "@/components/matrix/technicianMedalComments";
 import { queryKeys } from "@/lib/react-query";
+import type { FocusFit } from "@/features/matrix-v2/focus/fit";
+import { FocusFitBadge } from "@/features/matrix-v2/focus/FocusFitBadge";
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Error desconocido";
@@ -52,9 +54,12 @@ interface TechnicianRowProps {
   compact?: boolean;
   medalRank?: 'gold' | 'silver' | 'bronze';
   lastYearMedalRank?: 'gold' | 'silver' | 'bronze';
+  /** Job focus: how this technician fits the focused job. While set, a click assigns instead of opening the profile. */
+  focusFit?: FocusFit;
+  onFocusAssign?: (technicianId: string) => void;
 }
 
-const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank, focusFit, onFocusAssign }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isAdmin = isAdminRole(userRole);
   const isManagementUser = isManagementRole(userRole);
@@ -273,6 +278,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   };
 
   const handlePopoverOpenChange = (open: boolean) => {
+    // In job focus a click on the name assigns; the profile is back when focus ends.
+    if (open && onFocusAssign) {
+      onFocusAssign(technician.id);
+      return;
+    }
     setPopoverOpen(open);
     if (open) {
       loadMetrics();
@@ -403,6 +413,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                   {displayName}
                 </div>
                 <div className="text-[10px] leading-none text-muted-foreground">{deptAbbrev}</div>
+                {focusFit && <FocusFitBadge fit={focusFit} className="mt-0.5" />}
               </div>
             ) : (
               <div className="flex h-full items-center gap-2.5">
@@ -432,6 +443,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                     {displayName}
                   </div>
                   <div className="mt-1 flex flex-nowrap gap-1 overflow-hidden">
+                    {focusFit && <FocusFitBadge fit={focusFit} />}
                     <span
                       className={`inline-flex h-5 items-center whitespace-nowrap rounded-md border px-1.5 text-xs font-semibold leading-none ${getDepartmentColor(technician.department)}`}
                     >

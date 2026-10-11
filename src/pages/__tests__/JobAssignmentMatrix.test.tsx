@@ -305,7 +305,26 @@ describe('JobAssignmentMatrix', () => {
     expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-whatsapp-buttons:user-1')).toBe('true');
   });
 
-  it('toggles mark unavailable mode for management users', async () => {
+  it('gives managers the new matrix by default: no editing modes to switch on', async () => {
+    useOptimizedAuthMock.mockReturnValue({
+      user: { id: 'manager-1' },
+      userDepartment: 'sound',
+      userRole: 'management',
+    });
+
+    render(<JobAssignmentMatrix />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('allow-mark-unavailable')).toHaveTextContent('false');
+    });
+    expect(screen.queryByLabelText(/Alternar marcar no disponible/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Alternar asignación directa/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Enfocar trabajo' }).length).toBeGreaterThan(0);
+  });
+
+  it('toggles mark unavailable mode for management users (legacy matrix)', async () => {
+    // The old matrix is still there for whoever chose it in Ajustes.
+    window.localStorage.setItem('matrix-v2', 'v1');
     useOptimizedAuthMock.mockReturnValue({
       user: { id: 'manager-1' },
       userDepartment: 'sound',

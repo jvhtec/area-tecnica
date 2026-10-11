@@ -77,6 +77,8 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  /** Offers include it as their message unless it is edited. */
+  description?: string | null;
   job_date_types?: Array<{ date: string; type: string }>;
   assigned_count?: number;
   worked_count?: number;
@@ -657,6 +659,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = useCallback(async () => {
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('assignment-command-state') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignment-command-states') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-staffing-summary') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-assignments') }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') }),
@@ -735,6 +740,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
     const invalidate = throttle(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.scope('assignment-command-state') });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignment-command-states') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
       // Confirmed and open-slot badges are counted off timesheets too.
       void invalidateMatrixHeaderCounts(queryClient);

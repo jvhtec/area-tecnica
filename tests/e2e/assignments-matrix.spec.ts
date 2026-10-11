@@ -1,8 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { bootstrapApp, isMobileViewport } from "./support/app";
 
-test("extended job dates stay open for a new staffing cycle without repeating single-day badges", async ({ page }) => {
+/** One staffing cycle already answered on a job that was later extended by two days. */
+async function openExtendedJobMatrix(page: Page, query: string) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const day = (offset: number) => {
     const value = new Date(`${today}T12:00:00Z`);
@@ -26,11 +27,18 @@ test("extended job dates stay open for a new staffing cycle without repeating si
       get_staffing_requests_matrix_filtered: requests,
     },
   });
-  await page.goto("/job-assignment-matrix");
-  const original = page.locator(`[data-technician-id="tech-1"][data-date-key="${day(1)}"]`);
+  await page.goto(`/job-assignment-matrix${query}`);
+  return {
+    day,
+    original: page.locator(`[data-technician-id="tech-1"][data-date-key="${day(1)}"]`),
+    added: page.locator(`[data-technician-id="tech-1"][data-date-key="${day(0)}"]`),
+  };
+}
+
+test("extended job dates stay open for a new staffing cycle without repeating single-day badges (legacy matrix)", async ({ page }) => {
+  const { original, added } = await openExtendedJobMatrix(page, "?matriz=v1");
   await expect(original).toContainText("Festival ampliado");
   await expect(original).not.toContainText("Día único");
-  const added = page.locator(`[data-technician-id="tech-1"][data-date-key="${day(0)}"]`);
   await expect(added).toHaveAttribute("data-matrix-cell-state", "today");
   await expect(added).not.toContainText(/Disponibilidad|Confirmada|Oferta/i);
   if (isMobileViewport(page)) {
@@ -42,7 +50,23 @@ test("extended job dates stay open for a new staffing cycle without repeating si
   }
 });
 
-test("renders the assignments matrix and lets management toggle direct assign mode", async ({
+test("extended job dates stay open for a new staffing cycle without repeating single-day badges", async ({ page }) => {
+  const { original, added } = await openExtendedJobMatrix(page, "");
+  await expect(original).toContainText("Festival ampliado");
+  await expect(original).not.toContainText("Día único");
+  await expect(added).toHaveAttribute("data-matrix-cell-state", "today");
+  await expect(added).not.toContainText(/Disponibilidad|Confirmada|Oferta/i);
+  // The added day carries no answered request of the first cycle, and a new one can be composed right there.
+  await added.click();
+  const inspector = page.getByRole("dialog");
+  await expect(inspector).toBeVisible();
+  await expect(inspector).not.toContainText(/Disponibilidad:|Oferta:/);
+  await inspector.getByRole("button", { name: /Pedir disponibilidad u oferta/ }).click();
+  await expect(inspector.getByRole("radiogroup", { name: "Qué enviar" })).toBeVisible();
+  await expect(inspector.getByRole("button", { name: /Pedir disponibilidad/ })).toBeVisible();
+});
+
+test("renders the assignments matrix and lets management toggle direct assign mode (legacy matrix)", async ({
   page,
 }) => {
   await bootstrapApp(page, {
@@ -94,7 +118,7 @@ test("renders the assignments matrix and lets management toggle direct assign mo
     },
   });
 
-  await page.goto("/job-assignment-matrix");
+  await page.goto("/job-assignment-matrix?matriz=v1");
 
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
 
@@ -115,7 +139,7 @@ test("renders the assignments matrix and lets management toggle direct assign mo
   await expect(directAssignSwitch).toHaveAttribute("aria-checked", "true");
 });
 
-test("gives touch users the cell action sheet and long-press multi-select", async ({ page }) => {
+test("gives touch users the cell action sheet and long-press multi-select (legacy matrix)", async ({ page }) => {
   test.skip(!isMobileViewport(page), "The action sheet replaces the desktop cell's icon cluster on touch only.");
 
   await bootstrapApp(page, {
@@ -167,7 +191,7 @@ test("gives touch users the cell action sheet and long-press multi-select", asyn
     },
   });
 
-  await page.goto("/job-assignment-matrix");
+  await page.goto("/job-assignment-matrix?matriz=v1");
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
 
   const cell = page.locator('[data-matrix-cell="true"]').first();
@@ -192,7 +216,7 @@ test("gives touch users the cell action sheet and long-press multi-select", asyn
   await expect(page.getByRole("button", { name: /^Limpiar$/ })).toBeVisible();
 });
 
-test("walks the touch staffing flow from cell to coverage", async ({ page }) => {
+test("walks the touch staffing flow from cell to coverage (legacy matrix)", async ({ page }) => {
   test.skip(!isMobileViewport(page), "The sheet chain is the touch surface; desktop keeps the inline icons.");
 
   // Fixtures hang off today so the job lands inside the matrix's default window.
@@ -244,7 +268,7 @@ test("walks the touch staffing flow from cell to coverage", async ({ page }) => 
     },
   });
 
-  await page.goto("/job-assignment-matrix");
+  await page.goto("/job-assignment-matrix?matriz=v1");
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
 
   const todayCell = page.locator('[data-matrix-cell-state="today"]').first();
@@ -269,7 +293,7 @@ test("walks the touch staffing flow from cell to coverage", async ({ page }) => 
   await expect(page.getByRole("button", { name: /^Enviar \(\d+ días?\)$/ })).toBeVisible();
 });
 
-test("carries a long-press multi-select into the offer, clamped to the job", async ({ page }) => {
+test("carries a long-press multi-select into the offer, clamped to the job (legacy matrix)", async ({ page }) => {
   test.skip(!isMobileViewport(page), "Long press is the touch-only multi-select gesture.");
 
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -321,7 +345,7 @@ test("carries a long-press multi-select into the offer, clamped to the job", asy
     },
   });
 
-  await page.goto("/job-assignment-matrix");
+  await page.goto("/job-assignment-matrix?matriz=v1");
   await expect(page.getByRole("heading", { name: /matriz de asignación de trabajos/i })).toBeVisible();
 
   const todayPosition = await page.locator('[data-matrix-cell-state="today"]').first().evaluate((el) => {
