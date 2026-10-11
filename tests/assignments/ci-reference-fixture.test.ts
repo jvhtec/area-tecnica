@@ -5,7 +5,7 @@ import { activityCatalogDefaults } from '@/features/activity/catalog';
 
 describe('synthetic staffing runtime reference catalog', () => {
   it('preserves product visibility, severity, toast and template defaults without personal fixtures', () => {
-    const sql = readFileSync(resolve('tests/assignments/fixtures/staffing-runtime-reference.sql'), 'utf8');
+    const sql = readFileSync(resolve('tests/assignments/fixtures/staffing-runtime-reference.sql'), 'utf8').replace(/\r\n/g, '\n');
     const codes = Object.keys(activityCatalogDefaults);
     const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
     const rows = sql.slice(sql.indexOf('\nVALUES\n') + 8, sql.indexOf('\nON CONFLICT')).split(',\n');

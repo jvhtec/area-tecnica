@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { deepStrictEqual as assertEquals, throws as assertThrows } from "node:assert/strict";
 import { headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
 Deno.test("only Preparado and Enviado are publishable", () => {

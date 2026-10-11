@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
 import { requireServiceRoleRequest } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 import { decodeFlexPdf, headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
 const FLEX_BASE = "https://sectorpro.flexrentalsolutions.com/f5/api";
@@ -100,7 +101,8 @@ serve(createHttpHandler(async (request) => {
           if (redundant.length) {
             const { error: staleError } = await db.from("job_documents").delete().in("id", redundant.map((doc) => doc.id));
             if (staleError) throw staleError;
-            await db.storage.from(BUCKET).remove(redundant.map((doc) => doc.file_path));
+            const { error: storageError } = await db.storage.from(BUCKET).remove(redundant.map((doc) => doc.file_path));
+            if (storageError) throw storageError;
           }
           results.unchanged++; continue;
         }
@@ -123,11 +125,10 @@ serve(createHttpHandler(async (request) => {
         if (previous?.length) {
           const { error: deletionError } = await db.from("job_documents").delete()
             .in("id", previous.map((doc) => doc.id));
-          if (!deletionError) {
-            const { error: storageError } = await db.storage.from(BUCKET)
-              .remove(previous.map((doc) => doc.file_path));
-            if (storageError) void storageError;
-          } else void deletionError;
+          if (deletionError) throw deletionError;
+          const { error: storageError } = await db.storage.from(BUCKET)
+            .remove(previous.map((doc) => doc.file_path));
+          if (storageError) throw storageError;
         }
         results.published++;
         } finally {
@@ -140,5 +141,9 @@ serve(createHttpHandler(async (request) => {
       results.errors.push(job.id);
     }
   }
-  return new Response(JSON.stringify(results), { headers: { "Content-Type": "application/json" } });
+  logEvent(results.errors.length ? "warn" : "info", "sound_manifest_sync.completed", {
+    checked: results.checked, published: results.published, unchanged: results.unchanged,
+    pending: results.pending, failed: results.errors.length,
+  });
+  return new Response(JSON.stringify(results), { status: results.errors.length ? 500 : 200, headers: { "Content-Type": "application/json" } });
 }, { allowedMethods: ["POST"] }));
