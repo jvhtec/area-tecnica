@@ -2,17 +2,19 @@ import { describe, expect, it } from "vitest";
 import { findQuoteEquipmentListCandidates, isPullSheetKeyInfo } from "./discovery";
 
 const eventId = "10000000-0000-4000-8000-000000000001";
-const quoteId = "20000000-0000-4000-8000-000000000002";
+const quoteId = "b2000000-cdef-4abc-8def-abcdef000002";
 const sheetId = "a0000000-0000-4000-8000-000000000003";
 const lightsId = "40000000-0000-4000-8000-000000000004";
 const structureId = "50000000-0000-4000-8000-000000000005";
 const shipId = "60000000-0000-4000-8000-000000000006";
 const definitionId = "a220432c-af33-11df-b8d5-00e08175e43e";
 
+/** Build a direct equipment-list child with overrides for malformed and sibling fixtures. */
 function equipment(nodeId = sheetId, overrides: Record<string, unknown> = {}) {
   return { nodeId, parentId: quoteId, domainId: "equipment-list", ...overrides };
 }
 
+/** Build the requested quote root with explicit child and root variations. */
 function quote(children: unknown[] = [equipment()], overrides: Record<string, unknown> = {}) {
   return { nodeId: quoteId, parentId: eventId, domainId: "financial-document", children, ...overrides };
 }
@@ -36,13 +38,36 @@ describe("quote equipment-list discovery", () => {
       .toEqual([sheetId]);
   });
 
+  it.each([
+    [quoteId, quoteId.toUpperCase(), quoteId],
+    [quoteId.toUpperCase(), quoteId, quoteId.toUpperCase()],
+    [quoteId, quoteId, quoteId.toUpperCase()],
+    [quoteId.toUpperCase(), quoteId.toUpperCase(), quoteId],
+  ])("normalizes quote %s, root %s, and parent %s UUIDs", (requestedId, nodeId, parentId) => {
+    expect(findQuoteEquipmentListCandidates(quote([equipment(sheetId, { parentId })], { nodeId }), requestedId))
+      .toEqual([sheetId]);
+  });
+
+  it("returns an empty list only for a valid quote with null or empty-array children", () => {
+    expect(findQuoteEquipmentListCandidates(quote([], { children: null }), quoteId)).toEqual([]);
+    expect(findQuoteEquipmentListCandidates(quote([]), quoteId)).toEqual([]);
+    const { children: _children, ...missingChildren } = quote();
+    expect(findQuoteEquipmentListCandidates(missingChildren, quoteId)).toBeNull();
+    for (const children of [undefined, {}, "invalid", 42]) {
+      expect(findQuoteEquipmentListCandidates(quote([], { children }), quoteId)).toBeNull();
+    }
+  });
+
   it("fails closed for missing, deleted, or duplicate quote roots", () => {
     for (const tree of [null, [], {}, { children: [equipment()] }, quote(undefined, { deleted: true }),
       [quote(), quote()], { nodeId: eventId, children: [quote(), { children: [quote()] }] },
       quote([{ ...quote(), parentId: quoteId }])]) {
-      expect(findQuoteEquipmentListCandidates(tree, quoteId)).toEqual([]);
+      expect(findQuoteEquipmentListCandidates(tree, quoteId)).toBeNull();
     }
     expect(findQuoteEquipmentListCandidates([quote(undefined, { deleted: true }), quote()], quoteId)).toEqual([sheetId]);
+    expect(findQuoteEquipmentListCandidates([quote(), quote([], { nodeId: quoteId.toUpperCase() })], quoteId)).toBeNull();
+    expect(findQuoteEquipmentListCandidates([quote(), quote([], { nodeId: quoteId.toUpperCase() })], quoteId.toUpperCase()))
+      .toBeNull();
   });
 
   it("rejects deleted children, wrong or missing parents, invalid IDs, and other domains", () => {
@@ -57,11 +82,11 @@ describe("quote equipment-list discovery", () => {
 
   it("prunes deleted ancestors before locating or counting quote roots", () => {
     const deletedBranch = { nodeId: lightsId, deleted: true, children: [{ children: [quote()] }] };
-    expect(findQuoteEquipmentListCandidates({ nodeId: eventId, children: [deletedBranch] }, quoteId)).toEqual([]);
+    expect(findQuoteEquipmentListCandidates({ nodeId: eventId, children: [deletedBranch] }, quoteId)).toBeNull();
     expect(findQuoteEquipmentListCandidates({ nodeId: eventId, children: [deletedBranch, quote()] }, quoteId))
       .toEqual([sheetId]);
     expect(findQuoteEquipmentListCandidates({ nodeId: eventId, deleted: true, children: [quote()] }, quoteId))
-      .toEqual([]);
+      .toBeNull();
   });
 
   it("excludes grandchildren, including ship manifests, without reading candidate descendants", () => {
@@ -80,10 +105,10 @@ describe("quote equipment-list discovery", () => {
 
   it("rejects invalid quote IDs and arbitrary response wrappers", () => {
     for (const id of ["", "not-a-uuid", ` ${quoteId}`, `${quoteId}/tree`]) {
-      expect(findQuoteEquipmentListCandidates(quote(), id)).toEqual([]);
+      expect(findQuoteEquipmentListCandidates(quote(), id)).toBeNull();
     }
-    expect(findQuoteEquipmentListCandidates({ data: quote() }, quoteId)).toEqual([]);
-    expect(findQuoteEquipmentListCandidates(quote([], { children: { data: [equipment()] } }), quoteId)).toEqual([]);
+    expect(findQuoteEquipmentListCandidates({ data: quote() }, quoteId)).toBeNull();
+    expect(findQuoteEquipmentListCandidates(quote([], { children: { data: [equipment()] } }), quoteId)).toBeNull();
   });
 });
 

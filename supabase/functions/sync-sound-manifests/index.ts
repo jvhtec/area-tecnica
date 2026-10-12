@@ -94,7 +94,9 @@ serve(createHttpHandler(async (request) => {
         if (source.folder_type === "pull_sheet") { sheetIds.add(source.element_id.toLowerCase()); continue; }
         try {
           const tree = await flexJson(`/element/${encodeURIComponent(source.element_id)}/tree`, token);
-          for (const id of findQuoteEquipmentListCandidates(tree, source.element_id)) {
+          const candidates = findQuoteEquipmentListCandidates(tree, source.element_id);
+          if (candidates === null) throw new Error("Registered quote tree unavailable");
+          for (const id of candidates) {
             try {
               const info = await flexJson(`/element/${encodeURIComponent(id)}/key-info/`, token);
               if (isPullSheetKeyInfo(info, id)) sheetIds.add(id);

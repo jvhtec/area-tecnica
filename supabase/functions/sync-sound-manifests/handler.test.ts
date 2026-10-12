@@ -16,6 +16,7 @@ const prefix = `flex-reports/sound-manifests/${job.id}/${sheet}`;
 type Result = { data?: unknown; error?: { message: string } | null };
 const request = (authorization = "Bearer fixture-service", body?: unknown) => new Request("https://example.test", { method: "POST", headers: { authorization }, body: body === undefined ? undefined : JSON.stringify(body) });
 
+/** Model discovery filters and publication mutations independently of the worker. */
 function database(previous: { id: string; file_path: string }[] = [], options: {
   insertError?: boolean; deleteError?: boolean; releaseError?: boolean; claim?: boolean;
   references?: { file_path: string }[]; referencesError?: boolean;
@@ -92,6 +93,7 @@ function database(previous: { id: string; file_path: string }[] = [], options: {
   return { db, events, inserts, queries, queue, remove };
 }
 
+/** Supply deterministic warehouse, header and PDF responses for publication checks. */
 function flex(status = prepared, shippedStatus: string | null = null) {
   mocks.fetch.mockImplementation(async (url: string) => {
     if (url.includes("warehouse-state")) return Response.json({ prepManifestId: prep, shipManifestId: shippedStatus ? ship : null });
@@ -142,7 +144,7 @@ describe("Sound manifest worker", () => {
     expect(fixture.db.storage.from).not.toHaveBeenCalled();
   });
 
-  it.each([{ job_id: "invalid" }, { dry_run: "true" }, { element_id: ship }, null, []])("rejects invalid run options before any database or Flex access: %j", async (body) => {
+  it.each([{ job_id: "invalid" }, { dry_run: "true" }, { dry_run: true }, { element_id: ship }, null, []])("rejects invalid run options before any database or Flex access: %j", async (body) => {
     expect((await handler(request(undefined, body))).status).toBe(400);
     expect(mocks.createClient).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
@@ -171,6 +173,33 @@ describe("Sound manifest worker", () => {
     database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }, { element_id: sheet, folder_type: "pull_sheet" }] });
     const original = mocks.fetch.getMockImplementation()!;
     mocks.fetch.mockImplementation(async (url: string) => url.includes("/tree") ? new Response("Not found", { status: 404 }) : original(url));
+    const response = await handler(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });
+  });
+
+  it.each(["missing", "duplicate"])("reports a %s quote root while continuing mapped sheets", async (kind) => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }, { element_id: sheet, folder_type: "pull_sheet" }] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => url.includes("/tree")
+      ? Response.json({ nodeId: job.id, children: kind === "missing" ? [] : [1, 2].map(() => ({ nodeId: quote, children: [] })) })
+      : original(url));
+    const response = await handler(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });
+  });
+
+  it("continues a valid candidate after another candidate's key-info fails", async () => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes("/tree")) return Response.json({ nodeId: quote, children: [ship, sheet].map((nodeId) => ({ nodeId, parentId: quote, domainId: "equipment-list" })) });
+      if (url.includes("key-info")) return url.includes(ship) ? new Response("Unavailable", { status: 502 })
+        : Response.json({ elementId: sheet, definitionId: "a220432c-af33-11df-b8d5-00e08175e43e", isManifest: false, deleted: false });
+      return original(url);
+    });
     const response = await handler(request());
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });

@@ -12,6 +12,7 @@ export async function readRunOptions(request: Request): Promise<{ jobId?: string
   const options = body as Record<string, unknown>;
   if (Object.keys(options).some((key) => !["job_id", "dry_run", "triggered_by"].includes(key)) ||
     (options.triggered_by !== undefined && options.triggered_by !== "pg_cron") ||
+    (options.dry_run === true && options.job_id === undefined) ||
     (options.job_id !== undefined && (typeof options.job_id !== "string" || !UUID.test(options.job_id))) ||
     (options.dry_run !== undefined && typeof options.dry_run !== "boolean")) {
     throw new HttpError(400, "Invalid run options");
