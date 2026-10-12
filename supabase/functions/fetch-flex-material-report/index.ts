@@ -300,7 +300,8 @@ serve(createHttpHandler(async (req: Request) => {
       file_size: pdfBytes.byteLength,
       uploaded_by: caller.userId,
       original_type: "pdf",
-      visible_to_tech: true,
+      visible_to_tech: reportType !== "quote",
+      read_only: reportType === "quote",
     })
     .select("id")
     .single();

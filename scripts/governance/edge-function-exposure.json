@@ -139,6 +139,7 @@
     "submit-feature-request": { "class": "authenticated-user", "verifyJwt": true },
     "submit-public-artist-form": { "class": "public-token", "verifyJwt": false, "internalGuard": "Festival artist form submissions have durable ingress and token-scoped rate limits before persisting the submission." },
     "sync-flex-crew-for-job": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before reconciling desired assignments with Flex crew line items." },
+    "sync-sound-manifests": {"class":"service-only","verifyJwt":true,"internalGuard":"Requires the Authorization bearer to exactly match SUPABASE_SERVICE_ROLE_KEY before accessing Flex or publishing technician-visible PDFs; invoked by the guarded pg_cron wrapper."},
     "system-health": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Requires an authenticated admin/management caller; redacts internal errors and records a security audit entry. Liveness moved to the unauthenticated `health` function." },
     "tech-calendar-ics": { "class": "public-token", "verifyJwt": false, "internalGuard": "Per-technician calendar feed token embedded in the subscription URL; guarded by durable ingress and token/client scoped hourly rate limits." },
     "tour-guest-document-url": { "class": "public-token", "verifyJwt": false, "internalGuard": "Tour guest document signing has durable ingress and token/document scoped rate limits before issuing a scoped, time-limited document URL." },

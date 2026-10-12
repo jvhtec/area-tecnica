@@ -95,3 +95,7 @@ verify_jwt = false
 # Privileged diagnostics: gateway JWT plus an internal admin/management check.
 [functions.system-health]
 verify_jwt = true
+
+# Cron invokes with the service-role JWT; the handler also checks its bearer key.
+[functions.sync-sound-manifests]
+verify_jwt = true
