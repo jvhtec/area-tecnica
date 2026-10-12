@@ -14,15 +14,18 @@ const ship = "44444444-4444-4444-8444-444444444444";
 const prepared = "70b2de6c-aee8-11df-b8d5-00e08175e43e";
 const prefix = `flex-reports/sound-manifests/${job.id}/${sheet}`;
 type Result = { data?: unknown; error?: { message: string } | null };
-const request = (authorization = "Bearer fixture-service") => new Request("https://example.test", { method: "POST", headers: { authorization } });
+const request = (authorization = "Bearer fixture-service", body?: unknown) => new Request("https://example.test", { method: "POST", headers: { authorization }, body: body === undefined ? undefined : JSON.stringify(body) });
 
+/** Model discovery filters and publication mutations independently of the worker. */
 function database(previous: { id: string; file_path: string }[] = [], options: {
   insertError?: boolean; deleteError?: boolean; releaseError?: boolean; claim?: boolean;
   references?: { file_path: string }[]; referencesError?: boolean;
+  sources?: { element_id: string; folder_type: string }[];
+  jobs?: typeof job[];
 } = {}) {
   const events: string[] = [];
   const queue: Result[] = [
-    { data: [job] }, { data: [{ element_id: sheet }] }, { data: previous },
+    { data: options.jobs ?? [job] }, { data: options.sources ?? [{ element_id: sheet, folder_type: "pull_sheet" }] }, { data: previous },
   ];
   const queries: { table: string; filters: unknown[][] }[] = [];
   const inserts: Record<string, unknown>[] = [];
@@ -39,9 +42,23 @@ function database(previous: { id: string; file_path: string }[] = [], options: {
             result = { data: options.references ?? [], error: options.referencesError ? { message: "reference lookup failed" } : null };
           }
           return query;
-        }), gte: vi.fn(() => query), lte: vi.fn(() => query),
+        }), gte: vi.fn((...args: unknown[]) => {
+          filters.push(["gte", ...args]);
+          if (table === "jobs" && Array.isArray(result?.data)) result = { ...result, data: result.data.filter((row) => row.start_time >= String(args[1])) };
+          return query;
+        }), lte: vi.fn((...args: unknown[]) => {
+          filters.push(["lte", ...args]);
+          if (table === "jobs" && Array.isArray(result?.data)) result = { ...result, data: result.data.filter((row) => row.start_time <= String(args[1])) };
+          return query;
+        }),
         order: vi.fn(() => query), limit: vi.fn(() => query),
-        eq: vi.fn((...args: unknown[]) => { filters.push(["eq", ...args]); return query; }),
+        eq: vi.fn((...args: unknown[]) => {
+          filters.push(["eq", ...args]);
+          if (table === "flex_folders" && args[0] === "folder_type" && Array.isArray(result?.data)) {
+            result = { ...result, data: result.data.filter((row) => row.folder_type === args[1]) };
+          }
+          return query;
+        }),
         like: vi.fn((...args: unknown[]) => { filters.push(["like", ...args]); return query; }),
         insert: vi.fn((row: Record<string, unknown>) => {
           events.push("insert"); inserts.push(row);
@@ -49,7 +66,14 @@ function database(previous: { id: string; file_path: string }[] = [], options: {
           return query;
         }),
         delete: vi.fn(() => { events.push("delete"); result = { error: options.deleteError ? { message: "delete failed" } : null }; return query; }),
-        in: vi.fn((...args: unknown[]) => { filters.push(["in", ...args]); return query; }),
+        in: vi.fn((...args: unknown[]) => {
+          filters.push(["in", ...args]);
+          if (table === "flex_folders" && args[0] === "folder_type" && Array.isArray(args[1]) && Array.isArray(result?.data)) {
+            const types = args[1];
+            result = { ...result, data: result.data.filter((row) => types.includes(row.folder_type)) };
+          }
+          return query;
+        }),
         single: vi.fn(async () => result),
         then: (resolve: (result: Result | undefined) => unknown) => Promise.resolve(result).then(resolve),
       };
@@ -69,6 +93,7 @@ function database(previous: { id: string; file_path: string }[] = [], options: {
   return { db, events, inserts, queries, queue, remove };
 }
 
+/** Supply deterministic warehouse, header and PDF responses for publication checks. */
 function flex(status = prepared, shippedStatus: string | null = null) {
   mocks.fetch.mockImplementation(async (url: string) => {
     if (url.includes("warehouse-state")) return Response.json({ prepManifestId: prep, shipManifestId: shippedStatus ? ship : null });
@@ -78,12 +103,115 @@ function flex(status = prepared, shippedStatus: string | null = null) {
 }
 
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-12T12:00:00Z"));
   vi.stubGlobal("Deno", { env: { get: (name: string) => ({ SUPABASE_SERVICE_ROLE_KEY: "fixture-service", SUPABASE_URL: "https://project.supabase.co", X_AUTH_TOKEN: "fixture-flex" })[name] } });
   flex();
 });
-afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("Sound manifest worker", () => {
+  it.each([["comercial_presupuesto", false], ["dryhire_presupuesto", false], ["comercial_presupuesto", true], ["dryhire_presupuesto", true]] as const)("discovers an unregistered Pull Sheet beneath Sound %s with a mapped copy: %s", async (folderType, mapped) => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    const fixture = database([], { sources: [{ element_id: quote, folder_type: folderType }, ...(mapped ? [{ element_id: sheet, folder_type: "pull_sheet" }] : [])] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes("/tree")) return Response.json({ nodeId: job.id, children: [
+        { nodeId: quote, children: [{ nodeId: sheet, parentId: quote, domainId: "equipment-list", deleted: false }] },
+        { nodeId: ship, parentId: job.id, domainId: "equipment-list" },
+      ] });
+      if (url.includes("key-info")) return Response.json({ elementId: sheet, definitionId: "a220432c-af33-11df-b8d5-00e08175e43e", isManifest: false, deleted: false });
+      return original(url);
+    });
+    expect(await (await handler(request())).json()).toMatchObject({ checked: 1, published: 1, errors: [] });
+    expect(fixture.queries[1].filters).toEqual([
+      ["eq", "job_id", job.id], ["eq", "department", "sound"],
+      ["in", "folder_type", ["pull_sheet", "comercial_presupuesto", "dryhire_presupuesto"]],
+    ]);
+    expect(mocks.fetch.mock.calls.filter(([url]) => url.includes("warehouse-state")).map(([url]) => url))
+      .toEqual([`https://sectorpro.flexrentalsolutions.com/f5/api/equipment-list/warehouse-state/${sheet}`]);
+  });
+
+  it("validates a job-scoped PDF dry run without claiming a lease or changing documents", async () => {
+    const fixture = database();
+    expect(await (await handler(request(undefined, { job_id: job.id, dry_run: true }))).json())
+      .toMatchObject({ dry_run: true, checked: 1, published: 0, previews: [{ job_id: job.id, sheet_id: sheet, manifest_id: prep, pdf_bytes: new TextEncoder().encode("%PDF-1.7\nfixture\n%%EOF").length }] });
+    expect(fixture.queries[0].filters).toContainEqual(["eq", "id", job.id]);
+    expect(fixture.queries[0].filters).toContainEqual(["gte", "start_time", "2026-10-10T12:00:00.000Z"]);
+    expect(fixture.queries[0].filters).toContainEqual(["lte", "start_time", "2026-10-14T12:00:00.000Z"]);
+    expect(fixture.queries).toHaveLength(2);
+    expect(fixture.events).toEqual([]);
+    expect(fixture.db.rpc).not.toHaveBeenCalled();
+    expect(fixture.db.storage.from).not.toHaveBeenCalled();
+  });
+
+  it.each([{ job_id: "invalid" }, { dry_run: "true" }, { dry_run: true }, { element_id: ship }, null, []])("rejects invalid run options before any database or Flex access: %j", async (body) => {
+    expect((await handler(request(undefined, body))).status).toBe(400);
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("deduplicates repeated mapped Pull Sheets", async () => {
+    database([], { sources: [1, 2].map(() => ({ element_id: sheet, folder_type: "pull_sheet" })) });
+    expect(await (await handler(request())).json()).toMatchObject({ checked: 1, published: 1 });
+  });
+
+  it("preserves the installed cron request contract", async () => {
+    database();
+    expect(await (await handler(request(undefined, { triggered_by: "pg_cron" }))).json()).toMatchObject({ published: 1, errors: [] });
+  });
+
+  it("rejects malformed or oversized requests before discovery", async () => {
+    for (const [body, status] of [["{", 400], [" ".repeat(1025), 413]] as const) {
+      expect((await handler(new Request("https://example.test", { method: "POST", headers: { authorization: "Bearer fixture-service" }, body }))).status).toBe(status);
+    }
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("processes a mapped sheet while reporting a stale quote discovery failure", async () => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }, { element_id: sheet, folder_type: "pull_sheet" }] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => url.includes("/tree") ? new Response("Not found", { status: 404 }) : original(url));
+    const response = await handler(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });
+  });
+
+  it.each(["missing", "duplicate"])("reports a %s quote root while continuing mapped sheets", async (kind) => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }, { element_id: sheet, folder_type: "pull_sheet" }] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => url.includes("/tree")
+      ? Response.json({ nodeId: job.id, children: kind === "missing" ? [] : [1, 2].map(() => ({ nodeId: quote, children: [] })) })
+      : original(url));
+    const response = await handler(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });
+  });
+
+  it("continues a valid candidate after another candidate's key-info fails", async () => {
+    const quote = "55555555-5555-4555-8555-555555555555";
+    database([], { sources: [{ element_id: quote, folder_type: "comercial_presupuesto" }] });
+    const original = mocks.fetch.getMockImplementation()!;
+    mocks.fetch.mockImplementation(async (url: string) => {
+      if (url.includes("/tree")) return Response.json({ nodeId: quote, children: [ship, sheet].map((nodeId) => ({ nodeId, parentId: quote, domainId: "equipment-list" })) });
+      if (url.includes("key-info")) return url.includes(ship) ? new Response("Unavailable", { status: 502 })
+        : Response.json({ elementId: sheet, definitionId: "a220432c-af33-11df-b8d5-00e08175e43e", isManifest: false, deleted: false });
+      return original(url);
+    });
+    const response = await handler(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ checked: 1, published: 1, errors: [job.id] });
+  });
+
+  it.each(["2026-10-10T11:59:59Z", "2026-10-14T12:00:01Z"])("does not fetch Flex for a scoped job outside the window: %s", async (startTime) => {
+    const fixture = database([], { jobs: [{ ...job, start_time: startTime }] });
+    expect(await (await handler(request(undefined, { job_id: job.id, dry_run: true }))).json()).toMatchObject({ checked: 0, previews: [] });
+    expect(fixture.queries).toHaveLength(1);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
   it("denies non-service callers before database or Flex access", async () => {
     expect((await handler(request("Bearer fixture-user"))).status).toBe(403);
     expect(mocks.createClient).not.toHaveBeenCalled();
