@@ -4,6 +4,8 @@ import { createHttpHandler } from "../_shared/http.ts";
 import { requireServiceRoleRequest } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
+import { findQuoteEquipmentListCandidates, isPullSheetKeyInfo } from "./discovery.ts";
+import { readRunOptions } from "./runOptions.ts";
 import { decodeFlexPdf, headerText, isPublishableStatus, manifestReportUrl, manifestStatusId, soundManifestFileName } from "./manifest.ts";
 
 const FLEX_BASE = "https://sectorpro.flexrentalsolutions.com/f5/api";
@@ -65,24 +67,47 @@ serve(createHttpHandler(async (request) => {
   const token = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN");
   if (!serviceKey || !url || !token) return new Response("Service configuration unavailable", { status: 503 });
   requireServiceRoleRequest(request, serviceKey);
+  const options = await readRunOptions(request);
   const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const now = Date.now();
   const results = { checked: 0, published: 0, unchanged: 0, pending: 0, errors: [] as string[] };
+  const previews: Row[] = [];
   // Scan upcoming jobs, never depend on a user opening the application.
-  const { data: jobs, error: jobsError } = await db.from("jobs")
+  let jobQuery = db.from("jobs")
     .select("id,title,start_time,status")
     .gte("start_time", new Date(now - 48 * HOUR).toISOString())
     .lte("start_time", new Date(now + 48 * HOUR).toISOString())
     .order("start_time", { ascending: true }).limit(BATCH_SIZE);
+  if (options.jobId) jobQuery = jobQuery.eq("id", options.jobId);
+  const { data: jobs, error: jobsError } = await jobQuery;
   if (jobsError) return new Response("Job discovery failed", { status: 500 });
   for (const job of jobs ?? []) {
     if (["cancelled", "canceled", "cancelado"].includes(String(job.status ?? "").toLowerCase())) continue;
     try {
       const { data: sheets, error: folderError } = await db.from("flex_folders")
-        .select("element_id").eq("job_id", job.id).eq("department", "sound")
-        .eq("folder_type", "pull_sheet");
+        .select("element_id,folder_type").eq("job_id", job.id).eq("department", "sound")
+        .in("folder_type", ["pull_sheet", "comercial_presupuesto", "dryhire_presupuesto"]);
       if (folderError) throw folderError;
-      for (const sheet of sheets ?? []) {
+      const sheetIds = new Set<string>();
+      for (const source of sheets ?? []) {
+        if (!UUID.test(source.element_id ?? "")) continue;
+        if (source.folder_type === "pull_sheet") { sheetIds.add(source.element_id.toLowerCase()); continue; }
+        try {
+          const tree = await flexJson(`/element/${encodeURIComponent(source.element_id)}/tree`, token);
+          for (const id of findQuoteEquipmentListCandidates(tree, source.element_id)) {
+            try {
+              const info = await flexJson(`/element/${encodeURIComponent(id)}/key-info/`, token);
+              if (isPullSheetKeyInfo(info, id)) sheetIds.add(id);
+            } catch {
+              if (!results.errors.includes(job.id)) results.errors.push(job.id);
+            }
+          }
+        } catch {
+          if (!results.errors.includes(job.id)) results.errors.push(job.id);
+        }
+      }
+      for (const elementId of sheetIds) {
+        const sheet = { element_id: elementId };
         if (!UUID.test(sheet.element_id ?? "")) continue;
         results.checked++;
         const warehouse = asRecord(await flexJson(
@@ -103,6 +128,12 @@ serve(createHttpHandler(async (request) => {
           }
         }
         if (!manifestId) { results.pending++; continue; }
+        if (options.dryRun) {
+          const pdf = await fetchPdf(manifestId, token);
+          previews.push({ job_id: job.id, sheet_id: sheet.element_id, manifest_id: manifestId,
+            document_number: manifestNumber, pdf_bytes: pdf.byteLength, sha256: await sha256(pdf) });
+          continue;
+        }
         const lockToken = crypto.randomUUID();
         const { data: acquired, error: lockError } = await db.rpc("claim_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id, p_token: lockToken });
         if (lockError) throw lockError;
@@ -149,17 +180,17 @@ serve(createHttpHandler(async (request) => {
         results.published++;
         } finally {
           const { error: releaseError } = await db.rpc("release_sound_manifest_slot", { p_job_id: job.id, p_sheet_id: sheet.element_id, p_token: lockToken });
-          if (releaseError) results.errors.push(job.id);
+          if (releaseError && !results.errors.includes(job.id)) results.errors.push(job.id);
         }
       }
     } catch (error) {
       void error;
-      results.errors.push(job.id);
+      if (!results.errors.includes(job.id)) results.errors.push(job.id);
     }
   }
   logEvent(results.errors.length ? "warn" : "info", "sound_manifest_sync.completed", {
     checked: results.checked, published: results.published, unchanged: results.unchanged,
     pending: results.pending, failed: results.errors.length,
   });
-  return new Response(JSON.stringify(results), { status: results.errors.length ? 500 : 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(options.dryRun ? { ...results, dry_run: true, previews } : results), { status: results.errors.length ? 500 : 200, headers: { "Content-Type": "application/json" } });
 }, { allowedMethods: ["POST"] }));

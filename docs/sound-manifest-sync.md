@@ -11,7 +11,7 @@ The migrations install the database wrapper, private publication leases and quot
 
 ## Validation required before scheduling
 1. **Confirmed:** `GET /element/{manifestId}/header-data/?codeList=statusId` returns a `statusId` field whose `data.id` is the authoritative status option. Verify the response against a prepared manifest during integration testing.
-2. Confirm `flex_folders` Sound Pull Sheet mapping across single jobs, festivals, and tour dates.
+2. Confirm job-scoped `flex_folders` Sound mappings across single jobs, festivals, and tour dates. In addition to recorded `pull_sheet` entries, the worker discovers direct equipment-list children of registered Sound `comercial_presupuesto` / `dryhire_presupuesto` quotes. Flex returns the whole event tree: only the exact quote subtree is eligible, and each candidate's key-info must confirm the Pull Sheet definition rather than a manifest. No mapping is inferred from a document name.
 3. Verify report response is valid PDF/base64 PDF using a prepared manifest.
 4. Check `job_documents.read_only` and nullable `uploaded_by` against production schema.
 5. Test repeat runs, PDF replacements, concurrent invocations, and technician access with the real database.
@@ -20,6 +20,10 @@ The migrations install the database wrapper, private publication leases and quot
 
 ## Current scope
 A server-side service-role-only worker with strict status ID allowlist, report generation, content hashing, and publish-before-retire document replacement. This is a dormant integration: merging the code does not activate recurring execution or certify the real Flex report/mappings. Ordinary CI covers the worker contracts, while pgTAP covers quote metadata/Storage authorization, lease ownership, RPC grants and the unscheduled default.
+
+For manual validation, send `{"job_id":"<job UUID>","dry_run":true}` using server-side service-role authentication. This keeps the normal ±48-hour job window and cancellation filter, validates the real manifest status and PDF, and returns manifest IDs, PDF sizes and hashes without claiming leases or changing Storage/documents. Remove `dry_run` to publish only that job; repeat to check unchanged content. Empty requests and the installed `{"triggered_by":"pg_cron"}` contract retain the normal batch behavior. Unknown options, arbitrary Flex IDs and malformed values are rejected.
+
+GSTQ on 2026-10-12 exposed the discovery gap: its registered Sound quote contained a Pull Sheet and an Enviado manifest, but there was no Sound `pull_sheet` database mapping. The quote tree and Pull Sheet definition were verified in the authenticated Flex UI before adding discovery.
 
 ## Daytime polling window
 Once activated, cron invokes its database wrapper hourly, but the wrapper calls Flex only at **09:00, 11:00, 13:00, 15:00, 17:00 and 19:00 Europe/Madrid**. The timezone guard preserves local hours across daylight-saving changes. No overnight calls are made.
