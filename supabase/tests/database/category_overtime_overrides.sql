@@ -48,7 +48,9 @@ INSERT INTO public.custom_tech_rates (
   plus_10_12_eur, overtime_hour_eur, overtime_hour_especialista_eur,
   overtime_hour_responsable_eur
 )
-SELECT id, 180, 180, 200, 30, 15, 17, 20 FROM public.profiles
+SELECT id, 180, 180, 200, 30, 15, 17,
+       CASE WHEN role = 'house_tech' AND NOT seasonal_house_tech THEN 23 ELSE 20 END
+FROM public.profiles
 WHERE id IN ('dd100000-0000-0000-0000-000000000001', 'dd100000-0000-0000-0000-000000000002', 'dd100000-0000-0000-0000-000000000003', 'dd100000-0000-0000-0000-000000000004', 'dd100000-0000-0000-0000-000000000005');
 
 -- The management responsable fixture reproduces the reported overnight shift:
@@ -104,7 +106,7 @@ JOIN (VALUES
   ('dd300000-0000-0000-0000-000000000009'::uuid, 'technician responsable', 20::numeric, 290::numeric),
   ('dd300000-0000-0000-0000-000000000010'::uuid, 'house_tech tecnico', 15::numeric, 255::numeric),
   ('dd300000-0000-0000-0000-000000000011'::uuid, 'house_tech especialista', 17::numeric, 261::numeric),
-  ('dd300000-0000-0000-0000-000000000012'::uuid, 'house_tech responsable', 20::numeric, 290::numeric),
+  ('dd300000-0000-0000-0000-000000000012'::uuid, 'house_tech responsable', 23::numeric, 299::numeric),
   ('dd300000-0000-0000-0000-000000000013'::uuid, 'seasonal house_tech tecnico', 15::numeric, 45::numeric),
   ('dd300000-0000-0000-0000-000000000014'::uuid, 'seasonal house_tech especialista', 17::numeric, 51::numeric),
   ('dd300000-0000-0000-0000-000000000015'::uuid, 'seasonal house_tech responsable', 20::numeric, 60::numeric)
