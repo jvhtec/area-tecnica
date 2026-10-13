@@ -22,6 +22,8 @@ type LogisticsEventCardEvent = LogisticsCalendarEvent & {
   custom_title?: string | null;
   manual_title?: string | null;
   request_title?: string | null;
+  transport_company?:string|null;
+  transport_data_warning?:string|null;
 };
 
 interface LogisticsEventCardProps {
@@ -52,6 +54,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   const providerConfig = isTransportProvider(transportProvider)
     ? TRANSPORT_PROVIDERS[transportProvider]
     : null;
+  const company=event.transport_company?.trim()||providerConfig?.label||"Sin indicar";
 
   const getBgColor = () => {
     if (!event.color) return "";
@@ -96,8 +99,9 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
       )}
     >
       {variant === "calendar" ? (
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 space-y-1">
           <span className="min-w-0 truncate text-xs">{getDisplayName()}</span>
+          {!isCrewTransfer && <div className="break-words text-xs"><strong>Matrícula:</strong> {event.license_plate?.trim() || "Pendiente"}<br /><strong>Empresa:</strong> {company}</div>}
         </div>
       ) : (
         <>
@@ -121,7 +125,7 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
               </div>
             </div>
 
-            {providerConfig?.icon && (
+            {providerConfig?.icon && company===providerConfig.label && (
               <div className="shrink-0">
                 <img
                   src={providerConfig.icon}
@@ -140,6 +144,8 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
           </div>
 
           <h3 className="mt-2 min-w-0 break-words font-medium">{getDisplayName()}</h3>
+          <p className="mt-1 text-sm"><strong>Empresa de transporte:</strong> {company}</p>
+          {event.transport_data_warning&&<p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{event.transport_data_warning}</p>}
           <div className="mt-1 text-sm text-muted-foreground">
             {event.end_date && event.end_time
               ? formatTransportSpan(event)

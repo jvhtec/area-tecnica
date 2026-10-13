@@ -1,3 +1,4 @@
+import { openPersonnelService } from "@/features/logistics/personnel/personnelNavigation";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -446,6 +447,7 @@ export const LogisticsEventDialog = ({
     }
   };
 
+  if (isCrewTransfer && open) return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Traslado de personal</DialogTitle></DialogHeader><p>Los traslados se gestionan desde Logística de personal para mantener una única ficha.</p><Button onClick={() => openPersonnelService(selectedEvent?.id, selectedEvent?.event_date)}>Abrir ficha de personal</Button></DialogContent></Dialog>;
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>

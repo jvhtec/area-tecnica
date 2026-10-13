@@ -1,3 +1,4 @@
+import { openPersonnelService } from "@/features/logistics/personnel/personnelNavigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -59,6 +60,7 @@ export const TodayLogistics = ({ selectedDate, readOnly = false, scope = "all", 
 
   const handleEventClick = (event: LogisticsCalendarEvent) => {
     if (readOnly) return;
+    if (event.event_type === "crew_transfer") { openPersonnelService(event.id, event.event_date); return; }
     setSelectedEvent(event);
     setShowEventDialog(true);
   };

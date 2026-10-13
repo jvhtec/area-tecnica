@@ -1,31 +1,22 @@
-export const CODE_TO_LABEL: Record<string, string> = {
-  // Sound
-  'SND-FOH-R': 'FOH — Responsable',
-  'SND-MON-R': 'Monitores — Responsable',
-  'SND-SYS-R': 'Sistemas — Responsable',
-  'SND-FOH-E': 'FOH — Especialista',
-  'SND-MON-E': 'Monitores — Especialista',
-  'SND-RF-E':  'RF — Especialista',
-  'SND-SYS-E': 'Sistemas — Especialista',
-  'SND-PA-T':  'PA — Técnico',
-  // Lights
-  'LGT-BRD-R': 'Mesa — Responsable',
-  'LGT-SYS-R': 'Sistema/Rig — Responsable',
-  'LGT-BRD-E': 'Mesa — Especialista',
-  'LGT-SYS-E': 'Sistema/Rig — Especialista',
-  'LGT-FOLO-E': 'Follow Spot — Especialista',
-  'LGT-PA-T':  'PA — Técnico',
-  // Video
-  'VID-SW-R':  'Switcher/TD — Responsable',
-  'VID-DIR-E': 'Director — Especialista',
-  'VID-CAM-E': 'Cámara — Especialista',
-  'VID-LED-E': 'LED — Especialista',
-  'VID-PROJ-E': 'Proyección — Especialista',
-  'VID-PA-T':  'PA — Técnico',
-}
+// Keep the existing import path while using the shared role catalogue.
+export { CODE_TO_LABEL, labelForCode } from "../_shared/roles.ts";
+import { labelForCode } from "../_shared/roles.ts";
 
-export function labelForCode(value?: string | null): string | null {
-  if (!value) return null
-  return CODE_TO_LABEL[value] ?? value
-}
+// Descriptions specific to this email and roles absent from the shared base.
+const EMAIL_ROLE_LABELS: Record<string, string> = {
+  "SND-PA-T": "Tecnico de Escenario — Técnico",
+  "SND-MNT-T": "Montador — Técnico",
+  "LGT-ASST-R": "Asistente — Responsable",
+  "LGT-ASST-E": "Asistente — Especialista",
+  "LGT-DIM-R": "Dimmer — Responsable",
+  "LGT-DIM-E": "Dimmer — Especialista",
+  "LGT-CAN-T": "Cañón — Técnico",
+  "LGT-MON-T": "Montador — Técnico",
+  "PROD-RESP-R": "Responsable de Producción — Responsable",
+  "PROD-AYUD-T": "Ayudante de Producción — Técnico",
+  "PROD-COND-T": "Conductor — Técnico",
+};
 
+export function labelForRoleCode(value?: string | null): string | null {
+  return value ? EMAIL_ROLE_LABELS[value] ?? labelForCode(value) : null;
+}

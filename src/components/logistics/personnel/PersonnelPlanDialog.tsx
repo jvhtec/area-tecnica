@@ -1,3 +1,4 @@
+import { TourLogisticsReference } from "./TourLogisticsReference";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -13,8 +14,8 @@ import { useLogisticsMatrix } from "@/features/logistics/fleet/useLogisticsFleet
 import { useWorkshopAppointments } from "@/features/logistics/fleet/workshopApi";
 import { resourceConflicts } from "@/features/logistics/operations/conflicts";
 
-type Props = { plan: PersonnelPlan | null; day: string; options: PersonnelOptions; vehicles: FleetVehicle[]; drivers: MatrixDriver[]; readOnly: boolean; onClose: () => void };
-export function PersonnelPlanDialog({ plan, day, options, vehicles, drivers, readOnly, onClose }: Props) {
+type Props = { legacyEventId?: string; plan: PersonnelPlan | null; day: string; options: PersonnelOptions; vehicles: FleetVehicle[]; drivers: MatrixDriver[]; readOnly: boolean; onClose: () => void };
+export function PersonnelPlanDialog({ legacyEventId, plan, day, options, vehicles, drivers, readOnly, onClose }: Props) {
   const invalidate = useInvalidatePersonnel();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,18 +30,20 @@ export function PersonnelPlanDialog({ plan, day, options, vehicles, drivers, rea
   const workshop = useWorkshopAppointments(first, last);
   let warnings: string[] = [];
   if (form.status === "planned" || form.status === "confirmed") {
-    try { warnings = resourceConflicts({ start: personnelLocalInstant(start), end: personnelLocalInstant(end), vehicleId: form.vehicle_id, driverId: form.driver_id, excludeEventIds: [] }, (matrix.data?.assignments ?? []).filter((a) => a.id !== plan?.assignment_id), workshop.data ?? []); } catch { /* Date validation is shown on submission. */ }
+    try { warnings = resourceConflicts({ start: personnelLocalInstant(start), end: personnelLocalInstant(end), vehicleId: form.vehicle_id, driverId: form.driver_id, excludeEventIds: [] }, (matrix.data?.assignments ?? []).filter((a) => a.id !== plan?.assignment_id && a.logistics_event_id !== legacyEventId), workshop.data ?? []); } catch { /* Date validation is shown on submission. */ }
   }
   if (["planned", "confirmed"].includes(form.status) && matrix.data?.drivers.find((d) => d.id === form.driver_id)?.unavailable_days.some((d) => d.date >= first && d.date <= last)) warnings.push("El conductor tiene descanso, vacaciones u otra ausencia en este periodo.");
   const preflightPending = (form.status === "planned" || form.status === "confirmed") && (Boolean(form.vehicle_id) || Boolean(form.driver_id)) && (matrix.isLoading || workshop.isLoading);
   const preflightError = (form.status === "planned" || form.status === "confirmed") && (Boolean(form.vehicle_id) || Boolean(form.driver_id)) && (matrix.error ?? workshop.error);
   const update = <K extends keyof PersonnelInput>(key: K, value: PersonnelInput[K]) => setForm((old) => ({ ...old, [key]: value }));
   const selectClass = "h-10 w-full rounded-md border bg-background px-3 text-sm";
+  const tourId = options.jobs.find((job) => job.id === form.job_id)?.tour_id;
   const submit = async () => {
     if (saving || readOnly) return;
     setSaving(true); setError(null);
     try {
-      const input = { ...form, starts_at: personnelLocalInstant(start), ends_at: personnelLocalInstant(end) };
+      if (tourId && form.hotel_needed && !plan?.hotel_needed) throw new Error("El alojamiento de una gira se registra desde Giras.");
+      const input = { ...form, legacy_event_id: legacyEventId, starts_at: personnelLocalInstant(start), ends_at: personnelLocalInstant(end) };
       if (destinationMode === "address") {
         if (!destinationAddress.trim() || destinationAddress.trim().length > 300) throw new Error("Escribe la dirección del destino.");
         input.destination_location_id = "00000000-0000-0000-0000-000000000001";
@@ -77,9 +80,12 @@ export function PersonnelPlanDialog({ plan, day, options, vehicles, drivers, rea
         </div>
         {field("personnel-vehicle", "Vehículo", <select id="personnel-vehicle" className={selectClass} value={form.vehicle_id ?? ""} onChange={(event) => update("vehicle_id", event.target.value || null)}><option value="">Pendiente de asignar</option>{vehicles.filter((vehicle) => ["furgoneta", "rv", "sleeper_bus"].includes(vehicle.vehicle_type)).map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicleLabel(vehicle)} · {vehicle.passenger_seats ?? "?"} plazas</option>)}</select>)}
         {field("personnel-driver", "Conductor", <select id="personnel-driver" className={selectClass} value={form.driver_id ?? ""} onChange={(event) => update("driver_id", event.target.value || null)}><option value="">Pendiente de asignar</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driverDisplayName(driver)}</option>)}</select>)}
-        <p className="text-xs text-muted-foreground sm:col-span-2">Horario de Madrid. Para varios vehículos, crea un traslado por grupo. La dirección escrita se guarda como ubicación para reutilizarla.</p>
-        <label className="flex items-center gap-2 sm:col-span-2"><input type="checkbox" checked={form.hotel_needed} onChange={(event) => update("hotel_needed", event.target.checked)} /> Necesita hotel</label>
-        {form.hotel_needed && <>
+        {legacyEventId && <p className="text-sm">Completa y confirma los datos del movimiento anterior. Se vinculará su mismo evento; no se creará otro movimiento.</p>}
+    <p className="text-xs text-muted-foreground sm:col-span-2">Horario de Madrid. Para varios vehículos, crea un traslado por grupo. La dirección escrita se guarda como ubicación para reutilizarla.</p>
+        <label className="flex items-center gap-2 sm:col-span-2"><input type="checkbox" checked={form.hotel_needed} disabled={Boolean(tourId)} onChange={(event) => update("hotel_needed", event.target.checked)} /> Necesita hotel</label>
+        {tourId && <TourLogisticsReference tourId={tourId} />}
+      {tourId && form.hotel_needed && <p role="status">Este traslado conserva un alojamiento registrado anteriormente. No se ha borrado; revisa y concilia esa reserva con Giras antes de registrar cambios.</p>}
+      {form.hotel_needed && <fieldset disabled={Boolean(tourId)} className="contents">
           {field("personnel-hotel", "Hotel", <Input id="personnel-hotel" maxLength={200} placeholder="Por definir" value={form.hotel_name ?? ""} onChange={(event) => update("hotel_name", event.target.value || null)} />)}
           {field("personnel-hotel-address", "Dirección del hotel", <Input id="personnel-hotel-address" maxLength={300} value={form.hotel_address ?? ""} onChange={(event) => update("hotel_address", event.target.value || null)} />)}
           {field("personnel-check-in", "Entrada al hotel", <Input id="personnel-check-in" type="date" required value={form.hotel_check_in ?? ""} onChange={(event) => update("hotel_check_in", event.target.value || null)} />)}
@@ -87,8 +93,9 @@ export function PersonnelPlanDialog({ plan, day, options, vehicles, drivers, rea
           {field("personnel-single", "Habitaciones individuales", <Input id="personnel-single" type="number" min={0} max={10000} step={1} value={form.single_rooms} onChange={(event) => update("single_rooms", Number(event.target.value))} />)}
           {field("personnel-double", "Habitaciones dobles", <Input id="personnel-double" type="number" min={0} max={10000} step={1} value={form.double_rooms} onChange={(event) => update("double_rooms", Number(event.target.value))} />)}
           {field("personnel-booking", "Reserva de hotel", <select id="personnel-booking" className={selectClass} value={form.hotel_status} onChange={(event) => update("hotel_status", event.target.value as "pending" | "confirmed")}><option value="pending">Pendiente</option><option value="confirmed">Confirmada</option></select>)}
-          <p className="self-center text-sm">{form.single_rooms + form.double_rooms} habitaciones · {form.single_rooms + 2 * form.double_rooms} plazas de alojamiento</p>
-        </>}
+
+    <p className="self-center text-sm">{form.single_rooms + form.double_rooms} habitaciones · {form.single_rooms + 2 * form.double_rooms} plazas de alojamiento</p>
+        </fieldset>}
         <div className="space-y-1 sm:col-span-2"><Label htmlFor="personnel-notes">Observaciones</Label><Textarea id="personnel-notes" maxLength={2000} value={form.notes ?? ""} onChange={(event) => update("notes", event.target.value || null)} /></div>
       </fieldset>
       {warnings.length > 0 && <div role="alert" className="mt-3 rounded-md border border-destructive p-3 text-sm text-destructive">{warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>}
@@ -99,4 +106,3 @@ export function PersonnelPlanDialog({ plan, day, options, vehicles, drivers, rea
     <DialogFooter><Button variant="outline" disabled={saving} onClick={onClose}>Cerrar</Button>{!readOnly && <Button form="personnel-plan" type="submit" disabled={saving}>{saving ? "Guardando…" : "Guardar traslado"}</Button>}</DialogFooter>
   </DialogContent></Dialog>;
 }
-

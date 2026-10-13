@@ -22,6 +22,7 @@ export async function createPersonnelReport(plans: PersonnelPlan[], first: strin
   const detail = workbook.addWorksheet("Traslados");
   const hotel = workbook.addWorksheet("Hoteles");
   const complete = workbook.addWorksheet("Datos completos");
+  const hotelSource = (plan: PersonnelPlan) => plan.hotel_needed ? "Sí" : options.jobs.find((job) => job.id === plan.job_id)?.tour_id ? "Gestionado en Giras" : "No";
   const active = transfers.filter((plan) => plan.status !== "cancelled");
   summary.addRows([["Logística de personal"], [`${first} a ${last} · Horario de Madrid`], ["Concepto", "Total"],
     ["Traslados (todos los estados)", transfers.length], ["Personas por traslado (sin cancelados)", active.reduce((total, plan) => total + plan.people_count, 0)],
@@ -49,7 +50,7 @@ export async function createPersonnelReport(plans: PersonnelPlan[], first: strin
       plan.id, plan.title, plan.job_id ? options.jobs.find((job) => job.id === plan.job_id)?.title ?? plan.job_id : "Sin vincular",
       plan.people_count, dateTime(plan.starts_at), dateTime(plan.ends_at), place(plan.origin_location_id), address(plan.origin_location_id), place(plan.destination_location_id), address(plan.destination_location_id),
       vehicle?.name ?? (plan.vehicle_id ? "Vehículo no disponible" : "Pendiente"), vehicle?.license_plate ?? "", vehicle ? VEHICLE_TYPE_LABELS[vehicle.vehicle_type] : "", vehicle?.passenger_seats ?? null,
-      driver ? driverDisplayName(driver) : plan.driver_id ? "Conductor no disponible" : "Pendiente", driver?.phone ?? "", PERSONNEL_STATUSES[plan.status], plan.hotel_needed ? "Sí" : "No",
+      driver ? driverDisplayName(driver) : plan.driver_id ? "Conductor no disponible" : "Pendiente", driver?.phone ?? "", PERSONNEL_STATUSES[plan.status], hotelSource(plan),
       plan.hotel_needed ? plan.hotel_name ?? "Por definir" : "", plan.hotel_needed ? plan.hotel_address : null,
       plan.hotel_needed && plan.hotel_check_in ? new Date(`${plan.hotel_check_in}T00:00Z`) : null, plan.hotel_needed && plan.hotel_check_out ? new Date(`${plan.hotel_check_out}T00:00Z`) : null,
       plan.hotel_needed ? plan.single_rooms : null, plan.hotel_needed ? plan.double_rooms : null, plan.hotel_needed ? plan.single_rooms + plan.double_rooms : null,
@@ -60,7 +61,7 @@ export async function createPersonnelReport(plans: PersonnelPlan[], first: strin
   for (const plan of transfers) {
     const vehicle = vehicles.find((item) => item.id === plan.vehicle_id);
     const driver = drivers.find((item) => item.id === plan.driver_id);
-    detail.addRow([plan.title, plan.people_count, dateTime(plan.starts_at), dateTime(plan.ends_at), place(plan.origin_location_id), place(plan.destination_location_id), vehicle?.name ?? "Pendiente", vehicle?.license_plate ?? "", driver ? driverDisplayName(driver) : "Pendiente", PERSONNEL_STATUSES[plan.status], plan.hotel_needed ? "Sí" : "No", plan.notes]);
+    detail.addRow([plan.title, plan.people_count, dateTime(plan.starts_at), dateTime(plan.ends_at), place(plan.origin_location_id), place(plan.destination_location_id), vehicle?.name ?? "Pendiente", vehicle?.license_plate ?? "", driver ? driverDisplayName(driver) : "Pendiente", PERSONNEL_STATUSES[plan.status], hotelSource(plan), plan.notes]);
   }
   for (const plan of hotels) hotel.addRow([plan.title, plan.people_count, plan.hotel_name ?? "Por definir", plan.hotel_address, new Date(`${plan.hotel_check_in}T00:00Z`), new Date(`${plan.hotel_check_out}T00:00Z`), plan.single_rooms, plan.double_rooms, plan.single_rooms + plan.double_rooms, plan.single_rooms + 2 * plan.double_rooms, plan.hotel_status === "confirmed" ? "Confirmada" : "Pendiente", PERSONNEL_STATUSES[plan.status]]);
   for (const sheet of [summary, detail, hotel, complete]) {

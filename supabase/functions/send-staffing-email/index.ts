@@ -33,48 +33,7 @@ function scheduleVerificationUnavailableResponse(): Response {
   });
 }
 
-// Inlined from roles.ts for dashboard deployment compatibility
-const CODE_TO_LABEL: Record<string, string> = {
-  // Sound
-  'SND-FOH-R': 'FOH — Responsable',
-  'SND-MON-R': 'Monitores — Responsable',
-  'SND-SYS-R': 'Sistemas — Responsable',
-  'SND-FOH-E': 'FOH — Especialista',
-  'SND-MON-E': 'Monitores — Especialista',
-  'SND-RF-E':  'RF — Especialista',
-  'SND-SYS-E': 'Sistemas — Especialista',
-  'SND-PA-T':  'Tecnico de Escenario — Técnico',
-  'SND-MNT-T': 'Montador — Técnico',
-  // Lights
-  'LGT-BRD-R': 'Mesa — Responsable',
-  'LGT-SYS-R': 'Sistema/Rig — Responsable',
-  'LGT-BRD-E': 'Mesa — Especialista',
-  'LGT-SYS-E': 'Sistema/Rig — Especialista',
-  'LGT-FOLO-E': 'Follow Spot — Especialista',
-  'LGT-PA-T':  'PA — Técnico',
-  'LGT-ASST-R': 'Asistente — Responsable',
-  'LGT-ASST-E': 'Asistente — Especialista',
-  'LGT-DIM-R': 'Dimmer — Responsable',
-  'LGT-DIM-E': 'Dimmer — Especialista',
-  'LGT-CAN-T': 'Cañón — Técnico',
-  'LGT-MON-T': 'Montador — Técnico',
-  // Video
-  'VID-SW-R':  'Switcher/TD — Responsable',
-  'VID-DIR-E': 'Director — Especialista',
-  'VID-CAM-E': 'Cámara — Especialista',
-  'VID-LED-E': 'LED — Especialista',
-  'VID-PROJ-E': 'Proyección — Especialista',
-  'VID-PA-T':  'PA — Técnico',
-  // Production
-  'PROD-RESP-R': 'Responsable de Producción — Responsable',
-  'PROD-AYUD-T': 'Ayudante de Producción — Técnico',
-  'PROD-COND-T': 'Conductor — Técnico',
-}
-
-function labelForRoleCode(value?: string | null): string | null {
-  if (!value) return null
-  return CODE_TO_LABEL[value] ?? value
-}
+import { labelForRoleCode } from "./roles.ts";
 
 function dateOnly(value?: string | null): string | null {
   if (!value) return null;
@@ -365,10 +324,10 @@ serve(createHttpHandler(async (req) => {
     if (!normalizedTargetDate && single_day && normalizedDates.length === 1) {
       normalizedTargetDate = normalizedDates[0];
     }
-    
+
     // Enhanced validation logging
     logEvent('info', 'staffing_email.validating_fields');
-    
+
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
       const errorDetails = {
         missing_job_id: !job_id,
@@ -377,19 +336,19 @@ serve(createHttpHandler(async (req) => {
         received: { job_id, profile_id, phase }
       };
       logEvent('error', 'staffing_email.validation_failed');
-      return new Response(JSON.stringify({ error: "Bad Request", details: errorDetails }), { 
-        status: 400, 
+      return new Response(JSON.stringify({ error: "Bad Request", details: errorDetails }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    
+
     logEvent('info', 'staffing_email.validation_passed_proceeding_with_email_send');
 
     // Idempotency check: prevent duplicate sends within 24h
     if (idempotency_key && typeof idempotency_key === 'string') {
       logEvent('info', 'staffing_email.checking_idempotency_key');
       const since24h = new Date(Date.now() - 24*60*60*1000).toISOString();
-      
+
       const { data: existing, error: idempotencyError } = await supabase
         .from('staffing_requests')
         .select('id, status, created_at, role_code')
@@ -411,13 +370,13 @@ serve(createHttpHandler(async (req) => {
         }
 
         logEvent('info', 'staffing_email.idempotent_request_detected_returning_cached_response');
-        return new Response(JSON.stringify({ 
-          success: true, 
+        return new Response(JSON.stringify({
+          success: true,
           cached: true,
           staffing_request_id: existing.id,
           message: 'Request already processed (idempotent)'
-        }), { 
-          status: 200, 
+        }), {
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       } else {
@@ -435,13 +394,13 @@ serve(createHttpHandler(async (req) => {
         if (!BREVO_KEY) missingEnvs.push('BREVO_API_KEY');
         if (!BREVO_FROM) missingEnvs.push('BREVO_FROM');
       }
-      
+
       logEvent('error', 'staffing_email.missing_env_variables');
-      return new Response(JSON.stringify({ 
-        error: "Server configuration error", 
+      return new Response(JSON.stringify({
+        error: "Server configuration error",
         details: { missing_env_vars: missingEnvs }
-      }), { 
-        status: 500, 
+      }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -454,26 +413,26 @@ serve(createHttpHandler(async (req) => {
         .select("id", { count: "exact", head: true })
         .gte("created_at", since)
         .in("event", ["email_sent", "whatsapp_sent"]);
-      
+
       if (capError) {
         logEvent('error', 'staffing_email.daily_cap_check_error');
-        return new Response(JSON.stringify({ 
-          error: "Database error checking daily cap", 
-          details: capError 
-        }), { 
-          status: 500, 
+        return new Response(JSON.stringify({
+          error: "Database error checking daily cap",
+          details: capError
+        }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      
+
       logEvent('info', 'staffing_email.daily_cap_result', { count, limit: DAILY_CAP });
       if ((count ?? 0) >= DAILY_CAP) {
         logEvent('info', 'staffing_email.daily_cap_reached');
-        return new Response(JSON.stringify({ 
-          error: "Daily email limit reached", 
+        return new Response(JSON.stringify({
+          error: "Daily email limit reached",
           details: { current: count, limit: DAILY_CAP }
-        }), { 
-          status: 429, 
+        }), {
+          status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -518,7 +477,7 @@ serve(createHttpHandler(async (req) => {
         roleDepartmentPromise,
         jobDepartmentsPromise,
       ]);
-      
+
       logEvent('info', 'staffing_email.job_result');
       logEvent('info', 'staffing_email.profile_result');
       if (roleDepartmentResult.error) {
@@ -530,26 +489,26 @@ serve(createHttpHandler(async (req) => {
 
       if (jobResult.error) {
         logEvent('error', 'staffing_email.job_fetch_error');
-        return new Response(JSON.stringify({ 
-          error: "Error fetching job data", 
-          details: jobResult.error 
-        }), { 
-          status: 400, 
+        return new Response(JSON.stringify({
+          error: "Error fetching job data",
+          details: jobResult.error
+        }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       if (techResult.error) {
         logEvent('error', 'staffing_email.profile_fetch_error');
-        return new Response(JSON.stringify({ 
-          error: "Error fetching profile data", 
-          details: techResult.error 
-        }), { 
-          status: 400, 
+        return new Response(JSON.stringify({
+          error: "Error fetching profile data",
+          details: techResult.error
+        }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      
+
       const job = jobResult.data;
       const tech = techResult.data;
 
@@ -590,14 +549,14 @@ serve(createHttpHandler(async (req) => {
         : null;
       const jobDepartment = uniqueJobDepartments.length === 1 ? uniqueJobDepartments[0] : null;
       const staffingDepartment = departmentHint || roleDepartment || actorDepartment || jobDepartment || null;
-      
+
       if (!job) {
         logEvent('error', 'staffing_email.job_not_found');
-        return new Response(JSON.stringify({ 
-          error: "Job not found", 
+        return new Response(JSON.stringify({
+          error: "Job not found",
           details: { job_id }
-        }), { 
-          status: 404, 
+        }), {
+          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -606,21 +565,21 @@ serve(createHttpHandler(async (req) => {
       // desiredChannel already computed above
       if (desiredChannel === 'email' && !tech?.email) {
         logEvent('error', 'staffing_email.profile_not_found_or_no_email');
-        return new Response(JSON.stringify({ 
-          error: "Profile not found or no email address", 
+        return new Response(JSON.stringify({
+          error: "Profile not found or no email address",
           details: { profile_id, has_profile: !!tech, has_email: !!tech?.email }
-        }), { 
-          status: 404, 
+        }), {
+          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
       if (desiredChannel === 'whatsapp' && !tech?.phone) {
         logEvent('error', 'staffing_email.profile_has_no_phone_for_whatsapp');
-        return new Response(JSON.stringify({ 
-          error: "Profile has no phone number for WhatsApp", 
+        return new Response(JSON.stringify({
+          error: "Profile has no phone number for WhatsApp",
           details: { profile_id, has_phone: !!tech?.phone }
-        }), { 
-          status: 404, 
+        }), {
+          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -628,11 +587,11 @@ serve(createHttpHandler(async (req) => {
       // Only users with waha_endpoint can send WhatsApp
       if (desiredChannel === 'whatsapp' && !actorResult.data?.waha_endpoint) {
         logEvent('error', 'staffing_email.actor_not_authorized_for_whatsapp');
-        return new Response(JSON.stringify({ 
-          error: "User not authorized for WhatsApp operations", 
+        return new Response(JSON.stringify({
+          error: "User not authorized for WhatsApp operations",
           details: { actor_id: actorId }
-        }), { 
-          status: 403, 
+        }), {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -1624,7 +1583,7 @@ serve(createHttpHandler(async (req) => {
     } catch (operationError) {
       logEvent('error', 'staffing_email.operation_error');
       return new Response(JSON.stringify({ error: "Internal server error" }), {
-        status: 500, 
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

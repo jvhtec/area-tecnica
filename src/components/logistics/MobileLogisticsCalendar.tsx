@@ -1,3 +1,4 @@
+import { openPersonnelService } from "@/features/logistics/personnel/personnelNavigation";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
@@ -16,6 +17,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 import { queryKeys } from "@/lib/react-query";
 import { matchesLogisticsCalendarScope, type LogisticsCalendarScope } from "@/features/logistics/calendarScope";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
+import { useCalendarTransportDetails, calendarTransportForExport } from "@/features/logistics/calendarTransportDetails";
 import { isLogisticsEventOnDay, type LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface MobileLogisticsCalendarProps {
@@ -86,6 +88,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const currentDateEvents = getEventsForDate(currentDate);
   const currentDateKey = format(currentDate, "yyyy-MM-dd");
   const driversByEvent = useEventDriverSummaries(currentDateKey, currentDateKey);
+  const transportDetails=useCalendarTransportDetails(format(currentDate,"yyyy-MM-01"),format(new Date(currentDate.getFullYear(),currentDate.getMonth()+1,0),"yyyy-MM-dd"));
   const visibleEvents = React.useMemo(
     () => currentDateEvents.slice(0, visibleEventsCount),
     [currentDateEvents, visibleEventsCount],
@@ -95,21 +98,19 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
     setVisibleEventsCount(DEFAULT_VISIBLE_EVENTS);
   }, [currentDate]);
 
-  const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
-    await generateLogisticsCalendarPDF(range, {
-      events: events || [],
-      currentDate,
-    });
-    setShowPrintDialog(false);
+  const handleExport = async (range: "current_week" | "next_week" | "month", kind: "pdf" | "xls") => {
+    try {
+      const enriched = await calendarTransportForExport(events || [], range, currentDate);
+      const generate = kind === "pdf" ? generateLogisticsCalendarPDF : generateLogisticsCalendarXLS;
+      await generate(range, { events: enriched, currentDate: currentDate });
+      setShowPrintDialog(false);
+    } catch (error) {
+      console.error("Error al exportar el calendario", error);
+      toast({ title: "No se pudo exportar el calendario", description: "No se pudieron consultar las asignaciones o empresas. Reintenta la descarga.", variant: "destructive" });
+    }
   };
-
-  const handleGenerateXLS = async (range: "current_week" | "next_week" | "month") => {
-    await generateLogisticsCalendarXLS(range, {
-      events: events || [],
-      currentDate,
-    });
-    setShowPrintDialog(false);
-  };
+  const handleGeneratePDF = (range: "current_week" | "next_week" | "month") => handleExport(range, "pdf");
+  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => handleExport(range, "xls");
 
   const navigateToPrevious = () => {
     const newDate = subDays(currentDate, 1);
@@ -132,6 +133,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
     if (readOnly) return;
+    if (event.event_type === "crew_transfer") { openPersonnelService(event.id, event.event_date); return; }
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
@@ -145,6 +147,8 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   return (
     <div className="mx-auto w-full min-w-0 max-w-[520px] space-y-4">
       {filters.controls}
+      {transportDetails.error && <p role="alert" className="text-sm text-destructive">No se pudieron comprobar las matrículas y empresas asignadas. Los datos mostrados pueden estar incompletos.</p>}
+      {transportDetails.isLoading && <p role="status" className="text-sm text-muted-foreground">Consultando matrículas y empresas asignadas…</p>}
       <div className="min-w-0 space-y-3 rounded-2xl border bg-card px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
@@ -202,7 +206,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
             {visibleEvents.map((event) => (
               <LogisticsEventCard
                 key={event.id}
-                event={event}
+                event={{...event,...transportDetails.resolve(event)}}
                 onClick={(e) => handleEventClick(e, event)}
                 interactive={!readOnly}
                 className="w-full min-w-0 rounded-2xl"

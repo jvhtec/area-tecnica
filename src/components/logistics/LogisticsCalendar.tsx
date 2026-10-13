@@ -1,3 +1,4 @@
+import { openPersonnelService } from "@/features/logistics/personnel/personnelNavigation";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/ut
 import { queryKeys } from "@/lib/react-query";
 import { matchesLogisticsCalendarScope, type LogisticsCalendarScope } from "@/features/logistics/calendarScope";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
+import { useCalendarTransportDetails, calendarTransportForExport } from "@/features/logistics/calendarTransportDetails";
 import { isLogisticsEventOnDay, type LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
 
 interface LogisticsCalendarProps {
@@ -85,6 +87,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
     format(allDays[0], "yyyy-MM-dd"),
     format(allDays[allDays.length - 1], "yyyy-MM-dd"),
   );
+  const transportDetails=useCalendarTransportDetails(format(allDays[0],"yyyy-MM-dd"),format(allDays[allDays.length-1],"yyyy-MM-dd"));
 
   const getDayEvents = (date: Date) => {
     if (!events) return [];
@@ -104,21 +107,19 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
     setCurrentMonth(new Date());
   };
 
-  const handleGeneratePDF = async (range: "current_week" | "next_week" | "month") => {
-    await generateLogisticsCalendarPDF(range, {
-      events: events || [],
-      currentDate: currentMonth,
-    });
-    setShowPrintDialog(false);
+  const handleExport = async (range: "current_week" | "next_week" | "month", kind: "pdf" | "xls") => {
+    try {
+      const enriched = await calendarTransportForExport(events || [], range, currentMonth);
+      const generate = kind === "pdf" ? generateLogisticsCalendarPDF : generateLogisticsCalendarXLS;
+      await generate(range, { events: enriched, currentDate: currentMonth });
+      setShowPrintDialog(false);
+    } catch (error) {
+      console.error("Error al exportar el calendario", error);
+      toast({ title: "No se pudo exportar el calendario", description: "No se pudieron consultar las asignaciones o empresas. Reintenta la descarga.", variant: "destructive" });
+    }
   };
-
-  const handleGenerateXLS = async (range: "current_week" | "next_week" | "month") => {
-    await generateLogisticsCalendarXLS(range, {
-      events: events || [],
-      currentDate: currentMonth,
-    });
-    setShowPrintDialog(false);
-  };
+  const handleGeneratePDF = (range: "current_week" | "next_week" | "month") => handleExport(range, "pdf");
+  const handleGenerateXLS = (range: "current_week" | "next_week" | "month") => handleExport(range, "xls");
 
   const handleDayClick = (date: Date) => {
     if (onDateSelect && isValid(date)) {
@@ -130,6 +131,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
   const handleEventClick = (e: React.MouseEvent, event: LogisticsCalendarEvent) => {
     e.stopPropagation();
     if (readOnly) return;
+    if (event.event_type === "crew_transfer") { openPersonnelService(event.id, event.event_date); return; }
     setSelectedEvent(event);
     setShowEventDialog(true);
   };
@@ -137,6 +139,8 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
   return (
     <Card className="flex h-full min-w-0 flex-col">
       <div className="p-4 pb-0">{filters.controls}</div>
+      {transportDetails.error && <p role="alert" className="px-4 text-sm text-destructive">No se pudieron comprobar las matrículas y empresas asignadas. Los datos mostrados pueden estar incompletos.</p>}
+      {transportDetails.isLoading && <p role="status" className="px-4 text-sm text-muted-foreground">Consultando matrículas y empresas asignadas…</p>}
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-xl font-bold">Calendario de logística</CardTitle>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -214,7 +218,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
                         <TooltipTrigger asChild>
                           <div>
                             <LogisticsEventCard
-                              event={event}
+                              event={{...event,...transportDetails.resolve(event)}}
                               onClick={(e) => handleEventClick(e, event)}
                               compact
                               variant="calendar"
@@ -225,7 +229,7 @@ export const LogisticsCalendar = ({ onDateSelect, readOnly = false, scope = "all
                         </TooltipTrigger>
                         <TooltipContent side="top" align="start" className="w-64">
                           <LogisticsEventCard
-                            event={event}
+                            event={{...event,...transportDetails.resolve(event)}}
                             onClick={(e) => handleEventClick(e, event)}
                             interactive={!readOnly}
                             className="border-0 p-0 shadow-none"

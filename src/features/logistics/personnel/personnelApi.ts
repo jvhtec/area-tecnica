@@ -28,7 +28,7 @@ export function usePersonnelPlans(first: string, last: string) {
 }
 export function usePersonnelOptions() {
   return useQuery({ queryKey: [PERSONNEL_QUERY_ROOT, "options"], queryFn: async (): Promise<PersonnelOptions> => {
-    const [jobs, locations] = await Promise.all([dataLayerClient.from("jobs").select("id,title").order("start_time", { ascending: false }).limit(500), dataLayerClient.from("locations").select("id,name,formatted_address").order("name")]);
+    const [jobs, locations] = await Promise.all([dataLayerClient.from("jobs").select("id,title,tour_id").order("start_time", { ascending: false }).limit(500), dataLayerClient.from("locations").select("id,name,formatted_address").order("name")]);
     if (jobs.error) throw jobs.error;
     if (locations.error) throw locations.error;
     return { jobs: jobs.data ?? [], locations: locations.data ?? [] };

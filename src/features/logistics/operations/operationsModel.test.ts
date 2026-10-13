@@ -29,7 +29,8 @@ describe("Gestión diaria de logística", () => {
     const sheet = workbook.getWorksheet("Responsables y costes")!;
     expect(sheet.getCell("A2").value).toBe("Salida");
     expect(sheet.getCell("F2").value).toBeNull();
-    expect(sheet.getCell("I2").value).toBe(0);
+    expect(sheet.getCell("I2").value).toBeNull();
+    expect(sheet.getCell("M2").value).toBe("Sin importes registrados");
     expect(sheet.getCell("A3").value).not.toBe("Fuera");
   });
 });

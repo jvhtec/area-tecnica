@@ -15,7 +15,7 @@ export const personnelSchema = z.object({
 });
 export type PersonnelPlan = z.infer<typeof personnelSchema>;
 export type PersonnelInput = Omit<PersonnelPlan, "id" | "updated_at"> & { id: string | null };
-export type PersonnelOptions = { jobs: { id: string; title: string }[]; locations: { id: string; name: string; formatted_address?: string | null }[] };
+export type PersonnelOptions = { jobs: { id: string; title: string; tour_id?: string | null }[]; locations: { id: string; name: string; formatted_address?: string | null }[] };
 export function validatePersonnelPlan(plan: PersonnelInput, vehicles: FleetVehicle[], drivers: MatrixDriver[]) {
   if (!plan.title.trim() || plan.title.length > 200) return "Indica un nombre de evento de hasta 200 caracteres.";
   if (!Number.isInteger(plan.people_count) || plan.people_count < 1 || plan.people_count > 10000) return "Indica cuántas personas se trasladan (entre 1 y 10000).";

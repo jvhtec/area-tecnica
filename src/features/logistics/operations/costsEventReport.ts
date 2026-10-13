@@ -1,5 +1,6 @@
+import { costSummary } from "./costSummary";
 import type { Workbook } from "exceljs";
-import { operationKey, operationTotal, type Operation, type WorkItem } from "./operationsModel";
+import { operationKey, type Operation, type WorkItem } from "./operationsModel";
 
 export type CostReportItem = Pick<WorkItem, "id" | "kind" | "title" | "date" | "status"> & { eventId?: string | null; eventTitle?: string; source?: WorkItem["source"] };
 
@@ -46,23 +47,18 @@ export function addEventCostCards(workbook: Workbook, items: CostReportItem[], o
     const bodyHeight = Math.max(150, group.items.length * 105);
     merged(`A${row + 2}:D${row + 4}`, serviceText);
     for (let offset = 2; offset <= 4; offset++) sheet.getRow(row + offset).height = bodyHeight / 3;
-    const keys = ["transport_cost", "hotel_cost", "other_cost"] as const;
-    const labels = ["Transporte", "Hotel", "Otros"];
-    const pending: string[] = [];
-    const totals = keys.map((key, index) => {
-      const values = group.items.map((item) => map.get(operationKey(item.kind, item.id))?.[key]);
-      if (values.some((value) => value == null)) pending.push(labels[index]);
-      const value = values.reduce<number>((sum, amount) => sum + Math.round((amount ?? 0) * 100), 0) / 100;
-      merged(`F${row + 2 + index}:G${row + 2 + index}`, labels[index]);
-      const cell = merged(`H${row + 2 + index}:I${row + 2 + index}`, value);
+    const summary = costSummary(group.items.map((item) => map.get(operationKey(item.kind, item.id))));
+    const pending = summary.concepts.filter((concept) => concept.pending).map((concept) => concept.label);
+    summary.concepts.forEach((concept, index) => {
+      merged(`F${row + 2 + index}:G${row + 2 + index}`, concept.label);
+      const cell = merged(`H${row + 2 + index}:I${row + 2 + index}`, concept.recorded ? concept.amount : "Pendiente");
       cell.numFmt = '#,##0.00" €"';
       cell.font = { name: "Arial", size: 12, bold: true };
-      return value;
     });
-    const groupTotal = Math.round(totals.reduce((sum, value) => sum + value, 0) * 100) / 100;
-    total += group.items.reduce((sum, item) => sum + Math.round(operationTotal(map.get(operationKey(item.kind, item.id))) * 100), 0);
+    const groupTotal = summary.total;
+    total += Math.round(summary.total * 100);
     merged(`F${row + 5}:G${row + 5}`, "Total registrado");
-    merged(`H${row + 5}:I${row + 5}`, groupTotal).numFmt = '#,##0.00" €"';
+    merged(`H${row + 5}:I${row + 5}`, summary.hasRecorded ? groupTotal : "Sin importes").numFmt = '#,##0.00" €"';
     const warning = merged(`A${row + 6}:I${row + 6}`, pending.length ? `Importes pendientes: ${pending.join(", ")}. Revisar Responsables y costes.` : "Todos los importes están registrados.");
     warning.fill = { type: "pattern", pattern: "solid", fgColor: { argb: pending.length ? "FFFEF3C7" : "FFF1F5F9" } };
     sheet.getRow(row + 6).height = 32;

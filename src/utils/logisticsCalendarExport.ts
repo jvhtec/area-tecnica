@@ -43,6 +43,8 @@ interface LogisticsEvent {
   end_time?: string | null;
   // Nullable to match the `logistics_events` columns.
   transport_provider?: string | null;
+  license_plate?: string | null;
+  transport_company?:string|null;
   job?: {
     title: string;
   } | null;
@@ -119,6 +121,11 @@ function prepareLogisticsCalendarData(
   return { startDate, endDate, rangeLabel, events: sortedEvents };
 }
 
+export function logisticsCalendarExportBounds(range: "current_week" | "next_week" | "month", currentDate: Date) {
+  const { startDate, endDate } = prepareLogisticsCalendarData(range, [], currentDate);
+  return { first: format(startDate, "yyyy-MM-dd"), last: format(endDate, "yyyy-MM-dd") };
+}
+
 export const generateLogisticsCalendarXLS = async (
   range: "current_week" | "next_week" | "month",
   data: LogisticsExportData
@@ -130,7 +137,7 @@ export const generateLogisticsCalendarXLS = async (
   const sheetData: (string | null)[][] = [];
 
   // Title row
-  sheetData.push([rangeLabel, null, null, null, null, null, null]);
+  sheetData.push([rangeLabel, null, null, null, null, null, null, null]);
   sheetData.push([]); // Empty row
 
   // Header row
@@ -140,8 +147,9 @@ export const generateLogisticsCalendarXLS = async (
     "Tipo de Transporte",
     "Hora",
     "Tipo de Operación",
-    "Proveedor de Transporte",
+    "Empresa de transporte",
     "Departamento",
+    "Matrícula",
   ]);
 
   // Data rows
@@ -156,7 +164,7 @@ export const generateLogisticsCalendarXLS = async (
     const jobTitle = getJobTitle(event);
     const transportType = getLogisticsTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
-    const transportProvider = getTransportProviderLabel(event.transport_provider);
+    const transportProvider = event.transport_company?.trim()||getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
     sheetData.push([
@@ -167,12 +175,13 @@ export const generateLogisticsCalendarXLS = async (
       operationType,
       transportProvider,
       departments,
+      event.license_plate?.trim() || "Pendiente de indicar",
     ]);
   }
 
   // If no events, add a message
   if (sortedEvents.length === 0) {
-    sheetData.push(["No hay eventos de logística en este período", null, null, null, null, null, null]);
+    sheetData.push(["No hay eventos de logística en este período", null, null, null, null, null, null, null]);
   }
 
   // Create workbook and worksheet
@@ -191,17 +200,21 @@ export const generateLogisticsCalendarXLS = async (
   ws.getColumn(5).width = 18; // Tipo de Operación
   ws.getColumn(6).width = 22; // Proveedor de Transporte
   ws.getColumn(7).width = 18; // Departamento
+  ws.getColumn(8).width = 18; // Matrícula
+  ws.views = [{ state: "frozen", ySplit: 3 }];
+  ws.autoFilter = { from: "A3", to: `H${Math.max(3, ws.rowCount)}` };
+  ws.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
 
   // Merge title cell
   if (sheetData.length > 0) {
-    ws.mergeCells("A1:G1");
+    ws.mergeCells("A1:H1");
   }
 
   // Apply styles
   const totalRows = sheetData.length;
   for (let R = 1; R <= totalRows; R++) {
     const row = ws.getRow(R);
-    for (let C = 1; C <= 7; C++) {
+    for (let C = 1; C <= 8; C++) {
       const cell = row.getCell(C);
 
       // Title row (row 1)
@@ -280,7 +293,7 @@ export const generateLogisticsCalendarPDF = async (
     const jobTitle = getJobTitle(event);
     const transportType = getLogisticsTransportTypeLabel(event.transport_type);
     const operationType = getOperationTypeLabel(event.event_type, event.movement_type);
-    const transportProvider = getTransportProviderLabel(event.transport_provider);
+    const transportProvider = event.transport_company?.trim()||getTransportProviderLabel(event.transport_provider);
     const departments = getDepartmentsLabel(event.departments);
 
     return [
