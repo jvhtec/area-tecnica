@@ -608,7 +608,7 @@ under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 
 Job create/edit fields use `GooglePlaceAutocomplete` → `place-search` (Text Search),
 returning name, address, coordinates and Google place ID in one request. An explicit
-worldwide bias avoids datacenter IP proximity. Other pickers, maps and geocoding
+broad, Google-supported viewport bias avoids datacenter IP proximity. Other pickers, maps and geocoding
 use Mapbox; photos use Wikimedia. See `docs/google-places-cost-reduction.md`.
 
 ### 5.5 Mapbox GL
