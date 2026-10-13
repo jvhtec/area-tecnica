@@ -601,10 +601,15 @@ under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 
 | Attribute | Detail |
 |-----------|--------|
-| **Purpose** | Static maps, place photos, restaurant search for tour books |
-| **Integration** | API key delivered via role-gated Edge Function |
-| **Auth** | `GOOGLE_MAPS_API_KEY` + role verification |
-| **Edge Functions** | `get-google-maps-key`, `static-map`, `place-photos`, `place-restaurants` |
+| **Purpose** | Job venue-name search and restaurant enrichment for tour books |
+| **Integration** | Server-side Places API (New); the key never leaves the server |
+| **Auth** | JWT + verified user, shared daily Google Places quotas |
+| **Edge Functions** | `place-search`, `place-restaurants`; `get-google-maps-key` is deprecated (410) |
+
+Job create/edit fields use `GooglePlaceAutocomplete` → `place-search` (Text Search),
+returning name, address, coordinates and Google place ID in one request. An explicit
+worldwide bias avoids datacenter IP proximity. Other pickers, maps and geocoding
+use Mapbox; photos use Wikimedia. See `docs/google-places-cost-reduction.md`.
 
 ### 5.5 Mapbox GL
 

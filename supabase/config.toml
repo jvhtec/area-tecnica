@@ -99,3 +99,6 @@ verify_jwt = true
 # Cron invokes with the service-role JWT; the handler also checks its bearer key.
 [functions.sync-sound-manifests]
 verify_jwt = true
+
+[functions.place-search]
+verify_jwt = true

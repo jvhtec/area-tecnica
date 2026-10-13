@@ -19,7 +19,7 @@ import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
-import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { GooglePlaceAutocomplete } from "@/components/maps/GooglePlaceAutocomplete";
 import type { LocationDetails } from "@/hooks/useLocationManagement";
 import { roleOptionsForDiscipline } from "@/types/roles";
 
@@ -324,15 +324,21 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
-            <PlaceAutocomplete
+            <GooglePlaceAutocomplete
               value={locationInput}
+              onInputChange={(name) => {
+                setLocationInput(name);
+                setValue("location.name", name);
+                setValue("location.coordinates", undefined);
+                setValue("location.place_id", undefined);
+              }}
               onSelect={(result) => {
                 setLocationInput(result.name);
                 setValue("location", {
                   name: result.name,
                   address: result.address,
                   coordinates: result.coordinates,
-                  place_id: undefined, // PlaceAutocomplete doesn't provide place_id
+                  place_id: result.place_id,
                 });
               }}
               placeholder="Ingrese ubicación del venue"
