@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { JobType, InvoicingCompany } from "@/types/job";
 import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
-import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { GooglePlaceAutocomplete } from "@/components/maps/GooglePlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import {
@@ -508,12 +508,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
               <Label className="text-base font-semibold">Venue Information</Label>
               <div className="grid gap-4">
-                <PlaceAutocomplete
+                <GooglePlaceAutocomplete
                   value={venueName}
+                  onInputChange={(name) => { setVenueName(name); setVenueData(null); }}
                   onSelect={handleVenueSelect}
                   onBusyChange={setIsVenueBusy}
-                  placeholder="Search for venue (WiZink Center Madrid, etc.)"
-                  label="Venue Name"
+                  placeholder="Buscar recinto (WiZink Center Madrid, etc.)"
+                  label="Nombre del recinto"
                   className="w-full"
                 />
                 <div>

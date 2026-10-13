@@ -1,6 +1,31 @@
 # Google Places / Maps cost reduction → Mapbox migration
 
-## Goal
+## Job venue search exception (October 2026)
+
+The create/edit job location fields use `GooglePlaceAutocomplete` and the
+JWT-protected `place-search` Edge Function. The Mapbox venue picker permitted
+POIs but sent `proximity=ip`; the reported regression was poor venue-name matches
+and unrelated nearby businesses. Job search restores Google's Text Search by
+name, without category/country restrictions. An explicit worldwide viewport
+bias prevents implicit IP bias toward the Edge Function's datacenter.
+
+Only those two job fields switch providers. Maps and the other autocomplete
+fields retain the migration below. The Google key stays server-side. Search
+returns name, address, coordinates and Google place ID together, avoiding a
+second paid details call on selection. The dialog debounces input by 400 ms and
+keeps at most 30 repeat-query results in memory. Searches share the existing
+atomic Google Places user/global daily quotas with restaurant lookups. These
+are paid Text Search requests; the original zero-cost goal below no longer
+applies to job venue searches.
+
+Deploy `place-search` from the PR ref **before** merging the frontend, using the
+existing Edge Function deployment workflow. It needs the existing
+`GOOGLE_MAPS_API_KEY` secret with Places API (New) access for server requests.
+Verify a venue-name lookup returns its address and coordinates in production.
+There is no schema change and no production database push. Rollback: revert the
+frontend change; the unused authenticated function can remain deployed.
+
+## Original migration goal
 
 Bring the monthly Google Maps Platform bill to €0 with **no loss of features**, by
 moving everything Mapbox can do to Mapbox (free tier), moving photos to
