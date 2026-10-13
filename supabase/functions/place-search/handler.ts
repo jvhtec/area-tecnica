@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { logEvent } from '../_shared/structuredLogger.ts';
 import { HttpError, jsonResponse, readBoundedJsonObject, requireBearerToken } from '../_shared/http.ts';
 
 interface GooglePlace {
@@ -42,16 +43,30 @@ export function createPlaceSearchHandler(supabase: SupabaseClient, apiKey: strin
         textQuery: query,
         pageSize: 6,
         languageCode: 'es',
-        // A global bias avoids Google's default IP bias toward the Edge
-        // Function's datacenter. Venue searches must work across tour cities.
+        // Google rejects viewports wider than 180 degrees. This broad bias
+        // covers Europe without restricting results to a country or nearby area.
+        // Explicit query locations override it; avoid datacenter IP bias.
         locationBias: { rectangle: {
-          low: { latitude: -90, longitude: -180 },
-          high: { latitude: 90, longitude: 180 },
+          low: { latitude: -90, longitude: -90 },
+          high: { latitude: 90, longitude: 90 },
         } },
       }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!response.ok) throw new HttpError(502, 'Google Places search failed');
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null) as {
+        error?: { status?: string; message?: string };
+      } | null;
+      const summary = typeof problem?.error?.message === 'string'
+        ? problem.error.message.replaceAll(apiKey, '[REDACTED]').replaceAll(query, '[REDACTED_QUERY]')
+        : 'No structured provider error';
+      logEvent('error', 'place_search.provider_rejected', {
+        upstream_status: response.status,
+        upstream_code: typeof problem?.error?.status === 'string' ? problem.error.status : 'UNKNOWN',
+        upstream_summary: summary,
+      });
+      throw new HttpError(502, 'Google Places search failed');
+    }
     const data = await response.json() as { places?: GooglePlace[] };
     const places = (data.places ?? []).map((place) => ({
       place_id: place.id,

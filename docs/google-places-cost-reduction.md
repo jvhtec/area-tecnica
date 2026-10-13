@@ -6,8 +6,11 @@ The create/edit job location fields use `GooglePlaceAutocomplete` and the
 JWT-protected `place-search` Edge Function. The Mapbox venue picker permitted
 POIs but sent `proximity=ip`; the reported regression was poor venue-name matches
 and unrelated nearby businesses. Job search restores Google's Text Search by
-name, without category/country restrictions. An explicit worldwide viewport
-bias prevents implicit IP bias toward the Edge Function's datacenter.
+name, without category/country restrictions. A broad viewport
+bias prevents implicit IP bias toward the Edge Function's datacenter. Its
+longitude range is −90° to +90°: Google rejects rectangles wider than 180°. This
+is a soft bias covering Europe, not a geographic restriction; explicit query
+locations override it.
 
 Only those two job fields switch providers. Maps and the other autocomplete
 fields retain the migration below. The Google key stays server-side. Search
