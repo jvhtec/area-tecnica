@@ -10,6 +10,7 @@ import type {
 import { getErrorMessage } from "@/utils/errorMessage";
 import type { HojaDocumentSaveInput } from "@/features/hoja-de-ruta/model/HojaDocument";
 import { HojaDocumentValidationError } from "@/features/hoja-de-ruta/model/useHojaValidation";
+import { isHojaVersionConflict } from "@/features/hoja-de-ruta/lib/hojaConflict";
 
 type AtomicSave = (payload: HojaDocumentSaveInput) => Promise<{
   id: string;
@@ -33,12 +34,6 @@ type UseHojaDeRutaSaveOptions = {
   validateBeforeSave: () => Promise<boolean>;
   /** Saving approved content sends it back to review on the server. */
   isApproved: boolean;
-};
-
-const errorCode = (error: unknown): string | undefined => {
-  if (!error || typeof error !== "object" || !("code" in error)) return undefined;
-  const value = (error as { code?: unknown }).code;
-  return typeof value === "string" ? value : undefined;
 };
 
 export const useHojaDocumentSave = ({
@@ -107,7 +102,7 @@ export const useHojaDocumentSave = ({
         });
         throw error;
       }
-      const isConflict = errorCode(error) === "40001";
+      const isConflict = isHojaVersionConflict(error);
       if (isConflict) onConflict();
       const message = isConflict
         ? "Otra persona ha guardado cambios en esta Hoja de Ruta. Recarga los datos antes de sobrescribirlos."

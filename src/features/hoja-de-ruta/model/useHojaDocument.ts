@@ -25,6 +25,7 @@ import { toHojaStatus } from "@/features/hoja-de-ruta/api/hojaDocumentApi";
 import { useHojaDocumentPersistence } from "@/features/hoja-de-ruta/api/useHojaDocumentPersistence";
 import { useHojaDocumentState } from "@/features/hoja-de-ruta/model/useHojaDocumentState";
 import { useHojaValidation } from "@/features/hoja-de-ruta/model/useHojaValidation";
+import { isHojaVersionConflict } from "@/features/hoja-de-ruta/lib/hojaConflict";
 
 export type UseHojaDocumentOptions = {
   prepareImagesForSave: (jobId: string) => Promise<HojaDeRutaImageRecord[]>;
@@ -245,7 +246,7 @@ export const useHojaDocument = (
         expectedVersion: expectedStatusVersion,
       });
     } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "40001") {
+      if (isHojaVersionConflict(error)) {
         setHasExternalConflict(true);
       }
       toast({
@@ -309,7 +310,7 @@ export const useHojaDocument = (
       });
       return true;
     } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "40001") {
+      if (isHojaVersionConflict(error)) {
         setHasExternalConflict(true);
       }
       toast({
@@ -437,7 +438,7 @@ export const useHojaDocument = (
 
   // Detect a newer document version written by another editor, Tour Ops or a
   // crew change. The RPC remains the final authority and rejects stale writes
-  // with SQLSTATE 40001.
+  // with SQLSTATE PT409 (see isHojaVersionConflict).
   const handleRemoteVersion = useCallback((nextVersion: number) => {
     if (
       isSavingRef.current
