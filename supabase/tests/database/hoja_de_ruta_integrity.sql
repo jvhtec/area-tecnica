@@ -284,7 +284,7 @@ SELECT throws_ok(
        (SELECT payload FROM hoja_integrity_payloads WHERE name = 'base'),
        ARRAY[]::uuid[]
      ) $$,
-  '40001',
+  'PT409',
   NULL,
   'an editor loaded before a direct child write gets a conflict instead of deleting it'
 );
@@ -949,7 +949,7 @@ SELECT throws_ok(
        (SELECT document_version - 1 FROM public.hoja_de_ruta WHERE job_id = 'dc200000-0000-0000-0000-000000000001'::uuid),
        '[]'::jsonb
      ) $$,
-  '40001',
+  'PT409',
   'La Hoja de Ruta ha cambiado desde la última carga',
   'Tour Ops Programa rejects a stale Hoja version before writing'
 );
@@ -1353,7 +1353,7 @@ SELECT throws_ok(
        0,
        'Cambio de conductor'
      ) $$,
-  '40001',
+  'PT409',
   NULL,
   'reopening a stale version is rejected'
 );
@@ -1584,7 +1584,7 @@ SELECT throws_ok(
        ),
        false
      ) $$,
-  '40001',
+  'PT409',
   'La Hoja de Ruta ha cambiado desde la última carga',
   'a multi-Hoja external mutation rejects the whole operation when either snapshot is stale'
 );
