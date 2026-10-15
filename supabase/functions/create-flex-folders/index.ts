@@ -58,7 +58,18 @@ const createFlexElement = async (payload: Record<string, unknown>, authToken: st
     body: JSON.stringify(payload),
   }, { retryOnTimeout: false });
   if (!response.ok) {
-    const message = `Flex returned HTTP ${response.status}`;
+    // As in updateFlexElementHeader: Flex's reason is only in the body. Log it and
+    // keep its code in the message, which the engine stores on the node's
+    // safe_error, so a rejection can be diagnosed after the fact.
+    const flexFields = await readFlexErrorFields(response);
+    logEvent("error", "flex.element_create_failed", {
+      status: response.status,
+      definitionId: typeof payload.definitionId === "string" ? payload.definitionId : undefined,
+      documentNumber: typeof payload.documentNumber === "string" ? payload.documentNumber : undefined,
+      ...flexFields,
+    });
+    const flexCode = typeof flexFields.flexCode === "string" ? ` (Flex ${flexFields.flexCode})` : "";
+    const message = `Flex returned HTTP ${response.status}${flexCode}`;
     if (response.status >= 400 && response.status < 500 && response.status !== 408) {
       throw new FlexProvisioningDeterministicError(message);
     }
@@ -758,6 +769,12 @@ serve(async (req) => {
       }).then(() => undefined, () => undefined);
     }
     const status = getErrorStatus(error, 500);
+    logEvent(status >= 500 ? "error" : "warn", "flex.provisioning_failed", {
+      status,
+      operationId: lease?.operation_id,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorText: error instanceof Error ? error.message.slice(0, 300) : undefined,
+    });
     const message = error instanceof HttpError && error.exposeDetails ? error.message : "Internal server error";
     return new Response(JSON.stringify({ success: false, error: message }), {
       status,

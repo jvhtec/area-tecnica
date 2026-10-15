@@ -25,6 +25,28 @@ describe("server-owned job plans", () => {
     expect(custom?.payload.plannedEndDate).toBe("2026-09-09T18:00:00.000Z");
   });
 
+  it("sends date-picker pullsheet dates to Flex as Madrid day boundaries, not bare dates", () => {
+    // Exactly what failed in production: Flex answered HTTP 400 to "2026-10-16".
+    const plan = buildJobPlan({ ...base, selected: new Set(["lights"]), job: { id: "job-ps", title: "Loquillo - Almeria", job_type: "single" }, options: { lights: { subfolders: [], customPullsheet: { enabled: true, name: "Loquillo - Almeria", startDate: "2026-10-16", endDate: "2026-10-16" } } } });
+    const pullsheet = plan.find((node) => node.key === "department:lights:pullsheet:PS01");
+    expect(pullsheet?.payload.plannedStartDate).toBe("2026-10-15T22:00:00.000Z"); // 00:00 CEST
+    expect(pullsheet?.payload.plannedEndDate).toBe("2026-10-16T21:59:59.000Z"); // 23:59:59 CEST
+  });
+
+  it("uses the winter offset after the October clock change", () => {
+    const plan = buildJobPlan({ ...base, selected: new Set(["lights"]), job: { id: "job-ps-winter", title: "Job", job_type: "single" }, options: { lights: { subfolders: [], customPullsheet: { entries: [{ name: "Winter", plannedStartDate: "2026-11-03", plannedEndDate: "2026-11-04" }] } } } });
+    const pullsheet = plan.find((node) => node.payload.name === "Winter");
+    expect(pullsheet?.payload.plannedStartDate).toBe("2026-11-02T23:00:00.000Z"); // 00:00 CET
+    expect(pullsheet?.payload.plannedEndDate).toBe("2026-11-04T22:59:59.000Z"); // 23:59:59 CET
+  });
+
+  it("normalizes date-only commercial budget dates too", () => {
+    const plan = buildJobPlan({ ...base, job: { id: "job-budget", title: "Job", job_type: "single" }, options: { comercial: { subfolders: ["presupuestoSound"], extrasPresupuesto: { startDate: "2026-12-01", endDate: "2026-12-02" } } } });
+    const budget = plan.find((node) => String(node.key).includes("comercial") && node.payload.plannedStartDate !== base.start);
+    expect(budget?.payload.plannedStartDate).toBe("2026-11-30T23:00:00.000Z");
+    expect(budget?.payload.plannedEndDate).toBe("2026-12-02T22:59:59.000Z");
+  });
+
   it("keeps default suffixes before numbering additional custom pullsheets", () => {
     const plan = buildJobPlan({ ...base, job: { id: "job-custom", title: "Job", job_type: "single" }, options: { sound: { subfolders: ["pullSheetTP", "pullSheetPA"], customPullsheet: { entries: [{ name: "One" }, { name: "Two" }, { name: "Three" }] } } } });
     const documents = plan.filter((node) => node.key.startsWith("department:sound:pullsheet:"))
