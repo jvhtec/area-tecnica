@@ -23,7 +23,7 @@ describe('calculator project return navigation (#1005)', () => {
       const url = new URL(withProjectManagementReturn(`${path}?jobId=job-1`), 'https://app.test');
       expect(url.pathname).toBe(path);
       expect(url.searchParams.get('jobId')).toBe('job-1');
-      expect(getCalculatorReturnPath(url.searchParams)).toBe('/project-management');
+      expect(getCalculatorReturnPath(url.searchParams)).toBe('/project-management?setupJobId=job-1');
     },
   );
 
@@ -48,6 +48,13 @@ describe('calculator project return navigation (#1005)', () => {
       projectReturnTo: '/project-management',
     });
     expect(getCalculatorReturnPath(params)).toBe('/jobs/job-1/setup');
+  });
+
+  it('encodes the job id and falls back to the bare route without one', () => {
+    expect(getProjectManagementReturnPath(new URLSearchParams({ projectReturnTo: '/project-management', jobId: 'a&b/c' })))
+      .toBe('/project-management?setupJobId=a%26b%2Fc');
+    expect(getProjectManagementReturnPath(new URLSearchParams({ projectReturnTo: '/project-management' })))
+      .toBe('/project-management');
   });
 
   it('does not override navigation from a department or tour when no origin exists', () => {

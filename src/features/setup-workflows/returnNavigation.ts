@@ -34,10 +34,17 @@ export function withProjectManagementReturn(href: string) {
   return `${path}?${params.toString()}`;
 }
 
+/**
+ * The return target keeps the originating job (`setupJobId`, already understood by
+ * Project Management) so the page reopens on that job's month/department/card
+ * instead of today's defaults. The destination path itself is fixed.
+ */
 export function getProjectManagementReturnPath(searchParams: URLSearchParams): string | null {
-  return searchParams.get(PROJECT_RETURN_PARAM) === PROJECT_MANAGEMENT_PATH
-    ? PROJECT_MANAGEMENT_PATH
-    : null;
+  if (searchParams.get(PROJECT_RETURN_PARAM) !== PROJECT_MANAGEMENT_PATH) return null;
+  const jobId = searchParams.get('jobId');
+  return jobId
+    ? `${PROJECT_MANAGEMENT_PATH}?setupJobId=${encodeURIComponent(jobId)}`
+    : PROJECT_MANAGEMENT_PATH;
 }
 
 /** Guided setup has precedence when both origins are present. */
