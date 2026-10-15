@@ -418,7 +418,7 @@ describe('JobCardActions', () => {
       ['sound', '/sound/pesos', '/sound/consumos'],
       ['lights', '/lights-pesos-tool', '/lights-consumos-tool'],
       ['video', '/video-pesos-tool', '/video-consumos-tool'],
-    ])('preserves project-management origin for %s calculators', (department, weightsPath, powerPath) => {
+    ] as const)('preserves project-management origin for %s calculators', (department, weightsPath, powerPath) => {
       render(<JobCardActions {...defaultProps} department={department} />);
 
       fireEvent.click(screen.getByTitle('Calculadora de Pesos'));
