@@ -43,7 +43,7 @@ export const JobTypeFilter = ({
         <Button variant="outline" size="sm" className={cn("gap-2", isMobile && "w-full justify-between")}>
           <span className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
-            Types
+            Tipos
             {selectedJobTypes.length > 0 && (
               <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
                 {selectedJobTypes.length}
