@@ -464,7 +464,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     // Fallback to visibility function when RLS blocks
                     let timesheets = ts || [];
                     if (!timesheets.length) {
-                      const { data: visible } = await dataLayerClient.rpc("get_timesheet_amounts_visible");
+                      const { data: visible } = await dataLayerClient.rpc("get_timesheet_amounts_visible", {
+                        p_job_ids: [resolvedJobId],
+                      });
                       timesheets =
                         (visible as any[] | null)?.filter(
                           (r) =>

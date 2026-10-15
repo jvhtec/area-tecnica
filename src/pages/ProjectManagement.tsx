@@ -28,14 +28,7 @@ import { useSetupJob } from "@/features/setup-workflows/jobContext";
 
 
 import { queryKeys } from "@/lib/react-query";
-const normalizeSearchText = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
-
-const buildSearchTokens = (query: string) => normalizeSearchText(query).split(/\s+/).filter(Boolean);
+import { buildJobSearchTokens, matchesJobSearch } from "@/utils/jobSearch";
 
 const TYPE_LABELS: Record<string, string> = {
   single: "Sencillo",
@@ -143,7 +136,7 @@ const ProjectManagement = () => {
     isSearching ? undefined : startDate,
     isSearching ? undefined : endDate,
     true, // include dryhire jobs in project management
-    { refetchOnMount: "always" }
+    { refetchOnMount: "always", search: debouncedQuery }
   );
 
   // Check user permissions early
@@ -176,7 +169,7 @@ const ProjectManagement = () => {
   }, [optimizedJobs, canCreateItems, isSearching, toast]);
 
   // Filter jobs by selected job type and statuses with database-level optimization
-  const tokens = buildSearchTokens(debouncedQuery);
+  const tokens = buildJobSearchTokens(debouncedQuery);
   const jobs = (optimizedJobs || []).filter((job: any) => {
     if (focusedSetupJobId) return job.id === focusedSetupJobId;
     const matchesType = isSearching
@@ -184,13 +177,7 @@ const ProjectManagement = () => {
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const searchableValues = [job.title, job.location?.name, job.location?.formatted_address]
-      .filter(Boolean)
-      .map((value: string) => normalizeSearchText(value));
-    const matchesSearch =
-      tokens.length === 0 ||
-      tokens.every((token) => searchableValues.some((value) => value.includes(token)));
-    return matchesType && matchesStatus && matchesSearch;
+    return matchesType && matchesStatus && matchesJobSearch(job, tokens);
   });
 
   // Highlight today's jobs when page loads

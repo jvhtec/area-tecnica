@@ -208,7 +208,9 @@ export async function buildTourRatesExportPayload(
   const jobsWithQuotes: TourJobQuotesWithLPO[] = [];
   let visibleTimesheetsPromise: Promise<TimesheetBreakdownRow[]> | null = null;
   const getVisibleTimesheets = async (): Promise<TimesheetBreakdownRow[]> => {
-    visibleTimesheetsPromise ??= Promise.resolve(supabase.rpc('get_timesheet_amounts_visible')).then(({ data }) =>
+    visibleTimesheetsPromise ??= Promise.resolve(
+      supabase.rpc('get_timesheet_amounts_visible', { p_job_ids: jobs.map((j) => j.id) })
+    ).then(({ data }) =>
       Array.isArray(data) ? (data as TimesheetBreakdownRow[]) : []
     );
     return visibleTimesheetsPromise;
