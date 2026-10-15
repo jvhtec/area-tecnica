@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertTriangle, FileText, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FileText, Plus, Trash2 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF } from "@/utils/pdfExport";
 import { supabase } from "@/lib/supabase";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { getCalculatorReturnPath } from "@/features/setup-workflows/returnNavigation";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { DocumentationJobPicker } from "@/features/technical-tools/jobs/DocumentationJobPicker";
 
@@ -289,7 +290,18 @@ const LightsRiggingPlanner: React.FC = () => {
     <Card className="w-full max-w-5xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold">Rigging Planner (Tilt-accurate)</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Volver a la pantalla anterior"
+              onClick={() => navigate(getCalculatorReturnPath(searchParams) ?? (tourId ? "/tours" : "/lights"))}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-2xl font-bold">Rigging Planner (Tilt-accurate)</CardTitle>
+          </div>
           <div className="flex gap-2 items-center">
             {isTourDefaults && <Badge variant="outline">Tour Defaults</Badge>}
             <Button variant="secondary" onClick={solveAll}>Solve All</Button>
