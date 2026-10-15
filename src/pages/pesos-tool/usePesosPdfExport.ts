@@ -1,6 +1,7 @@
 import { useToast } from "@/hooks/use-toast";
 import type { JobSelection } from "@/hooks/useJobSelection";
 import { exportToPDF } from "@/utils/pdfExport";
+import { downloadPdfBlob } from "@/utils/pdf/downloadPdfBlob";
 import { uploadWeightReportAndCompleteTasks } from "@/features/technical-tools/weights/weightPersistence";
 import { getJobTechnicalPdfFileName } from "@/utils/technicalPdfNames";
 import { appendTechnicalStageToFilename, formatTechnicalStageLabel } from "@/features/technical-tools/stage/stageAllocation";
@@ -111,14 +112,7 @@ export const usePesosPdfExport = ({ activeTables, selectedJob, selectedJobId, se
           : 'PDF has been generated and uploaded successfully.',
       });
 
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadPdfBlob(pdfBlob, fileName);
     } catch (error) {
       console.error(error);
       toast({
