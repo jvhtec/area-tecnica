@@ -254,6 +254,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager', jobId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager', jobId, tourId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager') });
+      // Approval creates Flex work orders; refresh the LPO numbers payout panels show.
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('flex-work-orders-by-job', jobId) });
       if (data?.approve) {
         if (data?.syncResult?.created) {
           toast.success(`Órdenes de trabajo creadas en Flex: ${data.syncResult.created}`);
