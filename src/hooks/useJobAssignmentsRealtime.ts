@@ -199,8 +199,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           if (tsError?.code === 'PGRST200' || tsError?.code === 'PGRST301' || tsError?.code === '42501') {
             try {
               const { data: vis, error: visErr } = await supabase
-                .rpc('get_timesheet_amounts_visible')
-                .eq('job_id', jobId);
+                .rpc('get_timesheet_amounts_visible', { p_job_ids: [jobId] });
               if (!visErr && Array.isArray(vis)) {
                 visibleTimesheets = vis as VisibleAssignmentTimesheetRow[];
               }

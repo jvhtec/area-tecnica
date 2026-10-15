@@ -13075,7 +13075,7 @@ export type Database = {
         }[]
       }
       get_timesheet_amounts_visible: {
-        Args: never
+        Args: { p_job_ids?: string[]; p_timesheet_ids?: string[] }
         Returns: {
           amount_breakdown: Json
           amount_breakdown_visible: Json

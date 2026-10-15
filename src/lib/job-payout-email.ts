@@ -116,7 +116,9 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<P
     .eq('is_active', true);
   if (error) throw error;
   if (data && data.length) return data as PayoutTimesheetRow[];
-  const { data: rpcData, error: rpcError } = await client.rpc('get_timesheet_amounts_visible');
+  const { data: rpcData, error: rpcError } = await client.rpc('get_timesheet_amounts_visible', {
+    p_job_ids: [jobId],
+  });
   if (rpcError) throw rpcError;
   const visibleRows = Array.isArray(rpcData) ? (rpcData as PayoutTimesheetRow[]) : [];
   return visibleRows.filter(
