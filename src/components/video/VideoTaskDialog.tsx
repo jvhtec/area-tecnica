@@ -34,6 +34,8 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { canCreateJobPersonnelRow } from "@/utils/permissions";
 import type { Database } from "@/integrations/supabase/types";
 import { getErrorMessage } from '@/utils/errorMessage';
 import {
@@ -70,6 +72,8 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const queryClient = useQueryClient();
+  const { userRole, userDepartment } = useOptimizedAuth();
+  const canCreatePersonnel = canCreateJobPersonnelRow('video', userRole, userDepartment);
 
   const { data: managementUsers } = useQuery({
     queryKey: queryKeys.scope('management-users'),
@@ -107,7 +111,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
   });
 
   const { data: personnel } = useQuery({
-    queryKey: queryKeys.scope('video-personnel', jobId),
+    queryKey: queryKeys.scope('video-personnel', jobId, canCreatePersonnel),
     queryFn: async () => {
       if (!jobId) return null;
 
@@ -115,8 +119,12 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
         .select('*')
         .eq('job_id', jobId)
         .maybeSingle();
-      
+
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+      // Only roles the RLS policy accepts may create the row; for everyone
+      // else the insert was always rejected. The inputs stay disabled.
+      if (!existingData && !canCreatePersonnel) return null;
 
       if (!existingData) {
         const { data: newData, error: insertError } = await dataLayerClient.from('video_job_personnel')

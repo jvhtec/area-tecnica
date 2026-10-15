@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   inbox: vi.fn(),
   roles: vi.fn(),
+  existing: vi.fn(),
 }));
 
 vi.mock("../transportRequestEmail.ts", () => ({ sendTransportRequestEmail: vi.fn() }));
@@ -18,6 +19,7 @@ vi.mock("../data.ts", () => ({
   getJobType: async () => "single", getProfileDisplayName: async () => "Coordinación",
   getTourName: async () => null,
   getProfileRoles: mocks.roles,
+  getExistingProfileIds: mocks.existing,
 }));
 vi.mock("../routing.ts", () => ({
   getPushNotificationRoutes: async () => [], applyRoutingOverrides: async () => undefined,
@@ -63,6 +65,7 @@ describe("per-recipient notification destinations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.roles.mockResolvedValue(new Map([["manager-1", "management"], ["tech-1", "technician"]]));
+    mocks.existing.mockImplementation(async (_client: unknown, ids: string[]) => new Set(ids));
     mocks.routes.mockImplementation(async (context) => {
       context.state.title = "Trabajo actualizado";
       context.audience.clearAllRecipients();
@@ -96,5 +99,38 @@ describe("per-recipient notification destinations", () => {
     });
     const resolvePush = mocks.push.mock.calls[0][3] as PayloadResolver;
     expect(resolvePush("tech-1").url).toBe("/festival-management/job-1?singleJob=true");
+  });
+});
+
+describe("recipients without a profile", () => {
+  const SERVICE_CALLER = "00000000-0000-0000-0000-000000000000";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.roles.mockResolvedValue(new Map());
+    mocks.routes.mockImplementation(async (context) => {
+      context.state.title = "Trabajo actualizado";
+      return true;
+    });
+    mocks.inbox.mockImplementation(async (_client: unknown, recipientIds: string[]) =>
+      new Map(recipientIds.map((userId) => [userId, `inbox-${userId}`])));
+    mocks.push.mockResolvedValue([{ ok: true }]);
+  });
+
+  it("drops the service caller and deleted users before claiming inbox rows", async () => {
+    mocks.existing.mockResolvedValue(new Set(["tech-1"]));
+    await handleBroadcast({} as SupabaseClient, SERVICE_CALLER, {
+      action: "broadcast", type: "job.updated", job_id: "job-1", user_ids: ["tech-1", "deleted-user"],
+    });
+    expect(mocks.inbox).toHaveBeenCalledTimes(1);
+    expect(mocks.inbox.mock.calls[0][1]).toEqual(["tech-1"]);
+  });
+
+  it("keeps every recipient when the existence lookup fails", async () => {
+    mocks.existing.mockResolvedValue(null);
+    await handleBroadcast({} as SupabaseClient, "manager-1", {
+      action: "broadcast", type: "job.updated", job_id: "job-1", user_ids: ["tech-1"],
+    });
+    expect(mocks.inbox.mock.calls[0][1]).toEqual(["tech-1", "manager-1"]);
   });
 });
