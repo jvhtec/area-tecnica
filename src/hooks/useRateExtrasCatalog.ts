@@ -9,7 +9,8 @@ export interface RateExtraRow {
   amount_eur: number;
 }
 
-export function useRateExtrasCatalog() {
+/** The catalog is readable by management only (RLS); pass `enabled: false` elsewhere. */
+export function useRateExtrasCatalog(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: RATES_QUERY_KEYS.extrasCatalog,
     queryFn: async (): Promise<RateExtraRow[]> => {
@@ -21,6 +22,7 @@ export function useRateExtrasCatalog() {
       return (data || []) as RateExtraRow[];
     },
     staleTime: 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
 
