@@ -10,6 +10,7 @@ import { AlertTriangle, ArrowLeft, FileText, Plus, Trash2 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF } from "@/utils/pdfExport";
+import { downloadPdfBlob } from "@/utils/pdf/downloadPdfBlob";
 import { supabase } from "@/lib/supabase";
 import { getStorageUploadErrorMessage, uploadStorageObject } from "@/utils/storageUpload";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -255,14 +256,7 @@ const LightsRiggingPlanner: React.FC = () => {
       );
 
       const fileName = `${title} - Rigging.pdf`;
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadPdfBlob(pdfBlob, fileName);
 
       if (!isTourDefaults && selectedJobId) {
         const file = new File([pdfBlob], fileName, { type: "application/pdf" });
