@@ -8,6 +8,7 @@ import {
   getJobType,
   getManagementByDepartmentUserIds,
   getManagementUserIds,
+  getExistingProfileIds,
   getProfileDisplayName,
   getProfileRoles,
   getSoundDepartmentUserIds,
@@ -230,6 +231,16 @@ export async function handleBroadcast(
   if (type === 'job.assignment.confirmed' || type === 'job.assignment.direct') {
     if (!body.recipient_id || body.recipient_id !== userId) {
       recipients.delete(userId);
+    }
+  }
+
+  // The service caller (nil UUID, see auth.ts) and deleted users have no
+  // auth.users row. A single such id failed the notification_inbox FK for the
+  // whole batched upsert and dropped the event for every other recipient.
+  const existingProfileIds = await getExistingProfileIds(client, Array.from(recipients));
+  if (existingProfileIds) {
+    for (const id of Array.from(recipients)) {
+      if (!existingProfileIds.has(id)) recipients.delete(id);
     }
   }
 

@@ -35,7 +35,7 @@ type ProfileRoleRow = {
   role?: unknown;
 } | null;
 
-function timingSafeEqual(left: string, right: string): boolean {
+export function timingSafeEqual(left: string, right: string): boolean {
   const maxLength = Math.max(left.length, right.length);
   let mismatch = left.length ^ right.length;
 

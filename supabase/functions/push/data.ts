@@ -547,6 +547,28 @@ export async function getProfileRoles(
   return roles;
 }
 
+/**
+ * Ids from `userIds` that belong to a real profile. Returns null when the
+ * lookup fails so callers can fall back to the unfiltered list instead of
+ * silently dropping every recipient.
+ */
+export async function getExistingProfileIds(
+  client: SupabaseClient,
+  userIds: string[],
+): Promise<Set<string> | null> {
+  if (userIds.length === 0) return new Set();
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .in('id', userIds)
+    .returns<Array<{ id: string }>>();
+  if (error) {
+    logEvent('warn', 'push_recipient_existence_lookup_failed', { errorCode: error.code ?? 'unknown' });
+    return null;
+  }
+  return new Set((data ?? []).map((row) => row.id));
+}
+
 export async function resolveSoundVisionVenueName(
   client: SupabaseClient,
   body: BroadcastBody,
