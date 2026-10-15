@@ -36,7 +36,7 @@ import { assignSuffixes, createEmptyRow, type Table, type TableRow } from "@/pag
 import { usePesosPdfExport } from "@/pages/pesos-tool/usePesosPdfExport";
 import { usePesosLoadedTables } from "@/pages/pesos-tool/usePesosLoadedTables";
 import { usePesosContext } from "@/features/technical-tools/weights/usePesosContext";
-import { getSetupReturnPath } from '@/features/setup-workflows/returnNavigation';
+import { getCalculatorReturnPath } from '@/features/setup-workflows/returnNavigation';
 
 const PesosTool: React.FC = () => {
   const { toast } = useToast();
@@ -71,8 +71,8 @@ const PesosTool: React.FC = () => {
     tourId,
     tourDateId,
   });
-  const setupReturnPath = getSetupReturnPath(searchParams);
-  const handleBackNavigation = () => setupReturnPath ? navigate(setupReturnPath) : handleContextBack();
+  const returnPath = getCalculatorReturnPath(searchParams);
+  const handleBackNavigation = () => returnPath ? navigate(returnPath) : handleContextBack();
   const {
     selectedStage,
     selectedStageNumber,
