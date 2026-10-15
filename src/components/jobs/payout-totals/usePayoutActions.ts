@@ -28,7 +28,6 @@ interface UsePayoutActionsArgs {
   payoutTotals: JobPayoutTotals[];
   profilesWithEmail: TechnicianProfileWithEmail[];
   profileMap: Map<string, TechnicianProfileWithEmail>;
-  lpoMap: Map<string, string | null>;
   getTechName: (id: string) => string;
   getTechOverride: (techId: string) => { override_amount_eur: number } | undefined;
 }
@@ -43,7 +42,6 @@ export function usePayoutActions({
   payoutTotals,
   profilesWithEmail,
   profileMap,
-  lpoMap,
   getTechName,
   getTechOverride,
 }: UsePayoutActionsArgs): PayoutActions {
@@ -52,7 +50,6 @@ export function usePayoutActions({
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
   const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
   const [missingEmailTechIds, setMissingEmailTechIds] = React.useState<string[]>([]);
-  const lastPreparedContext = React.useRef<JobPayoutEmailContextResult | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewContext, setPreviewContext] = React.useState<JobPayoutEmailContextResult | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
@@ -99,7 +96,6 @@ export function usePayoutActions({
   /* ── Reset on job/type change ── */
   React.useEffect(() => {
     setMissingEmailTechIds([]);
-    lastPreparedContext.current = null;
   }, [jobId, isTourDate]);
 
   /* ── Override handlers ── */
@@ -144,19 +140,20 @@ export function usePayoutActions({
   }, []);
 
   /* ── Email context preparation (standard) ── */
+  // LPO numbers are read from the database at action time (no lpoMap is
+  // passed in): work orders synced moments ago, in this tab or another, must
+  // reach the PDF/e-mail without a page reload.
   const prepareStandardContext = React.useCallback(async (payouts: JobPayoutTotals[]) => {
     const context = await prepareJobPayoutEmailContext({
       jobId,
       supabase: dataLayerClient,
       payouts,
       profiles: profilesWithEmail,
-      lpoMap,
       jobDetails: jobMeta || undefined,
     });
-    lastPreparedContext.current = context;
     setMissingEmailTechIds(context.missingEmails);
     return context;
-  }, [jobId, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, profilesWithEmail, jobMeta]);
 
   /* ── PDF export ── */
   const handleExport = React.useCallback(async () => {
@@ -183,7 +180,7 @@ export function usePayoutActions({
             job_type: jobMeta.job_type ?? undefined,
           },
           profilesWithEmail as TechnicianProfile[],
-          lpoMap,
+          tourContext.lpoMap,
           {
             timesheetMap: tourContext.timesheetDateMap,
             prepTimesheetMap: tourContext.prepTimesheetMap,
@@ -208,7 +205,7 @@ export function usePayoutActions({
         context.payouts,
         context.job,
         context.profiles,
-        context.lpoMap ?? lpoMap,
+        context.lpoMap,
         context.timesheetMap
       );
       toast.success('PDF de pagos generado');
@@ -224,7 +221,6 @@ export function usePayoutActions({
     visibleTourQuotes,
     jobMeta,
     profilesWithEmail,
-    lpoMap,
     standardPayoutTotals,
     prepareStandardContext,
   ]);
@@ -287,11 +283,8 @@ export function usePayoutActions({
         supabase: dataLayerClient,
         payouts: approvedPayouts,
         profiles: profilesWithEmail,
-        lpoMap,
         jobDetails: jobMeta || undefined,
-        existingContext: lastPreparedContext.current ?? undefined,
       });
-      lastPreparedContext.current = result.context;
       setMissingEmailTechIds(result.context.missingEmails);
 
       if (result.error) {
@@ -326,7 +319,6 @@ export function usePayoutActions({
     profilesWithEmail,
     technicianId,
     standardPayoutTotals,
-    lpoMap,
     jobMeta,
   ]);
 
@@ -423,7 +415,6 @@ export function usePayoutActions({
         supabase: dataLayerClient,
         payouts: approvedPayouts,
         profiles: profilesWithEmail,
-        lpoMap,
         jobDetails: jobMeta || undefined,
       });
 
@@ -435,7 +426,7 @@ export function usePayoutActions({
     } finally {
       setIsLoadingPreview(false);
     }
-  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, payoutTotals, profilesWithEmail, lpoMap, jobMeta, buildTourPreviewTimesheetMap]);
+  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, payoutTotals, profilesWithEmail, jobMeta, buildTourPreviewTimesheetMap]);
 
   /* ── Single technician email ── */
   const handleSendEmailForTech = React.useCallback(
@@ -501,7 +492,6 @@ export function usePayoutActions({
           supabase: dataLayerClient,
           payouts: standardPayoutTotals.filter((p) => p.technician_id === techId),
           profiles: profilesWithEmail.filter((p) => p.id === techId),
-          lpoMap,
           jobDetails: jobMeta || undefined,
         });
 
@@ -534,7 +524,6 @@ export function usePayoutActions({
       visibleTourQuotes,
       profilesWithEmail,
       standardPayoutTotals,
-      lpoMap,
       jobMeta,
     ]
   );
