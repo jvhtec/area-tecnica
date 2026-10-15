@@ -20,6 +20,10 @@ export const downloadPdfBlob = (pdfBlob: Blob, fileName: string) => {
   anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(anchor);
+  // Edge/Chromium may still be processing the download when click() returns.
+  // Keep the blob URL alive until the browser has consumed the navigation.
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+    anchor.remove();
+  }, 60_000);
 };
