@@ -332,6 +332,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                         queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval", resolvedJobId) });
                         queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval-map") });
                         queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-approval-status", resolvedJobId) });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-folder", resolvedJobId) });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-rows", resolvedJobId) });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-work-orders-by-job", resolvedJobId) });
                         if (approvalSucceeded) {
                           toast.success("Tarifas aprobadas", {
                             description: canManagePayouts
@@ -427,6 +430,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                   setIsSyncingWorkOrders(false);
                   queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-folder", resolvedJobId) });
                   queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-rows", resolvedJobId) });
+                  // The payout panel's LPO numbers come from this query.
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-work-orders-by-job", resolvedJobId) });
                 }
               }}
               disabled={isSyncingWorkOrders}
@@ -464,7 +469,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     // Fallback to visibility function when RLS blocks
                     let timesheets = ts || [];
                     if (!timesheets.length) {
-                      const { data: visible } = await dataLayerClient.rpc("get_timesheet_amounts_visible");
+                      const { data: visible } = await dataLayerClient.rpc("get_timesheet_amounts_visible", {
+                        p_job_ids: [resolvedJobId],
+                      });
                       timesheets =
                         (visible as any[] | null)?.filter(
                           (r) =>

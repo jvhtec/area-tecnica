@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
 import {
+  canCreateJobPersonnelRow,
   canManageLogisticsMatrix,
   canViewLogisticsMatrix,
   isConductorRole,
@@ -251,5 +252,20 @@ describe('logistics matrix and conductors', () => {
 describe('dashboard routing for conductors', () => {
   it('sends drivers to their transports', () => {
     expect(getDashboardPath('conductor')).toBe('/conductor');
+  });
+});
+
+describe('job personnel row creation', () => {
+  it('lets only lights admins/management in an allowed department create lights rows', () => {
+    expect(canCreateJobPersonnelRow('lights', 'management', 'lights')).toBe(true);
+    expect(canCreateJobPersonnelRow('lights', 'admin', 'admin')).toBe(true);
+    expect(canCreateJobPersonnelRow('lights', 'house_tech', 'lights')).toBe(false);
+    expect(canCreateJobPersonnelRow('lights', 'management', 'sound')).toBe(false);
+  });
+
+  it('lets video department staff create video rows', () => {
+    expect(canCreateJobPersonnelRow('video', 'house_tech', 'video')).toBe(true);
+    expect(canCreateJobPersonnelRow('video', 'technician', 'lights')).toBe(false);
+    expect(canCreateJobPersonnelRow('video', null, null)).toBe(false);
   });
 });

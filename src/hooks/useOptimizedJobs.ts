@@ -7,6 +7,12 @@ import { sanitizeLogData } from "@/lib/enhanced-security-config";
 import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from "@/utils/jobType";
 import { shouldHideJobForTourState } from "@/utils/cancelledTourJobs";
 import { fetchJobProducerClaims } from "@/features/jobs/producer-claims/producerClaims";
+import { buildJobSearchTokens, matchesJobSearch } from "@/utils/jobSearch";
+
+/** Keeps `id=in.(...)` well under URL length limits. */
+const SEARCH_ID_CHUNK_SIZE = 150;
+/** At or below the API's per-response row cap, so `length < size` means the last page. */
+const SEARCH_PAGE_SIZE = 1000;
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -27,6 +33,11 @@ export const useOptimizedJobs = (
      * Callers that fetch all departments leave this undefined (defaults to enabled).
      */
     enabled?: boolean;
+    /**
+     * Free-text search (title, location name or address; accent-insensitive).
+     * Matches on a light projection and loads full data only for the hits.
+     */
+    search?: string;
   }
 ) => {
   // Subscribe only to tables that affect this hook's query results
@@ -45,6 +56,55 @@ export const useOptimizedJobs = (
     { table: 'tours', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
   ]);
 
+  const jobTypes = includeDryhire ? [...OPS_JOB_TYPES_WITH_DRYHIRE] : [...OPS_JOB_TYPES_NO_DRYHIRE];
+  const searchTokens = buildJobSearchTokens(options?.search ?? "");
+  const searchKey = searchTokens.join(" ");
+
+  /**
+   * Search runs over every job of the department, so match on a light
+   * projection first and only load the full nested job data for the hits.
+   * Returns null when not searching.
+   */
+  const findSearchMatchIds = async (): Promise<string[] | null> => {
+    if (searchTokens.length === 0) return null;
+
+    const buildSearchQuery = () => {
+      let searchQuery = supabase
+        .from('jobs')
+        .select('id, title, location:locations(name, formatted_address), job_departments!inner(department)')
+        .in('job_type', jobTypes);
+      if (department) {
+        searchQuery = searchQuery.eq('job_departments.department', department);
+      }
+      if (startDate) {
+        searchQuery = searchQuery.gte('end_time', startDate.toISOString());
+      }
+      if (endDate) {
+        searchQuery = searchQuery.lte('start_time', endDate.toISOString());
+      }
+      return searchQuery;
+    };
+
+    // A department can hold more jobs than one API response (Supabase caps a
+    // response at 1,000 rows), so page through the projection in a stable order.
+    const matches: string[] = [];
+    for (let from = 0; ; from += SEARCH_PAGE_SIZE) {
+      const { data, error } = await buildSearchQuery()
+        .order('id', { ascending: true })
+        .range(from, from + SEARCH_PAGE_SIZE - 1);
+      if (error) {
+        console.error("useOptimizedJobs: Error searching jobs:", sanitizeLogData(error));
+        throw error;
+      }
+      const page = data ?? [];
+      for (const job of page) {
+        if (matchesJobSearch(job, searchTokens)) matches.push(job.id);
+      }
+      if (page.length < SEARCH_PAGE_SIZE) break;
+    }
+    return matches;
+  };
+
   const fetchOptimizedJobs = async () => {
     const startTime = Date.now();
     const debug = import.meta.env.DEV;
@@ -52,10 +112,29 @@ export const useOptimizedJobs = (
       console.log("useOptimizedJobs: Fetching optimized jobs data", sanitizeLogData({
         department,
         startDate: startDate?.toISOString(),
-        endDate: endDate?.toISOString()
+        endDate: endDate?.toISOString(),
+        searching: searchTokens.length > 0,
       }));
     }
-    
+
+    const searchMatchIds = await findSearchMatchIds();
+    if (searchMatchIds && searchMatchIds.length === 0) return [];
+    if (searchMatchIds && searchMatchIds.length > SEARCH_ID_CHUNK_SIZE) {
+      const chunks: string[][] = [];
+      for (let i = 0; i < searchMatchIds.length; i += SEARCH_ID_CHUNK_SIZE) {
+        chunks.push(searchMatchIds.slice(i, i + SEARCH_ID_CHUNK_SIZE));
+      }
+      const results = await Promise.all(chunks.map((ids) => fetchJobsData(ids)));
+      return finalizeJobs(
+        results.flat().sort((a, b) => String(a.start_time).localeCompare(String(b.start_time))),
+        startTime,
+        debug
+      );
+    }
+    return finalizeJobs(await fetchJobsData(searchMatchIds), startTime, debug);
+  };
+
+  const fetchJobsData = async (ids: string[] | null) => {
     let query = supabase
       .from('jobs')
       .select(`
@@ -133,7 +212,7 @@ export const useOptimizedJobs = (
         )
       `)
       // Include relevant job types; optionally include dryhire
-      .in('job_type', includeDryhire ? [...OPS_JOB_TYPES_WITH_DRYHIRE] : [...OPS_JOB_TYPES_NO_DRYHIRE])
+      .in('job_type', jobTypes)
       .order('start_time', { ascending: true });
 
     // Apply filters efficiently using indexes
@@ -141,13 +220,18 @@ export const useOptimizedJobs = (
       query = query.eq('job_departments.department', department);
     }
 
-    // Date-range filtering should include jobs that overlap the window (multi-day jobs).
-    if (startDate) {
-      query = query.gte('end_time', startDate.toISOString());
-    }
+    if (ids) {
+      // Search hits were already matched against the same department and dates.
+      query = query.in('id', ids);
+    } else {
+      // Date-range filtering should include jobs that overlap the window (multi-day jobs).
+      if (startDate) {
+        query = query.gte('end_time', startDate.toISOString());
+      }
 
-    if (endDate) {
-      query = query.lte('start_time', endDate.toISOString());
+      if (endDate) {
+        query = query.lte('start_time', endDate.toISOString());
+      }
     }
 
     const { data, error } = await query;
@@ -157,7 +241,14 @@ export const useOptimizedJobs = (
       throw error;
     }
 
-    const jobs = data || [];
+    return data || [];
+  };
+
+  const finalizeJobs = async (
+    jobs: Awaited<ReturnType<typeof fetchJobsData>>,
+    startTime: number,
+    debug: boolean
+  ) => {
     // Process the data to match expected format with optimized processing
     // Claims are decoration on top of the job list: a failure here must not
     // blank the calendar, so fall back to an unclaimed view.
@@ -223,7 +314,7 @@ export const useOptimizedJobs = (
   };
 
   return useQuery({
-    queryKey: queryKeys.scope('optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire),
+    queryKey: queryKeys.scope('optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire, searchKey),
     queryFn: fetchOptimizedJobs,
     enabled: options?.enabled ?? true,
     staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching

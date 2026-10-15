@@ -107,7 +107,6 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     payoutTotals: displayedPayouts,
     profilesWithEmail: filteredProfilesWithEmail,
     profileMap: data.profileMap,
-    lpoMap: data.lpoMap,
     getTechName: data.getTechName,
     getTechOverride: data.getTechOverride,
   });

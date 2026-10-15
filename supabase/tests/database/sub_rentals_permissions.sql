@@ -48,7 +48,8 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'sub_rentals'
       AND policyname = 'sub_rentals_insert_scoped'
-      AND with_check ILIKE '%created_by = auth.uid()%'
+      -- auth.uid() is wrapped as an InitPlan (20261015202000_rls_initplan_wrap_auth_helpers).
+      AND with_check ILIKE '%created_by = ( SELECT auth.uid() AS uid)%'
       AND with_check ILIKE '%assignment.job_id = sub_rentals.job_id%'
   ),
   'sub_rentals inserts are self-attributed and scope checked'

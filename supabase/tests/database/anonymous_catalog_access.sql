@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(9);
+SELECT plan(10);
 
 SELECT ok(
   NOT has_table_privilege('anon', 'public.festival_artists', 'SELECT'),
@@ -55,6 +55,20 @@ SELECT ok(
       AND qual NOT ILIKE '%OR true%'
   ),
   'rate-extra reads require a management user'
+);
+
+-- Permissive policies are OR-ed: a second, broader SELECT policy would reopen
+-- the catalog to every signed-in user (20261015210000).
+SELECT is(
+  (
+    SELECT array_agg(policyname::text ORDER BY policyname)
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'rate_extras_2025'
+      AND cmd IN ('SELECT', 'ALL')
+  ),
+  ARRAY['rate_extras_2025_select_management'],
+  'the management policy is the only one that grants rate-extra reads'
 );
 
 SELECT ok(

@@ -17,6 +17,7 @@ vi.mock("../data.ts", () => ({
   getJobTitle: async () => "Auditorio", getJobDepartment: async () => "sound",
   getJobType: async () => "single", getProfileDisplayName: async () => "Solicitante",
   getProfileRoles: async () => new Map(),
+  getExistingProfileIds: async (_client: unknown, ids: string[]) => new Set(ids),
   getTourName: async () => null,
 }));
 vi.mock("../routing.ts", () => ({

@@ -11,6 +11,8 @@ import { MonthNavigation } from "@/components/project-management/MonthNavigation
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
 import { JobTypeFilter } from "@/components/project-management/JobTypeFilter";
+import { ProducerFilter, ProducerFilterAccordionItem } from "@/components/project-management/ProducerFilter";
+import { useProducerFilter } from "@/components/project-management/useProducerFilter";
 import { Input } from "@/components/ui/input";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
@@ -28,14 +30,7 @@ import { useSetupJob } from "@/features/setup-workflows/jobContext";
 
 
 import { queryKeys } from "@/lib/react-query";
-const normalizeSearchText = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
-
-const buildSearchTokens = (query: string) => normalizeSearchText(query).split(/\s+/).filter(Boolean);
+import { buildJobSearchTokens, matchesJobSearch } from "@/utils/jobSearch";
 
 const TYPE_LABELS: Record<string, string> = {
   single: "Sencillo",
@@ -63,7 +58,7 @@ const ProjectManagement = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { openDialog } = useCreateJobDialogStore();
-  const { userDepartment, isLoading: authLoading } = useOptimizedAuth();
+  const { userDepartment, isLoading: authLoading, user } = useOptimizedAuth();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>((userDepartment as Department) ?? "sound");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -143,7 +138,7 @@ const ProjectManagement = () => {
     isSearching ? undefined : startDate,
     isSearching ? undefined : endDate,
     true, // include dryhire jobs in project management
-    { refetchOnMount: "always" }
+    { refetchOnMount: "always", search: debouncedQuery }
   );
 
   // Check user permissions early
@@ -176,7 +171,7 @@ const ProjectManagement = () => {
   }, [optimizedJobs, canCreateItems, isSearching, toast]);
 
   // Filter jobs by selected job type and statuses with database-level optimization
-  const tokens = buildSearchTokens(debouncedQuery);
+  const tokens = buildJobSearchTokens(debouncedQuery);
   const jobs = (optimizedJobs || []).filter((job: any) => {
     if (focusedSetupJobId) return job.id === focusedSetupJobId;
     const matchesType = isSearching
@@ -184,13 +179,7 @@ const ProjectManagement = () => {
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const searchableValues = [job.title, job.location?.name, job.location?.formatted_address]
-      .filter(Boolean)
-      .map((value: string) => normalizeSearchText(value));
-    const matchesSearch =
-      tokens.length === 0 ||
-      tokens.every((token) => searchableValues.some((value) => value.includes(token)));
-    return matchesType && matchesStatus && matchesSearch;
+    return matchesType && matchesStatus && matchesJobSearch(job, tokens);
   });
 
   // Highlight today's jobs when page loads
@@ -210,6 +199,22 @@ const ProjectManagement = () => {
       }
     }
   }, [loading, jobs]);
+
+  const {
+    selectedProducerIds,
+    producerOptions,
+    toggleProducer,
+    clearProducers,
+    filterByProducer,
+  } = useProducerFilter(optimizedJobs, user?.id);
+  // A job opened from its setup workflow stays visible whatever producer is filtered.
+  const visibleJobs = focusedSetupJobId ? jobs : filterByProducer(jobs);
+  const producerFilterProps = {
+    options: producerOptions,
+    selectedProducerIds,
+    onToggle: toggleProducer,
+    onClear: clearProducers,
+  };
 
   // Check user access and fetch profile role.
   useEffect(() => {
@@ -415,7 +420,7 @@ const ProjectManagement = () => {
 
   const MobileFilterContent = () => (
     <div className="w-full space-y-4">
-      <Accordion type="multiple" defaultValue={["types", "status"]} className="w-full space-y-3">
+      <Accordion type="multiple" defaultValue={["types", "status", "producer"]} className="w-full space-y-3">
         <AccordionItem value="types" className="rounded-md border px-3">
           <AccordionTrigger className="py-3 text-sm hover:no-underline">
             <span className="flex items-center gap-2">
@@ -493,6 +498,11 @@ const ProjectManagement = () => {
             </div>
           </AccordionContent>
         </AccordionItem>
+
+        <ProducerFilterAccordionItem
+          {...producerFilterProps}
+          renderOption={({ key, ...option }) => <MobileFilterOption key={key} {...option} />}
+        />
       </Accordion>
 
       {canCreateItems && (
@@ -514,10 +524,13 @@ const ProjectManagement = () => {
     </div>
   );
 
+  // Called as plain functions, not rendered as <FilterContent />: a component
+  // declared inside the page is a new type on every render, so React remounted
+  // the filter row on each toggle and closed any open dropdown.
   const FilterContent = () => (
     <div className={cn("flex flex-col gap-4", isMobile ? "w-full" : "")}>
       {isMobile ? (
-        <MobileFilterContent />
+        MobileFilterContent()
       ) : (
         <>
           <div className="flex items-center gap-4">
@@ -531,6 +544,7 @@ const ProjectManagement = () => {
               selectedJobStatuses={selectedJobStatuses}
               onStatusSelection={handleJobStatusSelection}
             />
+            <ProducerFilter {...producerFilterProps} />
           </div>
           {canCreateItems && (
             <Button 
@@ -578,9 +592,9 @@ const ProjectManagement = () => {
                   <Button variant="outline" size="sm" className="gap-2">
                     <Filter className="h-4 w-4" />
                     Filtros
-                    {(selectedJobTypes.length > 0 || selectedJobStatuses.length > 0) && (
+                    {(selectedJobTypes.length + selectedJobStatuses.length + selectedProducerIds.length) > 0 && (
                       <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
-                        {selectedJobTypes.length + selectedJobStatuses.length}
+                        {selectedJobTypes.length + selectedJobStatuses.length + selectedProducerIds.length}
                       </span>
                     )}
                   </Button>
@@ -593,17 +607,17 @@ const ProjectManagement = () => {
                   <SheetHeader className="mb-4">
                     <SheetTitle>Filtros</SheetTitle>
                     <SheetDescription className="sr-only">
-                      Selecciona tipos y estados para filtrar la lista de proyectos.
+                      Selecciona tipos, estados y responsable para filtrar la lista de proyectos.
                     </SheetDescription>
                   </SheetHeader>
-                  <FilterContent />
+                  {FilterContent()}
                 </SheetContent>
               </Sheet>
             )}
           </div>
           
           <div className={cn("flex gap-2", isMobile ? "flex-col" : "flex-row flex-wrap items-center")}>
-            {!isMobile && <FilterContent />}
+            {!isMobile && FilterContent()}
             <div className={cn("relative", isMobile ? "w-full" : "flex-1 min-w-[220px] max-w-[280px]")}>
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -630,7 +644,7 @@ const ProjectManagement = () => {
           <DepartmentTabs
             selectedDepartment={selectedDepartment}
             onDepartmentChange={(value) => setSelectedDepartment(value as Department)}
-            jobs={jobs}
+            jobs={visibleJobs}
             jobsLoading={jobsLoading}
             onDeleteDocument={undefined}
             userRole={userRole}

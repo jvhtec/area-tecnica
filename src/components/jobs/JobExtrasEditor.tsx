@@ -11,7 +11,8 @@ import {
   JobExtraType,
   EXTRA_TYPE_LABELS,
   EXTRA_TYPE_LIMITS,
-  JobExtra
+  JobExtra,
+  JobExtrasBreakdown
 } from '@/types/jobExtras';
 import { formatCurrency } from '@/lib/utils';
 import { useRateExtrasCatalog } from '@/hooks/useRateExtrasCatalog';
@@ -30,6 +31,11 @@ interface JobExtrasEditorProps {
   customTravelFullRate?: number | null;
   showVehicleDisclaimer?: boolean;
   vehicleDisclaimerText?: string;
+  /**
+   * The technician's approved extras as priced by the payout view. Non-managers
+   * cannot read the rate catalog, so their unit prices come from here.
+   */
+  extrasBreakdown?: JobExtrasBreakdown;
 }
 
 export function JobExtrasEditor({
@@ -43,9 +49,10 @@ export function JobExtrasEditor({
   customTravelFullRate,
   showVehicleDisclaimer = false,
   vehicleDisclaimerText,
+  extrasBreakdown,
 }: JobExtrasEditorProps) {
   const { data: jobExtras = [], isLoading } = useJobExtras(jobId, technicianId);
-  const { data: catalog = [], isLoading: catalogLoading } = useRateExtrasCatalog();
+  const { data: catalog = [], isLoading: catalogLoading } = useRateExtrasCatalog({ enabled: isManager });
   const upsertJobExtra = useUpsertJobExtra();
 
   const [editingQuantities, setEditingQuantities] = useState<Partial<Record<JobExtraType, number>>>({});
@@ -93,8 +100,10 @@ export function JobExtrasEditor({
   };
 
   // Get unit amount for extra type
-  // Priority: custom per-technician rate > house tech fixed €20 > catalog rate
-  function getUnitAmount(extraType: JobExtraType): number {
+  // Priority: custom per-technician rate > house tech fixed €20 > catalog rate.
+  // Without catalog access (non-managers) the price comes from the payout
+  // breakdown, which only lists approved extras: null means "not priced yet".
+  function getUnitAmount(extraType: JobExtraType): number | null {
     // Custom per-technician travel rates (highest priority)
     if (extraType === 'travel_half' && customTravelHalfRate != null) {
       return customTravelHalfRate;
@@ -106,6 +115,10 @@ export function JobExtrasEditor({
     const qualifiesForFixedRate = isHouseTech || isAssignableManagement;
     if (qualifiesForFixedRate && (extraType === 'travel_half' || extraType === 'travel_full')) {
       return FIXED_TRAVEL_RATE;
+    }
+    if (!isManager) {
+      const item = extrasBreakdown?.items?.find(i => i.extra_type === extraType);
+      return item?.unit_eur ?? null;
     }
     const catalogItem = catalog?.find(r => r.extra_type === extraType);
     return catalogItem?.amount_eur ?? 0;
@@ -127,7 +140,7 @@ export function JobExtrasEditor({
   const totalExtrasAmount = (Object.keys(EXTRA_TYPE_LABELS) as JobExtraType[])
     .reduce((total, extraType) => {
       const quantity = getCurrentQuantity(extraType);
-      const unitAmount = getUnitAmount(extraType);
+      const unitAmount = getUnitAmount(extraType) ?? 0;
       return total + (quantity * unitAmount);
     }, 0);
 
@@ -159,8 +172,8 @@ export function JobExtrasEditor({
           const hasUnsavedChange = editingQuantities[extraType] !== undefined;
           const maxQuantity = EXTRA_TYPE_LIMITS[extraType];
           const unitAmount = getUnitAmount(extraType);
-          const currentTotal = currentQuantity * unitAmount;
-          const displayTotal = displayQuantity * unitAmount;
+          const currentTotal = currentQuantity * (unitAmount ?? 0);
+          const displayTotal = displayQuantity * (unitAmount ?? 0);
 
           return (
             <div key={extraType} className="space-y-2">
@@ -169,14 +182,16 @@ export function JobExtrasEditor({
                   {EXTRA_TYPE_LABELS[extraType]}
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant={usesFixedTravelRate(extraType) || hasCustomTravelRate(extraType) ? "default" : "outline"}
-                    className={`text-xs ${usesFixedTravelRate(extraType) ? 'bg-blue-600 text-white' : hasCustomTravelRate(extraType) ? 'bg-emerald-600 text-white' : ''}`}
-                  >
-                    {formatCurrency(unitAmount)} each
-                    {usesFixedTravelRate(extraType) && ' (plantilla)'}
-                    {hasCustomTravelRate(extraType) && ' (personalizada)'}
-                  </Badge>
+                  {unitAmount !== null && (
+                    <Badge
+                      variant={usesFixedTravelRate(extraType) || hasCustomTravelRate(extraType) ? "default" : "outline"}
+                      className={`text-xs ${usesFixedTravelRate(extraType) ? 'bg-blue-600 text-white' : hasCustomTravelRate(extraType) ? 'bg-emerald-600 text-white' : ''}`}
+                    >
+                      {formatCurrency(unitAmount)} each
+                      {usesFixedTravelRate(extraType) && ' (plantilla)'}
+                      {hasCustomTravelRate(extraType) && ' (personalizada)'}
+                    </Badge>
+                  )}
                   {currentQuantity > 0 && (
                     <Badge variant="secondary" className="text-xs">
                       Current: {currentQuantity}
@@ -256,9 +271,13 @@ export function JobExtrasEditor({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">
-                      {currentQuantity > 0 ? `${currentQuantity} × ${formatCurrency(unitAmount)}` : 'None'}
+                      {currentQuantity > 0
+                        ? unitAmount !== null
+                          ? `${currentQuantity} × ${formatCurrency(unitAmount)}`
+                          : `${currentQuantity}`
+                        : 'None'}
                     </span>
-                    {currentQuantity > 0 && (
+                    {currentQuantity > 0 && unitAmount !== null && (
                       <Badge variant="secondary" className="">
                         {formatCurrency(currentTotal)}
                       </Badge>

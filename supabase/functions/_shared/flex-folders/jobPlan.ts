@@ -25,18 +25,57 @@ const basePayload = (start: string, end: string) => ({
   locationId: FLEX_FOLDER_IDS.location,
 });
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const PLANNING_TIME_ZONE = "Europe/Madrid";
+
+/** Minutes `utcMs` is ahead of UTC in the planning time zone (CET +60, CEST +120). */
+const zoneOffsetMinutes = (utcMs: number) => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: PLANNING_TIME_ZONE, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    }).formatToParts(new Date(utcMs)).map((part) => [part.type, part.value]),
+  );
+  const wallAsUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second),
+  );
+  return Math.round((wallAsUtc - utcMs) / 60_000);
+};
+
+/**
+ * The custom pullsheet / budget date pickers are `<input type="date">` and send
+ * "2026-10-16". Flex rejects a date-only plannedStartDate/plannedEndDate with
+ * HTTP 400, so turn it into the start (00:00:00) or end (23:59:59) of that
+ * Madrid day, in the same `…T…:…:….000Z` form as every other Flex date.
+ * Anything else (already a timestamp) is passed through unchanged.
+ */
+export const normalizePlannedDate = (value: string | undefined, edge: "start" | "end") => {
+  if (!value || !DATE_ONLY.test(value)) return value;
+  const wallClock = Date.parse(`${value}T${edge === "start" ? "00:00:00" : "23:59:59"}Z`);
+  if (Number.isNaN(wallClock)) return value;
+  const utcMs = wallClock - zoneOffsetMinutes(wallClock) * 60_000;
+  return `${new Date(utcMs).toISOString().split(".")[0]}.000Z`;
+};
+
+const withFlexDates = (entry: MetadataEntry): MetadataEntry => ({
+  ...entry,
+  plannedStartDate: normalizePlannedDate(entry.plannedStartDate, "start"),
+  plannedEndDate: normalizePlannedDate(entry.plannedEndDate, "end"),
+});
+
 const customPullsheetMetadata = (selection: Selection[string]): MetadataEntry[] => {
   const custom = selection?.customPullsheet;
-  if (custom?.entries?.length) return custom.entries;
+  if (custom?.entries?.length) return custom.entries.map(withFlexDates);
   if (!custom || (!custom.enabled && !custom.name?.trim() && !custom.startDate && !custom.endDate)) return [];
-  return [{ name: custom.name?.trim() || "", plannedStartDate: custom.startDate, plannedEndDate: custom.endDate }];
+  return [withFlexDates({ name: custom.name?.trim() || "", plannedStartDate: custom.startDate, plannedEndDate: custom.endDate })];
 };
 
 const commercialBudgetMetadata = (selection: Selection[string]): MetadataEntry[] => {
   const extras = selection?.extrasPresupuesto;
-  if (extras?.entries?.length) return extras.entries;
+  if (extras?.entries?.length) return extras.entries.map(withFlexDates);
   return extras?.startDate || extras?.endDate
-    ? [{ plannedStartDate: extras.startDate, plannedEndDate: extras.endDate }]
+    ? [withFlexDates({ plannedStartDate: extras.startDate, plannedEndDate: extras.endDate })]
     : [];
 };
 

@@ -5,6 +5,30 @@ import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
 import type { SubscribeBody, SubscribeNativeBody, UnsubscribeBody, UnsubscribeNativeBody } from "./types.ts";
 
+/**
+ * Browsers rotate a device's push endpoint. The new endpoint matches no row,
+ * but the device already has one under the unique (user_id, device_id) index,
+ * so a plain insert failed with 23505 and the rotated endpoint was never
+ * stored. Move the device's row to the new endpoint instead.
+ */
+async function replaceDeviceEndpointOrInsert(
+  client: SupabaseClient,
+  userId: string,
+  payload: Record<string, unknown> & { device_id: string | null },
+) {
+  if (payload.device_id) {
+    const { data, error } = await client
+      .from("push_subscriptions")
+      .update(payload)
+      .eq("user_id", userId)
+      .eq("device_id", payload.device_id)
+      .select("id");
+    if (error) return { error };
+    if ((data ?? []).length > 0) return { error: null };
+  }
+  return await client.from("push_subscriptions").insert(payload);
+}
+
 export async function handleSubscribe(
   client: SupabaseClient,
   userId: string,
@@ -54,7 +78,7 @@ export async function handleSubscribe(
       .update(payload)
       .eq("endpoint", body.subscription.endpoint)
       .eq("user_id", userId)
-    : await client.from("push_subscriptions").insert(payload);
+    : await replaceDeviceEndpointOrInsert(client, userId, payload);
 
   if (error) {
     console.error("push subscribe error", error);

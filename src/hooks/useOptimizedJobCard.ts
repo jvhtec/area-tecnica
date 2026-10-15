@@ -164,8 +164,7 @@ export const useOptimizedJobCard = <TJob extends OptimizedJobCardJob>(
       let visibleTimesheets: TimesheetForCard[] = [];
       try {
         const { data: visible, error: visErr } = await supabase
-          .rpc('get_timesheet_amounts_visible')
-          .eq('job_id', job.id);
+          .rpc('get_timesheet_amounts_visible', { p_job_ids: [job.id] });
         if (!visErr && Array.isArray(visible)) {
           visibleTimesheets = visible as TimesheetForCard[];
         }

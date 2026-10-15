@@ -511,7 +511,7 @@ SELECT throws_ok(
        (SELECT payload FROM hoja_hardening_payloads WHERE name = 'job_one_update'),
        ARRAY[]::uuid[]
      ) $$,
-  '40001',
+  'PT409',
   NULL,
   'a stale expected version is rejected'
 );
@@ -629,7 +629,7 @@ SELECT throws_ok(
        'review',
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid) - 1
      ) $$,
-  '40001',
+  'PT409',
   'La Hoja de Ruta ha cambiado desde la última carga',
   'a stale editor cannot transition Hoja status'
 );
@@ -686,7 +686,7 @@ SELECT throws_ok(
        'db800000-0000-0000-0000-000000000001'::uuid,
        (SELECT document_version FROM public.hoja_de_ruta WHERE job_id = 'db200000-0000-0000-0000-000000000001'::uuid) - 1
      ) $$,
-  '40001',
+  'PT409',
   'La Hoja de Ruta ha cambiado desde la última carga',
   'a stale editor cannot publish a canonical PDF'
 );

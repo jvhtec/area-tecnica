@@ -234,6 +234,7 @@ export const JobExtrasManagement = ({
                 customTravelHalfRate={techCustomRates?.travel_half_day_eur}
                 customTravelFullRate={techCustomRates?.travel_full_day_eur}
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
+                extrasBreakdown={technicianPayout?.extras_breakdown}
               />
 
               {index < visibleAssignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}

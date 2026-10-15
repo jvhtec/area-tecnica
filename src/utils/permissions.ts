@@ -100,6 +100,29 @@ export const canEditJobs = (role: UserRole) => PROJECT_MANAGEMENT_ALLOWED_ROLES.
 
 export const canAssignPersonnel = (role: UserRole) => PROJECT_MANAGEMENT_ALLOWED_ROLES.includes(role as AppUserRole);
 
+/**
+ * Mirrors the "Department personnel can manage … personnel" RLS policies on
+ * lights_/video_job_personnel: INSERT … RETURNING must pass both the
+ * WITH CHECK (role) and the USING (raw profile department) predicates.
+ */
+const JOB_PERSONNEL_CREATE_RULES = {
+  lights: { roles: ['admin', 'management'], departments: ['lights', 'admin', 'management'] },
+  video: {
+    roles: ['admin', 'management', 'house_tech', 'technician', 'logistics'],
+    departments: ['video', 'admin', 'management'],
+  },
+} as const satisfies Record<string, { roles: readonly string[]; departments: readonly string[] }>;
+
+export const canCreateJobPersonnelRow = (
+  table: keyof typeof JOB_PERSONNEL_CREATE_RULES,
+  role: UserRole,
+  department?: UserDepartment,
+): boolean => {
+  const rule = JOB_PERSONNEL_CREATE_RULES[table];
+  return (rule.roles as readonly string[]).includes(role ?? '')
+    && (rule.departments as readonly string[]).includes(department ?? '');
+};
+
 export const canUploadDocuments = (role: UserRole) => PROJECT_MANAGEMENT_ALLOWED_ROLES.includes(role as AppUserRole);
 
 export const canDeleteDocuments = (role: UserRole) => isManagementRole(role);
