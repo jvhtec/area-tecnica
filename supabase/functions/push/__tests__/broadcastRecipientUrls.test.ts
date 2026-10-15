@@ -126,11 +126,19 @@ describe("recipients without a profile", () => {
     expect(mocks.inbox.mock.calls[0][1]).toEqual(["tech-1"]);
   });
 
-  it("keeps every recipient when the existence lookup fails", async () => {
+  it("keeps the remaining recipients when the existence lookup fails", async () => {
     mocks.existing.mockResolvedValue(null);
     await handleBroadcast({} as SupabaseClient, "manager-1", {
       action: "broadcast", type: "job.updated", job_id: "job-1", user_ids: ["tech-1"],
     });
     expect(mocks.inbox.mock.calls[0][1]).toEqual(["tech-1", "manager-1"]);
+  });
+
+  it("never submits the service caller, even when the existence lookup fails", async () => {
+    mocks.existing.mockResolvedValue(null);
+    await handleBroadcast({} as SupabaseClient, SERVICE_CALLER, {
+      action: "broadcast", type: "job.updated", job_id: "job-1", user_ids: ["tech-1"],
+    });
+    expect(mocks.inbox.mock.calls[0][1]).toEqual(["tech-1"]);
   });
 });

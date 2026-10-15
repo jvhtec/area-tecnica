@@ -16,6 +16,7 @@ import {
 } from "./data.ts";
 import { channelEs } from "./format.ts";
 import { jsonResponse } from "./http.ts";
+import { SERVICE_CALLER_ID } from "./serviceCaller.ts";
 import { applyRoutingOverrides, getPushNotificationRoutes } from "./routing.ts";
 import { resolveNotificationUrl, validateInternalUrl } from "./urls.ts";
 import { destinationForRole } from "./recipientDestinations.ts";
@@ -237,6 +238,8 @@ export async function handleBroadcast(
   // The service caller (nil UUID, see auth.ts) and deleted users have no
   // auth.users row. A single such id failed the notification_inbox FK for the
   // whole batched upsert and dropped the event for every other recipient.
+  // The service caller is never a real user, so drop it even if the lookup fails.
+  recipients.delete(SERVICE_CALLER_ID);
   const existingProfileIds = await getExistingProfileIds(client, Array.from(recipients));
   if (existingProfileIds) {
     for (const id of Array.from(recipients)) {

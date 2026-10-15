@@ -11,6 +11,8 @@ import { buildJobSearchTokens, matchesJobSearch } from "@/utils/jobSearch";
 
 /** Keeps `id=in.(...)` well under URL length limits. */
 const SEARCH_ID_CHUNK_SIZE = 150;
+/** At or below the API's per-response row cap, so `length < size` means the last page. */
+const SEARCH_PAGE_SIZE = 1000;
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -66,28 +68,41 @@ export const useOptimizedJobs = (
   const findSearchMatchIds = async (): Promise<string[] | null> => {
     if (searchTokens.length === 0) return null;
 
-    let searchQuery = supabase
-      .from('jobs')
-      .select('id, title, location:locations(name, formatted_address), job_departments!inner(department)')
-      .in('job_type', jobTypes);
-    if (department) {
-      searchQuery = searchQuery.eq('job_departments.department', department);
-    }
-    if (startDate) {
-      searchQuery = searchQuery.gte('end_time', startDate.toISOString());
-    }
-    if (endDate) {
-      searchQuery = searchQuery.lte('start_time', endDate.toISOString());
-    }
+    const buildSearchQuery = () => {
+      let searchQuery = supabase
+        .from('jobs')
+        .select('id, title, location:locations(name, formatted_address), job_departments!inner(department)')
+        .in('job_type', jobTypes);
+      if (department) {
+        searchQuery = searchQuery.eq('job_departments.department', department);
+      }
+      if (startDate) {
+        searchQuery = searchQuery.gte('end_time', startDate.toISOString());
+      }
+      if (endDate) {
+        searchQuery = searchQuery.lte('start_time', endDate.toISOString());
+      }
+      return searchQuery;
+    };
 
-    const { data, error } = await searchQuery;
-    if (error) {
-      console.error("useOptimizedJobs: Error searching jobs:", sanitizeLogData(error));
-      throw error;
+    // A department can hold more jobs than one API response (Supabase caps a
+    // response at 1,000 rows), so page through the projection in a stable order.
+    const matches: string[] = [];
+    for (let from = 0; ; from += SEARCH_PAGE_SIZE) {
+      const { data, error } = await buildSearchQuery()
+        .order('id', { ascending: true })
+        .range(from, from + SEARCH_PAGE_SIZE - 1);
+      if (error) {
+        console.error("useOptimizedJobs: Error searching jobs:", sanitizeLogData(error));
+        throw error;
+      }
+      const page = data ?? [];
+      for (const job of page) {
+        if (matchesJobSearch(job, searchTokens)) matches.push(job.id);
+      }
+      if (page.length < SEARCH_PAGE_SIZE) break;
     }
-    return (data ?? [])
-      .filter((job) => matchesJobSearch(job, searchTokens))
-      .map((job) => job.id);
+    return matches;
   };
 
   const fetchOptimizedJobs = async () => {

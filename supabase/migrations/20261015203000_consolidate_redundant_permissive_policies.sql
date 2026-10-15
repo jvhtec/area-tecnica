@@ -88,8 +88,12 @@ begin
         v_target.table_name,
         v_suffix,
         v_roles,
-        case when v_suffix in ('update', 'delete') then format(' using (%s)', v_policy.qual) else '' end,
-        case when v_suffix in ('insert', 'update') then format(' with check (%s)', v_policy.with_check) else '' end
+        -- A FOR ALL policy without WITH CHECK applies its USING expression to
+        -- writes (pg_policies.with_check is NULL then), so carry that over.
+        case when v_suffix in ('update', 'delete') and v_policy.qual is not null
+             then format(' using (%s)', v_policy.qual) else '' end,
+        case when v_suffix in ('insert', 'update') and coalesce(v_policy.with_check, v_policy.qual) is not null
+             then format(' with check (%s)', coalesce(v_policy.with_check, v_policy.qual)) else '' end
       );
     end loop;
   end loop;

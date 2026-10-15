@@ -2,8 +2,7 @@ import type { SupabaseClient } from "./deps.ts";
 import { SERVICE_ROLE_KEY } from "./config.ts";
 import { corsHeaders } from "./http.ts";
 import { timingSafeEqual } from "../_shared/auth.ts";
-
-const SERVICE_CALLER_ID = '00000000-0000-0000-0000-000000000000';
+import { SERVICE_CALLER_ID } from "./serviceCaller.ts";
 
 const isServiceToken = (token: string): boolean => {
   const internal = Deno.env.get('PUSH_INTERNAL_TOKEN') || '';

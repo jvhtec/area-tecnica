@@ -207,7 +207,8 @@ const ProjectManagement = () => {
     clearProducers,
     filterByProducer,
   } = useProducerFilter(optimizedJobs, user?.id);
-  const visibleJobs = filterByProducer(jobs);
+  // A job opened from its setup workflow stays visible whatever producer is filtered.
+  const visibleJobs = focusedSetupJobId ? jobs : filterByProducer(jobs);
   const producerFilterProps = {
     options: producerOptions,
     selectedProducerIds,
