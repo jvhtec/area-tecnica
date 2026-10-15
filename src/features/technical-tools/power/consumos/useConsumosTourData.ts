@@ -34,10 +34,8 @@ import {
   getStringField,
   toStoredPowerFields,
 } from "./consumosStoredPower";
-import {
-  downloadPdfBlob,
-  type ConsumosJob,
-} from "./consumosUtils";
+import type { ConsumosJob } from "./consumosUtils";
+import { downloadPdfBlob } from "@/utils/pdf/downloadPdfBlob";
 import { jobPowerRequirementTablesQueryKey } from "./useJobPowerRequirementTables";
 
 type EditingTarget =

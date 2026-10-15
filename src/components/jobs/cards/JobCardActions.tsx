@@ -17,6 +17,7 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { withProjectManagementReturn } from "@/features/setup-workflows/returnNavigation";
 
 export type { JobCardActionsProps };
 
@@ -143,8 +144,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       default:
         path = type === "pesos" ? "/sound/pesos" : "/sound/consumos";
     }
-    navigate(`${path}?${params.toString()}`);
-  }, [department, job.id, navigate]);
+    const href = `${path}?${params.toString()}`;
+    navigate(isProjectManagementPage ? withProjectManagementReturn(href) : href);
+  }, [department, isProjectManagementPage, job.id, navigate]);
 
   const navigateToMemoria = React.useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

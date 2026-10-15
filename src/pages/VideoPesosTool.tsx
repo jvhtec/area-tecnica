@@ -8,12 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
+import { downloadPdfBlob } from '@/utils/pdf/downloadPdfBlob';
 import { getJobTechnicalPdfFileName } from '@/utils/technicalPdfNames';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { DocumentationJobPicker } from '@/features/technical-tools/jobs/DocumentationJobPicker';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getSetupReturnPath } from '@/features/setup-workflows/returnNavigation';
+import { getCalculatorReturnPath } from '@/features/setup-workflows/returnNavigation';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
@@ -58,7 +59,7 @@ const VideoPesosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
-  const setupReturnPath = getSetupReturnPath(searchParams);
+  const returnPath = getCalculatorReturnPath(searchParams);
   const jobIdFromUrl = searchParams.get('jobId');
   
   // Tour override mode detection
@@ -328,14 +329,7 @@ const VideoPesosTool: React.FC = () => {
       );
 
       const fileName = getJobTechnicalPdfFileName('video', jobToUse.title, 'weight');
-      const url = window.URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadPdfBlob(pdfBlob, fileName);
 
       toast({
         title: 'Success',
@@ -382,7 +376,7 @@ const VideoPesosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate(setupReturnPath ?? '/video')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(returnPath ?? '/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <CardTitle className="text-2xl font-bold">

@@ -12,14 +12,3 @@ export type ConsumosJob = {
   } | null;
   location?: { name?: string } | null;
 };
-
-export const downloadPdfBlob = (pdfBlob: Blob, fileName: string) => {
-  const url = window.URL.createObjectURL(pdfBlob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(anchor);
-};

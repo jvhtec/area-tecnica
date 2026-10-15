@@ -412,6 +412,32 @@ describe('JobCardActions', () => {
     vi.restoreAllMocks();
   });
 
+
+  describe('calculator return navigation (#1005)', () => {
+    it.each([
+      ['sound', '/sound/pesos', '/sound/consumos'],
+      ['lights', '/lights-pesos-tool', '/lights-consumos-tool'],
+      ['video', '/video-pesos-tool', '/video-consumos-tool'],
+    ] as const)('preserves project-management origin for %s calculators', (department, weightsPath, powerPath) => {
+      render(<JobCardActions {...defaultProps} department={department} />);
+
+      fireEvent.click(screen.getByTitle('Calculadora de Pesos'));
+      expect(navigateMock).toHaveBeenLastCalledWith(
+        `${weightsPath}?jobId=test-job-id&projectReturnTo=%2Fproject-management`,
+      );
+      fireEvent.click(screen.getByTitle('Calculadora de Consumos'));
+      expect(navigateMock).toHaveBeenLastCalledWith(
+        `${powerPath}?jobId=test-job-id&projectReturnTo=%2Fproject-management`,
+      );
+    });
+
+    it('does not offer project-card calculators outside Project Management', () => {
+      render(<JobCardActions {...defaultProps} isProjectManagementPage={false} department="sound" />);
+      expect(screen.queryByTitle('Calculadora de Pesos')).not.toBeInTheDocument();
+      expect(screen.queryByTitle('Calculadora de Consumos')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Sound XMLP Flex job action', () => {
     it('renders only on the Sound department job card', () => {
       const { rerender } = render(<JobCardActions {...defaultProps} department="sound" />);
