@@ -155,9 +155,13 @@ async function readForm(req: Request): Promise<FormData> {
   try { return await safeRequest.formData(); } catch { throw new ApiError(400, "invalid_form_data"); }
 }
 function fileName(value: string): string {
-  // Keep human-readable original name. A slash or control character cannot
-  // legitimately belong to an iOS filename. Never use this name as a path.
-  if (!value || value.length > 255 || /[\\/\x00-\x1F\x7F]/.test(value) || value === "." || value === "..") {
+  // Keep the exact display filename, but do not allow path separators or
+  // control characters. The storage object key is generated separately.
+  const invalid = [...value].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 || code === 47 || code === 92;
+  });
+  if (!value || value.length > 255 || invalid || value === "." || value === "..") {
     throw new ApiError(400, "invalid_file_name");
   }
   return value;
