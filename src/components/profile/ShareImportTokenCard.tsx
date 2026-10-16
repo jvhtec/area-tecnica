@@ -11,7 +11,7 @@ type Device = {
   id: string;
   label: string;
   created_at: string;
-  expires_at: string;
+  expires_at: string | null;
   revoked_at: string | null;
   last_used_at: string | null;
 };
@@ -100,7 +100,7 @@ export function ShareImportTokenCard() {
         <CardTitle>Importar documentos desde iOS</CardTitle>
         <CardDescription>
           Vincula un atajo de iPhone para enviar adjuntos de Outlook a un trabajo.
-          El permiso sirve solo para importar documentos y caduca en 90 días.
+          El permiso sirve solo para importar documentos y no caduca; puedes revocarlo cuando quieras.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -145,13 +145,14 @@ export function ShareImportTokenCard() {
           {!loaded && <Loader2 className="h-4 w-4 animate-spin" />}
           {loaded && devices.length === 0 && <p className="text-xs text-muted-foreground">Ninguno todavía</p>}
           {devices.map((device) => {
-            const inactive = Boolean(device.revoked_at) || new Date(device.expires_at).getTime() <= Date.now();
+            const inactive = Boolean(device.revoked_at)
+              || (device.expires_at !== null && new Date(device.expires_at).getTime() <= Date.now());
             return (
               <div key={device.id} className="flex items-center justify-between gap-2 rounded border p-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{device.label}</div>
                   <div className="text-xs text-muted-foreground">
-                    {inactive ? "Inactivo" : `Válido hasta ${new Date(device.expires_at).toLocaleDateString("es-ES")}`}
+                    {inactive ? "Inactivo" : device.expires_at ? `Válido hasta ${new Date(device.expires_at).toLocaleDateString("es-ES")}` : "Sin caducidad"}
                     {device.last_used_at && ` · Último uso ${new Date(device.last_used_at).toLocaleDateString("es-ES")}`}
                   </div>
                 </div>

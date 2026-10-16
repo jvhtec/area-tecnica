@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(12);
+SELECT plan(13);
 
 SELECT has_table('public', 'ios_share_import_tokens', 'token table exists');
 SELECT has_table('public', 'ios_share_import_receipts', 'receipt table exists');
@@ -75,7 +75,13 @@ SELECT throws_ok(
 INSERT INTO public.ios_share_import_tokens (id, user_id, token_hash, expires_at)
 VALUES (
   '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a1',
-  repeat('b', 64), now() + interval '90 days'
+  repeat('b', 64), NULL
+);
+
+SELECT is(
+  (SELECT expires_at FROM public.ios_share_import_tokens WHERE id = '00000000-0000-4000-8000-0000000000b1'),
+  NULL::timestamptz,
+  'a token may be created without an expiry'
 );
 
 SELECT throws_ok(

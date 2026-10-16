@@ -37,7 +37,7 @@ adjunto por ejecución.
 En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**:
 
 1. Crear conexión «Mi iPhone». Copiar la clave `ati_...` **una sola vez**.
-   Las claves caducan en 90 días y se pueden revocar desde el perfil.
+   Las claves no caducan; se revocan desde el perfil cuando haga falta.
 2. Copiar la dirección de la API, terminada en
    `/functions/v1/ios-share-import`.
 3. En la app **Atajos**, editar «Enviar a área técnica», activar **Mostrar en

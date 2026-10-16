@@ -7,12 +7,13 @@ create table if not exists public.ios_share_import_tokens (
   label text not null default 'iPhone',
   token_hash text not null unique,
   created_at timestamptz not null default now(),
-  expires_at timestamptz not null,
+  -- Null = never expires; a device credential lives until it is revoked.
+  expires_at timestamptz,
   revoked_at timestamptz,
   last_used_at timestamptz,
   constraint ios_share_import_token_hash_shape check (token_hash ~ '^[0-9a-f]{64}$'),
   constraint ios_share_import_token_label_length check (length(label) between 1 and 80),
-  constraint ios_share_import_expiry_after_create check (expires_at > created_at)
+  constraint ios_share_import_expiry_after_create check (expires_at is null or expires_at > created_at)
 );
 create index if not exists ios_share_import_tokens_by_user
   on public.ios_share_import_tokens (user_id, created_at desc);

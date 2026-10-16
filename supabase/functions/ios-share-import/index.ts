@@ -11,7 +11,6 @@ import { escapeLike, type JobRow, jobOption, objectPath, STALE_UPLOAD_MS, validF
 // the user's normal Supabase JWT and never returns existing token secrets.
 const ALLOWED_ROLES = new Set(["admin", "management", "logistics", "house_tech"]);
 const DEPARTMENTS = new Set(["sound", "lights", "video", "production", "personnel", "logistics", "administrative"]);
-const TOKEN_TTL_DAYS = 90;
 const MAX_ACTIVE_TOKENS = 5;
 const MAX_FILE_BYTES = 45 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = MAX_FILE_BYTES + 1024 * 1024;
@@ -93,7 +92,8 @@ async function shortcutIdentity(req: Request, admin: DB): Promise<Identity> {
     .select("id,user_id,expires_at,revoked_at")
     .eq("token_hash", tokenHash).maybeSingle();
   requireResult(error);
-  if (!data || data.revoked_at || Date.parse(data.expires_at) <= Date.now()) {
+  // expires_at is null for the default non-expiring device credential.
+  if (!data || data.revoked_at || (data.expires_at && Date.parse(data.expires_at) <= Date.now())) {
     throw new ApiError(401, "expired_or_revoked_token");
   }
   const role = await currentRole(admin, data.user_id);
@@ -169,13 +169,12 @@ async function pair(req: Request, admin: DB, body: Record<string, unknown>): Pro
   if (!label) throw new ApiError(400, "invalid_label");
   const { count, error: countError } = await admin.from("ios_share_import_tokens")
     .select("id", { count: "exact", head: true }).eq("user_id", user.id)
-    .is("revoked_at", null).gt("expires_at", new Date().toISOString());
+    .is("revoked_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
   requireResult(countError);
   if ((count || 0) >= MAX_ACTIVE_TOKENS) throw new ApiError(409, "too_many_devices");
   const secret = `ati_${hexRandom(32)}`;
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_DAYS * 86_400_000).toISOString();
   const { data, error } = await admin.from("ios_share_import_tokens")
-    .insert({ user_id: user.id, label, token_hash: await sha256(secret), expires_at: expiresAt })
+    .insert({ user_id: user.id, label, token_hash: await sha256(secret), expires_at: null })
     .select("id,label,expires_at").single();
   requireResult(error);
   return json({ ok: true, token: secret, device: data }, 201);
