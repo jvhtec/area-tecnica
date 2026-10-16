@@ -112,7 +112,8 @@ async function readJson(req: Request): Promise<Record<string, unknown>> {
       if (total > 8_192) { await reader.cancel(); throw new ApiError(413, "body_too_large"); }
       chunks.push(value);
     }
-    raw = new TextDecoder().decode(new Blob(chunks) ? await new Blob(chunks).arrayBuffer() : new Uint8Array());
+    const decoder = new TextDecoder();
+    raw = chunks.map((part, i) => decoder.decode(part, { stream: i !== chunks.length - 1 })).join("");
   }
   let body: unknown;
   try { body = JSON.parse(raw); } catch { throw new ApiError(400, "invalid_json"); }
@@ -257,9 +258,6 @@ async function upload(req: Request, admin: DB): Promise<Response> {
   if (existing?.document_id) {
     return json({ ok: true, document_id: existing.document_id, file_name: name, reused: true });
   }
-  if (existing && Date.now() - Date.parse(existing.created_at) < 120_000) {
-    throw new ApiError(409, "upload_in_progress");
-  }
   const path = existing?.file_path || objectPath(dept, jobId, name, crypto.randomUUID());
   let receipt: Receipt;
   if (existing) {
@@ -273,6 +271,9 @@ async function upload(req: Request, admin: DB): Promise<Response> {
         .update({ document_id: orphanedRow.id, completed_at: new Date().toISOString() }).eq("id", receipt.id);
       requireResult(error);
       return json({ ok: true, document_id: orphanedRow.id, file_name: name, reused: true });
+    }
+    if (Date.now() - Date.parse(existing.created_at) < 120_000) {
+      throw new ApiError(409, "upload_in_progress");
     }
     // The abandoned upload is older than 2 minutes and has no metadata row.
     const { error: removeError } = await admin.storage.from("job_documents").remove([path]);
