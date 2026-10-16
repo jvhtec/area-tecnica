@@ -144,7 +144,12 @@ async function readForm(req: Request): Promise<FormData> {
   const safeRequest = new Request(req.url, {
     method: "POST",
     headers: { "content-type": type },
-    body: new Blob(chunks),
+    // Copy the pooled stream chunks into owned ArrayBuffers for strict Deno BlobPart typing.
+    body: new Blob(chunks.map((chunk) => {
+      const bytes = new Uint8Array(chunk.byteLength);
+      bytes.set(chunk);
+      return bytes.buffer;
+    })),
   });
   try { return await safeRequest.formData(); } catch { throw new ApiError(400, "invalid_form_data"); }
 }
