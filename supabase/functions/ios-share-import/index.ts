@@ -3,6 +3,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
+import { joinedSingle } from "../_shared/joins.ts";
+import { escapeLike, type JobRow, jobOption, objectPath, STALE_UPLOAD_MS, validFileName } from "./helpers.ts";
 
 // Native Shortcuts callers cannot use the PWA's Supabase session. They use an
 // opaque, revocable, import-only token in X-Share-Token. Pair/revoke requires
@@ -95,9 +97,11 @@ async function shortcutIdentity(req: Request, admin: DB): Promise<Identity> {
     throw new ApiError(401, "expired_or_revoked_token");
   }
   const role = await currentRole(admin, data.user_id);
-  // Non-critical bookkeeping must never interfere with a completed upload.
-  void admin.from("ios_share_import_tokens").update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id).then(({ error: e }) => { if (e) logEvent("warn", "ios_share_import.last_used_update_failed"); });
+  // Non-critical bookkeeping must never fail an upload, but it is awaited:
+  // the runtime may drop a floating promise once the response is sent.
+  const { error: touchError } = await admin.from("ios_share_import_tokens")
+    .update({ last_used_at: new Date().toISOString() }).eq("id", data.id);
+  if (touchError) logEvent("warn", "ios_share_import.last_used_update_failed");
   return { id: data.user_id, role, tokenId: data.id };
 }
 async function readJson(req: Request): Promise<Record<string, unknown>> {
@@ -155,22 +159,9 @@ async function readForm(req: Request): Promise<FormData> {
   try { return await safeRequest.formData(); } catch { throw new ApiError(400, "invalid_form_data"); }
 }
 function fileName(value: string): string {
-  // Keep the exact display filename, but do not allow path separators or
-  // control characters. The storage object key is generated separately.
-  const invalid = [...value].some((character) => {
-    const code = character.charCodeAt(0);
-    return code < 32 || code === 127 || code === 47 || code === 92;
-  });
-  if (!value || value.length > 255 || invalid || value === "." || value === "..") {
-    throw new ApiError(400, "invalid_file_name");
-  }
-  return value;
-}
-function objectPath(dept: string, jobId: string, name: string, objectId: string): string {
-  // Storage key is separate from file_name. Unknown and Unicode extensions
-  // are allowed; the key safely omits characters unsuitable for Storage.
-  const suffix = name.includes(".") ? name.split(".").at(-1)?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "";
-  return `${dept}/${jobId}/${objectId}${suffix ? "." + suffix : ""}`;
+  const name = validFileName(value);
+  if (!name) throw new ApiError(400, "invalid_file_name");
+  return name;
 }
 async function pair(req: Request, admin: DB, body: Record<string, unknown>): Promise<Response> {
   const user = await sessionIdentity(req, admin);
@@ -209,34 +200,56 @@ async function revoke(req: Request, admin: DB, body: Record<string, unknown>): P
   if (!data) throw new ApiError(404, "token_not_found");
   return json({ ok: true, revoked: tokenId });
 }
+const JOB_COLUMNS = "id,title,start_time,job_type,tour_id,tour_date_id,status,tour:tours(name)";
+type JobQueryRow = Omit<JobRow, "tourName"> & { tour?: { name: string | null } | { name: string | null }[] | null };
+
 async function jobs(req: Request, admin: DB): Promise<Response> {
   await shortcutIdentity(req, admin);
   const url = new URL(req.url);
   const search = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  let query = admin.from("jobs")
-    .select("id,title,start_time,job_type,tour_id,tour_date_id,status");
+  const notCancelled = "status.is.null,status.neq.Cancelado";
+  let rows: JobQueryRow[];
   if (search) {
-    // Escape LIKE metacharacters, retaining literal title searching.
-    const literal = search.replace(/[\\%_]/g, "\\$&");
-    query = query.ilike("title", `%${literal}%`).order("start_time", { ascending: false });
+    // Match the job title or its tour name; LIKE metacharacters stay literal.
+    const pattern = `%${escapeLike(search)}%`;
+    const byTitle = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
+      .ilike("title", pattern).order("start_time", { ascending: false }).limit(100);
+    requireResult(byTitle.error);
+    const { data: tours, error: toursError } = await admin.from("tours").select("id")
+      .ilike("name", pattern).limit(50);
+    requireResult(toursError);
+    const tourIds = (tours ?? []).map((tour) => tour.id as string);
+    let byTour: JobQueryRow[] = [];
+    if (tourIds.length > 0) {
+      const result = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
+        .in("tour_id", tourIds).order("start_time", { ascending: false }).limit(100);
+      requireResult(result.error);
+      byTour = (result.data ?? []) as unknown as JobQueryRow[];
+    }
+    const merged = new Map<string, JobQueryRow>();
+    for (const row of [...((byTitle.data ?? []) as unknown as JobQueryRow[]), ...byTour]) merged.set(row.id, row);
+    rows = [...merged.values()]
+      .sort((a, b) => String(b.start_time ?? "").localeCompare(String(a.start_time ?? "")))
+      .slice(0, 100);
   } else {
     const oldest = new Date(Date.now() - 14 * 86_400_000).toISOString();
-    query = query.gte("start_time", oldest).order("start_time", { ascending: true });
+    const { data, error } = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
+      .gte("start_time", oldest).order("start_time", { ascending: true }).limit(100);
+    requireResult(error);
+    rows = (data ?? []) as unknown as JobQueryRow[];
   }
-  const { data, error } = await query.limit(100);
-  requireResult(error);
-  const rows = (data ?? []).map((job) => {
-    const date = job.start_time ? String(job.start_time).slice(0, 10) : "sin fecha";
-    const title = String(job.title ?? "Sin título").replace(/[\r\n|]/g, " ").slice(0, 110);
-    const type = job.job_type === "tourdate" ? "Fecha de gira" : String(job.job_type || "Trabajo");
+  const result = rows.map((job) => {
+    const { tour, ...rest } = job;
+    const tourName = joinedSingle(tour)?.name ?? null;
     return {
-      id: job.id, title: job.title, date, job_type: job.job_type,
-      tour_id: job.tour_id, tour_date_id: job.tour_date_id,
-      // Human-readable label first; Shortcuts takes Last Item after splitting by " | ".
-      option: `${date} | ${type} | ${title} | ${job.id}`,
+      id: job.id, title: job.title,
+      date: job.start_time ? String(job.start_time).slice(0, 10) : "sin fecha",
+      job_type: job.job_type, tour_id: job.tour_id, tour_date_id: job.tour_date_id,
+      tour_name: tourName,
+      option: jobOption({ ...rest, tourName }),
     };
   });
-  return json({ ok: true, jobs: rows, options: rows.map((row) => row.option) });
+  return json({ ok: true, jobs: result, options: result.map((row) => row.option) });
 }
 async function upload(req: Request, admin: DB): Promise<Response> {
   const actor = await shortcutIdentity(req, admin);
@@ -291,10 +304,10 @@ async function upload(req: Request, admin: DB): Promise<Response> {
       requireResult(error);
       return json({ ok: true, document_id: orphanedRow.id, file_name: name, reused: true });
     }
-    if (Date.now() - Date.parse(existing.created_at) < 120_000) {
+    if (Date.now() - Date.parse(existing.created_at) < STALE_UPLOAD_MS) {
       throw new ApiError(409, "upload_in_progress");
     }
-    // The abandoned upload is older than 2 minutes and has no metadata row.
+    // The abandoned upload is older than STALE_UPLOAD_MS and has no metadata row.
     const { error: removeError } = await admin.storage.from("job_documents").remove([path]);
     if (removeError) throw new ApiError(503, "stale_upload_cleanup_failed");
   } else {
@@ -320,7 +333,7 @@ async function upload(req: Request, admin: DB): Promise<Response> {
       .insert({
         job_id: jobId, file_name: name, file_path: path,
         file_type: mime, file_size: file.size, uploaded_by: actor.id,
-        original_type: null, visible_to_tech: true,
+        original_type: null,
       }).select("id").single();
     if (insertError || !inserted) {
       await admin.storage.from("job_documents").remove([path]);
@@ -331,6 +344,15 @@ async function upload(req: Request, admin: DB): Promise<Response> {
       .update({ document_id: inserted.id, completed_at: new Date().toISOString() })
       .eq("id", receipt.id);
     requireResult(confirmationError, "receipt_confirmation_failed");
+    // Same notification the web upload broadcasts; best-effort by design.
+    try {
+      const { error: pushError } = await admin.functions.invoke("push", {
+        body: { action: "broadcast", type: "document.uploaded", job_id: jobId, file_name: name, actor_id: actor.id },
+      });
+      if (pushError) logEvent("warn", "ios_share_import.push_failed");
+    } catch {
+      logEvent("warn", "ios_share_import.push_failed");
+    }
     return json({ ok: true, document_id: inserted.id, job_id: jobId, department: dept, file_name: name }, 201);
   } catch (error) {
     // On a failed upload/DB insert there is no durable document. Release

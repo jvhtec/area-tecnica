@@ -52,7 +52,8 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    - Método: `GET`
    - Cabecera: `X-Share-Token` → `ClaveImportación`
 7. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
-   Las opciones tienen forma `<fecha> | <tipo> | <título> | <UUID>`.
+   Las opciones tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
+   muestran el nombre de la gira, p. ej. `Fecha de gira (Gira Verano)`.
    Dividir el elemento elegido por ` | ` y tomar **último elemento** como
    `job_id`. Si necesitas trabajos antiguos, usar una URL de búsqueda:
    `<API>?action=jobs&q=<texto codificado como URL>`.
@@ -90,8 +91,9 @@ con riders de producción.
 
 `GET ?action=jobs[&q=texto]`, cabecera `X-Share-Token: ati_...`:
 `{ok,jobs:[{id,title,date,job_type,tour_id,tour_date_id,option}], options:[...]}`.
-La lista inicial muestra 14 días anteriores y siguientes disponibles (hasta
-100 filas). Con `q` busca por título independientemente de la fecha.
+La lista inicial muestra los trabajos de los últimos 14 días y futuros (hasta
+100 filas). Con `q` busca por título **o nombre de gira**, independientemente de
+la fecha. Los trabajos cancelados no aparecen.
 
 `POST` con cabecera `X-Share-Token`, cuerpo multipart:
 `file` (binario), `file_name`, `job_id` (UUID), `department`,
@@ -117,6 +119,17 @@ recomprueba el rol actual del usuario y que el trabajo existe.
 - Probar separación entre diferentes fechas de gira.
 - Antes de operar sobre archivos mayores que 45 MiB, añadir sesión de subida
   directa/resumible. No elevar el límite sin probar memoria y timeouts.
+
+## Comportamiento al importar
+
+- El documento se crea **oculto para técnicos** (`visible_to_tech = false`, igual
+  que la subida desde la web); se activa desde la tarjeta del trabajo.
+- Tras confirmar la importación se emite la notificación `document.uploaded`,
+  igual que en la subida web (best-effort: un fallo de push no falla la subida).
+- Una petición con el mismo `request_id` que quedó a medias se considera
+  abandonada a los 10 minutos; antes responde 409 `upload_in_progress`.
+- Cualquier rol permitido (admin, management, logistics, house_tech) puede
+  importar a cualquier trabajo, igual que las políticas de Storage de la web.
 
 ## Riesgos y mantenimiento
 
