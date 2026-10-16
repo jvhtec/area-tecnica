@@ -232,8 +232,8 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
     return {
       id: job.id, title: job.title, date, job_type: job.job_type,
       tour_id: job.tour_id, tour_date_id: job.tour_date_id,
-      // First field is UUID so Shortcuts can Split Text by " | " and take First Item.
-      option: `${job.id} | ${date} | ${type} | ${title}`,
+      // Human-readable label first; Shortcuts takes Last Item after splitting by " | ".
+      option: `${date} | ${type} | ${title} | ${job.id}`,
     };
   });
   return json({ ok: true, jobs: rows, options: rows.map((row) => row.option) });
