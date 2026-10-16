@@ -45,12 +45,17 @@ SELECT u.id, '00000000-0000-0000-0000-000000000000'::uuid, u.email, 'test', now(
 FROM (VALUES
   ('e5100000-0000-0000-0000-000000000001'::uuid, 'skills-lights-manager@test.local'),
   ('e5100000-0000-0000-0000-000000000002'::uuid, 'skills-sound-tech@test.local')
-) AS u(id, email);
+) AS u(id, email)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (id, email, first_name, last_name, role, department)
 VALUES
   ('e5100000-0000-0000-0000-000000000001'::uuid, 'skills-lights-manager@test.local', 'Luz', 'Gestora', 'management', 'lights'),
-  ('e5100000-0000-0000-0000-000000000002'::uuid, 'skills-sound-tech@test.local', 'Sonia', 'Técnica', 'technician', 'sound');
+  ('e5100000-0000-0000-0000-000000000002'::uuid, 'skills-sound-tech@test.local', 'Sonia', 'Técnica', 'technician', 'sound')
+-- The auth.users trigger already created both profiles.
+ON CONFLICT (id) DO UPDATE
+SET role = excluded.role,
+    department = excluded.department;
 
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT set_config('request.jwt.claim.sub', 'e5100000-0000-0000-0000-000000000001', true);
