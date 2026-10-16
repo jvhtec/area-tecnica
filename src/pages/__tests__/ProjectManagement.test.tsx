@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import ProjectManagement from "../ProjectManagement";
 
 const mockNavigate = vi.fn();
+vi.mock("@/features/jobs/job-card-new/useJobCardsRealtime", () => ({ useJobCardsRealtime: () => undefined }));
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {

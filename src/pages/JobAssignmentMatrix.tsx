@@ -17,6 +17,7 @@ import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignm
 import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
 import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
 import { formatMadridDateKey } from '@/utils/timezoneUtils';
+import { useMatrixJobsRealtime } from '@/pages/job-assignment-matrix/useMatrixJobsRealtime';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -39,6 +40,7 @@ import { queryKeys } from "@/lib/react-query";
 
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
+  useMatrixJobsRealtime();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
   const { user, userDepartment, userRole } = useOptimizedAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
@@ -605,6 +607,7 @@ export default function JobAssignmentMatrix() {
     await Promise.all([
       qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') }),
       qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') }),
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-jobs') }),
     ]);
 
     // Dispatch the assignment update event to force refresh
