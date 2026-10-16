@@ -9,6 +9,8 @@ import {
 import {
   buildMissingCampaignRoleInserts,
   buildRequiredRoleQuantityMap,
+  campaignClosureReason,
+  campaignRoleChanged,
   canResumeCampaignStatus,
 } from "./orchestrationUtils.ts";
 import { finalizeCampaignTick } from "./campaignFinalization.ts";
@@ -566,6 +568,40 @@ async function tickCampaign(
       return { status: 400, body: { error: 'Campaign not active' } };
     }
 
+    // A campaign whose job is over (ended, cancelled, completed or deleted) can no longer
+    // staff anything; stop it instead of ticking it every few minutes forever.
+    const { data: campaignJob, error: campaignJobError } = await supabase
+      .from('jobs')
+      .select('end_time, status')
+      .eq('id', campaign.job_id)
+      .maybeSingle();
+
+    if (campaignJobError) {
+      return { status: 500, body: { error: campaignJobError.message } };
+    }
+
+    const closureReason = campaignClosureReason(campaignJob, now);
+    if (closureReason) {
+      const { error: closeError } = await supabase
+        .from('staffing_campaigns')
+        .update({ status: 'stopped', run_lock: null, next_run_at: null, updated_at: now.toISOString() })
+        .eq('id', campaign_id)
+        .eq('status', 'active');
+
+      if (closeError) {
+        return { status: 500, body: { error: closeError.message } };
+      }
+
+      const { error: eventError } = await supabase
+        .from('staffing_campaign_events')
+        .insert({ campaign_id, phase: 'system', reasons: { closed: closureReason } });
+      if (eventError) {
+        console.warn(`[staffing-orchestrator] Could not log closure of ${campaign_id}: ${eventError.message}`);
+      }
+
+      return { status: 200, body: { campaign_id, closed: closureReason } };
+    }
+
     // Check if already locked (crash recovery: >15min assumed dead)
     if (campaign.run_lock && campaign.last_run_at) {
       const lockAgeMin =
@@ -1081,8 +1117,12 @@ async function tickCampaign(
       });
     }
 
-    // Apply updates
+    // Apply updates, skipping roles whose counters did not change.
+    const currentRolesById = new Map((syncedCampaignRoles as any[]).map((role) => [role.id, role]));
     for (const update of updates) {
+      const currentRole = currentRolesById.get(update.id);
+      if (currentRole && !campaignRoleChanged(currentRole, update)) continue;
+
       const { error: roleUpdateError } = await supabase
         .from('staffing_campaign_roles')
         .update({

@@ -70,3 +70,66 @@ export function buildMissingCampaignRoleInserts(
       accepted_offers: 0,
     }));
 }
+
+export type CampaignJobLike = {
+  end_time?: string | null;
+  status?: string | null;
+} | null;
+
+export type CampaignClosureReason = "job_missing" | "job_cancelled" | "job_completed" | "job_ended";
+
+const CANCELLED_JOB_STATUSES = new Set(["cancelado", "cancelled"]);
+const COMPLETED_JOB_STATUSES = new Set(["completado", "completed"]);
+
+/**
+ * Why an active campaign can no longer staff its job, or null while it still
+ * can: the job was deleted, cancelled, marked completed, or its dates passed.
+ * A campaign for a job that is over keeps ticking forever otherwise.
+ */
+export function campaignClosureReason(job: CampaignJobLike, now: Date): CampaignClosureReason | null {
+  if (!job) return "job_missing";
+  const status = String(job.status || "").trim().toLowerCase();
+  if (CANCELLED_JOB_STATUSES.has(status)) return "job_cancelled";
+  if (COMPLETED_JOB_STATUSES.has(status)) return "job_completed";
+  if (job.end_time && new Date(job.end_time).getTime() < now.getTime()) return "job_ended";
+  return null;
+}
+
+export type CampaignRoleCounters = {
+  assigned_count?: unknown;
+  pending_availability?: unknown;
+  confirmed_availability?: unknown;
+  pending_offers?: unknown;
+  accepted_offers?: unknown;
+  stage?: unknown;
+  wave_number?: unknown;
+  last_wave_at?: unknown;
+};
+
+const ROLE_COUNTER_FIELDS = [
+  "assigned_count",
+  "pending_availability",
+  "confirmed_availability",
+  "pending_offers",
+  "accepted_offers",
+  "stage",
+  "wave_number",
+] as const;
+
+const instant = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const time = new Date(String(value)).getTime();
+  return Number.isNaN(time) ? null : time;
+};
+
+/**
+ * True when a tick's computed counters differ from the stored role row.
+ * Ticks run every few minutes, so writing unchanged rows only produced
+ * WAL and realtime traffic.
+ */
+export function campaignRoleChanged(current: CampaignRoleCounters, next: CampaignRoleCounters): boolean {
+  for (const field of ROLE_COUNTER_FIELDS) {
+    if (String(current[field] ?? "") !== String(next[field] ?? "")) return true;
+  }
+  return instant(current.last_wave_at) !== instant(next.last_wave_at);
+}
