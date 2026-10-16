@@ -36,6 +36,11 @@ FROM unnest(ARRAY['skills', 'role_skill_mapping']) AS t;
 
 
 -- Per-department creation through RLS.
+-- Seed as service_role: the profile privilege trigger refuses role changes
+-- from an unauthenticated session.
+SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at, created_at,
   updated_at, raw_app_meta_data, raw_user_meta_data, aud, role
