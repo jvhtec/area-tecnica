@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, tourDocumentPath, upcomingCutoffIso,
+  acceptsRiders, escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, tourDocumentPath, upcomingCutoffIso,
   validArtistName, validFileName, validIsoDate,
 } from './helpers'
 
@@ -78,6 +78,15 @@ describe('tourDocumentPath', () => {
   it('matches the web tour-documents layout and keeps the extension', () => {
     expect(tourDocumentPath('tour-1', 'Rider gira.pdf', 'obj')).toBe('tours/tour-1/obj.pdf')
     expect(tourDocumentPath('tour-1', 'sin extension', 'obj')).toBe('tours/tour-1/obj')
+  })
+})
+
+describe('acceptsRiders', () => {
+  it('excludes dry hire but accepts every other job type', () => {
+    expect(acceptsRiders('dryhire')).toBe(false)
+    for (const type of ['festival', 'evento', 'single', 'ciclo', 'tour', 'tourdate', null]) {
+      expect(acceptsRiders(type)).toBe(true)
+    }
   })
 })
 

@@ -60,7 +60,8 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    - Cabecera: `X-Share-Token` → `ClaveImportación`
 8. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
    Solo aparecen trabajos **próximos o en curso**, sin cancelados ni
-   completados. Las opciones
+   completados. Con `destination=rider` tampoco aparecen los trabajos de
+   *dry hire* (no tienen artistas). Las opciones
    tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
    muestran el nombre de la gira, p. ej. `Fecha de gira (Gira Verano)`.
    Dividir el elemento elegido por ` | ` y tomar **último elemento** como
@@ -145,14 +146,15 @@ recomprueba el rol actual del usuario y que el trabajo existe.
   correctos) con el archivo asociado y el rider como «Completo».
 - Rider repetido para el mismo artista y fecha: se añade al artista existente
   sin duplicarlo. Rider a una fecha de gira: aparece en los documentos de gira,
-  sin artista nuevo. Rider a un evento o single: crea el artista en su tabla.
+  sin artista nuevo. Rider a un evento o single: crea el artista en su tabla. Rider a un dry hire:
+  rechazado y sin archivo persistido.
 - La lista no muestra trabajos cancelados, completados ni ya terminados.
 - Antes de operar sobre archivos mayores que 45 MiB, añadir sesión de subida
   directa/resumible. No elevar el límite sin probar memoria y timeouts.
 
 ## Comportamiento al importar
 
-- **Rider (festival, evento, single, ciclo…):** si el trabajo ya tiene un
+- **Rider (festival, evento, single, ciclo…; nunca dry hire):** si el trabajo ya tiene un
   artista con ese nombre (sin distinguir mayúsculas) en esa fecha, el archivo
   se añade a ese artista; si no, se crea en la tabla de artistas del trabajo
   (escenario 1 por defecto) y se asocia como en el flujo normal. El rider queda en `festival_artist_files` bajo
@@ -163,6 +165,8 @@ recomprueba el rol actual del usuario y que el trabajo existe.
   `tours/<gira>/<uuid>.<ext>`), oculto para técnicos e invitados por defecto,
   con el nombre de archivo original. El nombre del artista se valida pero no
   se usa para crear nada.
+- Un rider a un trabajo **dry hire** se rechaza con `rider_not_allowed_for_job_type`;
+  los documentos de trabajo sí se admiten en dry hire.
 - El documento se crea **oculto para técnicos** (`visible_to_tech = false`, igual
   que la subida desde la web); se activa desde la tarjeta del trabajo.
 - Tras confirmar un documento se emite la notificación `document.uploaded`,

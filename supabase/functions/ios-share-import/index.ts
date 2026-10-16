@@ -5,8 +5,8 @@ import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import {
-  ApiError, type Destination, escapeLike, type JobRow, jobOption, STALE_UPLOAD_MS, upcomingCutoffIso,
-  validArtistName, validFileName, validIsoDate,
+  acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobOption, STALE_UPLOAD_MS, upcomingCutoffIso,
+  RIDER_EXCLUDED_JOB_TYPES, validArtistName, validFileName, validIsoDate,
 } from "./helpers.ts";
 import { documentTarget, type ImportTarget, riderTarget, tourDocumentTarget } from "./destinations.ts";
 
@@ -217,8 +217,13 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
   await shortcutIdentity(req, admin);
   const url = new URL(req.url);
   const search = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  const base = () =>
-    upcomingJobs(admin.from("jobs").select(JOB_COLUMNS)).order("start_time", { ascending: true }).limit(100);
+  // Riders have no place on dry hire jobs, so that destination does not offer them.
+  const forRider = url.searchParams.get("destination") === "rider";
+  const base = () => {
+    let query = upcomingJobs(admin.from("jobs").select(JOB_COLUMNS));
+    if (forRider) query = query.not("job_type", "in", `(${RIDER_EXCLUDED_JOB_TYPES.join(",")})`);
+    return query.order("start_time", { ascending: true }).limit(100);
+  };
   let rows: JobQueryRow[];
   if (search) {
     // Match the job title or its tour name; LIKE metacharacters stay literal.
@@ -339,6 +344,7 @@ async function upload(req: Request, admin: DB): Promise<Response> {
   requireResult(existingError);
   const existing = existingRow as Receipt | null;
   const kind = resolveKind(p, job.job_type);
+  if (kind !== "document" && !acceptsRiders(job.job_type)) throw new ApiError(400, "rider_not_allowed_for_job_type");
   if (existing && !sameRequest(existing, kind, p)) throw new ApiError(409, "idempotency_key_reused");
 
   const target: ImportTarget = kind === "document"

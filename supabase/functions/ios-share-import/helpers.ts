@@ -60,6 +60,13 @@ export class ApiError extends Error {
   constructor(public status: number, public code: string) { super(code); }
 }
 
+/** Dry hire jobs are equipment-only: they have no artists or riders. */
+export const RIDER_EXCLUDED_JOB_TYPES = ["dryhire"] as const;
+
+export function acceptsRiders(jobType: string | null): boolean {
+  return !(RIDER_EXCLUDED_JOB_TYPES as readonly string[]).includes(jobType ?? "");
+}
+
 export type Destination = "document" | "rider";
 
 /** Characters Storage keys can safely carry from the original extension. */
