@@ -52,8 +52,8 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    - Método: `GET`
    - Cabecera: `X-Share-Token` → `ClaveImportación`
 7. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
-   Las opciones tienen forma `<UUID> | <fecha> | <tipo> | <título>`.
-   Dividir el elemento elegido por ` | ` y tomar **primer elemento** como
+   Las opciones tienen forma `<fecha> | <tipo> | <título> | <UUID>`.
+   Dividir el elemento elegido por ` | ` y tomar **último elemento** como
    `job_id`. Si necesitas trabajos antiguos, usar una URL de búsqueda:
    `<API>?action=jobs&q=<texto codificado como URL>`.
 8. Usar «Elegir de menú» para departamento. Valores internos exactos:
