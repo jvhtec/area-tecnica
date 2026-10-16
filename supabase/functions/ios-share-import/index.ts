@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
+import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
 
 // Native Shortcuts callers cannot use the PWA's Supabase session. They use an
 // opaque, revocable, import-only token in X-Share-Token. Pair/revoke requires
@@ -235,6 +236,13 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
 }
 async function upload(req: Request, admin: DB): Promise<Response> {
   const actor = await shortcutIdentity(req, admin);
+  const quota = await checkEdgeRateLimit({
+    req, supabase: admin, scope: "ios-share-import.upload",
+    identifierParts: [actor.tokenId], includeIp: false, includeUserAgent: false,
+    windowSeconds: 3600, maxRequests: 120,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? getEnvironment("SUPABASE_SERVICE_ROLE_KEY"),
+  });
+  if (!quota.allowed) throw new ApiError(429, "rate_limited");
   const form = await readForm(req);
   const file = form.get("file");
   if (!(file instanceof File)) throw new ApiError(400, "missing_file");
@@ -332,6 +340,13 @@ async function upload(req: Request, admin: DB): Promise<Response> {
 serve(createHttpHandler(async (req: Request): Promise<Response> => {
   try {
     const admin = createAdmin();
+    // Public gateway: impose a durable ingress limit before token lookup or parsing.
+    const ingress = await checkEdgeRateLimit({
+      req, supabase: admin, scope: "ios-share-import.ingress",
+      windowSeconds: 60, maxRequests: 120,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? getEnvironment("SUPABASE_SERVICE_ROLE_KEY"),
+    });
+    if (!ingress.allowed) throw new ApiError(429, "rate_limited");
     const url = new URL(req.url);
     if (req.method === "GET" && url.searchParams.get("action") === "jobs") {
       return await jobs(req, admin);
