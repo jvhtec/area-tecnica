@@ -26,8 +26,7 @@ export function validFileName(value: string): string | null {
  * are allowed; the key keeps only characters that are safe for Storage.
  */
 export function objectPath(dept: string, jobId: string, name: string, objectId: string): string {
-  const suffix = name.includes(".") ? name.split(".").at(-1)?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "";
-  return `${dept}/${jobId}/${objectId}${suffix ? "." + suffix : ""}`;
+  return `${dept}/${jobId}/${objectId}${safeSuffix(name)}`;
 }
 
 export type JobRow = {
@@ -55,4 +54,56 @@ export function jobOption(job: JobRow): string {
     ? "Gira"
     : String(job.job_type || "Trabajo");
   return `${date} | ${type} | ${title} | ${job.id}`;
+}
+
+export class ApiError extends Error {
+  constructor(public status: number, public code: string) { super(code); }
+}
+
+export type Destination = "document" | "rider";
+
+/** Characters Storage keys can safely carry from the original extension. */
+function safeSuffix(name: string): string {
+  const suffix = name.includes(".") ? name.split(".").at(-1)?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "";
+  return suffix ? "." + suffix : "";
+}
+
+/** Rider objects live under the artist id, like the web upload (`<artist>/<uuid>.<ext>`). */
+export function riderPath(artistId: string, name: string, objectId: string): string {
+  return `${artistId}/${objectId}${safeSuffix(name)}`;
+}
+
+/** Artist names are free text; keep them single-line and bounded. Null when unusable. */
+export function validArtistName(value: string): string | null {
+  const name = value.replace(/\s+/g, " ").trim();
+  const invalid = [...name].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  return !name || name.length > 120 || invalid ? null : name;
+}
+
+/** Calendar date (YYYY-MM-DD) as written by the Shortcut; null unless it is a real date. */
+export function validIsoDate(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.toISOString().slice(0, 10) === value ? value : null;
+}
+
+const MADRID_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" });
+
+/** The Madrid calendar date (YYYY-MM-DD) of an instant. */
+export function madridDate(value: string | Date): string {
+  return MADRID_DATE.format(typeof value === "string" ? new Date(value) : value);
+}
+
+/**
+ * Start of "today" in Madrid, as an ISO instant, for the upcoming-jobs filter.
+ * Uses the summer offset (UTC+2), so in winter it errs an hour early, which
+ * only keeps a job that ended just before midnight visible a little longer.
+ */
+export function upcomingCutoffIso(now: Date = new Date()): string {
+  const [year, month, day] = madridDate(now).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day) - 2 * 3_600_000).toISOString();
 }

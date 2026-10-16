@@ -4,7 +4,11 @@ import { createHttpHandler } from "../_shared/http.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
 import { joinedSingle } from "../_shared/joins.ts";
-import { escapeLike, type JobRow, jobOption, objectPath, STALE_UPLOAD_MS, validFileName } from "./helpers.ts";
+import {
+  ApiError, type Destination, escapeLike, type JobRow, jobOption, STALE_UPLOAD_MS, upcomingCutoffIso,
+  validArtistName, validFileName, validIsoDate,
+} from "./helpers.ts";
+import { documentTarget, type ImportTarget, riderTarget } from "./destinations.ts";
 
 // Native Shortcuts callers cannot use the PWA's Supabase session. They use an
 // opaque, revocable, import-only token in X-Share-Token. Pair/revoke requires
@@ -28,13 +32,11 @@ type DB = SupabaseClient;
 type Identity = { id: string; role: string; tokenId?: string };
 type Receipt = {
   id: string; token_id: string; request_key: string; user_id: string;
-  job_id: string; department: string; file_name: string; file_path: string;
-  file_size: number; document_id: string | null; created_at: string;
+  job_id: string; destination: Destination; department: string | null; artist_name: string | null;
+  artist_id: string | null; file_name: string; file_path: string; file_size: number;
+  document_id: string | null; artist_file_id: string | null; created_at: string;
 };
 
-class ApiError extends Error {
-  constructor(public status: number, public code: string) { super(code); }
-}
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status, headers: { ...CORS, "Content-Type": "application/json; charset=utf-8" },
@@ -202,17 +204,30 @@ async function revoke(req: Request, admin: DB, body: Record<string, unknown>): P
 const JOB_COLUMNS = "id,title,start_time,job_type,tour_id,tour_date_id,status,tour:tours(name)";
 type JobQueryRow = Omit<JobRow, "tourName"> & { tour?: { name: string | null } | { name: string | null }[] | null };
 
+// Only jobs that are still ahead: not cancelled or completed, and not already finished.
+function upcomingJobs<T extends { or: (filters: string) => T }>(query: T): T {
+  const cutoff = upcomingCutoffIso();
+  return query
+    .or("status.is.null,status.in.(Tentativa,Confirmado)")
+    .or(`end_time.gte.${cutoff},and(end_time.is.null,start_time.gte.${cutoff})`);
+}
+
 async function jobs(req: Request, admin: DB): Promise<Response> {
   await shortcutIdentity(req, admin);
   const url = new URL(req.url);
   const search = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  const notCancelled = "status.is.null,status.neq.Cancelado";
+  // Riders belong to festival artists, so that destination only lists festivals.
+  const festivalsOnly = url.searchParams.get("destination") === "rider";
+  const base = () => {
+    let query = upcomingJobs(admin.from("jobs").select(JOB_COLUMNS));
+    if (festivalsOnly) query = query.eq("job_type", "festival");
+    return query.order("start_time", { ascending: true }).limit(100);
+  };
   let rows: JobQueryRow[];
   if (search) {
     // Match the job title or its tour name; LIKE metacharacters stay literal.
     const pattern = `%${escapeLike(search)}%`;
-    const byTitle = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
-      .ilike("title", pattern).order("start_time", { ascending: false }).limit(100);
+    const byTitle = await base().ilike("title", pattern);
     requireResult(byTitle.error);
     const { data: tours, error: toursError } = await admin.from("tours").select("id")
       .ilike("name", pattern).limit(50);
@@ -220,20 +235,17 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
     const tourIds = (tours ?? []).map((tour) => tour.id as string);
     let byTour: JobQueryRow[] = [];
     if (tourIds.length > 0) {
-      const result = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
-        .in("tour_id", tourIds).order("start_time", { ascending: false }).limit(100);
+      const result = await base().in("tour_id", tourIds);
       requireResult(result.error);
       byTour = (result.data ?? []) as unknown as JobQueryRow[];
     }
     const merged = new Map<string, JobQueryRow>();
     for (const row of [...((byTitle.data ?? []) as unknown as JobQueryRow[]), ...byTour]) merged.set(row.id, row);
     rows = [...merged.values()]
-      .sort((a, b) => String(b.start_time ?? "").localeCompare(String(a.start_time ?? "")))
+      .sort((a, b) => String(a.start_time ?? "").localeCompare(String(b.start_time ?? "")))
       .slice(0, 100);
   } else {
-    const oldest = new Date(Date.now() - 14 * 86_400_000).toISOString();
-    const { data, error } = await admin.from("jobs").select(JOB_COLUMNS).or(notCancelled)
-      .gte("start_time", oldest).order("start_time", { ascending: true }).limit(100);
+    const { data, error } = await base();
     requireResult(error);
     rows = (data ?? []) as unknown as JobQueryRow[];
   }
@@ -250,6 +262,57 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
   });
   return json({ ok: true, jobs: result, options: result.map((row) => row.option) });
 }
+type UploadParams = {
+  file: File; name: string; jobId: string; key: string; destination: Destination;
+  department: string; artistName: string; artistDate: string | null; stage: number | null;
+};
+
+function parseUpload(form: FormData): UploadParams {
+  const file = form.get("file");
+  if (!(file instanceof File)) throw new ApiError(400, "missing_file");
+  if (file.size <= 0) throw new ApiError(400, "empty_file");
+  if (file.size > MAX_FILE_BYTES) throw new ApiError(413, "file_too_large");
+  const name = fileName(String(form.get("file_name") || file.name));
+  const jobId = String(form.get("job_id") || "");
+  const key = String(form.get("request_id") || "");
+  // Without a destination the request behaves as the original document import.
+  const destination = String(form.get("destination") || "document");
+  if (!UUID.test(jobId)) throw new ApiError(400, "invalid_job_id");
+  if (!REQUEST_KEY.test(key)) throw new ApiError(400, "invalid_request_id");
+  if (destination !== "document" && destination !== "rider") throw new ApiError(400, "invalid_destination");
+  const params: UploadParams = {
+    file, name, jobId, key, destination, department: "", artistName: "", artistDate: null, stage: null,
+  };
+  if (destination === "document") {
+    params.department = String(form.get("department") || "");
+    if (!DEPARTMENTS.has(params.department)) throw new ApiError(400, "invalid_department");
+    return params;
+  }
+  const artistName = validArtistName(String(form.get("artist_name") || ""));
+  if (!artistName) throw new ApiError(400, "invalid_artist_name");
+  params.artistName = artistName;
+  const rawDate = String(form.get("artist_date") || "").trim();
+  if (rawDate) {
+    params.artistDate = validIsoDate(rawDate);
+    if (!params.artistDate) throw new ApiError(400, "invalid_artist_date");
+  }
+  const rawStage = String(form.get("stage") || "").trim();
+  if (rawStage) {
+    const stage = Number(rawStage);
+    if (!Number.isInteger(stage) || stage < 1 || stage > 4) throw new ApiError(400, "invalid_stage");
+    params.stage = stage;
+  }
+  return params;
+}
+
+function sameRequest(existing: Receipt, p: UploadParams): boolean {
+  return existing.job_id === p.jobId && existing.destination === p.destination &&
+    existing.file_name === p.name && Number(existing.file_size) === p.file.size &&
+    (p.destination === "document"
+      ? existing.department === p.department
+      : existing.artist_name === p.artistName);
+}
+
 async function upload(req: Request, admin: DB): Promise<Response> {
   const actor = await shortcutIdentity(req, admin);
   const quota = await checkEdgeRateLimit({
@@ -259,106 +322,96 @@ async function upload(req: Request, admin: DB): Promise<Response> {
     salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? getEnvironment("SUPABASE_SERVICE_ROLE_KEY"),
   });
   if (!quota.allowed) throw new ApiError(429, "rate_limited");
-  const form = await readForm(req);
-  const file = form.get("file");
-  if (!(file instanceof File)) throw new ApiError(400, "missing_file");
-  if (file.size <= 0) throw new ApiError(400, "empty_file");
-  if (file.size > MAX_FILE_BYTES) throw new ApiError(413, "file_too_large");
-  const name = fileName(String(form.get("file_name") || file.name));
-  const jobId = String(form.get("job_id") || "");
-  const dept = String(form.get("department") || "");
-  const key = String(form.get("request_id") || "");
-  if (!UUID.test(jobId)) throw new ApiError(400, "invalid_job_id");
-  if (!DEPARTMENTS.has(dept)) throw new ApiError(400, "invalid_department");
-  if (!REQUEST_KEY.test(key)) throw new ApiError(400, "invalid_request_id");
+  const p = parseUpload(await readForm(req));
+  const { file, name, jobId, key } = p;
 
   const { data: job, error: jobError } = await admin.from("jobs")
-    .select("id").eq("id", jobId).maybeSingle();
+    .select("id,start_time,job_type").eq("id", jobId).maybeSingle();
   requireResult(jobError);
   if (!job) throw new ApiError(404, "job_not_found");
 
   const tokenId = actor.tokenId!;
-  const { data: existing, error: existingError } = await admin
+  const { data: existingRow, error: existingError } = await admin
     .from("ios_share_import_receipts").select("*").eq("token_id", tokenId)
     .eq("request_key", key).maybeSingle();
   requireResult(existingError);
-  if (existing && (existing.job_id !== jobId || existing.department !== dept ||
-      existing.file_name !== name || Number(existing.file_size) !== file.size)) {
-    throw new ApiError(409, "idempotency_key_reused");
-  }
-  if (existing?.document_id) {
-    return json({ ok: true, document_id: existing.document_id, file_name: name, reused: true });
-  }
-  const path = existing?.file_path || objectPath(dept, jobId, name, crypto.randomUUID());
+  const existing = existingRow as Receipt | null;
+  if (existing && !sameRequest(existing, p)) throw new ApiError(409, "idempotency_key_reused");
+
+  const target: ImportTarget = p.destination === "document"
+    ? documentTarget(admin, jobId, p.department)
+    : await riderTarget(admin, {
+      job, artistName: p.artistName, artistDate: p.artistDate, stage: p.stage,
+      existingArtistId: existing?.artist_id ?? null,
+    });
+  const completed = (r: Receipt | null) => r?.[target.confirmColumn] ?? null;
+  const reusedResponse = (id: string) =>
+    json({ ok: true, ...target.response(), [target.confirmColumn]: id, file_name: name, reused: true });
+
+  if (existing && completed(existing)) return reusedResponse(completed(existing) as string);
+
+  const path = existing?.file_path || target.newPath(name);
   let receipt: Receipt;
   if (existing) {
-    receipt = existing as Receipt;
+    receipt = existing;
     // Recover a completed metadata insert if receipt confirmation failed.
-    const { data: orphanedRow, error: rowError } = await admin.from("job_documents")
-      .select("id").eq("job_id", jobId).eq("file_path", path).maybeSingle();
-    requireResult(rowError);
-    if (orphanedRow) {
+    const orphanedId = await target.findRecord(path);
+    if (orphanedId) {
       const { error } = await admin.from("ios_share_import_receipts")
-        .update({ document_id: orphanedRow.id, completed_at: new Date().toISOString() }).eq("id", receipt.id);
+        .update({ [target.confirmColumn]: orphanedId, completed_at: new Date().toISOString() }).eq("id", receipt.id);
       requireResult(error);
-      return json({ ok: true, document_id: orphanedRow.id, file_name: name, reused: true });
+      return reusedResponse(orphanedId);
     }
     if (Date.now() - Date.parse(existing.created_at) < STALE_UPLOAD_MS) {
       throw new ApiError(409, "upload_in_progress");
     }
     // The abandoned upload is older than STALE_UPLOAD_MS and has no metadata row.
-    const { error: removeError } = await admin.storage.from("job_documents").remove([path]);
+    const { error: removeError } = await admin.storage.from(target.bucket).remove([path]);
     if (removeError) throw new ApiError(503, "stale_upload_cleanup_failed");
   } else {
     const { data, error } = await admin.from("ios_share_import_receipts")
       .insert({
         token_id: tokenId, request_key: key, user_id: actor.id, job_id: jobId,
-        department: dept, file_name: name, file_path: path, file_size: file.size,
+        file_name: name, file_path: path, file_size: file.size, ...target.receiptFields,
       }).select("*").single();
     // A simultaneous retry is not allowed to create a second storage object.
-    if (error?.code === "23505") throw new ApiError(409, "upload_in_progress");
+    if (error?.code === "23505") {
+      await target.rollback();
+      throw new ApiError(409, "upload_in_progress");
+    }
+    if (error) await target.rollback();
     requireResult(error);
     receipt = data as Receipt;
   }
   const mime = file.type || "application/octet-stream";
   try {
-    const { error: storageError } = await admin.storage.from("job_documents")
+    const { error: storageError } = await admin.storage.from(target.bucket)
       .upload(path, file, { cacheControl: "0", contentType: mime, upsert: false });
     if (storageError) {
       logEvent("error", "ios_share_import.storage_failure");
       throw new ApiError(502, "storage_upload_failed");
     }
-    const { data: inserted, error: insertError } = await admin.from("job_documents")
-      .insert({
-        job_id: jobId, file_name: name, file_path: path,
-        file_type: mime, file_size: file.size, uploaded_by: actor.id,
-        original_type: null,
-      }).select("id").single();
-    if (insertError || !inserted) {
-      await admin.storage.from("job_documents").remove([path]);
-      requireResult(insertError, "document_registration_failed");
-      throw new ApiError(500, "document_registration_failed");
+    let recordId: string;
+    try {
+      recordId = await target.insertRecord({ path, name, mime, size: file.size, actorId: actor.id });
+    } catch (insertError) {
+      await admin.storage.from(target.bucket).remove([path]);
+      throw insertError;
     }
     const { error: confirmationError } = await admin.from("ios_share_import_receipts")
-      .update({ document_id: inserted.id, completed_at: new Date().toISOString() })
+      .update({ [target.confirmColumn]: recordId, completed_at: new Date().toISOString() })
       .eq("id", receipt.id);
     requireResult(confirmationError, "receipt_confirmation_failed");
-    // Same notification the web upload broadcasts; best-effort by design.
-    try {
-      const { error: pushError } = await admin.functions.invoke("push", {
-        body: { action: "broadcast", type: "document.uploaded", job_id: jobId, file_name: name, actor_id: actor.id },
-      });
-      if (pushError) logEvent("warn", "ios_share_import.push_failed");
-    } catch {
-      logEvent("warn", "ios_share_import.push_failed");
-    }
-    return json({ ok: true, document_id: inserted.id, job_id: jobId, department: dept, file_name: name }, 201);
+    await target.afterConfirm(name, actor.id);
+    return json({ ok: true, ...target.response(), [target.confirmColumn]: recordId, file_name: name }, 201);
   } catch (error) {
-    // On a failed upload/DB insert there is no durable document. Release
-    // the receipt so an immediate retry with the same request_id can proceed.
-    const { data: documentRow } = await admin.from("job_documents")
-      .select("id").eq("job_id", jobId).eq("file_path", path).maybeSingle();
-    if (!documentRow) await admin.from("ios_share_import_receipts").delete().eq("id", receipt.id);
+    // On a failed upload/DB insert there is no durable record. Release the
+    // receipt (and an artist created only for it) so an immediate retry with
+    // the same request_id can proceed.
+    if (!(await target.findRecord(path))) {
+      await admin.from("ios_share_import_receipts").delete().eq("id", receipt.id);
+      await target.rollback();
+    }
     throw error;
   }
 }

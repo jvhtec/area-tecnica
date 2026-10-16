@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(13);
+SELECT plan(18);
 
 SELECT has_table('public', 'ios_share_import_tokens', 'token table exists');
 SELECT has_table('public', 'ios_share_import_receipts', 'receipt table exists');
@@ -43,6 +43,19 @@ SELECT ok(
   has_table_privilege('service_role', 'public.ios_share_import_tokens', 'INSERT')
   AND has_table_privilege('service_role', 'public.ios_share_import_receipts', 'INSERT'),
   'the service role can manage both tables'
+);
+
+SELECT has_column('public', 'ios_share_import_receipts', 'destination', 'receipts record the import destination');
+SELECT has_column('public', 'ios_share_import_receipts', 'artist_id', 'rider receipts record the artist');
+SELECT has_column('public', 'ios_share_import_receipts', 'artist_file_id', 'rider receipts confirm via the artist file');
+
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.ios_share_import_receipts'::regclass
+      AND conname = 'ios_share_import_receipt_destination'
+  ),
+  'a receipt needs a department (document) or an artist name (rider)'
 );
 
 SELECT set_config('request.jwt.claim.role', 'service_role', true);
@@ -90,6 +103,21 @@ SELECT throws_ok(
   '23505',
   NULL,
   'token hashes are unique'
+);
+
+INSERT INTO public.jobs (id, title, start_time, end_time, job_type)
+VALUES (
+  '00000000-0000-4000-8000-0000000000c1', 'ios import fixture', now(), now() + interval '1 day', 'festival'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.ios_share_import_receipts
+      (token_id, request_key, user_id, job_id, destination, file_name, file_path, file_size)
+    VALUES ('00000000-0000-4000-8000-0000000000b1', 'rider-no-artist', '00000000-0000-4000-8000-0000000000a1',
+            '00000000-0000-4000-8000-0000000000c1', 'rider', 'rider.pdf', 'x/y.pdf', 10)$$,
+  '23514',
+  NULL,
+  'a rider receipt without an artist name is rejected'
 );
 
 DELETE FROM auth.users WHERE id = '00000000-0000-4000-8000-0000000000a1';

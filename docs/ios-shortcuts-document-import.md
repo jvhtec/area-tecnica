@@ -5,8 +5,10 @@ Seguimiento: [#1009](https://github.com/jvhtec/area-tecnica/issues/1009).
 ## Qué hace
 
 Desde un adjunto de Outlook en iPhone, elige **Compartir → Enviar a área técnica**,
-selecciona un trabajo (incluida una fecha de gira), elige departamento y sube
-el archivo **original, sin conversión** a `job_documents`. El nombre completo
+elige si va a **documentos del trabajo** (con departamento) o a **rider de
+artista** (pide el nombre y crea el artista en el festival si no existe),
+selecciona un trabajo próximo (incluida una fecha de gira) y sube el archivo
+**original, sin conversión** a `job_documents` o `festival_artist_files`. El nombre completo
 del fichero y sus bytes se conservan; el objeto recibe un nombre interno único
 para evitar colisiones. No hay lista de extensiones ni tipos MIME permitidos.
 Se admiten archivos desconocidos y binarios propietarios.
@@ -47,32 +49,44 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    Quitar el aviso de prueba cuando la subida funcione.
 5. Añadir «Texto» con la clave copiada y guardar como variable
    `ClaveImportación` (no publicar ni compartir este atajo con la clave).
-6. Añadir **Obtener contenido de URL**:
-   - URL: `<API>?action=jobs`
+6. **Elegir de menú** «¿Dónde?» con dos opciones y guardar el resultado
+   como variable `Destino`:
+   - `Documentos del trabajo` → valor interno `document`
+   - `Rider de artista` → valor interno `rider`
+7. Añadir **Obtener contenido de URL**:
+   - URL: `<API>?action=jobs&destination=<Destino>`
    - Método: `GET`
    - Cabecera: `X-Share-Token` → `ClaveImportación`
-7. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
-   Las opciones tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
+8. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
+   Solo aparecen trabajos **próximos o en curso**, sin cancelados ni
+   completados (con `destination=rider`, solo festivales). Las opciones
+   tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
    muestran el nombre de la gira, p. ej. `Fecha de gira (Gira Verano)`.
    Dividir el elemento elegido por ` | ` y tomar **último elemento** como
-   `job_id`. Si necesitas trabajos antiguos, usar una URL de búsqueda:
-   `<API>?action=jobs&q=<texto codificado como URL>`.
-8. Usar «Elegir de menú» para departamento. Valores internos exactos:
-   `sound`, `lights`, `video`, `production`, `personnel`,
-   `logistics`, `administrative`.
-9. Generar un **UUID** aleatorio para `request_id`. Mantener el mismo al
-   reintentar el mismo intento de subida para evitar documentos duplicados.
-10. Añadir otro **Obtener contenido de URL**:
-   - URL: `<API>`
-   - Método: `POST`
-   - Cabecera: `X-Share-Token` → `ClaveImportación`
-   - Cuerpo: **Formulario** (multipart/form-data).
-   - Campo de tipo **Archivo**, `file` → `Entrada de atajo`.
-   - Campo de texto `file_name` → variable **Nombre** de archivo.
-   - Campo de texto `job_id` → UUID del trabajo seleccionado.
-   - Campo de texto `department` → valor interno del menú.
-   - Campo de texto `request_id` → UUID del intento.
-11. Extraer `ok` del JSON resultante y mostrar confirmación **solo** si es
+   `job_id`. Para buscar, añadir `&q=<texto codificado como URL>` (título o
+   nombre de gira).
+9. **Si `Destino` es `document`:** «Elegir de menú» para el departamento.
+   Valores internos exactos: `sound`, `lights`, `video`, `production`,
+   `personnel`, `logistics`, `administrative`.
+   **Si `Destino` es `rider`:** «Pedir entrada» (texto) para el **nombre del
+   artista**. Opcionales: fecha del show como texto `yyyy-MM-dd` (por defecto,
+   el primer día del festival) y escenario `1`–`4` (por defecto, `1`).
+10. Generar un **UUID** aleatorio para `request_id`. Mantener el mismo al
+    reintentar el mismo intento de subida para evitar duplicados.
+11. Añadir otro **Obtener contenido de URL**:
+    - URL: `<API>`
+    - Método: `POST`
+    - Cabecera: `X-Share-Token` → `ClaveImportación`
+    - Cuerpo: **Formulario** (multipart/form-data).
+    - Campo de tipo **Archivo**, `file` → `Entrada de atajo`.
+    - Campo de texto `file_name` → variable **Nombre** de archivo.
+    - Campo de texto `job_id` → UUID del trabajo seleccionado.
+    - Campo de texto `request_id` → UUID del intento.
+    - Campo de texto `destination` → `Destino` (`document` o `rider`).
+    - Con `document`: campo `department` → valor interno del menú.
+    - Con `rider`: campo `artist_name` y, si se pidieron, `artist_date` y
+      `stage`. Los campos que no apliquen se pueden dejar vacíos.
+12. Extraer `ok` del JSON resultante y mostrar confirmación **solo** si es
     `true`; en caso contrario, mostrar `error` o el error HTTP.
 
 En iOS, los nombres de acciones pueden variar ligeramente según versión.
@@ -91,14 +105,22 @@ con riders de producción.
 
 `GET ?action=jobs[&q=texto]`, cabecera `X-Share-Token: ati_...`:
 `{ok,jobs:[{id,title,date,job_type,tour_id,tour_date_id,option}], options:[...]}`.
-La lista inicial muestra los trabajos de los últimos 14 días y futuros (hasta
-100 filas). Con `q` busca por título **o nombre de gira**, independientemente de
-la fecha. Los trabajos cancelados no aparecen.
+La lista solo incluye trabajos **próximos o en curso** (hasta 100 filas, por
+fecha): se excluyen cancelados, completados y los que ya terminaron antes de
+hoy. Con `q` busca por título **o nombre de gira** dentro de ese conjunto.
+
+`GET ?action=jobs&destination=rider` devuelve solo festivales.
 
 `POST` con cabecera `X-Share-Token`, cuerpo multipart:
-`file` (binario), `file_name`, `job_id` (UUID), `department`,
-`request_id` (UUID). Respuesta exitosa:
-`{ok:true,document_id,job_id,department,file_name}`.
+`file` (binario), `file_name`, `job_id` (UUID), `request_id` (UUID) y
+`destination` (`document` por defecto, o `rider`). Según el destino:
+
+- `document`: `department`. Respuesta exitosa:
+  `{ok:true,destination:"document",document_id,job_id,department,file_name}`.
+- `rider`: `artist_name` (obligatorio), `artist_date` (`yyyy-MM-dd`, opcional;
+  por defecto el día de inicio del trabajo en Madrid) y `stage` (1–4,
+  opcional; por defecto 1). Respuesta exitosa:
+  `{ok:true,destination:"rider",artist_file_id,artist_id,artist_name,artist_created,job_id,file_name}`.
 
 El token solo funciona en los dos endpoints de Shortcuts (trabajos e importar).
 No sirve para acceder a PostgREST, Storage u otras funciones. El backend
@@ -117,14 +139,27 @@ recomprueba el rol actual del usuario y que el trabajo existe.
 - Fallo de Storage o DB: no mostrar éxito. Comprobar limpieza de huérfanos.
 - Outlook «Compartir» entrega el archivo real, no solo una URL o un correo.
 - Probar separación entre diferentes fechas de gira.
+- Rider con artista nuevo: aparece en la tabla del festival (fecha y escenario
+  correctos) con el archivo asociado y el rider como «Completo».
+- Rider repetido para el mismo artista y fecha: se añade al artista existente
+  sin duplicarlo. Rider a un trabajo que no es festival: rechazado.
+- La lista no muestra trabajos cancelados, completados ni ya terminados.
 - Antes de operar sobre archivos mayores que 45 MiB, añadir sesión de subida
   directa/resumible. No elevar el límite sin probar memoria y timeouts.
 
 ## Comportamiento al importar
 
+- **Rider:** si el festival ya tiene un artista con ese nombre (sin distinguir
+  mayúsculas) en esa fecha, el archivo se añade a ese artista; si no, se crea
+  en la tabla de artistas del festival (escenario 1 por defecto) y se asocia
+  como en el flujo normal. El rider queda en `festival_artist_files` bajo
+  `<artista>/<uuid>.<ext>` y marca el rider como recibido (`rider_missing` y
+  `rider_outdated` a `false`). Si la subida falla, el artista creado por esa
+  misma petición se elimina. Solo se admiten trabajos de tipo `festival`.
 - El documento se crea **oculto para técnicos** (`visible_to_tech = false`, igual
   que la subida desde la web); se activa desde la tarjeta del trabajo.
-- Tras confirmar la importación se emite la notificación `document.uploaded`,
+- La notificación `document.uploaded` se emite solo para documentos de trabajo.
+- Tras confirmar un documento se emite la notificación `document.uploaded`,
   igual que en la subida web (best-effort: un fallo de push no falla la subida).
 - Una petición con el mismo `request_id` que quedó a medias se considera
   abandonada a los 10 minutos; antes responde 409 `upload_in_progress`.

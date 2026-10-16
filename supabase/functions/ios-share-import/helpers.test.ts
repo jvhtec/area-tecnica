@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { escapeLike, jobOption, objectPath, STALE_UPLOAD_MS, validFileName } from './helpers'
+import {
+  escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, upcomingCutoffIso,
+  validArtistName, validFileName, validIsoDate,
+} from './helpers'
 
 describe('validFileName', () => {
   it('keeps unknown, Unicode and extensionless names exactly', () => {
@@ -60,5 +63,47 @@ describe('jobOption', () => {
 describe('STALE_UPLOAD_MS', () => {
   it('outlasts the longest edge function run so a slow upload is never deleted mid-flight', () => {
     expect(STALE_UPLOAD_MS).toBeGreaterThanOrEqual(5 * 60_000)
+  })
+})
+
+describe('riderPath', () => {
+  it('stores riders under the artist id like the web upload', () => {
+    expect(riderPath('artist-1', 'Rider final.PDF', 'obj')).toBe('artist-1/obj.PDF')
+    expect(riderPath('artist-1', 'sin extension', 'obj')).toBe('artist-1/obj')
+    expect(riderPath('artist-1', 'a.b!?', 'obj')).toBe('artist-1/obj.b')
+  })
+})
+
+describe('validArtistName', () => {
+  it('trims, collapses whitespace and keeps Unicode', () => {
+    expect(validArtistName('  Rosalía   y  Los Ñus ')).toBe('Rosalía y Los Ñus')
+  })
+
+  it('rejects empty, control-character and overlong names', () => {
+    for (const value of ['', '   ', 'a\u0000b', 'x'.repeat(121)]) {
+      expect(validArtistName(value)).toBeNull()
+    }
+  })
+})
+
+describe('validIsoDate', () => {
+  it('accepts real calendar dates only', () => {
+    expect(validIsoDate('2026-10-16')).toBe('2026-10-16')
+    for (const value of ['2026-02-30', '2026-13-01', '16/10/2026', '2026-1-1', '']) {
+      expect(validIsoDate(value)).toBeNull()
+    }
+  })
+})
+
+describe('madridDate / upcomingCutoffIso', () => {
+  it('uses the Madrid calendar day, not the UTC one', () => {
+    expect(madridDate('2026-07-14T22:30:00Z')).toBe('2026-07-15')
+    expect(madridDate('2026-01-14T22:30:00Z')).toBe('2026-01-14')
+  })
+
+  it('cuts off at the start of today in Madrid', () => {
+    expect(upcomingCutoffIso(new Date('2026-07-15T10:00:00Z'))).toBe('2026-07-14T22:00:00.000Z')
+    // Just after midnight in Madrid is already the next day.
+    expect(upcomingCutoffIso(new Date('2026-07-14T22:30:00Z'))).toBe('2026-07-14T22:00:00.000Z')
   })
 })

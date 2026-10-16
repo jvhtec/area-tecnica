@@ -26,15 +26,25 @@ create table if not exists public.ios_share_import_receipts (
   request_key text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
   job_id uuid not null references public.jobs(id) on delete cascade,
-  department text not null,
+  -- 'document' = job_documents (needs department); 'rider' = festival_artist_files
+  -- for a named artist, created on the festival artist table when missing.
+  destination text not null default 'document',
+  department text,
+  artist_name text,
+  artist_id uuid references public.festival_artists(id) on delete set null,
   file_name text not null,
   file_path text not null,
   file_size bigint not null,
   document_id uuid references public.job_documents(id) on delete set null,
+  artist_file_id uuid references public.festival_artist_files(id) on delete set null,
   created_at timestamptz not null default now(),
   completed_at timestamptz,
   constraint ios_share_import_receipt_request_key check (request_key ~ '^[a-zA-Z0-9_-]{8,100}$'),
   constraint ios_share_import_receipt_size check (file_size > 0),
+  constraint ios_share_import_receipt_destination check (
+    (destination = 'document' and department is not null)
+    or (destination = 'rider' and artist_name is not null)
+  ),
   unique (token_id, request_key),
   unique (file_path)
 );
