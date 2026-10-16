@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(19);
 
 SELECT has_table('public', 'ios_share_import_tokens', 'token table exists');
 SELECT has_table('public', 'ios_share_import_receipts', 'receipt table exists');
@@ -48,6 +48,7 @@ SELECT ok(
 SELECT has_column('public', 'ios_share_import_receipts', 'destination', 'receipts record the import destination');
 SELECT has_column('public', 'ios_share_import_receipts', 'artist_id', 'rider receipts record the artist');
 SELECT has_column('public', 'ios_share_import_receipts', 'artist_file_id', 'rider receipts confirm via the artist file');
+SELECT has_column('public', 'ios_share_import_receipts', 'tour_document_id', 'tour-date riders confirm via the tour document');
 
 SELECT ok(
   EXISTS (

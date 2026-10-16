@@ -6,9 +6,10 @@ Seguimiento: [#1009](https://github.com/jvhtec/area-tecnica/issues/1009).
 
 Desde un adjunto de Outlook en iPhone, elige **Compartir → Enviar a área técnica**,
 elige si va a **documentos del trabajo** (con departamento) o a **rider de
-artista** (pide el nombre y crea el artista en el festival si no existe),
-selecciona un trabajo próximo (incluida una fecha de gira) y sube el archivo
-**original, sin conversión** a `job_documents` o `festival_artist_files`. El nombre completo
+artista** (pide el nombre y crea el artista en el trabajo si no existe; en una
+fecha de gira va a los documentos de gira), selecciona un trabajo próximo
+(incluida una fecha de gira) y sube el archivo **original, sin conversión** a
+`job_documents`, `festival_artist_files` o `tour_documents`. El nombre completo
 del fichero y sus bytes se conservan; el objeto recibe un nombre interno único
 para evitar colisiones. No hay lista de extensiones ni tipos MIME permitidos.
 Se admiten archivos desconocidos y binarios propietarios.
@@ -59,7 +60,7 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    - Cabecera: `X-Share-Token` → `ClaveImportación`
 8. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
    Solo aparecen trabajos **próximos o en curso**, sin cancelados ni
-   completados (con `destination=rider`, solo festivales). Las opciones
+   completados. Las opciones
    tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
    muestran el nombre de la gira, p. ej. `Fecha de gira (Gira Verano)`.
    Dividir el elemento elegido por ` | ` y tomar **último elemento** como
@@ -109,8 +110,6 @@ La lista solo incluye trabajos **próximos o en curso** (hasta 100 filas, por
 fecha): se excluyen cancelados, completados y los que ya terminaron antes de
 hoy. Con `q` busca por título **o nombre de gira** dentro de ese conjunto.
 
-`GET ?action=jobs&destination=rider` devuelve solo festivales.
-
 `POST` con cabecera `X-Share-Token`, cuerpo multipart:
 `file` (binario), `file_name`, `job_id` (UUID), `request_id` (UUID) y
 `destination` (`document` por defecto, o `rider`). Según el destino:
@@ -121,6 +120,9 @@ hoy. Con `q` busca por título **o nombre de gira** dentro de ese conjunto.
   por defecto el día de inicio del trabajo en Madrid) y `stage` (1–4,
   opcional; por defecto 1). Respuesta exitosa:
   `{ok:true,destination:"rider",artist_file_id,artist_id,artist_name,artist_created,job_id,file_name}`.
+  Si el trabajo es una **fecha de gira** (`tourdate`), el rider se guarda en los
+  **documentos de gira** y no se crea ningún artista; la respuesta es
+  `{ok:true,destination:"tour_document",tour_document_id,tour_id,artist_name,job_id,file_name}`.
 
 El token solo funciona en los dos endpoints de Shortcuts (trabajos e importar).
 No sirve para acceder a PostgREST, Storage u otras funciones. El backend
@@ -142,23 +144,27 @@ recomprueba el rol actual del usuario y que el trabajo existe.
 - Rider con artista nuevo: aparece en la tabla del festival (fecha y escenario
   correctos) con el archivo asociado y el rider como «Completo».
 - Rider repetido para el mismo artista y fecha: se añade al artista existente
-  sin duplicarlo. Rider a un trabajo que no es festival: rechazado.
+  sin duplicarlo. Rider a una fecha de gira: aparece en los documentos de gira,
+  sin artista nuevo. Rider a un evento o single: crea el artista en su tabla.
 - La lista no muestra trabajos cancelados, completados ni ya terminados.
 - Antes de operar sobre archivos mayores que 45 MiB, añadir sesión de subida
   directa/resumible. No elevar el límite sin probar memoria y timeouts.
 
 ## Comportamiento al importar
 
-- **Rider:** si el festival ya tiene un artista con ese nombre (sin distinguir
-  mayúsculas) en esa fecha, el archivo se añade a ese artista; si no, se crea
-  en la tabla de artistas del festival (escenario 1 por defecto) y se asocia
-  como en el flujo normal. El rider queda en `festival_artist_files` bajo
+- **Rider (festival, evento, single, ciclo…):** si el trabajo ya tiene un
+  artista con ese nombre (sin distinguir mayúsculas) en esa fecha, el archivo
+  se añade a ese artista; si no, se crea en la tabla de artistas del trabajo
+  (escenario 1 por defecto) y se asocia como en el flujo normal. El rider queda en `festival_artist_files` bajo
   `<artista>/<uuid>.<ext>` y marca el rider como recibido (`rider_missing` y
   `rider_outdated` a `false`). Si la subida falla, el artista creado por esa
-  misma petición se elimina. Solo se admiten trabajos de tipo `festival`.
+  misma petición se elimina.
+- **Rider en una fecha de gira:** va a `tour_documents` (bucket `tour-documents`,
+  `tours/<gira>/<uuid>.<ext>`), oculto para técnicos e invitados por defecto,
+  con el nombre de archivo original. El nombre del artista se valida pero no
+  se usa para crear nada.
 - El documento se crea **oculto para técnicos** (`visible_to_tech = false`, igual
   que la subida desde la web); se activa desde la tarjeta del trabajo.
-- La notificación `document.uploaded` se emite solo para documentos de trabajo.
 - Tras confirmar un documento se emite la notificación `document.uploaded`,
   igual que en la subida web (best-effort: un fallo de push no falla la subida).
 - Una petición con el mismo `request_id` que quedó a medias se considera

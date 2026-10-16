@@ -68,6 +68,11 @@ function safeSuffix(name: string): string {
   return suffix ? "." + suffix : "";
 }
 
+/** Tour documents live under `tours/<tour>/<uuid>.<ext>`, like the web upload. */
+export function tourDocumentPath(tourId: string, name: string, objectId: string): string {
+  return `tours/${tourId}/${objectId}${safeSuffix(name)}`;
+}
+
 /** Rider objects live under the artist id, like the web upload (`<artist>/<uuid>.<ext>`). */
 export function riderPath(artistId: string, name: string, objectId: string): string {
   return `${artistId}/${objectId}${safeSuffix(name)}`;

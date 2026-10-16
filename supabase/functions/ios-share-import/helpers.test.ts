@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, upcomingCutoffIso,
+  escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, tourDocumentPath, upcomingCutoffIso,
   validArtistName, validFileName, validIsoDate,
 } from './helpers'
 
@@ -71,6 +71,13 @@ describe('riderPath', () => {
     expect(riderPath('artist-1', 'Rider final.PDF', 'obj')).toBe('artist-1/obj.PDF')
     expect(riderPath('artist-1', 'sin extension', 'obj')).toBe('artist-1/obj')
     expect(riderPath('artist-1', 'a.b!?', 'obj')).toBe('artist-1/obj.b')
+  })
+})
+
+describe('tourDocumentPath', () => {
+  it('matches the web tour-documents layout and keeps the extension', () => {
+    expect(tourDocumentPath('tour-1', 'Rider gira.pdf', 'obj')).toBe('tours/tour-1/obj.pdf')
+    expect(tourDocumentPath('tour-1', 'sin extension', 'obj')).toBe('tours/tour-1/obj')
   })
 })
 

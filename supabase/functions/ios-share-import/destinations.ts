@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/structuredLogger.ts";
-import { ApiError, escapeLike, madridDate, objectPath, riderPath } from "./helpers.ts";
+import { ApiError, escapeLike, madridDate, objectPath, riderPath, tourDocumentPath } from "./helpers.ts";
 
 type DB = SupabaseClient;
 
@@ -13,7 +13,7 @@ export type StoredRecord = { path: string; name: string; mime: string; size: num
 export interface ImportTarget {
   bucket: string;
   /** Receipt column that stores the confirmed metadata row id. */
-  confirmColumn: "document_id" | "artist_file_id";
+  confirmColumn: "document_id" | "artist_file_id" | "tour_document_id";
   /** Columns merged into the receipt row when it is first inserted. */
   receiptFields: Record<string, unknown>;
   newPath(name: string): string;
@@ -69,6 +69,39 @@ export function documentTarget(admin: DB, jobId: string, department: string): Im
   };
 }
 
+/** Riders sent to a tour date are tour documents ("documentos de gira"), not artists. */
+export function tourDocumentTarget(admin: DB, job: { id: string; tour_id: string | null }, artistName: string): ImportTarget {
+  if (!job.tour_id) throw new ApiError(400, "tour_not_found");
+  const tourId = job.tour_id;
+  return {
+    bucket: "tour-documents",
+    confirmColumn: "tour_document_id",
+    receiptFields: { destination: "tour_document", artist_name: artistName },
+    newPath: (name) => tourDocumentPath(tourId, name, crypto.randomUUID()),
+    async findRecord(path) {
+      const { data, error } = await admin.from("tour_documents").select("id")
+        .eq("tour_id", tourId).eq("file_path", path).maybeSingle();
+      if (error) throw new ApiError(500, "database_error");
+      return data?.id ?? null;
+    },
+    async insertRecord(record) {
+      // Visibility flags are left to their defaults (hidden), like the web upload by a manager.
+      const { data, error } = await admin.from("tour_documents").insert({
+        tour_id: tourId, file_name: record.name, file_path: record.path,
+        file_type: record.mime, file_size: record.size, uploaded_by: record.actorId,
+      }).select("id").single();
+      if (error || !data) {
+        logEvent("error", "ios_share_import.tour_document_insert_failed");
+        throw new ApiError(500, "tour_document_registration_failed");
+      }
+      return data.id;
+    },
+    response: () => ({ destination: "tour_document", job_id: job.id, tour_id: tourId, artist_name: artistName }),
+    afterConfirm: async () => {},
+    rollback: async () => {},
+  };
+}
+
 export type RiderInput = {
   job: { id: string; start_time: string | null; job_type: string | null };
   artistName: string;
@@ -81,7 +114,6 @@ export type RiderInput = {
 /** Resolves (or creates) the festival artist, then returns a rider target bound to it. */
 export async function riderTarget(admin: DB, input: RiderInput): Promise<ImportTarget> {
   const { job, artistName } = input;
-  if (job.job_type !== "festival") throw new ApiError(400, "rider_requires_festival_job");
 
   let artistId = input.existingArtistId;
   let artistCreated = false;

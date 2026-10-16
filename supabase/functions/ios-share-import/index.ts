@@ -8,7 +8,7 @@ import {
   ApiError, type Destination, escapeLike, type JobRow, jobOption, STALE_UPLOAD_MS, upcomingCutoffIso,
   validArtistName, validFileName, validIsoDate,
 } from "./helpers.ts";
-import { documentTarget, type ImportTarget, riderTarget } from "./destinations.ts";
+import { documentTarget, type ImportTarget, riderTarget, tourDocumentTarget } from "./destinations.ts";
 
 // Native Shortcuts callers cannot use the PWA's Supabase session. They use an
 // opaque, revocable, import-only token in X-Share-Token. Pair/revoke requires
@@ -32,9 +32,10 @@ type DB = SupabaseClient;
 type Identity = { id: string; role: string; tokenId?: string };
 type Receipt = {
   id: string; token_id: string; request_key: string; user_id: string;
-  job_id: string; destination: Destination; department: string | null; artist_name: string | null;
+  job_id: string; destination: Destination | "tour_document"; department: string | null; artist_name: string | null;
   artist_id: string | null; file_name: string; file_path: string; file_size: number;
-  document_id: string | null; artist_file_id: string | null; created_at: string;
+  document_id: string | null; artist_file_id: string | null; tour_document_id: string | null;
+  created_at: string;
 };
 
 function json(data: unknown, status = 200): Response {
@@ -216,13 +217,8 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
   await shortcutIdentity(req, admin);
   const url = new URL(req.url);
   const search = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  // Riders belong to festival artists, so that destination only lists festivals.
-  const festivalsOnly = url.searchParams.get("destination") === "rider";
-  const base = () => {
-    let query = upcomingJobs(admin.from("jobs").select(JOB_COLUMNS));
-    if (festivalsOnly) query = query.eq("job_type", "festival");
-    return query.order("start_time", { ascending: true }).limit(100);
-  };
+  const base = () =>
+    upcomingJobs(admin.from("jobs").select(JOB_COLUMNS)).order("start_time", { ascending: true }).limit(100);
   let rows: JobQueryRow[];
   if (search) {
     // Match the job title or its tour name; LIKE metacharacters stay literal.
@@ -305,10 +301,16 @@ function parseUpload(form: FormData): UploadParams {
   return params;
 }
 
-function sameRequest(existing: Receipt, p: UploadParams): boolean {
-  return existing.job_id === p.jobId && existing.destination === p.destination &&
+// Riders sent to a tour date are stored as tour documents; everything else follows the request.
+function resolveKind(p: UploadParams, jobType: string | null): "document" | "rider" | "tour_document" {
+  if (p.destination === "document") return "document";
+  return jobType === "tourdate" ? "tour_document" : "rider";
+}
+
+function sameRequest(existing: Receipt, kind: string, p: UploadParams): boolean {
+  return existing.job_id === p.jobId && existing.destination === kind &&
     existing.file_name === p.name && Number(existing.file_size) === p.file.size &&
-    (p.destination === "document"
+    (kind === "document"
       ? existing.department === p.department
       : existing.artist_name === p.artistName);
 }
@@ -326,7 +328,7 @@ async function upload(req: Request, admin: DB): Promise<Response> {
   const { file, name, jobId, key } = p;
 
   const { data: job, error: jobError } = await admin.from("jobs")
-    .select("id,start_time,job_type").eq("id", jobId).maybeSingle();
+    .select("id,start_time,job_type,tour_id").eq("id", jobId).maybeSingle();
   requireResult(jobError);
   if (!job) throw new ApiError(404, "job_not_found");
 
@@ -336,10 +338,13 @@ async function upload(req: Request, admin: DB): Promise<Response> {
     .eq("request_key", key).maybeSingle();
   requireResult(existingError);
   const existing = existingRow as Receipt | null;
-  if (existing && !sameRequest(existing, p)) throw new ApiError(409, "idempotency_key_reused");
+  const kind = resolveKind(p, job.job_type);
+  if (existing && !sameRequest(existing, kind, p)) throw new ApiError(409, "idempotency_key_reused");
 
-  const target: ImportTarget = p.destination === "document"
+  const target: ImportTarget = kind === "document"
     ? documentTarget(admin, jobId, p.department)
+    : kind === "tour_document"
+    ? tourDocumentTarget(admin, job, p.artistName)
     : await riderTarget(admin, {
       job, artistName: p.artistName, artistDate: p.artistDate, stage: p.stage,
       existingArtistId: existing?.artist_id ?? null,
