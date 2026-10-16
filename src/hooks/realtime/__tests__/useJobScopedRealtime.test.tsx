@@ -117,7 +117,7 @@ describe("useMatrixJobsRealtime", () => {
     manager.cleaned = [];
   });
 
-  it("keeps job columns, required personnel, technicians and fridge live", () => {
+  it("keeps job columns, required personnel, technicians, skills and fridge live", () => {
     const { wrapper } = setup();
     const { unmount } = renderHook(() => useMatrixJobsRealtime(), { wrapper });
 
@@ -130,6 +130,8 @@ describe("useMatrixJobsRealtime", () => {
       ["job_assignments", ["matrix-staffing-summary"]],
       ["profiles", ["optimized-matrix-technicians"]],
       ["profile_skills", ["optimized-matrix-technicians"]],
+      ["skills", ["optimized-matrix-technicians"]],
+      ["skills", ["skill_catalog"]],
       ["profiles", ["technician-fridge-status"]],
       ["technician_fridge", ["technician-fridge-status"]],
     ]);

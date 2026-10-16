@@ -21,6 +21,9 @@ const MATRIX_REALTIME_SOURCES: MatrixRealtimeSource[] = [
   // Technician rows and fridge state.
   { table: "profiles", scope: "optimized-matrix-technicians", priority: "low" },
   { table: "profile_skills", scope: "optimized-matrix-technicians", priority: "low" },
+  { table: "skills", scope: "optimized-matrix-technicians", priority: "low" },
+  // Skill catalog behind the skills filter (shared with settings).
+  { table: "skills", scope: "skill_catalog", priority: "low" },
   { table: "profiles", scope: "technician-fridge-status", priority: "low" },
   { table: "technician_fridge", scope: "technician-fridge-status", priority: "medium" },
 ];
