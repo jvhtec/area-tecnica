@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-10-01T18:19:27.473Z",
+  "generatedAt": "2026-10-16T16:14:08.804Z",
   "note": "Lint warning ceilings by rule and file. New warnings fail governance; reductions are always allowed.",
-  "total": 976,
+  "total": 960,
   "domains": {
     "app": {
-      "total": 672,
+      "total": 664,
       "rules": {
         "@typescript-eslint/ban-ts-comment": 3,
-        "@typescript-eslint/no-explicit-any": 543,
+        "@typescript-eslint/no-explicit-any": 535,
         "react-hooks/exhaustive-deps": 65,
         "react-refresh/only-export-components": 43,
         "@typescript-eslint/no-require-imports": 1,
@@ -20,9 +20,9 @@
       }
     },
     "functions": {
-      "total": 304,
+      "total": 296,
       "rules": {
-        "@typescript-eslint/no-explicit-any": 269,
+        "@typescript-eslint/no-explicit-any": 261,
         "no-empty": 13,
         "no-control-regex": 2,
         "no-useless-escape": 18,
@@ -34,7 +34,7 @@
   "rules": {
     "@typescript-eslint/ban-ts-comment": 4,
     "@typescript-eslint/no-empty-object-type": 4,
-    "@typescript-eslint/no-explicit-any": 812,
+    "@typescript-eslint/no-explicit-any": 796,
     "@typescript-eslint/no-require-imports": 1,
     "@typescript-eslint/no-this-alias": 1,
     "@typescript-eslint/no-unsafe-function-type": 3,
@@ -274,9 +274,6 @@
     },
     "src/components/personal/VacationRequestsTabs.tsx": {
       "@typescript-eslint/no-explicit-any": 3
-    },
-    "src/components/profile/ProfileSkillsEditor.tsx": {
-      "@typescript-eslint/no-explicit-any": 1
     },
     "src/components/schedule/MultiDayScheduleBuilder.tsx": {
       "react-hooks/exhaustive-deps": 1
@@ -626,7 +623,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "src/pages/JobAssignmentMatrix.tsx": {
-      "@typescript-eslint/no-explicit-any": 19,
+      "@typescript-eslint/no-explicit-any": 12,
       "react-hooks/exhaustive-deps": 1
     },
     "src/pages/MorningSummary.tsx": {
@@ -799,7 +796,7 @@
       "@typescript-eslint/no-explicit-any": 1
     },
     "supabase/functions/send-staffing-email/index.ts": {
-      "@typescript-eslint/no-explicit-any": 32,
+      "@typescript-eslint/no-explicit-any": 31,
       "no-useless-escape": 8,
       "no-empty": 1
     },
@@ -817,7 +814,7 @@
       "no-empty": 1
     },
     "supabase/functions/staffing-click/index.ts": {
-      "@typescript-eslint/no-explicit-any": 20,
+      "@typescript-eslint/no-explicit-any": 13,
       "prefer-const": 1
     },
     "supabase/functions/staffing-orchestrator/index.ts": {

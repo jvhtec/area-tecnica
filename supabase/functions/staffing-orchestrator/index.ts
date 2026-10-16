@@ -12,6 +12,7 @@ import {
   canResumeCampaignStatus,
 } from "./orchestrationUtils.ts";
 import { finalizeCampaignTick } from "./campaignFinalization.ts";
+import { applyRoleUpdates, closeCampaignIfJobOver } from "./campaignTickWrites.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -578,6 +579,11 @@ async function tickCampaign(
       );
     }
 
+    // After the live-lock check: never close a campaign out from under a running tick.
+    const closure = await closeCampaignIfJobOver(supabase, campaign, now);
+    if (closure && 'error' in closure) return { status: 500, body: { error: closure.error } };
+    if (closure) return { status: 200, body: { campaign_id, closed: closure.closed } };
+
     // Acquire lock (compare-and-swap)
     let lockQuery = supabase
       .from('staffing_campaigns')
@@ -1081,26 +1087,9 @@ async function tickCampaign(
       });
     }
 
-    // Apply updates
-    for (const update of updates) {
-      const { error: roleUpdateError } = await supabase
-        .from('staffing_campaign_roles')
-        .update({
-          assigned_count: update.assigned_count,
-          pending_availability: update.pending_availability,
-          confirmed_availability: update.confirmed_availability,
-          pending_offers: update.pending_offers,
-          accepted_offers: update.accepted_offers,
-          stage: update.stage,
-          wave_number: update.wave_number,
-          last_wave_at: update.last_wave_at,
-          updated_at: update.updated_at,
-        })
-        .eq('id', update.id);
-
-      if (roleUpdateError) {
-        return { status: 500, body: { error: roleUpdateError.message } };
-      }
+    const roleUpdateError = await applyRoleUpdates(supabase, syncedCampaignRoles, updates);
+    if (roleUpdateError) {
+      return { status: 500, body: { error: roleUpdateError } };
     }
 
     const tickIntervalSeconds = Number(campaign.policy?.tick_interval_seconds || 300);

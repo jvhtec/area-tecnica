@@ -31,6 +31,7 @@ import { useSetupJob } from "@/features/setup-workflows/jobContext";
 
 import { queryKeys } from "@/lib/react-query";
 import { buildJobSearchTokens, matchesJobSearch } from "@/utils/jobSearch";
+import { useJobCardsRealtime } from "@/features/jobs/job-card-new/useJobCardsRealtime";
 
 const TYPE_LABELS: Record<string, string> = {
   single: "Sencillo",
@@ -113,6 +114,7 @@ const ProjectManagement = () => {
 
   // Use custom hook to keep the "jobs" tab active/visible.
   useTabVisibility(["optimized-jobs"]);
+  useJobCardsRealtime();
   
   // Force subscription to required tables
   useEffect(() => {

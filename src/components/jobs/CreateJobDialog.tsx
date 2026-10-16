@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { createQueryKey } from "@/lib/optimized-react-query";
+import { queryKeys } from "@/lib/react-query";
 import { useState, useCallback, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
@@ -247,8 +248,13 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         }
       }
 
-      // Refresh job queries (new job may fall into multiple cached ranges)
-      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.all });
+      // Refresh job queries (new job may fall into multiple cached ranges).
+      // The job lists and the matrix columns use their own keys.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-matrix-jobs") }),
+      ]);
 
       toast({
         title: "Trabajo creado",
