@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createHttpHandler } from "../_shared/http.ts";
+import { logEvent } from "../_shared/structuredLogger.ts";
 
 // Native Shortcuts callers cannot use the PWA's Supabase session. They use an
 // opaque, revocable, import-only token in X-Share-Token. Pair/revoke requires
@@ -38,7 +40,7 @@ function json(data: unknown, status = 200): Response {
 }
 function fail(error: unknown): Response {
   if (error instanceof ApiError) return json({ ok: false, error: error.code }, error.status);
-  console.error("[ios-share-import] unexpected error", error);
+  logEvent("error", "ios_share_import.unexpected_error", { error_name: error instanceof Error ? error.name : "unknown" });
   return json({ ok: false, error: "internal_error" }, 500);
 }
 function getEnvironment(name: string): string {
@@ -52,7 +54,7 @@ function createAdmin(): DB {
   });
 }
 function requireResult(error: { message?: string } | null, code = "database_error"): void {
-  if (error) { console.error("[ios-share-import] database operation failed", error.message); throw new ApiError(500, code); }
+  if (error) { logEvent("error", "ios_share_import.database_failure", { error_code: code }); throw new ApiError(500, code); }
 }
 async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
@@ -94,7 +96,7 @@ async function shortcutIdentity(req: Request, admin: DB): Promise<Identity> {
   const role = await currentRole(admin, data.user_id);
   // Non-critical bookkeeping must never interfere with a completed upload.
   void admin.from("ios_share_import_tokens").update({ last_used_at: new Date().toISOString() })
-    .eq("id", data.id).then(({ error: e }) => { if (e) console.warn("[ios-share-import] last-used update", e.message); });
+    .eq("id", data.id).then(({ error: e }) => { if (e) logEvent("warn", "ios_share_import.last_used_update_failed"); });
   return { id: data.user_id, role, tokenId: data.id };
 }
 async function readJson(req: Request): Promise<Record<string, unknown>> {
@@ -294,7 +296,7 @@ async function upload(req: Request, admin: DB): Promise<Response> {
     const { error: storageError } = await admin.storage.from("job_documents")
       .upload(path, file, { cacheControl: "0", contentType: mime, upsert: false });
     if (storageError) {
-      console.error("[ios-share-import] storage upload", storageError.message);
+      logEvent("error", "ios_share_import.storage_failure");
       throw new ApiError(502, "storage_upload_failed");
     }
     const { data: inserted, error: insertError } = await admin.from("job_documents")
@@ -322,8 +324,7 @@ async function upload(req: Request, admin: DB): Promise<Response> {
     throw error;
   }
 }
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+serve(createHttpHandler(async (req: Request): Promise<Response> => {
   try {
     const admin = createAdmin();
     const url = new URL(req.url);
@@ -346,4 +347,4 @@ serve(async (req: Request): Promise<Response> => {
   } catch (error) {
     return fail(error);
   }
-});
+}, { allowedMethods: ["GET", "POST"] }));
