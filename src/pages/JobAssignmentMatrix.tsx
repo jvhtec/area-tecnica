@@ -218,31 +218,7 @@ export default function JobAssignmentMatrix() {
     return c;
   }, [technicians, fridgeSet]);
 
-  // Realtime invalidation for fridge state
-  React.useEffect(() => {
-    const ch = (dataLayerClient as any)
-      .channel('rt-technician-fridge')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_fridge' }, () => {
-        qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
-      })
-      .subscribe();
-    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { /* channel may already be removed */ } };
-  }, [qc]);
-
-  // Keep the technician roster fresh when users are added or edited in settings.
-  React.useEffect(() => {
-    const ch = (dataLayerClient as any)
-      .channel('rt-matrix-profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
-        qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_skills' }, () => {
-        qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
-      })
-      .subscribe();
-    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { /* channel may already be removed */ } };
-  }, [qc]);
+  // Fridge state, technician rows and job columns stay live via useMatrixJobsRealtime().
 
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {

@@ -21,7 +21,7 @@ vi.mock("@/lib/unified-subscription-manager", () => ({
   },
 }));
 
-import { jobIdFromPayload, useJobScopedRealtime } from "@/hooks/realtime/useJobScopedRealtime";
+import { scopeIdFromPayload, useJobScopedRealtime } from "@/hooks/realtime/useJobScopedRealtime";
 import { useJobCardsRealtime } from "@/features/jobs/job-card-new/useJobCardsRealtime";
 import { useMatrixJobsRealtime } from "@/pages/job-assignment-matrix/useMatrixJobsRealtime";
 
@@ -48,10 +48,22 @@ describe("useJobScopedRealtime", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("reads the job id from the new row, or the old one on delete", () => {
-    expect(jobIdFromPayload({ new: { job_id: "a" } }, "job_id")).toBe("a");
-    expect(jobIdFromPayload({ new: {}, old: { job_id: "b" } }, "job_id")).toBe("b");
-    expect(jobIdFromPayload({ new: { job_id: "a" } }, null)).toBeNull();
+  it("reads the scope id from the new row, or the old one on delete", () => {
+    expect(scopeIdFromPayload({ new: { job_id: "a" } }, "job_id")).toBe("a");
+    expect(scopeIdFromPayload({ new: {}, old: { job_id: "b" } }, "job_id")).toBe("b");
+    expect(scopeIdFromPayload({ new: { job_id: "a" } }, null)).toBeNull();
+  });
+
+  it("covers WhatsApp groups and calculator defaults per card", () => {
+    const { invalidate, wrapper } = setup();
+    renderHook(() => useJobCardsRealtime(), { wrapper });
+
+    emit("job_whatsapp_groups", { new: { job_id: "job-3" } });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["job-whatsapp-group", "job-3"] });
+    emit("tour_default_sets", { new: { tour_id: "tour-9" } });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["tour-default-exists", "tour-9"] });
+    emit("transport_request_items", { new: { request_id: "req-1" } });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["transport-request"] });
   });
 
   it("refreshes only the changed job's card query, at once and once more for a burst", () => {
@@ -105,7 +117,7 @@ describe("useMatrixJobsRealtime", () => {
     manager.cleaned = [];
   });
 
-  it("keeps the matrix job columns live from jobs, departments and date types", () => {
+  it("keeps job columns, required personnel, technicians and fridge live", () => {
     const { wrapper } = setup();
     const { unmount } = renderHook(() => useMatrixJobsRealtime(), { wrapper });
 
@@ -113,6 +125,13 @@ describe("useMatrixJobsRealtime", () => {
       ["jobs", ["optimized-matrix-jobs"]],
       ["job_departments", ["optimized-matrix-jobs"]],
       ["job_date_types", ["optimized-matrix-jobs"]],
+      ["job_required_roles", ["matrix-open-slots"]],
+      ["job_required_roles", ["matrix-staffing-summary"]],
+      ["job_assignments", ["matrix-staffing-summary"]],
+      ["profiles", ["optimized-matrix-technicians"]],
+      ["profile_skills", ["optimized-matrix-technicians"]],
+      ["profiles", ["technician-fridge-status"]],
+      ["technician_fridge", ["technician-fridge-status"]],
     ]);
     const owner = manager.subscriptions[0]?.options.ownerRoute;
     expect(manager.subscriptions.every((s) => s.options.ownerRoute === owner)).toBe(true);

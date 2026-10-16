@@ -8,24 +8,25 @@ import { queryKeys } from "@/lib/react-query";
 import { throttle, type ThrottledFunction } from "@/utils/throttle";
 
 /**
- * One realtime source for job-scoped queries.
+ * One realtime source for scoped queries (one per job card, say).
  *
- * `keys(jobId)` returns the query keys to refresh for that job. When a change
- * carries no job id (a DELETE without REPLICA IDENTITY FULL, or a table keyed
- * by something else) `keys(null)` is used, so return prefix keys there.
+ * `keys(scopeId)` returns the query keys to refresh for the changed row's
+ * scope (its job, usually). When a change carries no scope id (a DELETE
+ * without REPLICA IDENTITY FULL, or a table keyed by something else)
+ * `keys(null)` is used, so return prefix keys there.
  */
 export type JobScopedRealtimeSource = {
   table: string;
-  keys: (jobId: string | null) => QueryKey[];
-  /** Column holding the job id; defaults to `job_id`. Use `null` for tables without one. */
-  jobIdColumn?: string | null;
+  keys: (scopeId: string | null) => QueryKey[];
+  /** Column holding the scope id; defaults to `job_id`. Use `null` for tables without one. */
+  scopeColumn?: string | null;
 };
 
 // One change usually comes with siblings (a folder tree, a task list): the
 // first refreshes at once, the rest of the burst adds one trailing refresh.
 const REFRESH_WINDOW_MS = 300;
 
-export function jobIdFromPayload(payload: RealtimeChangePayload, column: string | null): string | null {
+export function scopeIdFromPayload(payload: RealtimeChangePayload, column: string | null): string | null {
   if (!column) return null;
   const value = payload.new?.[column] ?? payload.old?.[column];
   return typeof value === "string" && value ? value : null;
@@ -34,7 +35,7 @@ export function jobIdFromPayload(payload: RealtimeChangePayload, column: string 
 /**
  * Keeps job-scoped queries (one per job card, say) fresh from realtime, going
  * through the unified subscription manager. Each change refreshes only the
- * affected job's keys, throttled per key on the leading edge.
+ * affected scope's keys, throttled per key on the leading edge.
  */
 export function useJobScopedRealtime(name: string, sources: JobScopedRealtimeSource[], enabled = true) {
   const queryClient = useQueryClient();
@@ -62,7 +63,7 @@ export function useJobScopedRealtime(name: string, sources: JobScopedRealtimeSou
     };
 
     for (const source of sourcesRef.current) {
-      const column = source.jobIdColumn === undefined ? "job_id" : source.jobIdColumn;
+      const column = source.scopeColumn === undefined ? "job_id" : source.scopeColumn;
       manager.subscribeToTable(
         source.table,
         queryKeys.scope("job-scoped-realtime", name, source.table),
@@ -72,7 +73,7 @@ export function useJobScopedRealtime(name: string, sources: JobScopedRealtimeSou
           ownerRoute: owner,
           invalidateOnPayload: false,
           onPayload: (payload) => {
-            source.keys(jobIdFromPayload(payload, column)).forEach(refresh);
+            source.keys(scopeIdFromPayload(payload, column)).forEach(refresh);
           },
         },
       );

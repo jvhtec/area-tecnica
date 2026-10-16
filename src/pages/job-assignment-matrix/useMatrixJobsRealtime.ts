@@ -1,30 +1,43 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
+import type { SubscriptionPriority } from "@/lib/unified-subscription-support";
 import { queryKeys } from "@/lib/react-query";
 
-// The matrix job columns come from `optimized-matrix-jobs` (jobs + their
-// departments and date types). Nothing listened for those tables here, so a
-// job created elsewhere only appeared after a reload.
-const MATRIX_JOB_TABLES = [
-  { table: "jobs", priority: "high" as const },
-  { table: "job_departments", priority: "medium" as const },
-  { table: "job_date_types", priority: "low" as const },
+type MatrixRealtimeSource = { table: string; scope: string; priority: SubscriptionPriority };
+
+// Page-level matrix data that only needs a refetch on change. Cell data
+// (assignments, timesheets, availability) is patched in place by
+// useOptimizedMatrixData and stays there.
+const MATRIX_REALTIME_SOURCES: MatrixRealtimeSource[] = [
+  // Job columns: a job created or edited elsewhere appears without a reload.
+  { table: "jobs", scope: "optimized-matrix-jobs", priority: "high" },
+  { table: "job_departments", scope: "optimized-matrix-jobs", priority: "medium" },
+  { table: "job_date_types", scope: "optimized-matrix-jobs", priority: "low" },
+  // Required personnel: open-slot header badges and the staffing reminder.
+  { table: "job_required_roles", scope: "matrix-open-slots", priority: "medium" },
+  { table: "job_required_roles", scope: "matrix-staffing-summary", priority: "medium" },
+  { table: "job_assignments", scope: "matrix-staffing-summary", priority: "low" },
+  // Technician rows and fridge state.
+  { table: "profiles", scope: "optimized-matrix-technicians", priority: "low" },
+  { table: "profile_skills", scope: "optimized-matrix-technicians", priority: "low" },
+  { table: "profiles", scope: "technician-fridge-status", priority: "low" },
+  { table: "technician_fridge", scope: "technician-fridge-status", priority: "medium" },
 ];
 
 export function useMatrixJobsRealtime() {
   const queryClient = useQueryClient();
   const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
-  const ownerRef = useRef(`matrix-jobs-${Math.random().toString(36).slice(2)}`);
+  const ownerRef = useRef(`matrix-realtime-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     const owner = ownerRef.current;
-    for (const { table, priority } of MATRIX_JOB_TABLES) {
-      // The manager prefix-invalidates the key and coalesces bursts on the
-      // leading edge, so every cached date window refetches once.
+    for (const { table, scope, priority } of MATRIX_REALTIME_SOURCES) {
+      // The manager prefix-invalidates the key (every cached window or job set)
+      // and coalesces bursts on the leading edge.
       manager.subscribeToTable(
         table,
-        queryKeys.scope("optimized-matrix-jobs"),
+        queryKeys.scope(scope),
         { event: "*", schema: "public" },
         priority,
         { ownerRoute: owner },
