@@ -37,6 +37,18 @@ describe('notification policy', () => {
     expect(groupingTag(first.type, first)).toBe('jobs:job:job-1')
   })
 
+  it('uses a caller idempotency key as the stable occurrence identity across retries', async () => {
+    const now = Date.parse('2026-09-17T10:02:00Z')
+    const effect = body('job.assignment.direct', { job_id: 'job-1', recipient_id: 'tech-1', idempotency_key: 'cmd-0001:1' })
+    // Same effect retried later, even with re-derived payload facts: one key.
+    const retried = { ...effect, assignment_status: 'confirmed' }
+    expect(await buildEventKey(effect, now)).toBe('job.assignment.direct:idem:cmd-0001:1')
+    expect(await buildEventKey(retried, now + 60 * 60 * 1000)).toBe('job.assignment.direct:idem:cmd-0001:1')
+    // A malformed key never becomes an identity; the content window applies.
+    const malformed = body('job.assignment.direct', { job_id: 'job-1', idempotency_key: 'x y' })
+    expect(await buildEventKey(malformed, now)).not.toContain(':idem:')
+  })
+
   it('keeps two rapid driver-assignment removals for one driver as separate events', async () => {
     const now = Date.parse('2026-09-17T10:02:00Z')
     const first = body('logistics.driver.removed', { recipient_id: 'driver-1', assignment_id: 'assignment-1' })

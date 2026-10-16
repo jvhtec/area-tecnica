@@ -78,11 +78,10 @@ export const deleteJobWithCleanup = async (jobId: string): Promise<void> => {
       console.warn('Could not fetch job title for notification:', err);
     }
 
-    // Remove Flex crew assignments first
-    await removeFlexCrewAssignments(jobId);
-
-    // Delete job assignments
+    // Reconciliation reads current membership. Remove it before requesting
+    // crew cleanup, while the crew-call mappings still exist.
     await deleteJobAssignments(jobId);
+    await removeFlexCrewAssignments(jobId);
 
     // Delete job departments
     await deleteJobDepartments(jobId);

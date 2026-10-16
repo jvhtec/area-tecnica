@@ -195,6 +195,8 @@ export const OptimizedMatrixCellDialogs = ({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Comprobando otras fechas asignadas...
                 </span>
+              ) : !multiDateRemoval.stateToken ? (
+                <>No se pudo cargar el estado actual de la asignación. Cierra y vuelve a intentarlo.</>
               ) : multiDateRemoval.otherDatesCount > 0 ? (
                 <>
                   {displayName} está asignado a este trabajo durante <strong>{multiDateRemoval.otherDatesCount + 1} días</strong>.
@@ -248,7 +250,7 @@ export const OptimizedMatrixCellDialogs = ({
                 event.stopPropagation();
                 void handleRemoveAssignment(multiDateRemoval.removeOption === 'all');
               }}
-              disabled={multiDateRemoval.isLoading || isRemovingAssignment}
+              disabled={multiDateRemoval.isLoading || isRemovingAssignment || !multiDateRemoval.stateToken}
             >
               {isRemovingAssignment ? (
                 <span className="flex items-center gap-2">

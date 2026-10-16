@@ -9,7 +9,7 @@ const { checkMultiDateAssignment } = vi.hoisted(() => ({ checkMultiDateAssignmen
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => true }));
 vi.mock('@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval', () => ({
   useMatrixCellAssignmentRemoval: () => ({
-    multiDateRemoval: { isOpen: false, isLoading: false, otherDates: [], otherDatesCount: 0, currentDate: null, removeOption: 'single' },
+    multiDateRemoval: { isOpen: false, isLoading: false, otherDates: [], otherDatesCount: 0, currentDate: null, removeOption: 'single', stateToken: null },
     setMultiDateRemoval: vi.fn(),
     isRemovingAssignment: false,
     checkMultiDateAssignment,

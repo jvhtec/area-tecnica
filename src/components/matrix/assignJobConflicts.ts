@@ -1,9 +1,9 @@
 import type { CoverageMode } from "@/components/matrix/assignJobDialogTypes";
 import {
-  checkTimeConflictEnhanced,
-  type ConflictCheckResult,
-} from "@/utils/technicianAvailability";
-import { formatMadridDateKey } from "@/utils/timezoneUtils";
+  conflictDetailsSchema,
+  type AssignmentCommandResult,
+} from "@/features/assignments/commands";
+import type { ConflictCheckResult } from "@/utils/technicianAvailability";
 
 export interface AssignmentConflictWarning {
   result: ConflictCheckResult;
@@ -11,53 +11,21 @@ export interface AssignmentConflictWarning {
   mode: CoverageMode;
 }
 
-interface CheckAssignmentConflictsInput {
-  technicianId: string;
-  selectedJobId: string;
-  coverageMode: CoverageMode;
-  multiDates: Date[];
-  assignmentDate: string;
-}
-
-export const checkAssignmentConflicts = async ({
-  technicianId,
-  selectedJobId,
-  coverageMode,
-  multiDates,
-  assignmentDate,
-}: CheckAssignmentConflictsInput): Promise<AssignmentConflictWarning | null> => {
-  if (!selectedJobId) return null;
-
-  if (coverageMode === "multi") {
-    const uniqueKeys = Array.from(new Set(multiDates.map(formatMadridDateKey)));
-    for (const key of uniqueKeys) {
-      const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-        targetDateIso: key,
-        singleDayOnly: true,
-        includePending: true,
-      });
-      if (result.hasHardConflict || result.hasSoftConflict) {
-        return { result, targetDate: key, mode: "multi" };
-      }
-    }
-    return null;
-  }
-
-  if (coverageMode === "single") {
-    const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-      targetDateIso: assignmentDate,
-      singleDayOnly: true,
-      includePending: true,
-    });
-    return result.hasHardConflict || result.hasSoftConflict
-      ? { result, targetDate: assignmentDate, mode: "single" }
-      : null;
-  }
-
-  const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-    includePending: true,
-  });
-  return result.hasHardConflict || result.hasSoftConflict
-    ? { result, mode: "full" }
-    : null;
+/**
+ * Builds the warning shown before an override from a `conflict` rejection.
+ * The conflict is decided by apply_direct_assignment under the technician
+ * lock, so this is authoritative rather than a stale browser pre-check.
+ */
+export const conflictWarningFromRejection = (
+  result: AssignmentCommandResult,
+  mode: CoverageMode,
+): AssignmentConflictWarning | null => {
+  if (result.ok || result.code !== "conflict") return null;
+  const parsed = conflictDetailsSchema.safeParse(result.details);
+  if (!parsed.success) return null;
+  return {
+    result: parsed.data.conflicts,
+    targetDate: mode === "full" ? undefined : parsed.data.target_date ?? undefined,
+    mode,
+  };
 };

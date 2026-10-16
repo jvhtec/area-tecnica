@@ -61,7 +61,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
     addAssignment,
     removeAssignment,
     isRemoving,
-  } = useJobAssignmentsRealtime(jobId);
+  } = useJobAssignmentsRealtime(jobId, { manageCommands: canManageAssignments });
 
   const { data: jobMeta } = useQuery({
     queryKey: queryKeys.scope('mobile-job-meta', jobId),

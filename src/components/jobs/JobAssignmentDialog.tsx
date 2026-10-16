@@ -34,11 +34,20 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleOptionsForDiscipline } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
+import {
+  ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE,
+  AssignmentCommandError,
+  changeAssignmentRole,
+  createAssignmentCommandId,
+  reconcileAssignmentViews,
+  requireCommitted,
+  runAssignmentSideEffects,
+  type AssignmentRoleDepartment,
+} from '@/features/assignments/commands';
 import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 import { queryKeys } from "@/lib/react-query";
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -57,45 +66,11 @@ interface JobAssignmentDialogProps {
   disableCategorySync?: boolean;
 }
 
-// Helper function to sync timesheet categories when assignment roles change
-const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
-  try {
-    // Fetch the current assignment to get all role fields
-    const { data: assignment, error: fetchError } = await dataLayerClient.from('job_assignments')
-      .select('sound_role, lights_role, video_role')
-      .eq('job_id', jobId)
-      .eq('technician_id', technicianId)
-      .single();
-
-    if (fetchError) {
-      console.error('Error fetching assignment for category sync:', fetchError);
-      return;
-    }
-
-    if (!assignment) {
-      console.warn('No assignment found for category sync');
-      return;
-    }
-
-    await syncTimesheetCategoriesForAssignment({
-      jobId,
-      technicianId,
-      soundRole: assignment.sound_role,
-      lightsRole: assignment.lights_role,
-      videoRole: assignment.video_role,
-    });
-
-  } catch (error) {
-    console.error('Error in syncTimesheetCategories:', error);
-    throw error;
-  }
-};
-
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department, disableCategorySync }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user } = useOptimizedAuth();
   const [isSyncing, setIsSyncing] = useState(false);
-  const { removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
+  const { removeAssignment, isRemoving, expectedStateTokenFor } = useJobAssignmentsRealtime(jobId, { manageCommands: true });
   const { useCrewCallData } = useFlexCrewAssignments();
 
   // Get current user's department or use the passed department
@@ -103,6 +78,67 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const { data: currentAssignments = [], refetch: refetchCurrentAssignments } =
     useDirectJobAssignments(jobId, isOpen);
+
+  const queryClient = useQueryClient();
+  const ROLE_CHANGE_LABELS: Record<AssignmentRoleDepartment, string> = {
+    sound: "El rol de sonido se ha actualizado exitosamente",
+    lights: "El rol de luces se ha actualizado exitosamente",
+    video: "El rol de video se ha actualizado exitosamente",
+    production: "El rol de producción se ha actualizado exitosamente",
+  };
+
+  // One atomic command: role column + category/repricing of unapproved days.
+  // Flex follows when a sound/lights role appears or is cleared.
+  const handleRoleChange = async (technicianId: string, roleDepartment: AssignmentRoleDepartment, newRole: string) => {
+    // Fail closed: a role change is only sent against the state this dialog loaded.
+    const expectedStateToken = expectedStateTokenFor(technicianId);
+    if (!expectedStateToken) {
+      toast({ title: "Error", description: ASSIGNMENT_STATE_UNAVAILABLE_MESSAGE, variant: "destructive" });
+      return;
+    }
+    try {
+      const result = requireCommitted(await changeAssignmentRole({
+        commandId: createAssignmentCommandId(),
+        jobId,
+        technicianId,
+        department: roleDepartment,
+        role: newRole === 'none' ? null : newRole,
+        syncCategory: !disableCategorySync,
+        expectedStateToken,
+        source: 'job-card',
+      }));
+      if (result.side_effects.length > 0) {
+        void runAssignmentSideEffects(result.command_id, result, { technicianDepartment: roleDepartment }).then((summary) => {
+          if (summary.failed > 0) {
+            toast({
+              title: "Sincronización pendiente",
+              description: "El rol se guardó, pero falló la sincronización con Flex. Queda registrado para reintentar.",
+              variant: "destructive",
+            });
+          }
+        }, (error: unknown) => console.error('Role change side effects could not run', error));
+      }
+      if (result.warnings.length > 0) {
+        toast({
+          title: "Rol actualizado con avisos",
+          description: "No se pudo recalcular el importe de algún parte",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Rol actualizado", description: ROLE_CHANGE_LABELS[roleDepartment] });
+      }
+      reconcileAssignmentViews(queryClient, { technicianId, jobIds: [jobId] });
+      refetchCurrentAssignments();
+      onAssignmentChange();
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast({
+        title: "Error",
+        description: error instanceof AssignmentCommandError ? error.message : getErrorMessage(error, "No se pudo actualizar el rol"),
+        variant: "destructive",
+      });
+    }
+  };
 
   // Filter assignments to only show those for the current department
   const departmentAssignments = useMemo(() => {
@@ -333,35 +369,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           <Select
                             value={assignment.sound_role || "none"}
                             disabled={isClosureLocked}
-                            onValueChange={async (newRole) => {
-                              try {
-                                const { error } = await dataLayerClient.from('job_assignments')
-                                  .update({ sound_role: newRole === 'none' ? null : newRole })
-                                  .eq('job_id', jobId)
-                                  .eq('technician_id', assignment.technician_id);
-
-                                if (error) throw error;
-
-                                // Sync timesheet categories with the new role
-                                if (!disableCategorySync) {
-                                  await syncTimesheetCategories(jobId, assignment.technician_id);
-                                }
-
-                                toast({
-                                  title: "Rol actualizado",
-                                  description: "El rol de sonido se ha actualizado exitosamente",
-                                });
-                                refetchCurrentAssignments();
-                                onAssignmentChange();
-                              } catch (error) {
-                                console.error("Error updating role:", error);
-                                toast({
-                                  title: "Error",
-                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
+                            onValueChange={(newRole) => void handleRoleChange(assignment.technician_id, 'sound', newRole)}
                           >
                             <SelectTrigger id={`sound-role-${assignment.technician_id}`}>
                               <SelectValue />
@@ -386,35 +394,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           <Select
                             value={assignment.lights_role || "none"}
                             disabled={isClosureLocked}
-                            onValueChange={async (newRole) => {
-                              try {
-                                const { error } = await dataLayerClient.from('job_assignments')
-                                  .update({ lights_role: newRole === 'none' ? null : newRole })
-                                  .eq('job_id', jobId)
-                                  .eq('technician_id', assignment.technician_id);
-
-                                if (error) throw error;
-
-                                // Sync timesheet categories with the new role
-                                if (!disableCategorySync) {
-                                  await syncTimesheetCategories(jobId, assignment.technician_id);
-                                }
-
-                                toast({
-                                  title: "Rol actualizado",
-                                  description: "El rol de luces se ha actualizado exitosamente",
-                                });
-                                refetchCurrentAssignments();
-                                onAssignmentChange();
-                              } catch (error) {
-                                console.error("Error updating role:", error);
-                                toast({
-                                  title: "Error",
-                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
+                            onValueChange={(newRole) => void handleRoleChange(assignment.technician_id, 'lights', newRole)}
                           >
                             <SelectTrigger id={`lights-role-${assignment.technician_id}`}>
                               <SelectValue />
@@ -439,35 +419,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           <Select
                             value={assignment.video_role || "none"}
                             disabled={isClosureLocked}
-                            onValueChange={async (newRole) => {
-                              try {
-                                const { error } = await dataLayerClient.from('job_assignments')
-                                  .update({ video_role: newRole === 'none' ? null : newRole })
-                                  .eq('job_id', jobId)
-                                  .eq('technician_id', assignment.technician_id);
-
-                                if (error) throw error;
-
-                                // Sync timesheet categories with the new role
-                                if (!disableCategorySync) {
-                                  await syncTimesheetCategories(jobId, assignment.technician_id);
-                                }
-
-                                toast({
-                                  title: "Rol actualizado",
-                                  description: "El rol de video se ha actualizado exitosamente",
-                                });
-                                refetchCurrentAssignments();
-                                onAssignmentChange();
-                              } catch (error) {
-                                console.error("Error updating role:", error);
-                                toast({
-                                  title: "Error",
-                                  description: getErrorMessage(error, "No se pudo actualizar el rol"),
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
+                            onValueChange={(newRole) => void handleRoleChange(assignment.technician_id, 'video', newRole)}
                           >
                             <SelectTrigger id={`video-role-${assignment.technician_id}`}>
                               <SelectValue />
