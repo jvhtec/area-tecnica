@@ -102,3 +102,8 @@ verify_jwt = true
 
 [functions.place-search]
 verify_jwt = true
+
+# Shortcuts uses a separate, revocable X-Share-Token rather than a Supabase JWT.
+# The function validates session JWTs for pairing and hashes for device calls.
+[functions.ios-share-import]
+verify_jwt = false
