@@ -17,7 +17,7 @@ vi.mock("@/hooks/useActiveSkills", () => ({
 }));
 
 import { SkillsFilter } from "../SkillsFilter";
-import { groupSkillsForDepartment } from "../skillsFilterGroups";
+import { groupSkillsForDepartment } from "@/utils/skillCatalog";
 
 const categories = (groups: ReturnType<typeof groupSkillsForDepartment>) => groups.map(([category]) => category);
 const names = (groups: ReturnType<typeof groupSkillsForDepartment>) =>

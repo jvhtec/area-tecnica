@@ -11,9 +11,11 @@
 --    in the group was. Holders of the other rows move to it; a technician who
 --    already has it keeps their existing row.
 -- 2. Make lower(name) unique so it cannot happen again.
--- 3. Publish skills to realtime, so the skills filter picks up skills created
---    or edited in settings without a reload (SELECT is open to everyone, and
---    the catalog changes a handful of times a year).
+-- 3. Publish skills and role_skill_mapping to realtime, so skills created or
+--    edited in settings (by any department's management) reach the matrix
+--    skills filter, the profile skill picker and other open settings screens
+--    without a reload. Both are readable by every signed-in user and change a
+--    handful of times a year.
 
 do $$
 declare
@@ -67,12 +69,16 @@ $$;
 create unique index if not exists skills_name_lower_key on public.skills (lower(name));
 
 do $$
+declare
+  v_table text;
 begin
-  if not exists (
-    select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'skills'
-  ) then
-    alter publication supabase_realtime add table public.skills;
-  end if;
+  foreach v_table in array array['skills', 'role_skill_mapping'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = v_table
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', v_table);
+    end if;
+  end loop;
 end;
 $$;

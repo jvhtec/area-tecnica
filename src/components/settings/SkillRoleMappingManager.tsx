@@ -9,11 +9,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
+import { useSkillCatalogRealtime } from '@/hooks/realtime/useSkillCatalogRealtime'
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth'
 import { queryKeys } from '@/lib/react-query'
 import { dataLayerClient } from '@/services/dataLayerClient'
 import { DEPARTMENT_LABELS, TECHNICAL_DEPARTMENTS, type TechnicalDepartment } from '@/types/department'
 import { roleOptionsForDiscipline } from '@/types/roles'
+import { describeSkillWriteError, skillCategoryLabel } from '@/utils/skillCatalog'
 
 type Skill = {
   id: string
@@ -175,6 +177,7 @@ export function SkillRoleMappingManager() {
   const [selectedWeight, setSelectedWeight] = useState('1')
 
   const isManagementUser = userRole === 'admin' || userRole === 'management'
+  useSkillCatalogRealtime(isManagementUser)
 
   const { data: skills = EMPTY_SKILLS, isLoading: skillsLoading } = useQuery({
     queryKey: SKILLS_QUERY_KEY,
@@ -302,6 +305,12 @@ export function SkillRoleMappingManager() {
       if (!canManageSkillCategory(newSkillCategory, userRole, userDepartment)) {
         throw new Error('No puedes crear habilidades en esa categoria')
       }
+      const existing = skillByName.get(name)
+      if (existing) {
+        throw new Error(existing.active
+          ? 'Ya existe una habilidad con ese nombre.'
+          : 'Ya existe una habilidad con ese nombre, desactivada: actívala en la lista.')
+      }
 
       const { error } = await dataLayerClient
         .from('skills')
@@ -322,7 +331,7 @@ export function SkillRoleMappingManager() {
     onError: (error) => {
       toast({
         title: 'No se pudo crear la habilidad',
-        description: error instanceof Error ? error.message : 'No se pudo crear la habilidad',
+        description: describeSkillWriteError(error, 'No se pudo crear la habilidad'),
         variant: 'destructive',
       })
     },
@@ -341,6 +350,8 @@ export function SkillRoleMappingManager() {
       ) {
         throw new Error('No puedes editar habilidades en esa categoria')
       }
+      const clash = skillByName.get(name)
+      if (clash && clash.id !== skill.id) throw new Error('Ya existe una habilidad con ese nombre.')
 
       const { error } = await dataLayerClient
         .from('skills')
@@ -360,7 +371,7 @@ export function SkillRoleMappingManager() {
     onError: (error) => {
       toast({
         title: 'No se pudo guardar la habilidad',
-        description: error instanceof Error ? error.message : 'No se pudo actualizar la habilidad',
+        description: describeSkillWriteError(error, 'No se pudo actualizar la habilidad'),
         variant: 'destructive',
       })
     },
@@ -498,7 +509,7 @@ export function SkillRoleMappingManager() {
             <SelectContent>
               {categoryOptions.map((category) => (
                 <SelectItem key={category} value={category}>
-                  {category}
+                  {skillCategoryLabel(category)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -560,7 +571,7 @@ export function SkillRoleMappingManager() {
                   <SelectContent>
                     {categoryOptions.map((category) => (
                       <SelectItem key={category} value={category}>
-                        {category}
+                        {skillCategoryLabel(category)}
                       </SelectItem>
                     ))}
                   </SelectContent>

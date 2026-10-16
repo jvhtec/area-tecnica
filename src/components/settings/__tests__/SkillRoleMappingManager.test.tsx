@@ -26,12 +26,17 @@ vi.mock('@/hooks/useOptimizedAuth', () => ({
   useOptimizedAuth: (...args: unknown[]) => useOptimizedAuthMock(...args),
 }))
 
+vi.mock('@/hooks/realtime/useSkillCatalogRealtime', () => ({
+  useSkillCatalogRealtime: vi.fn(),
+}))
+
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: toastMock }),
   toast: (...args: unknown[]) => toastMock(...args),
 }))
 
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
+import { ACTIVE_SKILLS_QUERY_KEY } from '@/hooks/useActiveSkills'
 
 type SkillRow = {
   id: string
@@ -56,7 +61,9 @@ type QueryResult = {
 
 const createdAt = '2026-05-19T10:00:00.000Z'
 
-function createQueryBuilder(table: string, state: { skills: SkillRow[]; mappings: MappingRow[] }) {
+type CatalogState = { skills: SkillRow[]; mappings: MappingRow[]; insertError?: unknown }
+
+function createQueryBuilder(table: string, state: CatalogState) {
   const filters: Array<[string, unknown]> = []
   let operation: 'select' | 'insert' | 'update' | 'delete' = 'select'
   let payload: any = null
@@ -90,6 +97,7 @@ function createQueryBuilder(table: string, state: { skills: SkillRow[]; mappings
   const run = (): QueryResult => {
     if (table === 'skills') {
       if (operation === 'insert') {
+        if (state.insertError) return { data: null, error: state.insertError }
         state.skills.push({
           id: `skill-${state.skills.length + 1}`,
           name: payload.name,
@@ -163,15 +171,18 @@ function setup({
   mappings = [],
   userRole = 'admin',
   userDepartment = 'sound',
+  insertError,
 }: {
   skills?: SkillRow[]
   mappings?: MappingRow[]
   userRole?: string
   userDepartment?: string
+  insertError?: unknown
 } = {}) {
-  const state = {
+  const state: CatalogState = {
     skills: [...skills],
     mappings: [...mappings],
+    insertError,
   }
 
   useOptimizedAuthMock.mockReturnValue({
@@ -208,6 +219,56 @@ describe('SkillRoleMappingManager', () => {
           }),
         ]),
       )
+    })
+  })
+
+  it('refreshes the shared active catalog (matrix filter, profile picker) after creating a skill', async () => {
+    const user = userEvent.setup()
+    const { queryClient } = setup({ skills: [], userRole: 'management', userDepartment: 'lights' })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await user.type(screen.getByLabelText(/^Nombre$/), 'Cañón')
+    await user.click(screen.getByRole('button', { name: /crear/i }))
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith({ title: 'Habilidad creada' }))
+    // TanStack invalidation is by prefix: the catalog key covers the active list.
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey)
+    expect(keys.some((key) => Array.isArray(key)
+      && key.every((part, index) => ACTIVE_SKILLS_QUERY_KEY[index] === part))).toBe(true)
+  })
+
+  it('rejects a name that already exists in another case without inserting', async () => {
+    const user = userEvent.setup()
+    const { state } = setup({ userRole: 'admin' })
+    await screen.findByLabelText('foh nombre de habilidad')
+
+    await user.type(screen.getByLabelText(/^Nombre$/), ' FOH ')
+    await user.click(screen.getByRole('button', { name: /crear/i }))
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'No se pudo crear la habilidad',
+        description: 'Ya existe una habilidad con ese nombre.',
+      }))
+    })
+    expect(state.skills.filter((skill) => skill.name === 'foh')).toHaveLength(1)
+  })
+
+  it('explains a server rejection in Spanish', async () => {
+    const user = userEvent.setup()
+    setup({
+      skills: [],
+      userRole: 'admin',
+      insertError: { code: '42501', message: 'new row violates row-level security policy for table "skills"' },
+    })
+
+    await user.type(screen.getByLabelText(/^Nombre$/), 'cañón')
+    await user.click(screen.getByRole('button', { name: /crear/i }))
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        description: 'No puedes gestionar habilidades en esa categoría.',
+      }))
     })
   })
 

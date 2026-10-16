@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Filter } from 'lucide-react';
 import { useActiveSkills } from '@/hooks/useActiveSkills';
-import { groupSkillsForDepartment, normalizeSkillKey, skillCategoryLabel } from './skillsFilterGroups';
+import { groupSkillsForDepartment, normalizeSkillKey, skillCategoryLabel } from '@/utils/skillCatalog';
 
 interface SkillsFilterProps {
   selected: string[]; // skill names

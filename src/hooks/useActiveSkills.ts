@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
+import type { CatalogSkill } from "@/utils/skillCatalog";
 
-export type ActiveSkill = { id: string; name: string; category: string | null };
+export type ActiveSkill = CatalogSkill;
 
 /**
  * The active skill catalog. Lives under the settings catalog key

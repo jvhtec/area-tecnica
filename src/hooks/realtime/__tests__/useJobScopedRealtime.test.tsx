@@ -24,6 +24,7 @@ vi.mock("@/lib/unified-subscription-manager", () => ({
 import { scopeIdFromPayload, useJobScopedRealtime } from "@/hooks/realtime/useJobScopedRealtime";
 import { useJobCardsRealtime } from "@/features/jobs/job-card-new/useJobCardsRealtime";
 import { useMatrixJobsRealtime } from "@/pages/job-assignment-matrix/useMatrixJobsRealtime";
+import { useSkillCatalogRealtime } from "@/hooks/realtime/useSkillCatalogRealtime";
 
 const setup = () => {
   const client = new QueryClient();
@@ -140,5 +141,34 @@ describe("useMatrixJobsRealtime", () => {
 
     unmount();
     expect(manager.cleaned).toEqual([owner]);
+  });
+});
+
+describe("useSkillCatalogRealtime", () => {
+  beforeEach(() => {
+    manager.subscriptions = [];
+    manager.cleaned = [];
+  });
+
+  it("refreshes the shared skill catalog and role mappings on any change", () => {
+    const { wrapper } = setup();
+    const { unmount } = renderHook(() => useSkillCatalogRealtime(), { wrapper });
+
+    expect(manager.subscriptions.map((s) => [s.table, s.queryKey])).toEqual([
+      ["skills", ["skill_catalog"]],
+      ["role_skill_mapping", ["role_skill_mappings"]],
+    ]);
+    // Default (prefix) invalidation, so ['skill_catalog', 'active'] refreshes too.
+    expect(manager.subscriptions.every((s) => s.options.invalidateOnPayload === undefined)).toBe(true);
+
+    const owner = manager.subscriptions[0]?.options.ownerRoute;
+    unmount();
+    expect(manager.cleaned).toEqual([owner]);
+  });
+
+  it("does not subscribe while disabled", () => {
+    const { wrapper } = setup();
+    renderHook(() => useSkillCatalogRealtime(false), { wrapper });
+    expect(manager.subscriptions).toHaveLength(0);
   });
 });

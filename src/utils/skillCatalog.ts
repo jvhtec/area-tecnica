@@ -1,6 +1,9 @@
-import type { ActiveSkill } from '@/hooks/useActiveSkills';
+import { getErrorMessage } from '@/utils/errorMessage';
 
-type Skill = ActiveSkill;
+/** A skill as the catalog lists it. */
+export type CatalogSkill = { id: string; name: string; category: string | null };
+
+type Skill = CatalogSkill;
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'General',
@@ -26,7 +29,7 @@ export const normalizeSkillKey = (value: string | null | undefined) => (value ||
  * rest (rigging is a production skill, but lights crews have it too). Names
  * match case-insensitively, so a name is listed once.
  */
-export function groupSkillsForDepartment(skills: Skill[], department?: string | null): Array<[string, Skill[]]> {
+export function groupSkillsForDepartment<T extends Skill>(skills: T[], department?: string | null): Array<[string, T[]]> {
   const dept = normalizeSkillKey(department);
   const rank = (category: string) => {
     if (dept && (category === dept || category.startsWith(`${dept}-`))) return 0;
@@ -35,7 +38,7 @@ export function groupSkillsForDepartment(skills: Skill[], department?: string | 
   };
 
   const seen = new Set<string>();
-  const groups = new Map<string, Skill[]>();
+  const groups = new Map<string, T[]>();
   for (const skill of skills) {
     const key = normalizeSkillKey(skill.name);
     if (!key || seen.has(key)) continue;
@@ -46,9 +49,25 @@ export function groupSkillsForDepartment(skills: Skill[], department?: string | 
   }
 
   return Array.from(groups.entries())
-    .map(([category, list]): [string, Skill[]] => [
+    .map(([category, list]): [string, T[]] => [
       category,
       [...list].sort((a, b) => a.name.localeCompare(b.name, 'es')),
     ])
     .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+const errorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object' || !('code' in error)) return undefined;
+  const { code } = error as { code?: unknown };
+  return typeof code === 'string' ? code : undefined;
+};
+
+/** A readable reason for a rejected skill insert or update. */
+export function describeSkillWriteError(error: unknown, fallback: string): string {
+  const code = errorCode(error);
+  if (code === '23505') return 'Ya existe una habilidad con ese nombre.';
+  if (code === '42501' || /row-level security/i.test(getErrorMessage(error, ''))) {
+    return 'No puedes gestionar habilidades en esa categoría.';
+  }
+  return getErrorMessage(error, fallback);
 }
