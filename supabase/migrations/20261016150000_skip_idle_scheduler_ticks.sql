@@ -126,6 +126,7 @@ begin
     where sc.status = 'active'
       and sc.next_run_at is not null
       and sc.next_run_at <= now()
+      and sc.run_lock is null
   ) then
     return;
   end if;

@@ -26,10 +26,19 @@ export type JobScopedRealtimeSource = {
 // first refreshes at once, the rest of the burst adds one trailing refresh.
 const REFRESH_WINDOW_MS = 300;
 
-export function scopeIdFromPayload(payload: RealtimeChangePayload, column: string | null): string | null {
-  if (!column) return null;
-  const value = payload.new?.[column] ?? payload.old?.[column];
-  return typeof value === "string" && value ? value : null;
+/**
+ * The scope ids a change touches: the new row's and, when the old row carries
+ * it (DELETE, or REPLICA IDENTITY FULL), the old row's too, so a row moved
+ * from one job to another refreshes both cards.
+ */
+export function scopeIdsFromPayload(payload: RealtimeChangePayload, column: string | null): string[] {
+  if (!column) return [];
+  const ids = new Set<string>();
+  for (const row of [payload.new, payload.old]) {
+    const value = row?.[column];
+    if (typeof value === "string" && value) ids.add(value);
+  }
+  return Array.from(ids);
 }
 
 /**
@@ -73,7 +82,9 @@ export function useJobScopedRealtime(name: string, sources: JobScopedRealtimeSou
           ownerRoute: owner,
           invalidateOnPayload: false,
           onPayload: (payload) => {
-            source.keys(scopeIdFromPayload(payload, column)).forEach(refresh);
+            const ids = scopeIdsFromPayload(payload, column);
+            const keys = ids.length ? ids.flatMap((id) => source.keys(id)) : source.keys(null);
+            keys.forEach(refresh);
           },
         },
       );

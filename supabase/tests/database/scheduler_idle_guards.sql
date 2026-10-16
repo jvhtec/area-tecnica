@@ -3,7 +3,7 @@
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET search_path TO public, extensions;
 BEGIN;
-SELECT plan(4);
+SELECT plan(5);
 
 -- Without a push_cron_config row, a tick that passes its guard logs
 -- 'Push cron config not set up'; a guarded tick logs nothing.
@@ -34,6 +34,11 @@ SELECT is(
 SELECT ok(
   pg_get_functiondef('public.invoke_staffing_sweeper()'::regprocedure) ~* 'staffing_campaigns[\s\S]*next_run_at <= now\(\)[\s\S]*net\.http_post',
   'the staffing sweeper checks for a due campaign before calling out'
+);
+
+SELECT ok(
+  pg_get_functiondef('public.invoke_staffing_sweeper()'::regprocedure) ~* 'next_run_at <= now\(\)\s+and sc\.run_lock is null[\s\S]*net\.http_post',
+  'like get_campaigns_to_tick(), the sweeper guard ignores campaigns another tick has locked'
 );
 
 SELECT * FROM finish();

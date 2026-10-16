@@ -13,11 +13,11 @@ import {
  * would otherwise be ticked every few minutes forever.
  *
  * Returns the closure reason when the campaign was stopped, null while it can
- * still run, or an error message.
+ * still run (or another tick took its lock meanwhile), or an error message.
  */
 export async function closeCampaignIfJobOver(
   supabase: SupabaseClient,
-  campaign: { id: string; job_id: string | null },
+  campaign: { id: string; job_id: string | null; run_lock?: string | null },
   now: Date,
 ): Promise<{ closed: CampaignClosureReason } | { error: string } | null> {
   const { data: job, error: jobError } = await supabase
@@ -30,12 +30,18 @@ export async function closeCampaignIfJobOver(
   const reason = campaignClosureReason(job, now);
   if (!reason) return null;
 
-  const { error: closeError } = await supabase
+  // Compare-and-swap on the lock read with the campaign (null, or a stale one
+  // the caller has already judged dead), so a tick that took the lock since
+  // keeps it; that tick closes the campaign itself next time.
+  let closeQuery = supabase
     .from("staffing_campaigns")
     .update({ status: "stopped", run_lock: null, next_run_at: null, updated_at: now.toISOString() })
     .eq("id", campaign.id)
     .eq("status", "active");
+  closeQuery = campaign.run_lock ? closeQuery.eq("run_lock", campaign.run_lock) : closeQuery.is("run_lock", null);
+  const { data: closed, error: closeError } = await closeQuery.select("id");
   if (closeError) return { error: closeError.message };
+  if (!closed?.length) return null;
 
   const { error: eventError } = await supabase
     .from("staffing_campaign_events")

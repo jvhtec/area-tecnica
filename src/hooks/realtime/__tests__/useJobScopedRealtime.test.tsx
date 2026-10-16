@@ -21,7 +21,7 @@ vi.mock("@/lib/unified-subscription-manager", () => ({
   },
 }));
 
-import { scopeIdFromPayload, useJobScopedRealtime } from "@/hooks/realtime/useJobScopedRealtime";
+import { scopeIdsFromPayload, useJobScopedRealtime } from "@/hooks/realtime/useJobScopedRealtime";
 import { useJobCardsRealtime } from "@/features/jobs/job-card-new/useJobCardsRealtime";
 import { useMatrixJobsRealtime } from "@/pages/job-assignment-matrix/useMatrixJobsRealtime";
 import { useSkillCatalogRealtime } from "@/hooks/realtime/useSkillCatalogRealtime";
@@ -49,10 +49,21 @@ describe("useJobScopedRealtime", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("reads the scope id from the new row, or the old one on delete", () => {
-    expect(scopeIdFromPayload({ new: { job_id: "a" } }, "job_id")).toBe("a");
-    expect(scopeIdFromPayload({ new: {}, old: { job_id: "b" } }, "job_id")).toBe("b");
-    expect(scopeIdFromPayload({ new: { job_id: "a" } }, null)).toBeNull();
+  it("reads the scope ids from the new row and the old one", () => {
+    expect(scopeIdsFromPayload({ new: { job_id: "a" } }, "job_id")).toEqual(["a"]);
+    expect(scopeIdsFromPayload({ new: {}, old: { job_id: "b" } }, "job_id")).toEqual(["b"]);
+    expect(scopeIdsFromPayload({ new: { job_id: "a" }, old: { job_id: "a" } }, "job_id")).toEqual(["a"]);
+    expect(scopeIdsFromPayload({ new: { job_id: "a" }, old: { job_id: "b" } }, "job_id")).toEqual(["a", "b"]);
+    expect(scopeIdsFromPayload({ new: { job_id: "a" } }, null)).toEqual([]);
+  });
+
+  it("refreshes both cards when a row moves to another job", () => {
+    const { invalidate, wrapper } = setup();
+    renderHook(() => useJobCardsRealtime(), { wrapper });
+
+    emit("logistics_events", { new: { job_id: "job-new" }, old: { job_id: "job-old" } });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["logistics-events-for-job", "job-new"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["logistics-events-for-job", "job-old"] });
   });
 
   it("covers WhatsApp groups and calculator defaults per card", () => {

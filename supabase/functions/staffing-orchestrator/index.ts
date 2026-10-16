@@ -567,10 +567,6 @@ async function tickCampaign(
       return { status: 400, body: { error: 'Campaign not active' } };
     }
 
-    const closure = await closeCampaignIfJobOver(supabase, campaign, now);
-    if (closure && 'error' in closure) return { status: 500, body: { error: closure.error } };
-    if (closure) return { status: 200, body: { campaign_id, closed: closure.closed } };
-
     // Check if already locked (crash recovery: >15min assumed dead)
     if (campaign.run_lock && campaign.last_run_at) {
       const lockAgeMin =
@@ -582,6 +578,11 @@ async function tickCampaign(
         `[staffing-orchestrator] Recovering from stale lock on ${campaign_id}, lockAge=${lockAgeMin}min`,
       );
     }
+
+    // After the live-lock check: never close a campaign out from under a running tick.
+    const closure = await closeCampaignIfJobOver(supabase, campaign, now);
+    if (closure && 'error' in closure) return { status: 500, body: { error: closure.error } };
+    if (closure) return { status: 200, body: { campaign_id, closed: closure.closed } };
 
     // Acquire lock (compare-and-swap)
     let lockQuery = supabase
