@@ -8,6 +8,7 @@ const DEPT_PREFIXES = new Set([
   "lights",
   "video",
   "production",
+  "personnel",
   "logistics",
   "administrative",
 ]);

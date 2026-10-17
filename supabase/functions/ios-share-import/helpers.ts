@@ -45,7 +45,7 @@ export type JobRow = {
  */
 export function jobOption(job: JobRow): string {
   const clean = (value: string) => value.replace(/[\r\n|]/g, " ").trim();
-  const date = job.start_time ? String(job.start_time).slice(0, 10) : "sin fecha";
+  const date = job.start_time ? madridDate(job.start_time) : "sin fecha";
   const title = clean(String(job.title ?? "Sin título")).slice(0, 110);
   const tour = job.tourName ? clean(job.tourName).slice(0, 60) : "";
   const type = job.job_type === "tourdate"
@@ -110,12 +110,24 @@ export function madridDate(value: string | Date): string {
   return MADRID_DATE.format(typeof value === "string" ? new Date(value) : value);
 }
 
+const MADRID_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+
 /**
  * Start of "today" in Madrid, as an ISO instant, for the upcoming-jobs filter.
- * Uses the summer offset (UTC+2), so in winter it errs an hour early, which
- * only keeps a job that ended just before midnight visible a little longer.
+ * The UTC offset is read for that date, so it is exact in winter (UTC+1) and
+ * summer (UTC+2). Clock changes happen at 01:00 UTC, after the 00:00 UTC
+ * instant sampled here, so the offset also holds at Madrid midnight.
  */
 export function upcomingCutoffIso(now: Date = new Date()): string {
   const [year, month, day] = madridDate(now).split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day) - 2 * 3_600_000).toISOString();
+  const utcMidnight = Date.UTC(year, month - 1, day);
+  const parts = MADRID_PARTS.formatToParts(new Date(utcMidnight));
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const madridAtUtcMidnight = Date.UTC(
+    value("year"), value("month") - 1, value("day"), value("hour"), value("minute"), value("second"),
+  );
+  return new Date(utcMidnight - (madridAtUtcMidnight - utcMidnight)).toISOString();
 }

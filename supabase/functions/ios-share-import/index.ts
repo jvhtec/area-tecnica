@@ -5,7 +5,8 @@ import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
 import { joinedSingle } from "../_shared/joins.ts";
 import {
-  acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobOption, STALE_UPLOAD_MS, upcomingCutoffIso,
+  acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobOption, madridDate, STALE_UPLOAD_MS,
+  upcomingCutoffIso,
   RIDER_EXCLUDED_JOB_TYPES, validArtistName, validFileName, validIsoDate,
 } from "./helpers.ts";
 import { documentTarget, type ImportTarget, riderTarget, tourDocumentTarget } from "./destinations.ts";
@@ -255,7 +256,7 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
     const tourName = joinedSingle(tour)?.name ?? null;
     return {
       id: job.id, title: job.title,
-      date: job.start_time ? String(job.start_time).slice(0, 10) : "sin fecha",
+      date: job.start_time ? madridDate(job.start_time) : "sin fecha",
       job_type: job.job_type, tour_id: job.tour_id, tour_date_id: job.tour_date_id,
       tour_name: tourName,
       option: jobOption({ ...rest, tourName }),
@@ -376,6 +377,15 @@ async function upload(req: Request, admin: DB): Promise<Response> {
     if (Date.now() - Date.parse(existing.created_at) < STALE_UPLOAD_MS) {
       throw new ApiError(409, "upload_in_progress");
     }
+    // Atomically claim the abandoned receipt so only one late retry reuses it;
+    // the others see a changed created_at and get the in-progress conflict.
+    const { data: claimed, error: claimError } = await admin.from("ios_share_import_receipts")
+      .update({ created_at: new Date().toISOString() })
+      .eq("id", existing.id).eq("created_at", existing.created_at).is(target.confirmColumn, null)
+      .select("*").maybeSingle();
+    requireResult(claimError);
+    if (!claimed) throw new ApiError(409, "upload_in_progress");
+    receipt = claimed as Receipt;
     // The abandoned upload is older than STALE_UPLOAD_MS and has no metadata row.
     const { error: removeError } = await admin.storage.from(target.bucket).remove([path]);
     if (removeError) throw new ApiError(503, "stale_upload_cleanup_failed");
@@ -409,10 +419,12 @@ async function upload(req: Request, admin: DB): Promise<Response> {
       await admin.storage.from(target.bucket).remove([path]);
       throw insertError;
     }
-    const { error: confirmationError } = await admin.from("ios_share_import_receipts")
+    const { data: confirmed, error: confirmationError } = await admin.from("ios_share_import_receipts")
       .update({ [target.confirmColumn]: recordId, completed_at: new Date().toISOString() })
-      .eq("id", receipt.id);
+      .eq("id", receipt.id).select("id").maybeSingle();
     requireResult(confirmationError, "receipt_confirmation_failed");
+    // A receipt that is gone means another retry took over: do not report success for it.
+    if (!confirmed) throw new ApiError(409, "upload_in_progress");
     await target.afterConfirm(name, actor.id);
     return json({ ok: true, ...target.response(), [target.confirmColumn]: recordId, file_name: name }, 201);
   } catch (error) {

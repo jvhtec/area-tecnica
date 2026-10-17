@@ -49,7 +49,7 @@ function json(body: unknown, status = 200) {
 function resolveJobDocBucket(path: string): string {
   const first = (path || "").split("/")[0];
   if (first === "soundvision-files") return "soundvision-files";
-  const DEPT_PREFIXES = new Set(["sound", "lights", "video", "production", "logistics", "administrative"]);
+  const DEPT_PREFIXES = new Set(["sound", "lights", "video", "production", "personnel", "logistics", "administrative"]);
   return DEPT_PREFIXES.has(first) ? "job_documents" : "job-documents";
 }
 

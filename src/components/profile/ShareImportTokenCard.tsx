@@ -25,6 +25,7 @@ export function ShareImportTokenCard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [label, setLabel] = useState("Mi iPhone");
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [newTokenId, setNewTokenId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -56,9 +57,11 @@ export function ShareImportTokenCard() {
   const create = async () => {
     setLoading(true);
     setNewToken(null);
+    setNewTokenId(null);
     try {
       const result = await call("pair", { label });
       setNewToken(result.token);
+      setNewTokenId(result.device?.id ?? null);
       await refresh();
     } catch (error) {
       toast({
@@ -73,7 +76,11 @@ export function ShareImportTokenCard() {
     setLoading(true);
     try {
       await call("revoke", { token_id: id });
-      setNewToken(null);
+      // The secret is shown once: only hide it when its own device is the one revoked.
+      if (id === newTokenId) {
+        setNewToken(null);
+        setNewTokenId(null);
+      }
       await refresh();
       toast({ title: "Dispositivo revocado" });
     } catch (error) {

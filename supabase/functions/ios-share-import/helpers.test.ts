@@ -55,6 +55,12 @@ describe('jobOption', () => {
     expect(jobOption({ ...base, job_type: 'tourdate' })).toContain('| Fecha de gira |')
   })
 
+  it('shows the Madrid calendar day, not the UTC one', () => {
+    // 00:30 in Madrid (summer) is still the previous day in UTC.
+    const option = jobOption({ ...base, job_type: 'evento', start_time: '2026-10-19T22:30:00Z' })
+    expect(option.startsWith('2026-10-20 | ')).toBe(true)
+  })
+
   it('tolerates missing date and title', () => {
     expect(jobOption({ ...base, title: null, start_time: null, job_type: null })).toBe('sin fecha | Trabajo | Sin título | abc')
   })
@@ -121,5 +127,16 @@ describe('madridDate / upcomingCutoffIso', () => {
     expect(upcomingCutoffIso(new Date('2026-07-15T10:00:00Z'))).toBe('2026-07-14T22:00:00.000Z')
     // Just after midnight in Madrid is already the next day.
     expect(upcomingCutoffIso(new Date('2026-07-14T22:30:00Z'))).toBe('2026-07-14T22:00:00.000Z')
+  })
+
+  it('uses the winter offset (UTC+1) exactly, not the summer one', () => {
+    expect(upcomingCutoffIso(new Date('2026-01-15T10:00:00Z'))).toBe('2026-01-14T23:00:00.000Z')
+  })
+
+  it('stays exact on the days the clocks change', () => {
+    // 2026-03-29: Madrid goes CET -> CEST at 01:00 UTC; midnight is still CET.
+    expect(upcomingCutoffIso(new Date('2026-03-29T12:00:00Z'))).toBe('2026-03-28T23:00:00.000Z')
+    // 2026-10-25: CEST -> CET at 01:00 UTC; midnight is still CEST.
+    expect(upcomingCutoffIso(new Date('2026-10-25T12:00:00Z'))).toBe('2026-10-24T22:00:00.000Z')
   })
 })
