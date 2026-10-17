@@ -43,6 +43,14 @@ const showDestination = () => {
   $('artistSection').hidden = !rider;
   $('departmentSection').hidden = rider;
 };
+// Show date, type and title only. Older server responses carry just `option`
+// ("date | type | title | uuid"), so drop its trailing id rather than show it.
+const jobLabel = (job) => String(
+  job.label
+    || String(job.option || '').replace(/ \| [0-9a-f]{8}-[0-9a-f-]{27}$/i, '')
+    || job.title
+    || 'Trabajo',
+);
 async function loadJobs() {
   if (!state.ready || state.committed) return;
   const currentValue = $('job').value;
@@ -61,7 +69,7 @@ async function loadJobs() {
     $('job').replaceChildren(new Option('Selecciona un trabajo', ''));
     for (const job of data.jobs || []) {
       if (job && typeof job.id === 'string') {
-        $('job').add(new Option(String(job.option || job.title || job.id), job.id));
+        $('job').add(new Option(jobLabel(job), job.id));
       }
     }
     $('job').value = currentValue;

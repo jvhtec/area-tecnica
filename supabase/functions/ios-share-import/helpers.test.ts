@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  acceptsRiders, escapeLike, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, tourDocumentPath, upcomingCutoffIso,
+  acceptsRiders, escapeLike, jobLabel, jobOption, madridDate, objectPath, riderPath, STALE_UPLOAD_MS, tourDocumentPath, upcomingCutoffIso,
   validArtistName, validFileName, validIsoDate,
 } from './helpers'
 
@@ -45,7 +45,7 @@ describe('jobOption', () => {
 
   it('puts the id last and removes the separator from titles', () => {
     const option = jobOption({ ...base, job_type: 'festival' })
-    expect(option).toBe('2026-10-20 | festival | Festival   Norte | abc')
+    expect(option).toBe('2026-10-20 | Festival | Festival   Norte | abc')
     expect(option.split(' | ').at(-1)).toBe('abc')
   })
 
@@ -63,6 +63,28 @@ describe('jobOption', () => {
 
   it('tolerates missing date and title', () => {
     expect(jobOption({ ...base, title: null, start_time: null, job_type: null })).toBe('sin fecha | Trabajo | Sin título | abc')
+  })
+})
+
+describe('jobLabel', () => {
+  const base = { id: '8b55cbd2-3a74-48cc-8c5d-6bbe1d5a4c8e', title: 'Art in motion', start_time: '2026-10-13T08:00:00Z', tour_id: null, tour_date_id: null }
+
+  it('shows date, type and title, and never the internal id', () => {
+    const label = jobLabel({ ...base, job_type: 'festival' })
+    expect(label).toBe('2026-10-13 · Festival · Art in motion')
+    expect(label).not.toContain(base.id)
+  })
+
+  it('uses readable type names and names the tour on a tour date', () => {
+    expect(jobLabel({ ...base, job_type: 'evento' })).toContain(' · Evento · ')
+    expect(jobLabel({ ...base, job_type: 'single' })).toContain(' · Trabajo · ')
+    expect(jobLabel({ ...base, job_type: 'tourdate', tourName: 'Gira Verano' })).toContain(' · Fecha de gira (Gira Verano) · ')
+  })
+
+  it('keeps the Shortcut option format: the id is the last " | " segment', () => {
+    const option = jobOption({ ...base, job_type: 'festival' })
+    expect(option.split(' | ').at(-1)).toBe(base.id)
+    expect(option.split(' | ').slice(0, -1).join(' · ')).toBe(jobLabel({ ...base, job_type: 'festival' }))
   })
 })
 
