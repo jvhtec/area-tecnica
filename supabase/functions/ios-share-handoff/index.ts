@@ -1,5 +1,4 @@
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {ROOT,SOURCE,MAX,BUCKET,HEAD,admin,auth,filename,seal,unseal,ErrorCode,type Ticket} from "./security.ts";
 async function rateHash(value:string){const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)));return [...bytes].map(b=>b.toString(16).padStart(2,"0")).join("")}
 function json(data:unknown,status=200){return Response.json(data,{status,headers:HEAD})}
