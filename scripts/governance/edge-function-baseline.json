@@ -79,6 +79,16 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
+      "functionName": "ios-share-handoff",
+      "path": "supabase/functions/ios-share-handoff/index.ts",
+      "reason": "Reviewed exception: authenticates scoped device credentials and short-lived AES-GCM browser tickets, accepts bounded raw binary requests, and returns plain-text URL/error redirect responses for native iOS Shortcuts. Public exposure is separately governed in edge-function-exposure.json."
+    },
+    {
+      "functionName": "ios-share-shortcut-handoff",
+      "path": "supabase/functions/ios-share-shortcut-handoff/index.ts",
+      "reason": "Reviewed exception: read-only public distribution of a fixed, credential-free Apple Shortcuts template via a signing service; requires binary AEA1 responses, not createHttpHandler JSON behavior. No privileged user data access."
+    },
+    {
       "functionName": "manage-flex-crew-assignments",
       "path": "supabase/functions/manage-flex-crew-assignments/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
