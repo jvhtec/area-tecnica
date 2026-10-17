@@ -4,7 +4,7 @@ SET search_path TO public, extensions;
 
 BEGIN;
 
-SELECT plan(19);
+SELECT plan(18);
 
 SELECT has_table('public', 'ios_share_import_tokens', 'token table exists');
 SELECT has_table('public', 'ios_share_import_receipts', 'receipt table exists');
