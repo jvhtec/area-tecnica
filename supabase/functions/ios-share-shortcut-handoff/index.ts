@@ -1,33 +1,67 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
+
 // Immutable, audited nine-action template. No runtime plist parsing or npm dependency.
 const TEMPLATE="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n  <dict>\n    <key>WFWorkflowName</key>\n    <string>Enviar a Área Técnica (v4)</string>\n    <key>WFWorkflowActions</key>\n    <array>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.gettext</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>WFTextActionText</key>\n          <string>PASTE_ATI_DEVICE_TOKEN_HERE</string>\n          <key>UUID</key>\n          <string>BECD01A2-5DF7-4EF0-A4EE-E202406DB4AC</string>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.setvariable</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>WFVariableName</key>\n          <string>Token</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>ActionOutput</string>\n              <key>OutputUUID</key>\n              <string>BECD01A2-5DF7-4EF0-A4EE-E202406DB4AC</string>\n            </dict>\n          </dict>\n          <key>UUID</key>\n          <string>944A191D-F615-47F1-B479-73BCD6CFA79B</string>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.setvariable</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>WFVariableName</key>\n          <string>File</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>ExtensionInput</string>\n            </dict>\n          </dict>\n          <key>UUID</key>\n          <string>0002FDF7-86FB-45DC-B73F-56B7B0451214</string>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.properties.files</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>WFContentItemPropertyName</key>\n          <string>Name</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>Variable</string>\n              <key>VariableName</key>\n              <string>File</string>\n            </dict>\n          </dict>\n          <key>UUID</key>\n          <string>FDFBFAA2-4832-441B-887D-50EEF2234B54</string>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.setvariable</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>WFVariableName</key>\n          <string>FileName</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>ActionOutput</string>\n              <key>OutputUUID</key>\n              <string>FDFBFAA2-4832-441B-887D-50EEF2234B54</string>\n            </dict>\n          </dict>\n          <key>UUID</key>\n          <string>F28834A2-7749-4E8D-A1F6-525E891AB3C7</string>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.urlencode</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>UUID</key>\n          <string>2FD812AC-0DEE-44AE-B2D9-1888FD41283C</string>\n          <key>WFEncodeMode</key>\n          <string>Encode</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>Variable</string>\n              <key>VariableName</key>\n              <string>FileName</string>\n            </dict>\n          </dict>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.downloadurl</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>UUID</key>\n          <string>ADAA8282-EEA4-4398-9D92-7730D84B0D49</string>\n          <key>WFURL</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenString</string>\n            <key>Value</key>\n            <dict>\n              <key>string</key>\n              <string>https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/ios-share-handoff?raw=1&amp;plain=1&amp;filename=￼</string>\n              <key>attachmentsByRange</key>\n              <dict>\n                <key>{95, 1}</key>\n                <dict>\n                  <key>Type</key>\n                  <string>ActionOutput</string>\n                  <key>OutputUUID</key>\n                  <string>2FD812AC-0DEE-44AE-B2D9-1888FD41283C</string>\n                </dict>\n              </dict>\n            </dict>\n          </dict>\n          <key>WFHTTPMethod</key>\n          <string>POST</string>\n          <key>WFHTTPBodyType</key>\n          <string>File</string>\n          <key>WFHTTPHeaders</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFDictionaryFieldValue</string>\n            <key>Value</key>\n            <dict>\n              <key>WFDictionaryFieldValueItems</key>\n              <array>\n                <dict>\n                  <key>WFItemType</key>\n                  <integer>0</integer>\n                  <key>WFKey</key>\n                  <dict>\n                    <key>WFSerializationType</key>\n                    <string>WFTextTokenString</string>\n                    <key>Value</key>\n                    <dict>\n                      <key>string</key>\n                      <string>X-Share-Token</string>\n                      <key>attachmentsByRange</key>\n                      <dict/>\n                    </dict>\n                  </dict>\n                  <key>WFValue</key>\n                  <dict>\n                    <key>WFSerializationType</key>\n                    <string>WFTextTokenString</string>\n                    <key>Value</key>\n                    <dict>\n                      <key>string</key>\n                      <string>￼</string>\n                      <key>attachmentsByRange</key>\n                      <dict>\n                        <key>{0, 1}</key>\n                        <dict>\n                          <key>Type</key>\n                          <string>Variable</string>\n                          <key>VariableName</key>\n                          <string>Token</string>\n                        </dict>\n                      </dict>\n                    </dict>\n                  </dict>\n                </dict>\n              </array>\n            </dict>\n          </dict>\n          <key>WFRequestVariable</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>Variable</string>\n              <key>VariableName</key>\n              <string>File</string>\n            </dict>\n          </dict>\n          <key>WFFormValues</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFDictionaryFieldValue</string>\n            <key>Value</key>\n            <dict>\n              <key>WFDictionaryFieldValueItems</key>\n              <array/>\n            </dict>\n          </dict>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.url</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>UUID</key>\n          <string>E4416246-5D03-4243-AD68-BD9D954EB119</string>\n          <key>WFURLActionURL</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenString</string>\n            <key>Value</key>\n            <dict>\n              <key>string</key>\n              <string>￼</string>\n              <key>attachmentsByRange</key>\n              <dict>\n                <key>{0, 1}</key>\n                <dict>\n                  <key>Type</key>\n                  <string>ActionOutput</string>\n                  <key>OutputUUID</key>\n                  <string>ADAA8282-EEA4-4398-9D92-7730D84B0D49</string>\n                </dict>\n              </dict>\n            </dict>\n          </dict>\n        </dict>\n      </dict>\n      <dict>\n        <key>WFWorkflowActionIdentifier</key>\n        <string>is.workflow.actions.openurl</string>\n        <key>WFWorkflowActionParameters</key>\n        <dict>\n          <key>UUID</key>\n          <string>6F12C660-018A-42B4-84BC-4B8B65B3C9BD</string>\n          <key>WFInput</key>\n          <dict>\n            <key>WFSerializationType</key>\n            <string>WFTextTokenAttachment</string>\n            <key>Value</key>\n            <dict>\n              <key>Type</key>\n              <string>ActionOutput</string>\n              <key>OutputUUID</key>\n              <string>E4416246-5D03-4243-AD68-BD9D954EB119</string>\n            </dict>\n          </dict>\n        </dict>\n      </dict>\n    </array>\n    <key>WFWorkflowIcon</key>\n    <dict>\n      <key>WFWorkflowIconGlyphNumber</key>\n      <integer>59511</integer>\n      <key>WFWorkflowIconStartColor</key>\n      <integer>946986751</integer>\n    </dict>\n    <key>WFWorkflowTypes</key>\n    <array>\n      <string>ActionExtension</string>\n    </array>\n    <key>WFWorkflowInputContentItemClasses</key>\n    <array>\n      <string>WFGenericFileContentItem</string>\n      <string>WFImageContentItem</string>\n      <string>WFPDFContentItem</string>\n      <string>WFAVAssetContentItem</string>\n      <string>WFURLContentItem</string>\n      <string>WFStringContentItem</string>\n    </array>\n    <key>WFWorkflowOutputContentItemClasses</key>\n    <array/>\n    <key>WFWorkflowHasShortcutInputVariables</key>\n    <true/>\n    <key>WFWorkflowHasOutputFallback</key>\n    <false/>\n    <key>WFWorkflowMinimumClientVersion</key>\n    <integer>900</integer>\n    <key>WFWorkflowMinimumClientVersionString</key>\n    <string>900</string>\n    <key>WFWorkflowClientVersion</key>\n    <string>2700.0.4</string>\n    <key>WFWorkflowImportQuestions</key>\n    <array/>\n  </dict>\n</plist>";
+
+const SIGNER_URL = "https://sign.shortcuty.app/api/v1/sign";
+const SHORTCUT_FILE = "Enviar_Area_Tecnica_v4.shortcut";
+
 // Public and unauthenticated, and each request calls the third-party signer,
 // so it is throttled (fail closed) before any outbound work.
-async function withinQuota(req:Request):Promise<boolean>{
- const url=Deno.env.get("SUPABASE_URL")||"",key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
- if(!url||!key)return false;
- const quota=await checkEdgeRateLimit({
-  req,supabase:createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}}),
-  scope:"ios-share-shortcut.download",windowSeconds:3600,maxRequests:30,
-  salt:Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET")??key,
- });
- return quota.allowed;
+async function withinQuota(req: Request): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    return false;
+  }
+  const quota = await checkEdgeRateLimit({
+    req,
+    supabase: createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } }),
+    scope: "ios-share-shortcut.download",
+    windowSeconds: 3600,
+    maxRequests: 30,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? key,
+  });
+  return quota.allowed;
 }
-Deno.serve(async(req:Request)=>{
- if(req.method!=="GET")return Response.json({ok:false,error:"method_not_allowed"},{status:405});
- try{if(!(await withinQuota(req)))return Response.json({ok:false,error:"rate_limited"},{status:429})}
- catch{return Response.json({ok:false,error:"rate_limit_unavailable"},{status:503})}
- if(new URL(req.url).searchParams.has("xml"))return new Response(TEMPLATE,{headers:{"Content-Type":"application/xml;charset=utf-8","Cache-Control":"no-store"}});
- try{
-  const form=new FormData();
-  form.append("file",new File([TEMPLATE],"Enviar_Area_Tecnica_v4.shortcut",{type:"application/octet-stream"}));
-  const upstream=await fetch("https://sign.shortcuty.app/api/v1/sign",{method:"POST",body:form,signal:AbortSignal.timeout(30000)});
-  const bytes=new Uint8Array(await upstream.arrayBuffer());
-  if(!upstream.ok||bytes.byteLength<1000||new TextDecoder().decode(bytes.slice(0,4))!=="AEA1")
-   return Response.json({ok:false,error:"signer_failed",status:upstream.status},{status:502});
-  if(new URL(req.url).searchParams.has("check"))
-   return Response.json({ok:true,signed:true,size:bytes.byteLength,actions:9,format:"AEA1"});
-  return new Response(bytes,{headers:{"Content-Type":"application/octet-stream","Content-Disposition":'attachment; filename="Enviar_Area_Tecnica_v4.shortcut"',"Cache-Control":"no-store"}});
- }catch{return Response.json({ok:false,error:"signer_unavailable"},{status:503})}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "GET") {
+    return Response.json({ ok: false, error: "method_not_allowed" }, { status: 405 });
+  }
+  const params = new URL(req.url).searchParams;
+  if (params.has("xml")) {
+    return new Response(TEMPLATE, {
+      headers: { "Content-Type": "application/xml;charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
+  try {
+    if (!(await withinQuota(req))) {
+      return Response.json({ ok: false, error: "rate_limited" }, { status: 429 });
+    }
+  } catch {
+    return Response.json({ ok: false, error: "rate_limit_unavailable" }, { status: 503 });
+  }
+  try {
+    const form = new FormData();
+    form.append("file", new File([TEMPLATE], SHORTCUT_FILE, { type: "application/octet-stream" }));
+    const upstream = await fetch(SIGNER_URL, { method: "POST", body: form, signal: AbortSignal.timeout(30000) });
+    const bytes = new Uint8Array(await upstream.arrayBuffer());
+    if (!upstream.ok || bytes.byteLength < 1000 || new TextDecoder().decode(bytes.slice(0, 4)) !== "AEA1") {
+      return Response.json({ ok: false, error: "signer_failed", status: upstream.status }, { status: 502 });
+    }
+    if (params.has("check")) {
+      return Response.json({ ok: true, signed: true, size: bytes.byteLength, actions: 9, format: "AEA1" });
+    }
+    return new Response(bytes, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${SHORTCUT_FILE}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch {
+    return Response.json({ ok: false, error: "signer_unavailable" }, { status: 503 });
+  }
 });
