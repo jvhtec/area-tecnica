@@ -3,7 +3,7 @@ import { isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 
-const DEPT_PREFIXES = new Set(['sound','lights','video','production','logistics','administrative']);
+const DEPT_PREFIXES = new Set(['sound','lights','video','production','personnel','logistics','administrative']);
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
 const UNAVAILABLE_DATE = 'Fecha no disponible';

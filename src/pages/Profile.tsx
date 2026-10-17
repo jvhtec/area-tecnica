@@ -16,6 +16,7 @@ import { Loading } from "@/components/ui/loading";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
+import { ShareImportTokenCard } from "@/components/profile/ShareImportTokenCard";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import { ConductorProfileCard } from "@/components/logistics/fleet/ConductorProfileCard";
@@ -605,6 +606,13 @@ export const Profile = () => {
           {canReceiveMorningSummary(profile?.role) && (
             <div className={cn(isMobile && activeSection !== "notifications" && "hidden")}>
               <MorningSummarySubscription />
+            </div>
+          )}
+
+          {/* iOS Share Sheet bridge, scoped to roles authorized for document upload */}
+          {["admin", "management", "logistics", "house_tech"].includes(profile?.role) && (
+            <div className={cn(isMobile && activeSection !== "security" && "hidden")}>
+              <ShareImportTokenCard />
             </div>
           )}
 
