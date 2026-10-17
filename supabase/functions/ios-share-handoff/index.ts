@@ -38,7 +38,7 @@ async function readRawFile(req:Request):Promise<File>{
  for(;;){
   const chunk=await stream.read();if(chunk.done)break;
   total+=chunk.value.byteLength;
-  if(total>MAX){await stream.cancel();throw new ErrorCode(413,"file_too_large")}
+  if(total>MAX){await stream.cancel();throw new ErrorCode(413,"file_too_large");}
   const copy=new Uint8Array(chunk.value.byteLength);
   copy.set(chunk.value);buffers.push(copy.buffer);
  }
@@ -153,7 +153,7 @@ Deno.serve(async req=>{
   if(req.method==="GET"&&url.searchParams.get("mode")==="info")return json({ok:true,file_name:t.name,size:t.size,expires_at:new Date(t.expiry).toISOString()});
   if(req.method==="GET"&&url.searchParams.get("mode")==="jobs")return await jobs(req,t);
   if(req.method==="POST"&&url.searchParams.get("mode")==="commit")return await commit(req,t);
-  if(req.method==="POST"&&url.searchParams.get("mode")==="discard"){const x=await admin().storage.from(BUCKET).remove([t.path]);if(x.error)throw new ErrorCode(503,"discard_failed");return json({ok:true,discarded:true})}
+  if(req.method==="POST"&&url.searchParams.get("mode")==="discard"){const x=await admin().storage.from(BUCKET).remove([t.path]);if(x.error)throw new ErrorCode(503,"discard_failed");return json({ok:true,discarded:true});}
   if(req.method==="GET"&&!url.searchParams.has("mode")){
     const destination=new URL("https://sector-pro.work/ios-share/");
     destination.searchParams.set("ticket",url.searchParams.get("ticket")||"");
