@@ -21,3 +21,9 @@
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
+
+
+# One-hour browser handoff tickets must not be cached or forwarded.
+/ios-share/*
+  Cache-Control: no-store, max-age=0
+  Referrer-Policy: no-referrer
