@@ -92,6 +92,8 @@ export function TransportRequestsInbox({ readOnly = false }: TransportRequestsIn
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request") }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") }),
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") }),
+      queryClient.invalidateQueries({ queryKey: ["logistics-work-requests"] }),
+      queryClient.invalidateQueries({ queryKey: ["logistics-operations"] }),
     ]);
   };
 

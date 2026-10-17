@@ -439,7 +439,7 @@ export async function saveFleetVehicle(input: FleetVehicleInput): Promise<void> 
 export async function deleteFleetVehicle(vehicleId: string): Promise<void> {
   const { error } = await dataLayerClient.from(fleetTable).delete().eq("id", vehicleId);
   if (error && (error as { code?: string }).code === "23503") {
-    throw new Error("El vehículo tiene asignaciones. Desactívalo en lugar de eliminarlo.");
+    throw new Error("El vehículo tiene asignaciones o citas de taller. Desactívalo en lugar de eliminarlo.");
   }
   throwIfError(error, "No se pudo eliminar el vehículo");
 }

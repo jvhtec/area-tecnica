@@ -1,3 +1,4 @@
+import { openPersonnelService } from "@/features/logistics/personnel/personnelNavigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -9,23 +10,29 @@ import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { queryKeys } from "@/lib/react-query";
+import { matchesLogisticsCalendarScope, type LogisticsCalendarScope } from "@/features/logistics/calendarScope";
 import { useEventDriverSummaries } from "@/features/logistics/fleet/useLogisticsFleet";
 import type { LogisticsCalendarEvent } from "@/components/logistics/logisticsEventTypes";
+import { useCalendarFilters, type CalendarResourceFilters } from "./LogisticsCalendarFilters";
 
 interface TodayLogisticsProps {
   selectedDate: Date;
   readOnly?: boolean;
+  scope?: LogisticsCalendarScope;
+  resourceFilters?: CalendarResourceFilters;
 }
 
-export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogisticsProps) => {
+export const TodayLogistics = ({ selectedDate, readOnly = false, scope = "all", resourceFilters }: TodayLogisticsProps) => {
   const { toast } = useToast();
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LogisticsCalendarEvent | null>(null);
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
   const driversByEvent = useEventDriverSummaries(formattedDate, formattedDate);
+  const filters = useCalendarFilters(formattedDate, formattedDate, resourceFilters);
 
   const { data: events, isLoading } = useQuery({
     queryKey: queryKeys.scope("today-logistics", formattedDate),
+    select: (data) => data.filter((event) => matchesLogisticsCalendarScope(event, scope) && filters.matches(event)),
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from("logistics_events")
         .select(`
@@ -53,6 +60,7 @@ export const TodayLogistics = ({ selectedDate, readOnly = false }: TodayLogistic
 
   const handleEventClick = (event: LogisticsCalendarEvent) => {
     if (readOnly) return;
+    if (event.event_type === "crew_transfer") { openPersonnelService(event.id, event.event_date); return; }
     setSelectedEvent(event);
     setShowEventDialog(true);
   };

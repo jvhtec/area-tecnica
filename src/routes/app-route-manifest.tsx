@@ -212,6 +212,7 @@ export const subscriptionProfiles = {
     { table: "job_assignments", priority: "high" },
   ],
   logistics: [
+    { table: "fleet_workshop_appointments", priority: "medium", queryKey: ["fleet_workshop_appointments"] },
     // Keep the normal logistics/calendar invalidations.
     { table: "jobs", priority: "high" },
     { table: "logistics_events", priority: "high" },

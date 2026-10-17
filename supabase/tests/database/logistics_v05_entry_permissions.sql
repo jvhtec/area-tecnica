@@ -1,0 +1,13 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path=public,extensions;
+select plan(6);
+select ok(not has_function_privilege('anon','public.save_personnel_logistics_plan_internal(jsonb,timestamptz)','EXECUTE'),'Anonymous users cannot bypass the personnel entry point');
+select ok(not has_function_privilege('authenticated','public.save_personnel_logistics_plan_internal(jsonb,timestamptz)','EXECUTE'),'Authenticated users cannot call the internal personnel implementation');
+select ok(has_function_privilege('authenticated','public.save_personnel_logistics_plan(jsonb,timestamptz)','EXECUTE'),'Authenticated users retain the public personnel entry point');
+select ok(not has_function_privilege('anon','public.set_logistics_driver_leave(uuid,date,date,text)','EXECUTE'),'Anonymous users cannot modify driver availability');
+select set_config('request.jwt.claim.sub','',true);
+select throws_ok($$select public.save_personnel_logistics_plan('{}'::jsonb,null)$$,'42501','Solo administración y gestión pueden modificar logística de personal.','The wrapper checks the identity before reading input');
+select throws_ok($$select public.set_logistics_driver_leave('00000000-0000-0000-0000-000000000001','2026-10-13','2026-10-14','day_off')$$,'42501','No tienes permiso para gestionar descansos.','Driver leave requires an authorized identity');
+select * from finish();
+rollback;

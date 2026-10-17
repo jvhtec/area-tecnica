@@ -34,6 +34,9 @@ import {
 import { berthShortfall } from "@/features/logistics/fleet/sleeperBusPlanning";
 import { getErrorMessage } from "@/utils/errorMessage";
 import { localInputToUTC, utcToLocalInput } from "@/utils/timezoneUtils";
+import { useWorkshopAppointments } from "@/features/logistics/fleet/workshopApi";
+import { useLogisticsMatrix } from "@/features/logistics/fleet/useLogisticsFleet";
+import { resourceConflicts } from "@/features/logistics/operations/conflicts";
 
 const NONE = "none";
 
@@ -97,6 +100,14 @@ export function DriverAssignmentForm({
     ? transportProviderLabel(event.transport_provider)
     : null;
   const hasTarget = driverId !== NONE || vehicleId !== NONE;
+  const first = start.slice(0, 10) || event.event_date;
+  const last = end.slice(0, 10) >= first ? end.slice(0, 10) : first;
+  const availability = useLogisticsMatrix(first, last);
+  const workshop = useWorkshopAppointments(first, last);
+  let advanceWarnings: string[] = [];
+  try {
+    advanceWarnings = resourceConflicts({ start: localInputToUTC(start, event.timezone).toISOString(), end: localInputToUTC(end, event.timezone).toISOString(), vehicleId: vehicleId === NONE ? null : vehicleId, driverId: driverId === NONE ? null : driverId, excludeEventIds: [] }, (availability.data ?? data).assignments.filter((a) => a.id !== existing?.id), workshop.data ?? []);
+  } catch { /* Submission validates malformed dates. */ }
 
   const submit = async (force: boolean) => {
     if (!hasTarget) {
@@ -136,6 +147,8 @@ export function DriverAssignmentForm({
         void submit(false);
       }}
     >
+      {advanceWarnings.length > 0 && <Alert variant="destructive"><AlertTitle>Revisa la disponibilidad antes de guardar</AlertTitle><AlertDescription>{advanceWarnings.map((warning) => <p key={warning}>{warning}</p>)}</AlertDescription></Alert>}
+      {(availability.error || workshop.error) && <Alert><AlertTitle>Disponibilidad sin verificar</AlertTitle><AlertDescription>No se pudieron cargar todas las reservas. El servidor comprobará los conflictos al guardar.</AlertDescription></Alert>}
       <div className="rounded-md border bg-muted/40 p-3 text-sm">
         <p className="font-medium">{transportEventTitle(event)}</p>
         <p className="text-muted-foreground">
