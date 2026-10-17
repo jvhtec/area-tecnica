@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#121c2b">
+  <title>Importar archivo · Área Técnica</title>
+  <link rel="stylesheet" href="/ios-share/style.css">
+  <script src="/ios-share/app.js" defer></script>
+</head>
+<body>
+<main class="content">
+  <header><span class="eyebrow">ÁREA TÉCNICA</span><h1>Importar archivo</h1><p class="sub">Enviado desde Outlook · iOS</p></header>
+  <section class="filebox" aria-labelledby="fileHeading">
+    <span class="eyebrow" id="fileHeading">Archivo recibido</span>
+    <strong id="receivedFile">Recuperando datos del archivo…</strong>
+    <span id="receivedSize"></span>
+  </section>
+  <form id="importForm" autocomplete="off">
+    <label for="fileName">Nombre del archivo</label>
+    <input id="fileName" name="fileName" type="text" maxlength="255" required spellcheck="false" placeholder="Nombre del archivo" disabled>
+    <div class="hint">Puedes corregir el nombre. El contenido original no se modifica.</div>
+    <label for="destination">Destino</label>
+    <select id="destination" name="destination"><option value="document">Documento del trabajo</option><option value="rider">Rider de artista</option></select>
+    <label for="search">Buscar trabajo o gira</label>
+    <input type="search" id="search" placeholder="Nombre del trabajo…" spellcheck="false">
+    <label for="job">Trabajo / fecha de gira</label>
+    <select id="job" required><option value="">Cargando trabajos…</option></select>
+    <section id="departmentSection">
+      <label for="department">Departamento</label>
+      <select id="department"><option value="sound">Sonido</option><option value="lights">Luces</option><option value="video">Vídeo</option><option value="production">Producción</option><option value="personnel">Personal</option><option value="logistics">Logística</option><option value="administrative">Administración</option></select>
+    </section>
+    <section id="artistSection" hidden>
+      <label for="artist">Artista</label>
+      <input type="text" id="artist" maxlength="120" placeholder="Nombre del artista">
+      <label for="artistDate">Fecha del show (opcional)</label>
+      <input type="date" id="artistDate">
+      <label for="stage">Escenario</label>
+      <select id="stage"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+    </section>
+    <button id="submit" type="submit" disabled>Guardar en Área Técnica</button>
+    <button id="discard" type="button" class="secondary">Descartar archivo</button>
+  </form>
+  <p id="message" role="status" aria-live="polite">Validando enlace…</p>
+  <p class="footer">El enlace caduca en una hora. El archivo se publica únicamente al confirmar.</p>
+</main>
+</body>
+</html>

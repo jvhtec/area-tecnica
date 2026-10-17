@@ -162,6 +162,13 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // iOS share tickets must never be cached by the app shell or its fallback.
+  // This stand-alone page uses a one-hour bearer ticket in the URL and must
+  // fail online instead of displaying a stale cached app/login screen.
+  if (url.pathname.startsWith('/ios-share/')) {
+    return
+  }
+
   // Network-first strategy for HTML/navigation requests.
   // Serving stale HTML can cause chunk hash mismatches after a new deploy, so we
   // always attempt the network first and only fall back to cache when offline.

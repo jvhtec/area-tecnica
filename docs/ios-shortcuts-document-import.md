@@ -1,5 +1,7 @@
 # iOS / Outlook → Área Técnica: importar adjuntos con Atajos
 
+> **Flujo recomendado:** el atajo firmado de 9 acciones con página de selección en Safari está descrito en [ios-share-handoff-design.md](ios-share-handoff-design.md). Esta guía documenta el contrato del importador (`ios-share-import`), que ese flujo reutiliza, y el montaje manual original con subida multipart directa.
+
 Seguimiento: [#1009](https://github.com/jvhtec/area-tecnica/issues/1009).
 
 ## Qué hace

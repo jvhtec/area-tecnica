@@ -57,6 +57,8 @@
     "get-secret": { "class": "authenticated-user", "verifyJwt": true, "internalGuard": "Direct secret delivery is disabled: valid authenticated callers are audited and receive HTTP 410, while missing/invalid auth receives 401." },
     "image-proxy": { "class": "authenticated-user", "verifyJwt": true, "internalGuard": "Retired endpoint: shared HTTP wrapper returns 410 without parsing or fetching caller-controlled URLs." },
     "import-users": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Uses requireAdminOrManagement before accepting the CSV upload or creating/updating users with the auth admin API." },
+    "ios-share-handoff": { "class": "public-token", "verifyJwt": false, "internalGuard": "POST validates the revocable SHA-256-hashed X-Share-Token, authorized profile role, and an hourly rate limit before writing a bounded private temporary file. Subsequent browser routes require the AES-GCM-sealed one-hour ticket, recheck token/role, and hand off final import to ios-share-import." },
+    "ios-share-shortcut-handoff": { "class": "public-token", "verifyJwt": false, "internalGuard": "Public download of a fixed reviewed Shortcuts workflow with a placeholder token only, no accounts or user data. The signer validates an AEA1 response and exposes no privileged server operations." },
     "ios-share-import": { "class": "privileged-role", "verifyJwt": false, "internalGuard": "Pair/list/revoke verifies a normal user's JWT via auth.getUser and ALLOWED_ROLES; Shortcuts actions require a SHA-256 hashed scoped X-Share-Token rechecked against current profile role, revocation and optional expiry, with no direct PostgREST/Storage access." },
     "job-hoja-de-ruta-link": {
       "class": "public-token",
