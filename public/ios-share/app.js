@@ -75,6 +75,20 @@ async function loadJobs() {
   }
 }
 async function initialize() {
+  const errorCode = new URLSearchParams(window.location.search).get('error');
+  if (errorCode) {
+    const errors = {
+      invalid_token: 'Comprueba la clave ati_ en la primera acción Texto del atajo.',
+      token_revoked: 'La clave del dispositivo ha caducado o está revocada.',
+      missing_file: 'Outlook no ha entregado ningún archivo. Comparte el adjunto original.',
+      file_too_large: 'El archivo supera el límite de 45 MiB.',
+      rate_limited: 'Demasiados intentos. Inténtalo más tarde.',
+      staging_failed: 'No se pudo recibir el archivo temporalmente. Reintenta la operación.'
+    };
+    say(errors[errorCode] || 'El archivo no se ha recibido (' + errorCode.replace(/[^a-z0-9_]/g, '').slice(0, 40) + ').', 'error');
+    window.history.replaceState(null, '', window.location.pathname);
+    return;
+  }
   if (!ticket || !/^[A-Za-z0-9_-]{50,2000}$/.test(ticket)) {
     say('Falta el enlace de importación. Abre el archivo desde Compartir en Outlook.', 'error');
     return;
