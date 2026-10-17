@@ -1,7 +1,6 @@
-import {PAGE} from "./page.ts";
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import {ROOT,SOURCE,MAX,BUCKET,HEAD,admin,auth,filename,seal,unseal,escapeHtml,ErrorCode,type Ticket} from "./security.ts";
+import {ROOT,SOURCE,MAX,BUCKET,HEAD,admin,auth,filename,seal,unseal,ErrorCode,type Ticket} from "./security.ts";
 async function rateHash(value:string){const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)));return [...bytes].map(b=>b.toString(16).padStart(2,"0")).join("")}
 function json(data:unknown,status=200){return Response.json(data,{status,headers:HEAD})}
 async function readMultipart(req:Request){
@@ -136,12 +135,6 @@ async function commit(req:Request,t:Ticket){
  const text=await response.text();
  if(response.ok)await storage.remove([t.path]);
  return new Response(text,{status:response.status,headers:{...HEAD,"Content-Type":"application/json"}});
-}
-async function page(t:Ticket){
- const nonce=crypto.randomUUID().replaceAll("-","");
- const template=PAGE;
- const html=template.replaceAll("__NONCE__",nonce).replace("__FILENAME__",escapeHtml(t.name)).replace("__FILESIZE__",String(t.size));
- return new Response(html,{headers:{...HEAD,"Content-Type":"text/html;charset=utf-8","Content-Security-Policy":"default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; img-src 'self' data:; style-src 'nonce-"+nonce+"'; script-src 'nonce-"+nonce+"'; connect-src 'self'"}});
 }
 Deno.serve(async req=>{
  try{
