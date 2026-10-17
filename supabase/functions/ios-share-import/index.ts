@@ -3,7 +3,6 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { createHttpHandler } from "../_shared/http.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
-import { joinedSingle } from "../_shared/joins.ts";
 import {
   acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobOption, madridDate, STALE_UPLOAD_MS,
   upcomingCutoffIso,
@@ -59,8 +58,11 @@ function createAdmin(): DB {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
-function requireResult(error: { message?: string } | null, code = "database_error"): void {
-  if (error) { logEvent("error", "ios_share_import.database_failure", { error_code: code }); throw new ApiError(500, code); }
+function requireResult(error: { message?: string; code?: string } | null, code = "database_error"): void {
+  if (error) {
+    logEvent("error", "ios_share_import.database_failure", { error_code: code, db_code: error.code ?? "none" });
+    throw new ApiError(500, code);
+  }
 }
 async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
@@ -203,15 +205,23 @@ async function revoke(req: Request, admin: DB, body: Record<string, unknown>): P
   if (!data) throw new ApiError(404, "token_not_found");
   return json({ ok: true, revoked: tokenId });
 }
-const JOB_COLUMNS = "id,title,start_time,job_type,tour_id,tour_date_id,status,tour:tours(name)";
-type JobQueryRow = Omit<JobRow, "tourName"> & { tour?: { name: string | null } | { name: string | null }[] | null };
+// jobs has no foreign key to tours (a tour date links through tour_date_id ->
+// tour_dates), so PostgREST cannot embed `tours(...)` here; tour names are
+// looked up separately by tour_id.
+const JOB_COLUMNS = "id,title,start_time,job_type,tour_id,tour_date_id,status";
+type JobQueryRow = Omit<JobRow, "tourName">;
+const UPCOMING_STATUSES = ["Tentativa", "Confirmado"];
 
-// Only jobs that are still ahead: not cancelled or completed, and not already finished.
-function upcomingJobs<T extends { or: (filters: string) => T }>(query: T): T {
-  const cutoff = upcomingCutoffIso();
-  return query
-    .or("status.is.null,status.in.(Tentativa,Confirmado)")
-    .or(`end_time.gte.${cutoff},and(end_time.is.null,start_time.gte.${cutoff})`);
+async function tourNamesById(admin: DB, rows: JobQueryRow[]): Promise<Map<string, string>> {
+  const ids = [...new Set(rows.map((row) => row.tour_id).filter((id): id is string => !!id))];
+  const names = new Map<string, string>();
+  if (ids.length === 0) return names;
+  const { data, error } = await admin.from("tours").select("id,name").in("id", ids);
+  requireResult(error);
+  for (const tour of data ?? []) {
+    if (typeof tour.name === "string") names.set(tour.id as string, tour.name);
+  }
+  return names;
 }
 
 async function jobs(req: Request, admin: DB): Promise<Response> {
@@ -221,7 +231,10 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
   // Riders have no place on dry hire jobs, so that destination does not offer them.
   const forRider = url.searchParams.get("destination") === "rider";
   const base = () => {
-    let query = upcomingJobs(admin.from("jobs").select(JOB_COLUMNS));
+    // Only jobs still ahead: not cancelled or completed, and not already finished
+    // (end_time is NOT NULL, so a plain comparison is enough).
+    let query = admin.from("jobs").select(JOB_COLUMNS)
+      .in("status", UPCOMING_STATUSES).gte("end_time", upcomingCutoffIso());
     if (forRider) query = query.not("job_type", "in", `(${RIDER_EXCLUDED_JOB_TYPES.join(",")})`);
     return query.order("start_time", { ascending: true }).limit(100);
   };
@@ -251,15 +264,15 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
     requireResult(error);
     rows = (data ?? []) as unknown as JobQueryRow[];
   }
+  const tourNames = await tourNamesById(admin, rows);
   const result = rows.map((job) => {
-    const { tour, ...rest } = job;
-    const tourName = joinedSingle(tour)?.name ?? null;
+    const tourName = (job.tour_id && tourNames.get(job.tour_id)) || null;
     return {
       id: job.id, title: job.title,
       date: job.start_time ? madridDate(job.start_time) : "sin fecha",
       job_type: job.job_type, tour_id: job.tour_id, tour_date_id: job.tour_date_id,
       tour_name: tourName,
-      option: jobOption({ ...rest, tourName }),
+      option: jobOption({ ...job, tourName }),
     };
   });
   return json({ ok: true, jobs: result, options: result.map((row) => row.option) });
