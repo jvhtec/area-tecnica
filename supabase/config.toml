@@ -107,3 +107,13 @@ verify_jwt = true
 # The function validates session JWTs for pairing and hashes for device calls.
 [functions.ios-share-import]
 verify_jwt = false
+
+
+# Shortcuts downloads a signed credential-free workflow template.
+[functions.ios-share-shortcut-handoff]
+verify_jwt = false
+
+# Opaque device token is validated inside the handler for binary staging.
+# AES-GCM ticket is validated again for browser selection and final import.
+[functions.ios-share-handoff]
+verify_jwt = false
