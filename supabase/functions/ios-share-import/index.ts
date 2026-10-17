@@ -4,7 +4,7 @@ import { createHttpHandler } from "../_shared/http.ts";
 import { logEvent } from "../_shared/structuredLogger.ts";
 import { checkEdgeRateLimit } from "../_shared/rateLimit.ts";
 import {
-  acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobOption, madridDate, STALE_UPLOAD_MS,
+  acceptsRiders, ApiError, type Destination, escapeLike, type JobRow, jobLabel, jobOption, madridDate, STALE_UPLOAD_MS,
   upcomingCutoffIso,
   RIDER_EXCLUDED_JOB_TYPES, validArtistName, validFileName, validIsoDate,
 } from "./helpers.ts";
@@ -228,14 +228,13 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
   await shortcutIdentity(req, admin);
   const url = new URL(req.url);
   const search = (url.searchParams.get("q") ?? "").trim().slice(0, 80);
-  // Riders have no place on dry hire jobs, so that destination does not offer them.
-  const forRider = url.searchParams.get("destination") === "rider";
   const base = () => {
     // Only jobs still ahead: not cancelled or completed, and not already finished
     // (end_time is NOT NULL, so a plain comparison is enough).
     let query = admin.from("jobs").select(JOB_COLUMNS)
       .in("status", UPCOMING_STATUSES).gte("end_time", upcomingCutoffIso());
-    if (forRider) query = query.not("job_type", "in", `(${RIDER_EXCLUDED_JOB_TYPES.join(",")})`);
+    // Dry hire jobs are equipment-only (no riders) and never a target here.
+    query = query.not("job_type", "in", `(${RIDER_EXCLUDED_JOB_TYPES.join(",")})`);
     return query.order("start_time", { ascending: true }).limit(100);
   };
   let rows: JobQueryRow[];
@@ -272,6 +271,7 @@ async function jobs(req: Request, admin: DB): Promise<Response> {
       date: job.start_time ? madridDate(job.start_time) : "sin fecha",
       job_type: job.job_type, tour_id: job.tour_id, tour_date_id: job.tour_date_id,
       tour_name: tourName,
+      label: jobLabel({ ...job, tourName }),
       option: jobOption({ ...job, tourName }),
     };
   });

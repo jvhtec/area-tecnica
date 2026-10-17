@@ -39,21 +39,37 @@ export type JobRow = {
   tourName?: string | null;
 };
 
-/**
- * One line per job for the Shortcuts "Choose from List" action. The UUID is
- * last because the Shortcut splits by " | " and takes the Last Item.
- */
-export function jobOption(job: JobRow): string {
+const JOB_TYPE_LABELS: Record<string, string> = {
+  festival: "Festival",
+  evento: "Evento",
+  single: "Trabajo",
+  ciclo: "Ciclo",
+  tour: "Gira",
+  dryhire: "Dry hire",
+};
+
+function jobParts(job: JobRow): string[] {
   const clean = (value: string) => value.replace(/[\r\n|]/g, " ").trim();
   const date = job.start_time ? madridDate(job.start_time) : "sin fecha";
   const title = clean(String(job.title ?? "Sin título")).slice(0, 110);
   const tour = job.tourName ? clean(job.tourName).slice(0, 60) : "";
   const type = job.job_type === "tourdate"
     ? (tour ? `Fecha de gira (${tour})` : "Fecha de gira")
-    : job.job_type === "tour"
-    ? "Gira"
-    : String(job.job_type || "Trabajo");
-  return `${date} | ${type} | ${title} | ${job.id}`;
+    : JOB_TYPE_LABELS[job.job_type ?? ""] ?? String(job.job_type || "Trabajo");
+  return [date, type, title];
+}
+
+/** What a person sees in a picker: date, type and title, never the internal id. */
+export function jobLabel(job: JobRow): string {
+  return jobParts(job).join(" · ");
+}
+
+/**
+ * One line per job for the Shortcuts "Choose from List" action. The UUID is
+ * last because the Shortcut splits by " | " and takes the Last Item.
+ */
+export function jobOption(job: JobRow): string {
+  return [...jobParts(job), job.id].join(" | ");
 }
 
 export class ApiError extends Error {

@@ -62,8 +62,8 @@ En Área Técnica → Perfil → Seguridad → **Importar documentos desde iOS**
    - Cabecera: `X-Share-Token` → `ClaveImportación`
 8. Del diccionario de respuesta extraer `options` y **Elegir de lista**.
    Solo aparecen trabajos **próximos o en curso**, sin cancelados ni
-   completados. Con `destination=rider` tampoco aparecen los trabajos de
-   *dry hire* (no tienen artistas). Las opciones
+   completados. Los trabajos de *dry hire* nunca aparecen (son solo material,
+   sin artistas). Las opciones
    tienen forma `<fecha> | <tipo> | <título> | <UUID>`; las fechas de gira
    muestran el nombre de la gira, p. ej. `Fecha de gira (Gira Verano)`.
    Dividir el elemento elegido por ` | ` y tomar **último elemento** como
@@ -108,10 +108,12 @@ con riders de producción.
 - `{"action":"revoke","token_id":"uuid"}` → revoca dispositivo propio.
 
 `GET ?action=jobs[&q=texto]`, cabecera `X-Share-Token: ati_...`:
-`{ok,jobs:[{id,title,date,job_type,tour_id,tour_date_id,option}], options:[...]}`.
+`{ok,jobs:[{id,title,date,job_type,tour_id,tour_date_id,tour_name,label,option}], options:[...]}`.
+`label` (`fecha · tipo · título`) es lo que se muestra a una persona y nunca lleva el UUID;
+`option` conserva el formato `fecha | tipo | título | UUID` para el atajo manual.
 La lista solo incluye trabajos **próximos o en curso** (hasta 100 filas, por
-fecha): se excluyen cancelados, completados y los que ya terminaron antes de
-hoy. Con `q` busca por título **o nombre de gira** dentro de ese conjunto.
+fecha): se excluyen cancelados, completados, los que ya terminaron antes de
+hoy y los de *dry hire*. Con `q` busca por título **o nombre de gira** dentro de ese conjunto.
 
 `POST` con cabecera `X-Share-Token`, cuerpo multipart:
 `file` (binario), `file_name`, `job_id` (UUID), `request_id` (UUID) y
@@ -167,8 +169,8 @@ recomprueba el rol actual del usuario y que el trabajo existe.
   `tours/<gira>/<uuid>.<ext>`), oculto para técnicos e invitados por defecto,
   con el nombre de archivo original. El nombre del artista se valida pero no
   se usa para crear nada.
-- Un rider a un trabajo **dry hire** se rechaza con `rider_not_allowed_for_job_type`;
-  los documentos de trabajo sí se admiten en dry hire.
+- Los trabajos **dry hire** no se ofrecen en la lista. Si se envía igualmente un rider a uno,
+  el servidor lo rechaza con `rider_not_allowed_for_job_type`.
 - El documento se crea **oculto para técnicos** (`visible_to_tech = false`, igual
   que la subida desde la web); se activa desde la tarjeta del trabajo.
 - Tras confirmar un documento se emite la notificación `document.uploaded`,

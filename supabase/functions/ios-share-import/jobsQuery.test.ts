@@ -20,6 +20,16 @@ describe('ios-share-import job list query', () => {
     expect(source).toMatch(/from\("tours"\)\.select\("id,name"\)\.in\("id", ids\)/)
   })
 
+  it('never offers dry hire jobs, whatever the destination', () => {
+    expect(source).toMatch(/query = query\.not\("job_type", "in", `\(\$\{RIDER_EXCLUDED_JOB_TYPES\.join\(","\)\}\)`\)/)
+    expect(source).not.toMatch(/if \(forRider\)/)
+  })
+
+  it('returns a human label without the id next to the Shortcut option', () => {
+    expect(source).toMatch(/label: jobLabel\(\{ \.\.\.job, tourName \}\)/)
+    expect(source).toMatch(/option: jobOption\(\{ \.\.\.job, tourName \}\)/)
+  })
+
   it('keeps the upcoming-only filters that need no OR/AND grouping', () => {
     expect(source).toMatch(/\.in\("status", UPCOMING_STATUSES\)\.gte\("end_time", upcomingCutoffIso\(\)\)/)
     expect(source).toMatch(/const UPCOMING_STATUSES = \["Tentativa", "Confirmado"\]/)
