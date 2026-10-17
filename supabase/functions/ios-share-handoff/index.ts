@@ -45,10 +45,30 @@ async function readRawFile(req:Request):Promise<File>{
  }
  if(total===0)throw new ErrorCode(400,"missing_file");
  const url=new URL(req.url);
+
  const original=url.searchParams.get("filename")||"";
- const decoded=/%[a-f0-9]{2}/i.test(original)?decodeURIComponent(original):original;
- const safe=filename(decoded);
- return new File(buffers,safe,{type:req.headers.get("content-type")||"application/octet-stream"});
+ // URLSearchParams already decoded once. Do not double-decode a literal %2F.
+ const clean=original.normalize("NFC").trim().replace(/[/\\\x00-\x1f\x7f]/g,"_").slice(0,255).trim();
+ const mime=(req.headers.get("content-type")||"application/octet-stream").split(";")[0].toLowerCase();
+ const extensions:Record<string,string>={
+  "application/pdf":".pdf","image/jpeg":".jpg","image/png":".png",
+  "image/webp":".webp","image/heic":".heic","image/heif":".heif",
+  "image/gif":".gif","text/plain":".txt","text/csv":".csv",
+  "application/zip":".zip","audio/mpeg":".mp3","audio/wav":".wav",
+  "video/mp4":".mp4",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":".docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":".xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation":".pptx"
+ };
+ const head=buffers[0]?new Uint8Array(buffers[0]):new Uint8Array();
+ const pdf=head.length>=4&&head[0]===37&&head[1]===80&&head[2]===68&&head[3]===70;
+ const zip=head.length>=4&&head[0]===80&&head[1]===75;
+ const png=head.length>=4&&head[0]===137&&head[1]===80&&head[2]===78&&head[3]===71;
+ const jpg=head.length>=3&&head[0]===255&&head[1]===216&&head[2]===255;
+ const ext=extensions[mime]||(pdf?".pdf":zip?".zip":png?".png":jpg?".jpg":".bin");
+ const fallback="Adjunto_Outlook_"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15).replace("T","_")+"_"+crypto.randomUUID().slice(0,8)+ext;
+ const safe=filename(clean&&clean!=="."&&clean!==".."?clean:fallback);
+ return new File(buffers,safe,{type:mime});
 }
 
 async function stage(req:Request){
@@ -105,8 +125,9 @@ async function commit(req:Request,t:Ticket){
  if(error||!file)throw new ErrorCode(410,"staged_file_missing");
  if(file.size!==t.size)throw new ErrorCode(409,"staged_file_changed");
  const body=new FormData();
- body.set("file",new File([file],t.name,{type:file.type||"application/octet-stream"}));
- body.set("file_name",t.name);body.set("job_id",job);body.set("request_id",t.id);body.set("destination",dest);
+ const finalName=filename(String(input.file_name||t.name).normalize("NFC").trim());
+ body.set("file",new File([file],finalName,{type:file.type||"application/octet-stream"}));
+ body.set("file_name",finalName);body.set("job_id",job);body.set("request_id",t.id);body.set("destination",dest);
  if(dest==="document")body.set("department",String(input.department||""));
  else{body.set("artist_name",String(input.artist_name||""));
   if(input.artist_date)body.set("artist_date",String(input.artist_date));
@@ -130,7 +151,7 @@ Deno.serve(async req=>{
   if(req.method==="GET"&&url.searchParams.has("error")){
    const code=(url.searchParams.get("error")||"unknown_error").replace(/[^a-z0-9_]/g,"").slice(0,80);
    const info=code==="invalid_token"||code==="token_revoked"?"Comprueba la clave ati_ del primer bloque Texto de tu atajo.":code==="missing_file"?"Outlook no ha compartido un archivo. Abre el adjunto y usa Compartir.":code==="file_too_large"?"El límite es 45 MiB por adjunto.":"La transferencia no se completó; el archivo no se ha registrado.";
-   return new Response("<!doctype html><html lang='es'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font:16px system-ui;padding:24px;background:#131e2b;color:white'><h2>No se pudo recibir el archivo</h2><p>Código: "+code+"</p><p>"+info+"</p></body></html>",{headers:{...HEAD,"Content-Type":"text/html;charset=utf-8"}});
+   return new Response("<!doctype html><html lang='es'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font:16px system-ui;padding:24px;background:#131e2b;color:white'><h2>No se pudo recibir el archivo</h2><p>Código: "+code+"</p><p>"+info+"</p></body></html>",{headers:{...HEAD,"Content-Type":"text/html;charset=utf-8"}});
   }
   if(req.method==="GET"&&url.searchParams.has("check"))return json({ok:true,service:"ios-shortcut-handoff"});
   if(req.method==="POST"&&!url.searchParams.has("mode"))return await stage(req);
