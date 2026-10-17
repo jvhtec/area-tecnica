@@ -148,18 +148,24 @@ Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:HEAD});
   const url=new URL(req.url);
 
+
   if(req.method==="GET"&&url.searchParams.has("error")){
-   const code=(url.searchParams.get("error")||"unknown_error").replace(/[^a-z0-9_]/g,"").slice(0,80);
-   const info=code==="invalid_token"||code==="token_revoked"?"Comprueba la clave ati_ del primer bloque Texto de tu atajo.":code==="missing_file"?"Outlook no ha compartido un archivo. Abre el adjunto y usa Compartir.":code==="file_too_large"?"El límite es 45 MiB por adjunto.":"La transferencia no se completó; el archivo no se ha registrado.";
-   return new Response("<!doctype html><html lang='es'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font:16px system-ui;padding:24px;background:#131e2b;color:white'><h2>No se pudo recibir el archivo</h2><p>Código: "+code+"</p><p>"+info+"</p></body></html>",{headers:{...HEAD,"Content-Type":"text/html;charset=utf-8"}});
+    const errorTarget=new URL("https://sector-pro.work/ios-share/");
+    errorTarget.searchParams.set("error",(url.searchParams.get("error")||"unknown_error").replace(/[^a-z0-9_]/g,"").slice(0,80));
+    return Response.redirect(errorTarget.toString(),303);
   }
   if(req.method==="GET"&&url.searchParams.has("check"))return json({ok:true,service:"ios-shortcut-handoff"});
   if(req.method==="POST"&&!url.searchParams.has("mode"))return await stage(req);
   const t=await unseal(url.searchParams.get("ticket"));
+  if(req.method==="GET"&&url.searchParams.get("mode")==="info")return json({ok:true,file_name:t.name,size:t.size,expires_at:new Date(t.expiry).toISOString()});
   if(req.method==="GET"&&url.searchParams.get("mode")==="jobs")return await jobs(req,t);
   if(req.method==="POST"&&url.searchParams.get("mode")==="commit")return await commit(req,t);
   if(req.method==="POST"&&url.searchParams.get("mode")==="discard"){const x=await admin().storage.from(BUCKET).remove([t.path]);if(x.error)throw new ErrorCode(503,"discard_failed");return json({ok:true,discarded:true})}
-  if(req.method==="GET"&&!url.searchParams.has("mode"))return await page(t);
+  if(req.method==="GET"&&!url.searchParams.has("mode")){
+    const destination=new URL("https://sector-pro.work/ios-share/");
+    destination.searchParams.set("ticket",url.searchParams.get("ticket")||"");
+    return Response.redirect(destination.toString(),303);
+  }
   throw new ErrorCode(405,"invalid_method");
  }catch(e){
   const fail=e instanceof ErrorCode?e:new ErrorCode(500,"internal_error");
