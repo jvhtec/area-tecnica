@@ -1,5 +1,7 @@
 
 import {ROOT,SOURCE,MAX,BUCKET,HEAD,admin,auth,filename,seal,unseal,ErrorCode,type Ticket} from "./security.ts";
+import {sanitizeFileName} from "./filename.ts";
+import {logEvent} from "../_shared/structuredLogger.ts";
 async function rateHash(value:string){const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)));return [...bytes].map(b=>b.toString(16).padStart(2,"0")).join("")}
 function json(data:unknown,status=200){return Response.json(data,{status,headers:HEAD})}
 async function readMultipart(req:Request){
@@ -46,7 +48,7 @@ async function readRawFile(req:Request):Promise<File>{
 
  const original=url.searchParams.get("filename")||"";
  // URLSearchParams already decoded once. Do not double-decode a literal %2F.
- const clean=original.normalize("NFC").trim().replace(/[/\\\x00-\x1f\x7f]/g,"_").slice(0,255).trim();
+ const clean=sanitizeFileName(original);
  const mime=(req.headers.get("content-type")||"application/octet-stream").split(";")[0].toLowerCase();
  const extensions:Record<string,string>={
   "application/pdf":".pdf","image/jpeg":".jpg","image/png":".png",
@@ -160,6 +162,7 @@ Deno.serve(async req=>{
   }
   throw new ErrorCode(405,"invalid_method");
  }catch(e){
+  if(!(e instanceof ErrorCode))logEvent("error","ios_share_handoff.unexpected_error",{error_name:e instanceof Error?e.name:"unknown"});
   const fail=e instanceof ErrorCode?e:new ErrorCode(500,"internal_error");
   const url=new URL(req.url);
   if(req.method==="POST"&&url.searchParams.get("plain")==="1"){

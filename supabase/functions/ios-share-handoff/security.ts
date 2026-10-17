@@ -1,5 +1,6 @@
 
 import {createClient} from "npm:@supabase/supabase-js@2";
+import {isValidFileName} from "./filename.ts";
 export const ROOT=Deno.env.get("SUPABASE_URL")||"";
 const SERVICE=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 export const SOURCE=ROOT+"/functions/v1/ios-share-import";
@@ -20,7 +21,7 @@ export async function auth(token:string){
  return data.id as string;
 }
 export function filename(s:string){
- if(!s||s.length>255||s==="."||s===".."||/[\x00-\x1f\x7f/\\]/.test(s))throw new ErrorCode(400,"invalid_file_name");
+ if(!isValidFileName(s))throw new ErrorCode(400,"invalid_file_name");
  return s;
 }
 export type Ticket={v:1,token:string,path:string,id:string,name:string,size:number,expiry:number};

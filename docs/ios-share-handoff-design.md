@@ -22,9 +22,10 @@ The Shortcut has **9 native actions**, with no conditional blocks, no setup wiza
 - Error pages declare UTF-8 explicitly so iOS displays Spanish accents correctly.
 - The device credential is entered **on the user's device**, not present in the distributed shortcut.
 - The device credential is required for initial upload and is validated against its SHA-256 hash, current profile role, expiration, and revocation; stage uploads are limited to 40/hour per device.
-- The browser ticket is AES-GCM encrypted, includes the scope and original filename, and expires after **one hour**. It carries no plaintext device token in the URL.
+- The browser ticket is AES-GCM encrypted (key derived from the service-role secret, random IV), includes the original filename, size and staging path, and expires after **one hour**. It also carries the device token, but only inside the sealed payload: the URL never exposes it in plaintext. Every ticket use re-validates that token (revocation, expiry, current role), so revoking the device kills outstanding tickets. Treat a ticket URL as sensitive for its hour.
 - Storage is the existing **private** `job_documents` bucket under `ios-stage/YYYY-MM-DD/<UUID>`. Temporary files are never registered as `job_documents`; confirmed documents use the original importer.
 - A successful import removes its staging blob. Abandoned objects are opportunistically purged after two days by staging requests. The `mode=discard` endpoint can remove the blob with the valid ticket.
+- The public Shortcut download (`ios-share-shortcut-handoff`) is rate limited (30 requests/hour per client, fail closed) because every request calls the third-party signer.
 - Avoid caching responses and leaking ticket URLs in referrers. Do not share an installed shortcut after inserting the secret.
 
 ## API
@@ -33,6 +34,7 @@ The Shortcut has **9 native actions**, with no conditional blocks, no setup wiza
 | --- | --- | --- |
 | Stage | `POST ?raw=1&plain=1&filename=...` with binary request body, `X-Share-Token` | `text/plain` canonical HTTPS ticket URL; failure maps to HTTPS error page |
 | Open page | `GET ?ticket=...` | Job/rider selection UI |
+| Info | `GET ?ticket=...&mode=info` | File name, size and expiry of the staged file |
 | Jobs | `GET ?ticket=...&mode=jobs&destination=...` | Authenticated JSON from `ios-share-import` |
 | Commit | `POST ?ticket=...&mode=commit` with JSON job/department/artist | Real backend result, `ok:true` only on confirmed registration |
 | Discard | `POST ?ticket=...&mode=discard` | Remove temporary file |
