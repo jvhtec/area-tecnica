@@ -17,6 +17,9 @@ The Shortcut has **9 native actions**, with no conditional blocks, no setup wiza
 
 ## Security and lifecycle
 
+- Filename metadata from Outlook may arrive missing or malformed. The server uses a safe fallback (`Adjunto_Outlook_...` with a MIME/signature-based extension when identifiable), without changing file contents. The selection page allows editing the filename before final commit.
+- URL query parameters are decoded **once**. Avoid a second `decodeURIComponent`, which can turn a legitimate literal `%2F` in the filename into a slash.
+- Error pages declare UTF-8 explicitly so iOS displays Spanish accents correctly.
 - The device credential is entered **on the user's device**, not present in the distributed shortcut.
 - The device credential is required for initial upload and is validated against its SHA-256 hash, current profile role, expiration, and revocation; stage uploads are limited to 40/hour per device.
 - The browser ticket is AES-GCM encrypted, includes the scope and original filename, and expires after **one hour**. It carries no plaintext device token in the URL.
